@@ -1,317 +1,506 @@
 ---
-title: "1. Introduction to Programming and C, Compilation, Memory "
+title: "1. Introduction to C Programming"
 author: "Zakhar Podyakov"
 date: "September 16, 2025"
 format: html
+engine: knitr
 ---
 
 #### 1. Summary
 
-##### 1.1 What is Programming?
-**Programming** is the fundamental skill in computer science. It involves writing instructions for a computer to execute. A professional programmer should not only know several languages but also be able to quickly learn new ones. This is possible by understanding the **basic concepts** that are common to nearly all programming languages, such as:
+##### 1.1 The C Language: Philosophy and Characteristics
+The C programming language was designed with a philosophy of providing programmers with a simple, efficient, and direct way to interact with computer hardware. It is often described as a **"middle-level" language** because it bridges the gap between low-level assembly languages and high-level, abstract languages like Python or Java.
 
-*   *Data types*
-*   *Algorithms and control flow*
-*   *Expressions and statements*
-*   *Syntax and semantics*
+Key characteristics of C include:
 
-##### 1.2 Fundamental Concepts
-- **Variable, Constant, Value**: A **variable** is a named storage location that holds a **value**, which can change during program execution. A **constant** is a named storage location whose value cannot be changed after it is initialized.
-- **Operators and Assignment**: **Operators** are symbols that perform operations on values (e.g., `+`, `-`, `*`, `/`). The **assignment** operator (`=`) is used to store a value in a variable.
-- **Data Structures**: These are ways of organizing and storing data. Simple examples include **arrays**, **lists**, **stacks**, and **queues**.
-- **Programming Paradigms**: This refers to the style or "way" of programming. Common paradigms include:
-    - **Imperative**: Describes computation as a series of statements that change a program's state (e.g., C).
-    - **Object-Oriented (OOP)**: Organizes code around "objects," which bundle data and the methods that operate on that data (e.g., Java, C++).
-    - **Functional**: Treats computation as the evaluation of mathematical functions and avoids changing state and mutable data (e.g., Lisp, Haskell, and features in modern C++).
+*   ***Closeness to Hardware***: C allows for direct memory manipulation and provides constructs that map efficiently to machine instructions. This makes it ideal for system-level programming, such as writing operating systems, compilers, and embedded software.
+*   ***Simplicity and Power***: The core language has a small, minimalist set of keywords and features. This simplicity, however, does not limit its power. Its "absence of restrictions," as noted by its creators Kernighan and Ritchie, allows programmers to perform complex tasks effectively.
+*   ***Compiled Language***: C code must be translated into machine-executable instructions through a process called compilation. This is in contrast to interpreted languages, where code is executed line-by-line by another program.
+*   ***Procedural Paradigm***: C is primarily a procedural language, meaning programs are structured around functions (procedures) that operate on data.
+*   ***Manual Memory Management***: C gives the programmer full responsibility for managing memory. While this provides great flexibility and performance, it is also a common source of errors, such as memory leaks and invalid memory access.
+*   ***Statically Typed***: Every variable in C has a type (e.g., `int`, `float`), and this type is checked at compile time. However, the type system is not as strict as in some other languages, and it allows for explicit type conversions.
 
-##### 1.3 Introduction to the C Language
-Created by Dennis Ritchie and Brian Kernighan, C is a powerful and influential language.
+##### 1.2 The Structure of a C Program
+A C program is fundamentally a collection of declarations, with the primary organizational unit being the **function**.
 
-- **Middle-Level Language**: It provides a level of abstraction above assembly language but is still close enough to the hardware to allow for fine-grained control over memory and system resources.
-- **Unsafe by Design**: C prioritizes performance and control over safety. It leaves memory management (allocating and freeing memory) and bounds-checking entirely up to the programmer, which is a common source of bugs.
-- **Assumes Compilation**: C source code must be translated into machine instructions by a **compiler** before it can be run by the computer's processor.
+*   **Entry Point**: Every C program must have exactly one function named `main`. The execution of the program begins at the first line of the `main` function.
+*   **Preprocessor Directives**: Lines beginning with a `#` symbol are preprocessor directives. The most common is `#include`, which instructs the compiler to textually insert the contents of another file (a header file) before compilation begins. For example, `#include <stdio.h>` includes the standard input/output library, providing functions like `printf`.
+*   **Functions**: A function is a self-contained block of code that performs a specific task. A program is built by defining and calling various functions.
+*   **Statements**: A statement is a single instruction that performs an action. In C, every statement must end with a semicolon (`;`).
+*   **Comments**: Comments are explanatory notes ignored by the compiler. C supports multi-line comments enclosed in `/* ... */`.
 
-##### 1.4 Building a C Program: Compilation and Linking
-A C program is built in two main stages:
+A minimal "Hello, World!" program illustrates this structure:
+```c
+// Preprocessor directive to include the standard I/O library
+#include <stdio.h>
 
-1.  **Compilation**: A compiler (such as **GCC**, the GNU Compiler Collection) takes a human-readable **source file** (e.g., `program.c`) and translates it into a machine-readable **object file** (e.g., `program.o`). Each source file is compiled independently of others.
-2.  **Linking**: A **linker** takes one or more object files and combines them with any necessary code from libraries (like the standard I/O library) to produce a single, final **executable file**.
+// The main function where execution begins
+int main() {
+    // A statement calling the printf function
+    printf("Hello, World!\n");
 
-The diagram below illustrates this process for a program split into multiple files:
+    // A statement returning a value to the operating system
+    return 0;
+}
+```
 
-````{=tex}
-\begin{tikzpicture}[node distance=2.5cm, auto, >=stealth]
-    % Nodes for source files
-    \node[draw, rectangle, rounded corners] (main_c) {main.c};
-    \node[draw, rectangle, rounded corners, below of=main_c] (utils_c) {utils.c};
+##### 1.3 The Compilation and Linking Process
+Creating an executable program from C source code is a two-step process: compilation and linking. A program can be composed of multiple source files, which are compiled independently and then linked together.
 
-    % Nodes for object files
-    \node[draw, circle, right of=main_c] (main_o) {main.o};
-    \node[draw, circle, right of=utils_c] (utils_o) {utils.o};
+1.  **Source Files (`.c`)**: These are human-readable text files containing the C code. Each file is a self-contained unit but can reference functions and variables defined in other files.
 
-    % Node for the linker
-    \node[draw, rectangle, fill=blue!10, right of=main_o, yshift=-1.25cm] (linker) {Linker};
-    
-    % Node for the executable
-    \node[draw, rectangle, fill=green!10, right of=linker] (executable) {Program.exe};
+2.  **Compilation**: A **compiler** (like GCC) translates each source file into an **object file (`.o` or `.obj`)**. This object file contains machine code (instructions for the processor) but is not yet a complete program. It may contain unresolved references to functions or variables defined in other files. A source file that is compiled is often called a **translation unit**.
 
-    % Arrows for compilation
-    \draw[->] (main_c) -- node[above] {Compilation} (main_o);
-    \draw[->] (utils_c) -- node[above] {Compilation} (utils_o);
-    
-    % Arrows for linking
-    \draw[->] (main_o) -- (linker);
-    \draw[->] (utils_o) -- (linker);
-    \draw[->] (linker) -- node[above] {Linking} (executable);
+3.  **Linking**: A **linker** takes one or more object files and combines them into a single **executable file**. During this process, it resolves the previously unresolved references by finding the corresponding machine code in other object files or in **libraries** (pre-compiled collections of object files).
+
+The diagram below illustrates this process for a program split into three source files: `main.c`, `foo.c`, and `bar.c`.
+
+```{tikz}
+#| label: fig-compilation-linking
+#| fig-cap: "The process of compiling source files into object files and linking them into a final executable."
+#| echo: false
+#| lang: tex
+
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+
+\begin{tikzpicture}[
+    node distance=1.5cm and 2.5cm,
+    source/.style={rectangle, draw, rounded corners, fill=blue!10, minimum height=1cm, minimum width=2cm, font=\sffamily\small},
+    process/.style={rectangle, draw, fill=yellow!30, minimum height=1cm, minimum width=2cm, font=\sffamily\small},
+    object/.style={trapezium, trapezium left angle=70, trapezium right angle=110, draw, fill=green!10, minimum height=1cm, minimum width=2cm, font=\sffamily\small},
+    linker/.style={rectangle, draw, fill=red!30, minimum height=2cm, minimum width=1.5cm, font=\sffamily\small, text width=1.5cm, align=center},
+    library/.style={ellipse, draw, fill=gray!20, minimum height=1cm, font=\sffamily\small},
+    executable/.style={rectangle, draw, rounded corners, fill=purple!20, minimum height=1cm, minimum width=2cm, font=\sffamily\small},
+    arrow/.style={-Latex, thick}
+]
+
+% Source files
+\node[source] (main_c) at (0,0) {`main.c`};
+\node[source] (foo_c) [above=0.75cm of main_c] {`foo.c`};
+\node[source] (bar_c) [below=0.75cm of main_c] {`bar.c`};
+
+% Compilers (Assembler in the original slide)
+\node[process] (asm1) [right=of foo_c] {Compiler};
+\node[process] (asm2) [right=of main_c] {Compiler};
+\node[process] (asm3) [right=of bar_c] {Compiler};
+
+% Object files
+\node[object] (main_o) [right=of asm2] {`main.o`};
+\node[object] (foo_o) [right=of asm1] {`foo.o`};
+\node[object] (bar_o) [right=of asm3] {`bar.o`};
+
+% Linker
+\node[linker] (linker) [right=of main_o] {Linker};
+
+% Library
+\node[library] (libs) [below=of linker] {External Libraries};
+
+% Executable
+\node[executable] (fubar) [right=of linker] {Executable};
+
+% Arrows
+\draw[arrow] (foo_c) -- (asm1);
+\draw[arrow] (main_c) -- (asm2);
+\draw[arrow] (bar_c) -- (asm3);
+\draw[arrow] (asm1) -- (foo_o);
+\draw[arrow] (asm2) -- (main_o);
+\draw[arrow] (asm3) -- (bar_o);
+\draw[arrow] (foo_o) -- (linker);
+\draw[arrow] (main_o) -- (linker);
+\draw[arrow] (bar_o) -- (linker);
+\draw[arrow] (libs) -- (linker);
+\draw[arrow] (linker) -- (fubar);
+
 \end{tikzpicture}
-````
+```
 
-##### 1.5 The C Program Structure
-- **Preprocessor Directives**: These are commands that are processed before the actual compilation begins. The most common is `#include <stdio.h>`, which tells the preprocessor to include the contents of the standard input/output header file.
-- **The `main` Function**: Every C program must have a `main` function. It is the **entry point** of the program—execution always begins here.
-- **Functions**: All program logic and functionality are organized into functions.
-- **Variables**:
-    - **Global Variables**: Declared outside of any function. They are accessible from any function in the program.
-    - **Local Variables**: Declared inside a function or a block. They are only accessible within that function or block.
-    - **Function Parameters**: Variables used to pass information into a function. They behave like local variables.
+##### 1.4 Variables, Scope, and Memory Model
+In C, data is stored in variables. The rules governing where a variable can be accessed are called **scope**, and the location where it is stored is determined by the program's memory model.
 
-##### 1.6 The Common Memory Model
-When a C program runs, the operating system allocates a virtual address space for it, which is typically divided into four main regions:
+A program's memory is typically divided into several segments:
 
-- **Code (or Text) Segment**: This is where the compiled machine instructions of the program are stored. This region is read-only to prevent the program from accidentally modifying its own instructions.
-- **Static/Global Data Segment**: This segment stores **global variables**, **static variables**, and string literals. These variables exist for the entire duration of the program's execution.
-- **Heap**: This region is used for **dynamic memory allocation**. The programmer can request blocks of memory from the heap during runtime (e.g., using `malloc`) and must explicitly free them when they are no longer needed. The heap typically grows upwards in memory address.
-- **Stack**: This region is used to manage function calls. It stores **local variables**, **function parameters**, and return addresses. The stack operates in a Last-In, First-Out (LIFO) manner and grows downwards in memory address.
+*   **Code/Text Segment**: This read-only area stores the compiled machine instructions of the program.
+*   **Static/Global Data Segment**: This segment stores global variables and static variables. These variables exist for the entire lifetime of the program.
+*   **Heap**: This is a region of memory used for dynamic memory allocation. The programmer must explicitly request memory from the heap (e.g., using `malloc`) and release it when it's no longer needed (e.g., using `free`). The heap grows upwards towards higher memory addresses.
+*   **Stack**: This segment is used to manage function calls. It operates on a **Last-In, First-Out (LIFO)** basis. The stack grows downwards towards lower memory addresses.
 
-````{=tex}
-\begin{tikzpicture}
-    \draw (0,0) rectangle (4,6);
-    \node at (2,6.5) {Program Address Space};
+When a function is called, a **stack frame** (or activation record) is pushed onto the stack. This frame contains:
+1.  The return address (where to resume execution after the function finishes).
+2.  The arguments passed to the function.
+3.  Space for the function's local variables.
 
-    % Memory Regions
-    \draw[fill=gray!20] (0,0) rectangle (4,1.5);
-    \node at (2,0.75) {Code (Program)};
-    
-    \draw[fill=blue!10] (0,1.5) rectangle (4,2.5);
-    \node at (2,2) {Static/Global Data};
-    
-    \draw[fill=green!10] (0,2.5) rectangle (4,4);
-    \node at (2,3.25) {Heap};
-    
-    \draw[fill=red!10] (0,4) rectangle (4,6);
-    \node at (2,5) {Stack};
+When the function returns, its stack frame is popped off the stack, and all its local variables are destroyed.
 
-    % Growth arrows
-    \draw[->, thick] (4.2, 2.7) -- (4.2, 3.8) node[midway, right] {grows upward};
-    \draw[->, thick] (4.2, 5.8) -- (4.2, 4.2) node[midway, right] {grows downward};
-    
-    % Address labels
-    \node[left] at (-0.2, 0) {Low Address ($0x0000$)};
-    \node[left] at (-0.2, 6) {High Address ($0xFFFF$)};
+```{tikz}
+#| label: fig-call-stack
+#| fig-cap: "The call stack grows downwards as nested function calls add new stack frames."
+#| echo: false
+#| lang: tex
+
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, decorations.pathmorphing}
+
+\begin{tikzpicture}[
+    stack_frame/.style={draw, minimum height=1.2cm, minimum width=4cm, text width=3.5cm, align=center},
+    global_frame/.style={draw, fill=blue!10, minimum height=1.2cm, minimum width=4cm, text width=3.5cm, align=center}
+]
+
+% Stack frames
+\node[global_frame] (globals) at (0,0) {Global Variables};
+\node[stack_frame, fill=cyan!20, below=0cm of globals] (main_frame) {Stack Frame: `main`};
+\node[stack_frame, fill=blue!20, below=0cm of main_frame] (a_frame) {Stack Frame: `a`};
+\node[stack_frame, fill=red!20, below=0cm of a_frame] (b_frame) {Stack Frame: `b`};
+\node[stack_frame, fill=green!20, below=0cm of b_frame] (c_frame) {Stack Frame: `c`};
+\node[stack_frame, fill=magenta!20, below=0cm of c_frame] (d_frame) {Stack Frame: `d`};
+
+% Stack pointer
+\node (sp_label) [left=1cm of d_frame] {Stack Pointer};
+\draw[->, thick, red] (sp_label.east) -- (d_frame.west);
+
+% Growth direction
+\draw[->, very thick, gray] (main_frame.north) -- (d_frame.south) node[midway, right, text=black] {Stack grows down};
+
+% Code representation
+\begin{scope}[xshift=-6cm, yshift=-3cm, font=\small\ttfamily]
+    \node[align=left] (code) {
+        int main() \{ a(); \} \\
+        void a() \{ b(); \} \\
+        void b() \{ c(); \} \\
+        void c() \{ d(); \} \\
+        void d() \{ /* ... */ \}
+    };
+    \draw[->, decorate, decoration={snake, segment length=10pt, amplitude=1.5pt}] (code.east) ++(0.5,2.0) -- ++(1,0) -| (main_frame.west);
+    \draw[->, decorate, decoration={snake, segment length=10pt, amplitude=1.5pt}] (code.east) ++(0.5,1.2) -- ++(1.2,0) -| (a_frame.west);
+    \draw[->, decorate, decoration={snake, segment length=10pt, amplitude=1.5pt}] (code.east) ++(0.5,0.4) -- ++(1.4,0) -| (b_frame.west);
+    \draw[->, decorate, decoration={snake, segment length=10pt, amplitude=1.5pt}] (code.east) ++(0.5,-0.4) -- ++(1.6,0) -| (c_frame.west);
+    \draw[->, decorate, decoration={snake, segment length=10pt, amplitude=1.5pt}] (code.east) ++(0.5,-1.2) -- ++(1.8,0) -| (d_frame.west);
+\end{scope}
+
 \end{tikzpicture}
-````
+```
 
-##### 1.7 How the Stack Works
-The stack is fundamental to controlling the flow of program execution.
+A **block** is any section of code enclosed in curly braces `{}`. Blocks define **scope**. A variable declared inside a block is only visible and accessible within that block and any nested inner blocks. If a variable in an inner block has the same name as one in an outer block, it *hides* or *shadows* the outer variable.
 
-- When a function is called, a new **Stack Frame** (also called an Activation Record) is **pushed** onto the top of the stack.
-- This stack frame contains all the necessary information for that function call, including its parameters, local variables, and the return address (where execution should resume after the function finishes).
-- If that function calls another function, a new stack frame for the new function is pushed on top of the previous one.
-- When a function finishes and returns, its stack frame is **popped** off the stack, and its local variables are destroyed. Execution jumps back to the return address stored in the now-exposed stack frame below.
+##### 1.5 Storage Class Specifiers
+Storage class specifiers in C determine a variable's lifetime (how long it exists) and visibility (where it can be accessed).
 
-##### 1.8 Scope and Blocks
-- **Scope** refers to the portion of the source code where a variable is "visible" and can be accessed.
-- A **Block** is a section of code enclosed in curly braces (`{...}`). In C, blocks are the primary mechanism for defining scope.
-- A variable declared inside a block is local to that block and is only visible from the point of its declaration to the end of the block.
-- **Variable Hiding**: If you declare a variable in an inner block with the same name as a variable in an outer block, the inner variable "hides" the outer one. Within the inner block, any reference to that name will refer to the inner variable.
-
-##### 1.9 Storage Class Specifiers
-Storage class specifiers in C determine a variable's lifetime (how long it exists) and visibility (scope).
-
-- **`auto`**: This is the default specifier for local variables. An `auto` variable is created on the stack when its block is entered and is destroyed when the block is exited. Its value is not retained between function calls.
-- **`static`**:
-    - When used with a *local variable*, it changes the variable's lifetime. A `static` local variable is stored in the **static data segment**, not the stack. It is created only once (when the program starts) and exists for the entire program duration. Its value is preserved between function calls.
-    - When used with a *global variable*, it restricts the variable's visibility to only the file in which it is declared.
-- **`extern`**: This is a declaration, not a definition. It tells the compiler that a variable is defined in another source file. It acts as a placeholder that the linker will resolve later by finding the actual variable definition.
+*   `auto`: This is the default specifier for variables declared inside a function. An `auto` variable is a local variable stored on the stack. It is created when its block is entered and destroyed when the block is exited.
+*   `static`:
+    *   When used with a *local variable*, `static` makes it exist for the entire duration of the program, not just the function call. It is initialized only once and retains its value between function calls.
+    *   When used with a *global variable* or *function*, `static` limits its visibility to the file in which it is declared. It cannot be accessed from other source files.
+*   `extern`: This declares a variable without defining it. It tells the compiler that the variable is defined in another source file. This is essential for sharing global variables across multiple files.
+*   `register`: This is a hint to the compiler to store the variable in a fast CPU register instead of memory. Modern compilers are very good at optimization and often ignore this hint, making it largely obsolete.
 
 #### 2. Definitions
 
-- **Compiler**: A program that translates source code from a high-level programming language (like C) to a lower-level language (like machine code) that the computer can execute.
-- **Linker**: A program that takes one or more object files generated by a compiler and combines them into a single executable program.
-- **Scope**: The region of a program's source code in which a declared variable is visible and can be accessed.
-- **Stack**: A region of memory that stores temporary variables and control data for function calls. It operates in a Last-In, First-Out (LIFO) manner.
-- **Heap**: A region of memory used for dynamic memory allocation, where the programmer has direct control over creating and destroying data during runtime.
-- **Static Memory**: A region of memory where global and static variables are stored. These variables exist for the entire lifetime of the program.
-- **Programming Paradigm**: A fundamental style of programming, such as imperative, functional, or object-oriented, which dictates how programs are structured and executed.
-- **Syntax**: The set of rules that defines the combinations of symbols that are considered to be correctly structured programs in a language. For example, `int x = 10;` is syntactically correct C.
-- **Semantics**: The meaning of the language's constructs. *Static semantics* are checked at compile-time (e.g., trying to assign a string to an integer variable), while *dynamic semantics* define the program's behavior at runtime.
+*   **Compiler**: A program that translates source code from a high-level programming language (like C) into a lower-level language, typically machine code, to create an object file.
+*   **Linker**: A program that takes one or more object files generated by a compiler and combines them into a single executable program. It resolves references between files and includes code from libraries.
+*   **Source File**: A text file containing program code written in a human-readable language like C. The standard file extension is `.c`.
+*   **Object File**: A file containing machine code produced by a compiler. It is not yet a complete executable and may contain unresolved references to other parts of the program.
+*   **Translation Unit**: A single source file after the C preprocessor has processed it (e.g., by including header files). This is the basic unit of code that is fed to the compiler.
+*   **Stack**: A region of memory that stores temporary data for function calls, such as local variables, function parameters, and return addresses. It operates in a Last-In, First-Out (LIFO) manner.
+*   **Heap**: A region of memory used for dynamic memory allocation, where the programmer can request and release blocks of memory as needed during program execution.
+*   **Scope**: The region of a program's source code in which a declared variable is visible and can be accessed. In C, scope is typically defined by blocks (`{}`).
+*   **Block**: A section of code enclosed in curly braces `{}` that forms a syntactic unit and defines a scope.
+*   **Preprocessor**: A tool that processes the source code before the main compilation stage. It handles directives like `#include` and `#define`.
+*   **Storage Class**: A specifier (`auto`, `static`, `extern`, `register`) that determines the lifetime and visibility of a variable or function.
 
 #### 3. Mistakes
 
-- **Confusing Syntax with Semantics**: Assuming that because code compiles without errors (correct syntax), it is logically correct (correct semantics). **Why it's wrong**: A program can be syntactically perfect but contain logical flaws or undefined behavior that the compiler cannot detect, leading to runtime errors or incorrect results.
-- **Ignoring Compiler Warnings**: Compiling code and running it despite the compiler issuing warnings. **Why it's wrong**: Warnings often indicate potential bugs or non-standard behavior that could cause the program to fail under certain conditions. For instance, using a variable before it has been initialized is a common warning that leads to unpredictable behavior.
-- **Forgetting `&` in `scanf`**: Writing `scanf("%d", n);` instead of `scanf("%d", &n);`. **Why it's wrong**: The `scanf` function needs the memory *address* where it should store the input value. The expression `n` evaluates to the *value* of the variable, whereas `&n` evaluates to its *address*. Providing the value instead of the address causes `scanf` to write to an unpredictable memory location, often leading to a program crash.
-- **Using a Variable Outside Its Scope**: Declaring a variable inside a loop (e.g., `for (int i=0;...)`) and then trying to access `i` after the loop has finished. **Why it's wrong**: A variable's lifetime is tied to its scope. Once program execution leaves the block (`{...}`) where the variable was declared, the variable is destroyed and its memory is reclaimed. Attempting to access it results in a compile-time error.
-- **Returning a Pointer to a Local Variable**: Writing a function that creates a local variable and returns its memory address. **Why it's wrong**: Local variables are stored on the stack in the function's stack frame. When the function returns, its stack frame is destroyed. The returned pointer becomes a "dangling pointer" because it points to memory that is no longer valid. Accessing this memory leads to undefined and often catastrophic behavior.
+*   **Using `=` for comparison instead of `==`**: A single equals sign (`=`) is the assignment operator, while the double equals sign (`==`) is the equality comparison operator. Using `if (x = 5)` assigns 5 to `x` and the expression evaluates to 5 (which is true), instead of checking if `x` is equal to 5. **Why it's wrong:** This leads to incorrect logic that is often hard to debug, as it's syntactically valid.
+*   **Forgetting the semicolon at the end of a statement**: Every statement in C must be terminated with a semicolon (`;`). **Why it's wrong:** The compiler will report a syntax error, often on the line *following* the one where the semicolon is missing, which can be confusing.
+*   **Ignoring compiler warnings**: Compilers often issue warnings for code that is syntactically correct but likely contains a logical error (e.g., using an uninitialized variable). **Why it's wrong:** Ignoring warnings can lead to bugs and unpredictable program behavior. Always compile with warnings enabled (e.g., `gcc -Wall`) and treat warnings as errors.
+*   **Integer division truncation**: When dividing two integers, C performs integer division, which discards any fractional part. For example, `7 / 2` evaluates to `3`, not `3.5`. **Why it's wrong:** This can lead to incorrect calculations if you expect a floating-point result. To get a floating-point result, at least one of the operands must be a floating-point type (e.g., `7.0 / 2`).
+*   **Accessing uninitialized variables**: A local variable that is declared but not assigned a value contains garbage data. **Why it's wrong:** Using such a variable leads to undefined behavior, meaning the program might crash, produce incorrect results, or appear to work correctly only to fail later.
+*   **Mismatched `printf`/`scanf` format specifiers**: Using the wrong format specifier (e.g., `%d` for a `float` or `%f` for an `int`) can cause `printf` to print garbage values or `scanf` to corrupt memory. **Why it's wrong:** These functions rely on the format string to interpret the memory layout of their arguments, and a mismatch breaks this contract.
 
 #### 4. Examples
 
-##### Example 1: Scope and Variable Hiding
-**Question:** What will the following C program print to the console?
+##### Example 1: Hello World
+**Question:** Write a C program to print the text "Hello, World!" to the screen, followed by a new line.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h> // Include standard I/O library for printf
+
+int main() {
+    // printf is a function that prints formatted output to the console.
+    // The "\n" is an escape sequence for a newline character.
+    printf("Hello, World!\n");
+
+    // It is conventional for main to return 0 to indicate successful execution.
+    return 0;
+}
+```
+</details>
+
+##### Example 2: Simple Arithmetic
+**Question:** Write a C program that declares two integer variables, `x` and `y`, initializes them to `10` and `5` respectively, and then prints their sum, difference, product, and quotient.
+
+<details>
+<summary>Click to see the solution</summary>
+
 ```c
 #include <stdio.h>
 
 int main() {
+    // Declare and initialize two integer variables.
     int x = 10;
-    printf("Outer x before block: %d\n", x);
+    int y = 5;
 
-    {
-        int x = 20; // This x "hides" the outer x
-        printf("Inner x: %d\n", x);
-    }
+    // Calculate and print the results of arithmetic operations.
+    // %d is the format specifier for printing integers.
+    printf("Sum: %d\n", x + y);
+    printf("Difference: %d\n", x - y);
+    printf("Product: %d\n", x * y);
+    printf("Quotient: %d\n", x / y);
 
-    printf("Outer x after block: %d\n", x);
     return 0;
 }
 ```
+</details>
+
+##### Example 3: Function Definition and Call
+**Question:** Write a program with a function `add` that takes two integers as input and returns their sum. Call this function from `main` and print the result.
 
 <details>
 <summary>Click to see the solution</summary>
-
-1.  **First `printf`**: The variable `x` with the value `10` is in scope. The program prints `10`.
-2.  **Entering the Inner Block**: A new local variable, also named `x`, is declared and initialized to `20`. This inner `x` is now in scope and hides the outer `x`.
-3.  **Second `printf`**: Inside the block, any reference to `x` refers to the inner variable. The program prints `20`.
-4.  **Exiting the Inner Block**: The inner `x` goes out of scope and is destroyed. The outer `x` (with value `10`) becomes visible again.
-5.  **Third `printf`**: The program prints the value of the outer `x`, which is `10`.
-
-**Answer:**
-```
-Outer x before block: 10
-Inner x: 20
-Outer x after block: 10
-```
-</details>
-
-##### Example 2: `auto` vs. `static` Local Variables
-**Question:** Analyze the two C functions below. What will be printed when `counter_auto()` and `counter_static()` are each called three times in a row?
 
 ```c
 #include <stdio.h>
 
-void counter_auto() {
-    auto int count = 0;
-    count++;
-    printf("Auto count: %d\n", count);
-}
-
-void counter_static() {
-    static int count = 0; // Initialized only once
-    count++;
-    printf("Static count: %d\n", count);
-}
-
-int main() {
-    printf("Calling counter_auto three times:\n");
-    counter_auto();
-    counter_auto();
-    counter_auto();
-
-    printf("\nCalling counter_static three times:\n");
-    counter_static();
-    counter_static();
-    counter_static();
-    
-    return 0;
-}
-```
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Analyze `counter_auto()`**: The variable `count` is an `auto` local variable. It is created on the stack each time the function is called and initialized to `0`. It is then incremented to `1` and printed. When the function returns, `count` is destroyed. Therefore, it will print `1` every time.
-2.  **Analyze `counter_static()`**: The variable `count` is a `static` local variable. It is stored in the static data segment and is initialized to `0` only *once*, when the program starts. Because it persists between function calls, its value is retained.
-    *   The first call increments it to `1` and prints `1`.
-    *   The second call increments it from `1` to `2` and prints `2`.
-    *   The third call increments it from `2` to `3` and prints `3`.
-
-**Answer:**
-```
-Calling counter_auto three times:
-Auto count: 1
-Auto count: 1
-Auto count: 1
-
-Calling counter_static three times:
-Static count: 1
-Static count: 2
-Static count: 3
-```
-</details>
-
-##### Example 3: Compiling and Linking Multiple Files
-**Question:** You are given three files: `main.c`, `math_utils.c`, and `math_utils.h`. What GCC commands are needed to compile and link them into a single executable named `calculator`?
-
-**File: `math_utils.h`**
-```c
-#ifndef MATH_UTILS_H
-#define MATH_UTILS_H
-
-// Function prototype
+// Function prototype (declaration) tells the compiler about the function's existence.
 int add(int a, int b);
 
-#endif
-```
+int main() {
+    int num1 = 25;
+    int num2 = 17;
+    int result;
 
-**File: `math_utils.c`**
-```c
-#include "math_utils.h"
+    // Call the add function and store its return value.
+    result = add(num1, num2);
 
-// Function definition
+    printf("The sum of %d and %d is %d.\n", num1, num2, result);
+
+    return 0;
+}
+
+// Function definition (implementation).
+// It takes two integer parameters 'a' and 'b'.
 int add(int a, int b) {
+    // It returns their sum.
     return a + b;
 }
 ```
+</details>
 
-**File: `main.c`**
-```c
-#include <stdio.h>
-#include "math_utils.h"
-
-int main() {
-    int result = add(5, 3);
-    printf("The result is: %d\n", result);
-    return 0;
-}
-```
+##### Example 4: Variable Scope
+**Question:** Write a program that demonstrates variable shadowing. Declare a global integer `x` with value 10. In `main`, declare a local integer `x` with value 20. Inside a nested block in `main`, declare another local integer `x` with value 30. Print the value of `x` from each scope.
 
 <details>
 <summary>Click to see the solution</summary>
 
-The process involves two steps: first, compiling each `.c` source file into an object file, and second, linking the object files together.
+```c
+#include <stdio.h>
 
-1.  **Compile `main.c`**: This command tells GCC to compile `main.c` but stop before linking (`-c`), creating an object file named `main.o`.
-    ```bash
-    gcc -c main.c -o main.o
-    ```
-2.  **Compile `math_utils.c`**: This command does the same for `math_utils.c`, creating `math_utils.o`.
-    ```bash
-    gcc -c math_utils.c -o math_utils.o
-    ```
-3.  **Link the object files**: This command takes the two object files and links them together to create the final executable file named `calculator` (`-o calculator`).
-    ```bash
-    gcc main.o math_utils.o -o calculator
-    ```
-    Alternatively, you can perform all steps in a single command, and GCC will handle the intermediate compilation and linking automatically.
+// Global variable x
+int x = 10;
 
-**Answer:** The commands are:
-```bash
-# Step-by-step approach
-gcc -c main.c -o main.o
-gcc -c math_utils.c -o math_utils.o
-gcc main.o math_utils.o -o calculator
+int main() {
+    // Local variable x in main, shadows the global x
+    int x = 20;
 
-# All-in-one command
-gcc main.c math_utils.c -o calculator
+    printf("Value of x in main's outer scope: %d\n", x);
+
+    // Start of a nested block
+    {
+        // Local variable x in the inner block, shadows main's x
+        int x = 30;
+        printf("Value of x in the inner block: %d\n", x);
+    } // End of the nested block
+
+    printf("Value of x in main's outer scope again: %d\n", x);
+
+    return 0;
+}
 ```
-To run the final program: `./calculator`
+</details>
+
+##### Example 5: `auto` vs. `static` Local Variables
+**Question:** Write a function `counter` that is called multiple times from a loop in `main`. Inside `counter`, declare two local variables: an `auto int` and a `static int`, both initialized to 0. Increment both and print their values on each call. Observe the difference.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+void counter() {
+    // 'auto_var' is created and initialized to 0 on every call.
+    auto int auto_var = 0;
+    
+    // 'static_var' is created and initialized to 0 only once.
+    // It retains its value between function calls.
+    static int static_var = 0;
+
+    auto_var++;
+    static_var++;
+
+    printf("Auto: %d, Static: %d\n", auto_var, static_var);
+}
+
+int main() {
+    printf("Calling counter 5 times:\n");
+    for (int i = 0; i < 5; i++) {
+        counter();
+    }
+    return 0;
+}
+
+// Expected Output:
+// Auto: 1, Static: 1
+// Auto: 1, Static: 2
+// Auto: 1, Static: 3
+// Auto: 1, Static: 4
+// Auto: 1, Static: 5```
+</details>
+
+##### Example 6: Reading User Input
+**Question:** Write a program that asks the user to enter their age, reads the integer value, and prints a message including the age they entered.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    int age; // Variable to store the user's age
+
+    // Prompt the user for input
+    printf("Please enter your age: ");
+
+    // Use scanf to read an integer from the keyboard.
+    // The '&' operator gets the memory address of the 'age' variable
+    // so scanf knows where to store the input value.
+    scanf("%d", &age);
+
+    // Print the value that was read
+    printf("You are %d years old.\n", age);
+
+    return 0;
+}
+```
+</details>
+
+##### Example 7: Iterative Euclid's Algorithm
+**Question:** Implement Euclid's algorithm to find the greatest common divisor (GCD) of two integers using an iterative approach (a `while` loop).
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int gcd_iterative(int a, int b) {
+    while (b != 0) {
+        int temp = b;
+        b = a % b;
+        a = temp;
+    }
+    return a;
+}
+
+int main() {
+    int num1 = 48;
+    int num2 = 18;
+    int result = gcd_iterative(num1, num2);
+    printf("The GCD of %d and %d is %d.\n", num1, num2, result);
+    return 0;
+}
+```
+</details>
+
+##### Example 8: Recursive Euclid's Algorithm
+**Question:** Implement Euclid's algorithm to find the greatest common divisor (GCD) of two integers using recursion.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int gcd_recursive(int a, int b) {
+    // Base case: if b is 0, the GCD is a.
+    if (b == 0) {
+        return a;
+    }
+    // Recursive step
+    else {
+        return gcd_recursive(b, a % b);
+    }
+}
+
+int main() {
+    int num1 = 56;
+    int num2 = 98;
+    int result = gcd_recursive(num1, num2);
+    printf("The GCD of %d and %d is %d.\n", num1, num2, result);
+    return 0;
+}
+```
+</details>
+
+##### Example 9: Simple `if-else` Logic
+**Question:** Write a program that reads an integer from the user and prints whether the number is positive, negative, or zero.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    int number;
+
+    printf("Enter an integer: ");
+    scanf("%d", &number);
+
+    if (number > 0) {
+        printf("The number is positive.\n");
+    } else if (number < 0) {
+        printf("The number is negative.\n");
+    } else {
+        printf("The number is zero.\n");
+    }
+
+    return 0;
+}
+```
+</details>
+
+##### Example 10: `for` Loop
+**Question:** Write a program that uses a `for` loop to print the numbers from 1 to 10, each on a new line.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    // The for loop has three parts:
+    // 1. Initialization: int i = 1 (executes once at the beginning)
+    // 2. Condition: i <= 10 (checked before each iteration)
+    // 3. Increment: i++ (executes at the end of each iteration)
+    for (int i = 1; i <= 10; i++) {
+        printf("%d\n", i);
+    }
+
+    return 0;
+}
+```
 </details>
