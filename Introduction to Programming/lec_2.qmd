@@ -1,0 +1,212 @@
+---
+title: "2. C Programming Fundamentals: Memory, Pointers, and Types"
+author: "Zakhar Podyakov"
+date: "September 16, 2025"
+format: html
+---
+
+#### 1. Summary
+
+##### 1.1 From Source Code to Executable Program
+A C program's journey from a human-readable text file to a machine-executable file involves several distinct stages. This process ensures that high-level logic is correctly translated into low-level instructions the computer's processor can understand.
+
+1.  **High-Level Language (Source Code):** You begin by writing code in a language like C (e.g., in a `program.c` file). This code is abstract and platform-independent.
+2.  **Compilation:** A **compiler** translates the source code into **assembly language**. Assembly is a low-level language that is much closer to machine instructions but still uses human-readable mnemonics.
+3.  **Assembly:** An **assembler** converts the assembly code into **machine code** (also known as **object code**). This code consists of binary digits (1s and 0s) that the CPU can directly execute. The output is typically an object file (e.g., `program.o`).
+4.  **Linking:** A C program is often built from multiple source files (called **translation units**). Each is compiled into its own object file. The **linker**'s job is to combine these object files, along with any necessary code from libraries (like the standard input/output library), into a single **executable program**.
+
+##### 1.2 Memory Organization and Access
+Computer memory can be visualized as a vast, single array of cells. Every cell has a unique **address** (its location) and stores a **value**. C programs typically interact with two main areas of memory: the stack and the heap.
+
+*   **The Stack:** This is a highly organized, efficient region of memory that operates on a *Last-In, First-Out (LIFO)* basis. It is used for **static memory allocation**. When a function is called, a new block of memory, called a **stack frame** or **activation record**, is pushed onto the stack. This frame holds the function's local variables, arguments, and the return address. When the function finishes, its frame is popped off the stack, and all its local variables are destroyed. This process is automatic and managed by the compiler.
+*   **The Heap:** This is a large, less organized pool of memory used for **dynamic memory allocation**. Unlike the stack, the programmer is responsible for managing memory on the heap. You must explicitly request a block of memory (using functions like `malloc`) and explicitly release it when you are done (using `free`). The lifetime of heap-allocated memory is not tied to function scopes; it persists until it is explicitly deallocated.
+
+##### 1.3 The C Type System: Static Typing
+C is a **statically-typed** language. This means that the type of every variable must be declared before it is used, and this type is checked by the compiler *before* the program is run. This is in contrast to **dynamically-typed** languages (like Python or JavaScript), where type checks happen at runtime.
+
+*   **Pros of Static Typing:**
+    *   **Safety:** Many type-related errors are caught during compilation, preventing bugs in the final program.
+    *   **Performance:** The compiler knows the exact size and layout of data, allowing it to generate highly optimized machine code.
+    *   **Readability:** Explicit type declarations make code easier for others to understand.
+*   **Fundamental Types:** These are the basic building blocks, such as `int`, `char`, `float`, and `double`. They can be modified with keywords like `signed`, `unsigned`, and `long`. The exact size of these types (except `char`, which is always one byte) can depend on the underlying hardware.
+*   **Derived Types:** These are more complex types built from fundamental types, including **arrays**, **structs**, **unions**, and **pointers**.
+
+##### 1.4 Pointers: The Core of C
+A **pointer** is arguably the most powerful and defining feature of C. It is a special type of variable whose value is not a number or character, but rather the *memory address* of another variable.
+
+*   **Address-Of Operator (`&`):** When placed before a variable name, this unary operator returns the memory address of that variable.
+*   **Dereference Operator (`*`):** Also known as the indirection operator. When placed before a pointer variable, it accesses the *value* stored at the memory address the pointer is holding.
+
+Pointers allow for indirect manipulation of data, efficient array processing, and are essential for dynamic memory management.
+
+##### 1.5 Dynamic Memory Allocation with `malloc`
+When you don't know the amount of memory you need at compile-time, you must allocate it dynamically on the **heap**. The standard library function `malloc()` (memory allocation) is used for this.
+
+*   `malloc(size)` takes one argument: the number of bytes to allocate.
+*   It finds a contiguous block of free memory of that size on the heap.
+*   It returns a `void*` pointer to the first byte of that block. A `void*` is a generic pointer that must be **cast** to the appropriate type (e.g., `int*`, `char*`) before it can be dereferenced.
+*   If `malloc` cannot find enough free memory, it returns `NULL`.
+
+##### 1.6 Arrays and Strings
+*   An **array** is a collection of elements of the *same type* stored in a *contiguous block of memory*. The name of an array often behaves like a pointer to its first element.
+*   A **C-style string** is not a built-in type but a convention: it is simply an **array of characters** that is terminated by a special **null character (`\0`)**. This null terminator acts as a sentinel, signaling the end of the string to library functions like `printf()` and `strlen()`.
+
+#### 2. Definitions
+
+*   **Pointer**: A variable whose value is the memory address of another variable.
+*   **Address**: A unique numerical identifier that specifies a location in the computer's memory.
+*   **Dereferencing**: The process of accessing the value stored at the memory address held by a pointer, using the `*` operator.
+*   **Stack**: A region of memory where local variables and function call information are stored. Memory is managed automatically in a Last-In, First-Out (LIFO) manner.
+*   **Heap**: A region of memory used for dynamic memory allocation. The programmer is responsible for explicitly allocating and deallocating memory blocks from this area.
+*   **Static Typing**: A type system where the type of a variable is known at compile-time. C enforces this, requiring explicit type declarations.
+*   **Dynamic Typing**: A type system where the type of a variable is determined at run-time.
+*   **Translation Unit**: A single source code file (`.c` file) and all the header files it includes. It is the basic unit of compilation.
+*   **Activation Record (Stack Frame)**: A block of memory on the stack created for a single function call, containing its local variables, parameters, and return address.
+
+#### 3. Mistakes
+
+*   **Dereferencing an Uninitialized or NULL Pointer**: Attempting to access the value at an invalid address. An uninitialized pointer contains a garbage address, and a NULL pointer points to nothing. **Why it's wrong:** This leads to undefined behavior, which almost always results in a program crash (segmentation fault). You must always ensure a pointer points to a valid memory location before dereferencing it.
+*   **Returning a Pointer to a Local Variable**: A function's local variables exist on its stack frame, which is destroyed when the function returns. Returning a pointer to such a variable creates a "dangling pointer." **Why it's wrong:** The pointer now points to a memory location that is no longer valid. That memory can be overwritten at any time by subsequent function calls, leading to unpredictable and hard-to-debug errors.
+*   **Forgetting to Null-Terminate a String**: If you build a string character by character, you must manually add the `\0` at the end. **Why it's wrong:** Standard string functions (`printf`, `strcpy`, `strlen`, etc.) rely on the null terminator to know where the string ends. Without it, they will continue reading from adjacent memory, leading to buffer overflows, corrupted data, or crashes.
+*   **Memory Leaks**: Forgetting to call `free()` on memory that was allocated with `malloc()`. **Why it's wrong:** The program loses its reference to the allocated heap memory but the memory remains reserved. Over time, repeated leaks will consume all available memory, causing the program or the entire system to fail. For every `malloc()`, there must be a corresponding `free()`.
+*   **Buffer Overflow**: Writing more data into an array (a buffer) than it has been allocated to hold. **Why it's wrong:** This overwrites adjacent memory, which could be holding other important variables or program instructions. It is a major source of software vulnerabilities and crashes.
+
+#### 4. Examples
+
+##### Example 1: Basic Pointer Manipulation
+**Question:** Declare an integer `val` with a value of 42. Create a pointer `p_val` that points to `val`. Use the pointer to change the value of `val` to 100, and then print the new value.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    // 1. Declare the original integer variable.
+    int val = 42;
+    printf("Original value of val: %d\n", val);
+
+    // 2. Declare a pointer to an integer.
+    int *p_val;
+
+    // 3. Assign the address of 'val' to the pointer 'p_val'.
+    // The '&' operator gets the memory address.
+    p_val = &val;
+
+    // 4. Dereference the pointer 'p_val' to change the value it points to.
+    // The '*' operator accesses the value at the stored address.
+    *p_val = 100;
+
+    // 5. Print the value of 'val' to confirm it has changed.
+    printf("New value of val: %d\n", val);
+
+    return 0;
+}
+```
+
+**Answer:** The program will output:
+```
+Original value of val: 42
+New value of val: 100
+```
+</details>
+
+##### Example 2: Swapping Values with a Function
+**Question:** Write a function `swap` that takes two integer pointers as arguments and swaps the values they point to. Demonstrate its use in `main`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// 1. Define the swap function that accepts two integer pointers.
+void swap(int *a, int *b) {
+    // 2. Create a temporary variable to hold the value of the first integer.
+    // We must dereference 'a' to get the value it points to.
+    int temp = *a;
+
+    // 3. Assign the value pointed to by 'b' to the location pointed to by 'a'.
+    *a = *b;
+
+    // 4. Assign the stored temporary value to the location pointed to by 'b'.
+    *b = temp;
+}
+
+int main() {
+    int x = 10;
+    int y = 20;
+
+    printf("Before swap: x = %d, y = %d\n", x, y);
+
+    // 5. Call the swap function, passing the addresses of x and y.
+    swap(&x, &y);
+
+    printf("After swap: x = %d, y = %d\n", x, y);
+
+    return 0;
+}
+```
+
+**Answer:** The program will output:
+```
+Before swap: x = 10, y = 20
+After swap: x = 20, y = 10
+```
+</details>
+
+##### Example 3: Dynamic Array Allocation
+**Question:** Ask the user how many integers they want to store. Dynamically allocate an array of that size on the heap, fill it with the numbers 0, 1, 2, ..., and then print the array. Finally, free the allocated memory.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <stdlib.h> // Required for malloc() and free()
+
+int main() {
+    int n;
+    printf("How many integers do you want to store? ");
+    scanf("%d", &n);
+
+    // 1. Declare a pointer that will hold the address of our dynamic array.
+    int *arr;
+
+    // 2. Allocate memory on the heap.
+    // We need space for 'n' integers, so the total size is n * sizeof(int).
+    // The result of malloc (a void*) is cast to an integer pointer (int*).
+    arr = (int*) malloc(n * sizeof(int));
+
+    // 3. Always check if malloc succeeded. If not, it returns NULL.
+    if (arr == NULL) {
+        printf("Error: Memory allocation failed.\n");
+        return 1; // Exit with an error code
+    }
+
+    // 4. Fill the dynamically allocated array with values.
+    for (int i = 0; i < n; i++) {
+        arr[i] = i; // Array syntax arr[i] is equivalent to *(arr + i)
+    }
+
+    // 5. Print the contents of the array to verify.
+    printf("Array elements: ");
+    for (int i = 0; i < n; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
+
+    // 6. Free the memory once we are done with it to prevent a memory leak.
+    free(arr);
+
+    return 0;
+}
+```
+
+**Answer:** If the user enters `5`, the output will be:
+```
+How many integers do you want to store? 5
+Array elements: 0 1 2 3 4 
+```
+</details>
