@@ -1,598 +1,382 @@
 ---
-title: "3. Pointers, Arrays, and File I/O in C"
+title: "Pointers, Declarations, Preprocessing, File I/O"
 author: "Zakhar Podyakov"
-date: "September 16, 2025"
+date: "September 17, 2025"
 format: html
 engine: knitr
 ---
 
-#### 1. Summary
+#### **1. Summary**
 
-##### 1.1 Pointers in C
+##### **1.1 Introduction to Pointers in C**
 
-A **pointer** is a fundamental concept in C that provides a way to work directly with computer memory. Essentially, a pointer is a special type of variable that does not hold a direct value (like an integer or a character) but instead holds the *memory address* of another variable. This allows for indirect access and manipulation of data, which is essential for dynamic memory allocation, efficient array handling, and complex data structures.
+A **pointer** is a fundamental concept in C programming. It is essentially a variable whose value is the *memory address* of another variable. Instead of holding data directly (like an integer or a character), a pointer "points to" the location where the data is stored. This allows for indirect manipulation of data, dynamic memory allocation, and efficient handling of complex data structures.
 
-The two primary operators used with pointers are:
-1.  **Address-of Operator (`&`)**: A unary operator that returns the memory address of a variable.
-2.  **Dereference Operator (`*`)**: A unary operator that accesses the value stored at the memory address held by a pointer.
+The primary operators used with pointers are:
+*   **Address-of operator (`&`)**: Returns the memory address of a variable.
+*   **Dereference operator (`*`)**: Accesses the value stored at the memory address held by a pointer.
 
-*A note on syntax: The asterisk (`*`) is used both to declare a pointer variable (e.g., `int *ptr;`) and to dereference it (e.g., `*ptr = 10;`). The context determines its meaning.*
+<!-- DIAGRAM HERE -->
 
-```{tikz}
-#| label: fig-pointer-concept
-#| fig-cap: "Visualization of a pointer `ptr` storing the address of a variable `var`."
-#| echo: false
-#| lang: tex
+##### **1.2 Common Problems with Pointers**
 
-\documentclass{standalone}
-\usepackage{tikz}
-\usetikzlibrary{shapes.misc, positioning, arrows.meta, shadows}
+Due to their low-level nature, pointers introduce several potential pitfalls that programmers must carefully manage.
 
-\begin{document}
-\begin{tikzpicture}[
-    font=\sffamily,
-    membox/.style={draw, rectangle, minimum height=1.2cm, minimum width=2.5cm, drop shadow, fill=blue!10},
-    ptrbox/.style={draw, rectangle, minimum height=1.2cm, minimum width=2.5cm, drop shadow, fill=green!10},
-    addr/.style={font=\tiny\ttfamily, fill=white, inner sep=1pt, anchor=north east, opacity=0.8},
-    arr/.style={-Latex, thick}
-]
-    % Variable 'var'
-    \node[membox] (var) at (0,0) {\textbf{int var} \\ 42};
-    \node[addr] at (var.north east) {0x7FFC...A1B0};
+*   **Ownership and Destruction**: A pointer declaration does not specify who is responsible for freeing the memory it points to. This ambiguity can lead to two major errors:
+    *   **Memory Leaks**: If memory is dynamically allocated and no part of the code frees it, the memory remains occupied for the program's lifetime, even if it's no longer accessible. This happens when the last pointer to the allocated memory goes out of scope.
+    *   **Double Free**: Attempting to free the same memory block more than once can corrupt memory management data structures, leading to unpredictable crashes.
 
-    % Pointer 'ptr'
-    \node[ptrbox] (ptr) at (4,0) {\textbf{int *ptr} \\ 0x7FFC...A1B0};
-    \node[addr] at (ptr.north east) {0x7FFC...A1B4};
+*   **Dangling Pointers**: A **dangling pointer** is a pointer that points to a memory location that has already been deallocated (freed). Dereferencing a dangling pointer results in *undefined behavior*, as the memory may have been reallocated for another purpose or could contain garbage data.
 
-    % Arrow connecting pointer to variable
-    \draw[arr, blue] (ptr.west) to[out=180, in=0] (var.east);
+<!-- DIAGRAM HERE -->
 
-    % Labels
-    \node[above=0.3cm of ptr, align=center] {Stores the address of `var`};
-    \node[above=0.3cm of var, align=center] {Holds an integer value};
-\end{tikzpicture}
-\end{document}
-```
+*   **Distinguishing Single Objects vs. Arrays**: A pointer of type `T*` can point to a single object of type `T` or to the first element of an array of `T`'s. The C language provides no built-in way to distinguish between these two cases, which can lead to errors when performing pointer arithmetic or deallocating memory (e.g., using `free()` on an array that requires `delete[]` in C++).
 
-##### 1.2 Pointer Arithmetic
+##### **1.3 Declarations in C**
 
-Unlike regular variables, pointers support a limited set of arithmetic operations. When you add an integer `n` to a pointer, the compiler does not add `n` to the raw memory address. Instead, it advances the pointer by `n * sizeof(type)`, where `type` is the data type the pointer points to. This makes it seamless to navigate through elements in an array, as the pointer automatically moves to the beginning of the next element, regardless of its size.
+A **declaration** in C introduces one or more identifiers (like variable or function names) into the program and specifies their meaning and properties. A single declaration provides up to four pieces of information:
 
-For example, if `int *p` points to the first element of an integer array, `p + 1` will point to the *second* element, not just the next byte in memory.
+1.  **Storage Class**: Determines the lifetime and visibility of the entity (e.g., `static`, `extern`, `auto`).
+2.  **Type Specifier**: Defines the data type of the entity (e.g., `int`, `double`, `struct S`).
+3.  **Entity Name**: The identifier being declared (e.g., `a`, `my_function`).
+4.  **Initializer**: An optional initial value for the entity (e.g., `= 777`).
 
-##### 1.3 Arrays in C
+C's declaration syntax follows a principle often called "declaration follows use." This means the declaration mimics the syntax of an expression that would yield a value of the base type.
 
-An **array** is a data structure that stores a fixed-size, sequential collection of elements of the same type. The elements are stored in a contiguous block of memory, which allows for efficient access using an index.
+*   `int *p;`: Dereferencing `p` (`*p`) yields an `int`. Therefore, `p` is a pointer to an `int`.
+*   `int a[10];`: Accessing an element of `a` (`a[i]`) yields an `int`. Therefore, `a` is an array of `int`s.
+*   `int f();`: Calling `f` (`f()`) yields an `int`. Therefore, `f` is a function returning an `int`.
 
-In C, arrays and pointers are very closely related. When an array name is used in an expression (with a few exceptions), it *decays* into a pointer to its first element. This means the array name itself behaves like a constant pointer. Because of this relationship, the following two expressions are equivalent for accessing the `i`-th element of an array:
-*   `array[i]` (array notation)
-*   `*(array + i)` (pointer notation)
+This can lead to complex declarations:
+*   `int *f(int);`: `f` is a function that takes an `int` and returns a pointer to an `int`.
+*   `int (*f)(int);`: `f` is a pointer to a function that takes an `int` and returns an `int`.
 
-This equivalence is a cornerstone of C programming and is why pointers are so effective for manipulating array data.
+The `typedef` keyword provides a way to create an alias for a complex type, which greatly improves code readability.
 
-##### 1.4 Dynamic Memory Allocation
+<!-- DIAGRAM HERE -->
 
-C provides two main regions for memory allocation: the **stack** and the **heap**.
+##### **1.4 The C Preprocessor**
 
-*   The **Stack** is used for static memory allocation. Local variables and function call information are stored here. Memory management is automatic; when a function returns, its local variables are automatically deallocated (popped off the stack). This process is fast but the size of the memory must be known at compile time.
-*   The **Heap** is used for dynamic memory allocation. This is a larger pool of memory available for the program to use at runtime. Memory allocated on the heap persists until it is explicitly deallocated by the programmer. This is more flexible but requires manual memory management.
-
-```{tikz}
-#| label: fig-stack-heap
-#| fig-cap: "Simplified model of program memory, showing the stack and heap."
-#| echo: false
-#| lang: tex
-
-\documentclass{standalone}
-\usepackage{tikz}
-\usetikzlibrary{shapes, arrows.meta, decorations.pathmorphing}
-
-\begin{document}
-\begin{tikzpicture}[font=\sffamily]
-    % Memory Block
-    \draw[thick] (0,0) rectangle (4,6);
-    \node[above] at (2,6) {Program Memory};
-
-    % Stack (grows down)
-    \fill[blue!10] (0,4) rectangle (4,6);
-    \node at (2,5.5) {\textbf{Stack}};
-    \node[align=center, font=\small] at (2,4.8) {Local Variables \\ Function Calls};
-    \draw[->, thick, blue] (2,5.2) -- (2,4.4) node[right, font=\small] {Grows Down};
-
-    % Heap (grows up)
-    \fill[green!10] (0,0) rectangle (4,2);
-    \node at (2,1.5) {\textbf{Heap}};
-    \node[align=center, font=\small] at (2,0.8) {Dynamic Allocation \\ (`malloc`)};
-    \draw[->, thick, green] (2,0.4) -- (2,1.2) node[right, font=\small] {Grows Up};
-
-    % Unused memory
-    \draw[decorate, decoration={zigzag, segment length=6pt, amplitude=1pt}] (0,2) -- (4,2);
-    \draw[decorate, decoration={zigzag, segment length=6pt, amplitude=1pt}] (0,4) -- (4,4);
-    \node[font=\small, color=gray] at (2,3) {.. Free Memory ..};
-\end{tikzpicture}
-\end{document}
-```
-
-Key functions for heap management from `<stdlib.h>` are:
-*   `void* malloc(size_t size)`: Allocates `size` bytes of memory on the heap and returns a `void` pointer to the first byte. If allocation fails, it returns `NULL`. The returned pointer must be cast to the desired type.
-*   `void free(void* ptr)`: Deallocates the block of memory previously allocated by `malloc` that `ptr` points to. This returns the memory to the heap for future use.
-
-##### 1.5 File I/O in C
-
-File Input/Output (I/O) in C is handled through a structure called **`FILE`**, which acts as a stream handle. To work with a file, you must first open it using the `fopen()` function.
-
-*   `FILE* fopen(const char* filename, const char* mode)`: Attempts to open the file specified by `filename` in the mode specified by `mode`. If successful, it returns a `FILE` pointer; otherwise, it returns `NULL`. It is critical to always check the return value of `fopen()`.
-
-Common modes include:
-*   `"r"`: Read only. The file must exist.
-*   `"w"`: Write only. Creates a new file or truncates an existing one.
-*   `"a"`: Append. Writes data to the end of the file. Creates the file if it does not exist.
-*   `"r+"`: Read and write. The file must exist.
-*   `"w+"`: Read and write. Creates a new file or truncates an existing one.
-
-After you are finished with a file, it must be closed using `fclose(FILE *stream)` to ensure all buffered data is written to disk and system resources are released.
-
-##### 1.6 C Preprocessor
-
-The C preprocessor is a tool that modifies the source code *before* it is passed to the compiler. It operates on commands called **directives**, which begin with a `#` symbol.
+The C preprocessor is a tool that processes the source code *before* compilation. It operates on a text-to-text basis, performing substitutions and transformations based on **preprocessor directives**—lines that begin with a `#` symbol. It does not understand C syntax or semantics.
 
 Key directives include:
-*   `#include`: Includes the contents of another file. Used for header files like `<stdio.h>` or user-defined headers `"myheader.h"`.
-*   `#define`: Creates a **macro**, which is a rule for text substitution.
-    *   *Object-like macros*: ` #define PI 3.14159` replaces all subsequent occurrences of `PI` with `3.14159`.
-    *   *Function-like macros*: `#define SQUARE(x) ((x) * (x))` replaces calls like `SQUARE(5)` with `((5) * (5))`. The extra parentheses are crucial to avoid operator precedence errors.
-*   `#ifdef`, `#ifndef`, `#endif`: These are used for **conditional compilation**. They allow you to include or exclude blocks of code based on whether a macro is defined. A common use is for "header guards" to prevent a header file from being included multiple times.
+*   `#include`: Replaces the directive with the entire content of a specified file. This is how header files (like `stdio.h`) are incorporated into your code.
+*   `#define`: Creates a **macro**. In its simplest form, it's a find-and-replace for a token. It can also define function-like macros with parameters, but these are prone to errors if not written carefully (e.g., by wrapping all parameters and the entire macro body in parentheses).
+*   `#if`, `#ifdef`, `#ifndef`, `#else`, `#elif`, `#endif`: These directives provide **conditional compilation**. They allow the preprocessor to include or exclude blocks of code based on certain conditions, such as whether a macro is defined. A common use case is the **include guard**, which prevents a header file from being included multiple times in a single compilation unit.
 
-#### 2. Definitions
+<!-- DIAGRAM HERE -->
 
-*   **Pointer**: A variable that stores the memory address of another variable.
-*   **Dereferencing**: The process of accessing the value stored at the memory address pointed to by a pointer, using the `*` operator.
-*   **Array**: A collection of a fixed number of elements of the same data type stored in a contiguous block of memory.
-*   **Array Decay**: The implicit conversion of an array name to a pointer to its first element in most expression contexts.
-*   **Stack**: A region of memory used for storing local variables and function call data. It is managed automatically by the compiler with a Last-In, First-Out (LIFO) discipline.
-*   **Heap**: A region of memory used for dynamic allocation, where the programmer has full control over the lifetime of variables.
-*   **Dynamic Memory Allocation**: The process of allocating memory from the heap at runtime using functions like `malloc`.
-*   **Memory Leak**: A situation where dynamically allocated memory is no longer needed by the program but is not deallocated with `free`, making it unusable for the remainder of the program's execution.
-*   **Dangling Pointer**: A pointer that continues to point to a memory location that has already been deallocated (freed).
-*   **File Handle**: A `FILE` pointer that represents an open file stream, used in all subsequent I/O operations on that file.
-*   **Preprocessor Directive**: An instruction for the C preprocessor, beginning with `#`, that modifies the source code before compilation.
-*   **Macro**: A named fragment of code that the preprocessor replaces with its defined value or expression before compilation.
+##### **1.5 File I/O in C**
 
-#### 3. Mistakes
+File input/output (I/O) in C is handled through the standard library, primarily defined in the `<stdio.h>` header. The central concept is the **file stream**, which is an abstraction that allows a programmer to treat files and other I/O devices (like the console) in a uniform way.
 
-*   **Dereferencing a NULL or Uninitialized Pointer**: Attempting to access the value at a `NULL` address or a pointer that hasn't been assigned a valid address. **Why it's wrong:** This results in undefined behavior, which almost always leads to a program crash (e.g., a segmentation fault), as you are trying to access memory that your program does not own.
-*   **Forgetting to call `free()` on Dynamically Allocated Memory**: Allocating memory with `malloc()` but never deallocating it. **Why it's wrong:** This causes a memory leak. The memory remains allocated but inaccessible, and over time, the program can consume all available memory and crash.
-*   **Using a Pointer After `free()` (Dangling Pointer)**: Continuing to use a pointer after the memory it points to has been deallocated. **Why it's wrong:** The memory you are trying to access may have been reallocated for another purpose. This can lead to silent data corruption, unpredictable behavior, and security vulnerabilities.
-*   **Incorrect Pointer Arithmetic Scaling**: Assuming `pointer + 1` adds 1 byte to the address. **Why it's wrong:** C automatically scales pointer arithmetic by the size of the pointed-to type. Misunderstanding this can lead to accessing incorrect memory locations within an array or structure.
-*   **Writing Macros Without Sufficient Parentheses**: Defining a function-like macro like `#define SQUARE(x) x * x`. **Why it's wrong:** This can lead to incorrect results due to operator precedence. For example, `SQUARE(a + b)` would expand to `a + b * a + b`, which is not `(a+b)*(a+b)`. The correct definition is `#define SQUARE(x) ((x) * (x))`.
-*   **Failing to Check if `fopen()` Returned `NULL`**: Opening a file without verifying that the returned `FILE` pointer is valid. **Why it's wrong:** If the file cannot be opened (e.g., it doesn't exist in read mode, or permissions are denied), `fopen()` returns `NULL`. Subsequent attempts to use this `NULL` pointer with functions like `fprintf()` or `fclose()` will result in a program crash.
+A file stream is represented by a pointer to a `FILE` object, often called a **file handle**.
 
-#### 4. Examples
+The standard workflow for file I/O is:
+1.  **Open the file**: Use the `fopen()` function, providing a file path and a *mode string* (e.g., `"r"` for reading, `"w"` for writing, `"a"` for appending). `fopen()` returns a `FILE` pointer if successful or `NULL` on failure.
+2.  **Perform I/O**: Read from or write to the file using functions like:
+    *   `fscanf()` / `fprintf()`: For formatted input/output, similar to `scanf()` and `printf()`.
+    *   `fgets()` / `fputs()`: For reading/writing strings (lines).
+    *   `fgetc()` / `fputc()`: For reading/writing single characters.
+    *   `fread()` / `fwrite()`: For binary I/O of raw data blocks.
+3.  **Close the file**: Use the `fclose()` function, passing the `FILE` pointer. This is a critical step that flushes any buffered data to the disk and releases system resources associated with the file. Forgetting to close a file can lead to data loss.
 
-##### Example 1: Swap two integers using pointers
-**Question:** Write a C function `void swap(int *a, int *b)` that swaps the values of the two integers it points to.
+#### **2. Definitions**
 
+*   **Pointer**: A variable that stores the memory address of another object.
+*   **Dereferencing**: The action of accessing the value stored at the memory address pointed to by a pointer, using the `*` operator.
+*   **Dynamic Memory Allocation**: The process of requesting memory from the operating system at runtime (e.g., using `malloc()`). This memory is not managed by the compiler's scope rules and must be manually deallocated.
+*   **Memory Leak**: A situation where dynamically allocated memory is no longer needed by the program but is not deallocated (freed), making it unusable for the remainder of the program's execution.
+*   **Dangling Pointer**: A pointer that refers to a memory location that has been freed or deallocated.
+*   **Preprocessor**: A program that processes source code before compilation, performing tasks like file inclusion, macro expansion, and conditional compilation.
+*   **Macro**: An identifier defined with `#define` that is replaced by its corresponding value or code block by the preprocessor before compilation.
+*   **Typedef**: A keyword in C used to create a synonym or alias for an existing data type, often used to simplify complex type declarations.
+*   **File Handle**: A pointer to a `FILE` structure (`FILE *`), which holds all the necessary information to manage a file stream, such as its current position, buffer status, and error indicators.
+
+#### **4. Mistakes**
+
+*   **Dereferencing an Uninitialized or NULL Pointer**: An uninitialized pointer holds a garbage value, and a `NULL` pointer points to nothing. Attempting to access the memory they "point to" results in undefined behavior, which often leads to a program crash (segmentation fault). **Why it's wrong**: You are trying to read from or write to a memory address that is either invalid or not owned by your program.
+*   **Forgetting to Free Dynamically Allocated Memory**: If you allocate memory with `malloc()` but fail to release it with `free()` when it's no longer needed, you create a memory leak. **Why it's wrong**: Over time, memory leaks can exhaust available system memory, causing the program or even the entire system to slow down or crash.
+*   **Using a Pointer After `free()`**: Accessing memory through a pointer after it has been freed is a classic dangling pointer error. **Why it's wrong**: The memory management system may have already reassigned that memory block to another part of your program or to a different application. Writing to it can corrupt data, and reading from it can yield garbage values.
+*   **Returning a Pointer to a Local Variable**: A function's local variables exist on the stack and are destroyed when the function returns. Returning a pointer to such a variable creates a dangling pointer. **Why it's wrong**: The caller receives a pointer to a memory address that is no longer valid. Any attempt to use it will result in undefined behavior.
+*   **Incorrect Macro Definitions**: Defining a macro like `#define SQUARE(x) x*x` can lead to incorrect results due to operator precedence. For example, `SQUARE(a+b)` expands to `a+b*a+b`, not `(a+b)*(a+b)`. **Why it's wrong**: The preprocessor performs simple text substitution without understanding C's rules. Always wrap macro parameters and the entire macro body in parentheses: `#define SQUARE(x) ((x)*(x))`.
+*   **Not Checking the Return Value of `fopen()`**: The `fopen()` function returns `NULL` if it fails to open a file (e.g., file not found, no permissions). Proceeding to use this `NULL` pointer with functions like `fgets()` or `fclose()` will cause a crash. **Why it's wrong**: It's a specific case of dereferencing a `NULL` pointer. Robust code must always verify that the file was opened successfully before attempting to use the file handle.
+
+#### **5. Examples**
+
+##### **5.1. Basic Pointer Manipulation**
+**Question:** Write a C program that declares an integer `x` with a value of 100. Declare a pointer `p`, make it point to `x`, and then use the pointer to change the value of `x` to 200. Print the final value of `x`.
 <details>
 <summary>Click to see the solution</summary>
-
-1.  **Declare a temporary variable:** Create a temporary integer `temp` to hold one of the values during the swap.
-2.  **Store the value of the first integer:** Dereference the first pointer `a` and store its value in `temp`.
-3.  **Assign the second value to the first:** Dereference the second pointer `b` and assign its value to the location pointed to by `a`.
-4.  **Assign the temporary value to the second:** Assign the value stored in `temp` to the location pointed to by `b`.
 
 ```c
 #include <stdio.h>
 
-void swap(int *a, int *b) {
-    // 1. Create a temporary variable
-    int temp;
-
-    // 2. Store the value pointed to by 'a'
-    temp = *a;
-
-    // 3. Store the value of 'b' into 'a'
-    *a = *b;
-
-    // 4. Store the original value of 'a' (from temp) into 'b'
-    *b = temp;
-}
-
 int main() {
-    int x = 10;
-    int y = 20;
-    printf("Before swap: x = %d, y = %d\n", x, y);
-    swap(&x, &y); // Pass the addresses of x and y
-    printf("After swap: x = %d, y = %d\n", x, y);
+    // 1. Declare an integer and a pointer.
+    int x;
+    int *p;
+
+    // 2. Initialize the integer and make the pointer point to it.
+    x = 100;
+    p = &x; // Assign the address of x to p
+
+    // 3. Use the pointer to modify the value.
+    // *p accesses the value at the address p is holding.
+    *p = 200;
+
+    // 4. Print the result.
+    printf("The final value of x is: %d\n", x);
+
     return 0;
 }
 ```
 
-**Answer:** The function correctly modifies the original variables `x` and `y` in the `main` function because it operates on their memory addresses.
+**Answer:** The program will print **`The final value of x is: 200`**.
+
 </details>
 
-##### Example 2: Find the length of a string using a pointer
-**Question:** Write a C function `int string_length(const char *str)` that computes the length of a string without using the `strlen()` library function.
-
+##### **5.2. Dynamic Memory Allocation**
+**Question:** Write a C program to dynamically allocate memory for an integer, assign it the value 42, print the value, and then free the memory.
 <details>
 <summary>Click to see the solution</summary>
 
-1.  **Create a moving pointer:** Declare a new pointer `const char *p` and initialize it with the starting address of the string `str`.
-2.  **Iterate until the null terminator:** Use a `while` loop that continues as long as the character pointed to by `p` is not the null terminator `'\0'`.
-3.  **Increment the pointer:** Inside the loop, increment the pointer `p` to move to the next character.
-4.  **Calculate the length:** After the loop terminates, the difference between the final address in `p` and the initial address in `str` gives the number of characters, which is the length of the string.
-
 ```c
 #include <stdio.h>
-
-int string_length(const char *str) {
-    // 1. Create a pointer to the start of the string
-    const char *p = str;
-
-    // 2 & 3. Loop until the null terminator is found, moving the pointer
-    while (*p != '\0') {
-        p++;
-    }
-
-    // 4. The difference in addresses is the length
-    return p - str;
-}
+#include <stdlib.h> // Required for malloc() and free()
 
 int main() {
-    char my_string[] = "Hello, World!";
-    int len = string_length(my_string);
-    printf("The length of \"%s\" is %d\n", my_string, len);
-    return 0;
-}
-```
+    // 1. Declare a pointer to hold the address of the dynamic memory.
+    int *ptr;
 
-**Answer:** The function will return **13**.
-</details>
+    // 2. Allocate memory for one integer using malloc().
+    // sizeof(int) ensures portability.
+    ptr = (int *)malloc(sizeof(int));
 
-##### Example 3: Sum array elements using pointer arithmetic
-**Question:** Write a C function to calculate the sum of elements in an integer array using only pointer arithmetic for traversal.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Initialize sum:** Declare an integer `sum` and initialize it to 0.
-2.  **Create a pointer to the end:** Create a pointer `p_end` that points one element past the end of the array. This will be the loop's termination condition. The address is calculated as `arr + size`.
-3.  **Loop through the array:** Use a `for` loop that iterates from the start of the array (`arr`) until the pointer reaches `p_end`.
-4.  **Add value to sum:** In each iteration, dereference the current pointer `p` to get the element's value and add it to `sum`.
-
-```c
-#include <stdio.h>
-
-int sum_array(int *arr, int size) {
-    // 1. Initialize sum
-    int sum = 0;
-    
-    // 2. Create a pointer to the element after the last one
-    int *p_end = arr + size;
-
-    // 3. Loop using a pointer 'p' from the start to the end
-    for (int *p = arr; p < p_end; p++) {
-        // 4. Add the value at the current pointer location
-        sum += *p;
-    }
-    
-    return sum;
-}
-
-int main() {
-    int numbers[] = {10, 20, 30, 40, 50};
-    int total = sum_array(numbers, 5);
-    printf("The sum of the array is: %d\n", total);
-    return 0;
-}
-```
-
-**Answer:** The function will return **150**.
-</details>
-
-##### Example 4: Dynamically allocate an array
-**Question:** Write a C program that asks the user for a size `n`, dynamically allocates an integer array of that size, fills it with numbers from 0 to `n-1`, prints the array, and then frees the memory.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Get size from user:** Prompt the user to enter an integer `n`.
-2.  **Allocate memory:** Call `malloc` to request `n * sizeof(int)` bytes of memory. Cast the returned `void*` to `int*`.
-3.  **Check for allocation failure:** Always check if `malloc` returned `NULL`. If it did, print an error and exit.
-4.  **Populate the array:** Use a `for` loop from 0 to `n-1` to fill the array with values.
-5.  **Print the array:** Use another `for` loop to print the elements.
-6.  **Free the memory:** Call `free()` on the pointer to deallocate the memory.
-
-```c
-#include <stdio.h>
-#include <stdlib.h>
-
-int main() {
-    int n;
-    
-    // 1. Get size from user
-    printf("Enter the size of the array: ");
-    scanf("%d", &n);
-
-    // 2. Allocate memory for 'n' integers
-    int *arr = (int*)malloc(n * sizeof(int));
-
-    // 3. Check if malloc was successful
-    if (arr == NULL) {
+    // 3. Check if malloc() was successful.
+    if (ptr == NULL) {
         printf("Memory allocation failed!\n");
         return 1; // Exit with an error code
     }
 
-    // 4. Populate the array
-    for (int i = 0; i < n; i++) {
-        arr[i] = i;
-    }
+    // 4. Assign a value to the allocated memory.
+    *ptr = 42;
 
-    // 5. Print the array
-    printf("Dynamically allocated array: ");
-    for (int i = 0; i < n; i++) {
-        printf("%d ", arr[i]);
-    }
-    printf("\n");
+    // 5. Print the value.
+    printf("Value in dynamically allocated memory: %d\n", *ptr);
 
-    // 6. Free the allocated memory
-    free(arr);
+    // 6. Free the allocated memory to prevent a leak.
+    free(ptr);
+    ptr = NULL; // Good practice to nullify pointer after freeing
 
     return 0;
 }
 ```
 
-**Answer:** If the user enters `5`, the program will allocate an array, fill it with `0, 1, 2, 3, 4`, print it, and then release the memory.
+**Answer:** The program will print **`Value in dynamically allocated memory: 42`**.
+
 </details>
 
-##### Example 5: Write a string to a file
-**Question:** Write a C program that creates a file named `output.txt` and writes the string "Hello, File I/O!" into it.
-
+##### **5.3. Passing Pointers to Functions (Swap)**
+**Question:** Create a function `swap` that takes pointers to two integers as arguments and swaps their values. Demonstrate its use in the `main` function.
 <details>
 <summary>Click to see the solution</summary>
-
-1.  **Open the file in write mode:** Call `fopen("output.txt", "w")` to get a `FILE` pointer.
-2.  **Check for `fopen` failure:** Verify that the returned pointer is not `NULL`.
-3.  **Write to the file:** Use `fprintf()` to write the string to the file stream.
-4.  **Close the file:** Call `fclose()` to close the file and save changes.
 
 ```c
 #include <stdio.h>
 
+// 1. Define the swap function that accepts pointers.
+void swap(int *a, int *b) {
+    int temp = *a; // Store the value at address 'a'
+    *a = *b;       // Put the value at address 'b' into address 'a'
+    *b = temp;     // Put the stored original value into address 'b'
+}
+
 int main() {
-    // 1. Open the file
-    FILE *file_ptr = fopen("output.txt", "w");
+    // 2. Initialize two integers.
+    int x = 10;
+    int y = 20;
 
-    // 2. Check if the file was opened successfully
-    if (file_ptr == NULL) {
-        printf("Error opening file!\n");
-        return 1;
-    }
+    printf("Before swap: x = %d, y = %d\n", x, y);
 
-    // 3. Write the string to the file
-    fprintf(file_ptr, "Hello, File I/O!");
+    // 3. Call swap, passing the addresses of x and y.
+    swap(&x, &y);
 
-    // 4. Close the file
-    fclose(file_ptr);
-
-    printf("Successfully wrote to output.txt\n");
+    printf("After swap: x = %d, y = %d\n", x, y);
 
     return 0;
-}```
+}
+```
 
-**Answer:** The program will create a file named `output.txt` in the same directory with the content "Hello, File I/O!".
+**Answer:** The program's output will be:
+**Before swap: x = 10, y = 20**
+**After swap: x = 20, y = 10**
+
 </details>
 
-##### Example 6: Read content from a file
-**Question:** Write a C program that reads the content of `output.txt` (created in the previous example) and prints it to the console character by character.
-
+##### **5.4. Pointer to a Function**
+**Question:** Create two functions, `add(int, int)` and `subtract(int, int)`. Create a pointer to a function that can point to either of them. Use the pointer to call both functions with inputs 5 and 3 and print the results.
 <details>
 <summary>Click to see the solution</summary>
 
-1.  **Open the file in read mode:** Call `fopen("output.txt", "r")`.
-2.  **Check for `fopen` failure:** Ensure the file pointer is not `NULL`.
-3.  **Read characters in a loop:** Use a `while` loop with `fgetc()` to read one character at a time. The loop continues until `fgetc()` returns `EOF` (End-Of-File).
-4.  **Print each character:** Inside the loop, print the character read using `putchar()`.
-5.  **Close the file:** Call `fclose()` after the loop finishes.
+```c
+#include <stdio.h>
+
+int add(int a, int b) {
+    return a + b;
+}
+
+int subtract(int a, int b) {
+    return a - b;
+}
+
+int main() {
+    // 1. Declare a pointer to a function that takes two ints and returns an int.
+    int (*operation)(int, int);
+    int result;
+
+    // 2. Point it to the 'add' function and call it.
+    operation = &add;
+    result = operation(5, 3); // or (*operation)(5, 3)
+    printf("Result of addition: %d\n", result);
+
+    // 3. Point it to the 'subtract' function and call it.
+    operation = &subtract;
+    result = operation(5, 3);
+    printf("Result of subtraction: %d\n", result);
+
+    return 0;
+}
+```
+
+**Answer:** The output will be:
+**Result of addition: 8**
+**Result of subtraction: 2**
+
+</details>
+
+##### **5.5. Fixing a Faulty Macro**
+**Question:** The following macro is intended to calculate the square of a number but fails for expressions like `SQUARE(2+3)`. Correct the macro.
+`#define SQUARE(x) x*x`
+<details>
+<summary>Click to see the solution</summary>
+
+1.  **Identify the problem**: The expression `SQUARE(2+3)` expands to `2+3*2+3`, which evaluates to `2 + 6 + 3 = 11` due to operator precedence, not the expected `5*5=25`.
+2.  **Add parentheses around parameters**: To ensure the parameter `x` is evaluated as a single unit, wrap every instance of it in parentheses. The macro becomes `#define SQUARE(x) (x)*(x)`.
+3.  **Add parentheses around the whole body**: To protect the macro from the surrounding context, wrap the entire body in parentheses.
+
+**Corrected Macro:**
+```c
+#define SQUARE(x) ((x)*(x))
+```
+
+**Example Usage:**
+```c
+#include <stdio.h>
+
+#define SQUARE(x) ((x)*(x))
+
+int main() {
+    int result = SQUARE(2+3);
+    printf("The result is: %d\n", result); // Prints 25
+    return 0;
+}
+```
+
+**Answer:** The corrected macro is **`#define SQUARE(x) ((x)*(x))`**.
+
+</details>
+
+##### **5.6. Reading from a File**
+**Question:** Write a program that creates a file named `data.txt`, writes "Hello, World!" to it, closes it, and then re-opens it for reading to print its content to the console.
+<details>
+<summary>Click to see the solution</summary>
 
 ```c
 #include <stdio.h>
 
 int main() {
-    // 1. Open the file in read mode
-    FILE *file_ptr = fopen("output.txt", "r");
+    FILE *file_ptr;
+    char buffer; // A buffer to hold the line read from the file
+
+    // 1. Open file for writing ("w" mode).
+    file_ptr = fopen("data.txt", "w");
+    if (file_ptr == NULL) {
+        printf("Could not create file for writing.\n");
+        return 1;
+    }
     
-    // 2. Check for failure
+    // 2. Write to the file and close it.
+    fprintf(file_ptr, "Hello, World!\n");
+    fclose(file_ptr);
+    printf("Wrote to data.txt successfully.\n");
+
+    // 3. Open the same file for reading ("r" mode).
+    file_ptr = fopen("data.txt", "r");
     if (file_ptr == NULL) {
-        printf("Error opening file for reading!\n");
+        printf("Could not open file for reading.\n");
         return 1;
     }
 
-    int ch;
-    printf("Content of output.txt:\n");
-
-    // 3. Read character by character until EOF is reached
-    while ((ch = fgetc(file_ptr)) != EOF) {
-        // 4. Print the character
-        putchar(ch);
+    // 4. Read the line from the file and print it.
+    if (fgets(buffer, sizeof(buffer), file_ptr) != NULL) {
+        printf("Content of data.txt: %s", buffer);
     }
-    printf("\n");
-
-    // 5. Close the file
-    fclose(file_ptr);
-
-    return 0;
-}
-```
-
-**Answer:** The program will print "Hello, File I/O!" to the console.
-</details>
-
-##### Example 7: Create a safe function-like macro
-**Question:** Define a function-like macro `MIN(a, b)` that correctly returns the minimum of two values, and demonstrate why parentheses are crucial.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Define the macro with parentheses:** Use the ternary operator `? :` for the comparison. Enclose each argument `a` and `b` in parentheses, and enclose the entire expression in parentheses.
-2.  **Demonstrate the macro:** Show its use with simple integers and with expressions to highlight its safety.
-
-```c
-#include <stdio.h>
-
-// 1. Correct and safe macro definition
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-
-int main() {
-    int x = 5, y = 10;
     
-    // Works as expected
-    printf("Min of %d and %d is %d\n", x, y, MIN(x, y));
-
-    // Works correctly with expressions because of parentheses
-    printf("Min of %d and %d is %d\n", x + 5, y - 8, MIN(x + 5, y - 8)); 
-    // Expands to (((5 + 5) < (10 - 8)) ? (5 + 5) : (10 - 8))
-    // which correctly evaluates to 2.
-
-    return 0;
-}
-```
-
-**Answer:** The macro `MIN(a, b)` correctly finds the minimum value even when the arguments are complex expressions, because the extra parentheses prevent operator precedence issues.
-</details>
-
-##### Example 8: Equivalence of array and pointer notation
-**Question:** Write a C program that creates an integer array and accesses its third element using both `array[2]` and `*(array + 2)` to prove they are equivalent.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Initialize an array:** Create an integer array with some values.
-2.  **Access with array notation:** Get the value of the third element using `numbers[2]` and store it in a variable.
-3.  **Access with pointer notation:** Get the value of the third element by treating the array name as a pointer: `*(numbers + 2)`. Store this in another variable.
-4.  **Print and compare:** Print both values to show they are identical.
-
-```c
-#include <stdio.h>
-
-int main() {
-    // 1. Initialize array
-    int numbers[] = {11, 22, 33, 44, 55};
-
-    // 2. Access using array notation
-    int val1 = numbers;
-
-    // 3. Access using pointer notation
-    int val2 = *(numbers + 2);
-
-    // 4. Print results
-    printf("Accessing the 3rd element:\n");
-    printf("Using array notation 'numbers': %d\n", val1);
-    printf("Using pointer notation '*(numbers + 2)': %d\n", val2);
-
-    return 0;
-}
-```
-
-**Answer:** The program will print `33` for both access methods, demonstrating their equivalence.
-</details>
-
-##### Example 9: Read integers from a file until EOF
-**Question:** Create a file `numbers.txt` with integers on each line (e.g., 10, 20, 30). Write a C program to read all integers from this file and print their sum.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Open the file:** Open `numbers.txt` in read mode.
-2.  **Initialize variables:** Create `int num` to hold the number read and `int sum = 0`.
-3.  **Loop with `fscanf`:** Use a `while` loop. The condition `fscanf(file_ptr, "%d", &num) == 1` will be true as long as `fscanf` successfully reads one integer. It will return `EOF` or 0 when it fails, stopping the loop.
-4.  **Add to sum:** Inside the loop, add the read number `num` to `sum`.
-5.  **Close file and print result:** After the loop, close the file and print the total `sum`.
-
-```c
-#include <stdio.h>
-
-int main() {
-    // Before running, create a file named "numbers.txt" with content:
-    // 10
-    // 20
-    // 30
-
-    // 1. Open the file
-    FILE *file_ptr = fopen("numbers.txt", "r");
-    if (file_ptr == NULL) {
-        printf("Could not open numbers.txt. Please create it first.\n");
-        return 1;
-    }
-
-    // 2. Initialize variables
-    int num;
-    int sum = 0;
-
-    // 3. Loop as long as fscanf successfully reads an integer
-    while (fscanf(file_ptr, "%d", &num) == 1) {
-        // 4. Add the number to sum
-        sum += num;
-    }
-
-    // 5. Close the file and print
+    // 5. Close the file.
     fclose(file_ptr);
-    printf("The sum of numbers in the file is: %d\n", sum);
 
     return 0;
 }
 ```
 
-**Answer:** If `numbers.txt` contains `10`, `20`, and `30`, the program will output a sum of **60**.
+**Answer:** The program will first print **`Wrote to data.txt successfully.`** and then **`Content of data.txt: Hello, World!`**.
+
 </details>
 
-##### Example 10: Dynamic allocation of a struct
-**Question:** Define a `struct Student`, dynamically allocate memory for one student, populate its fields, print them, and then free the memory.
-
+##### **5.7. Using an Include Guard**
+**Question:** Create a header file `math_utils.h` that defines a simple `PI` constant. Protect it with an include guard to prevent multiple inclusion errors. Then, create a `main.c` file that includes it twice to show the guard works.
 <details>
 <summary>Click to see the solution</summary>
 
-1.  **Define the struct:** Create a `struct Student` with fields like `id` and `name`.
-2.  **Allocate memory:** Use `malloc(sizeof(struct Student))` to allocate enough memory for one `Student` object.
-3.  **Check for `malloc` failure:** Ensure the returned pointer is not `NULL`.
-4.  **Populate the fields:** Use the arrow operator (`->`) to access and assign values to the struct fields via the pointer.
-5.  **Print the data:** Use the arrow operator again to print the field values.
-6.  **Free the memory:** Call `free()` on the pointer.
-
+**Step 1: Create `math_utils.h`**
 ```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+// math_utils.h
 
-// 1. Define the struct
-struct Student {
-    int id;
-    char name;
-};
+// 1. The include guard starts here.
+#ifndef MATH_UTILS_H
+#define MATH_UTILS_H
+
+// 2. The actual content of the header file.
+#define PI 3.14159
+
+// 3. The include guard ends here.
+#endif // MATH_UTILS_H
+```
+
+**Step 2: Create `main.c`**
+```c
+// main.c
+#include <stdio.h>
+
+// 4. Include the header file the first time.
+// The preprocessor sees that MATH_UTILS_H is not defined,
+// defines it, and includes the content.
+#include "math_utils.h"
+
+// 5. Include the header file the second time.
+// The preprocessor sees that MATH_UTILS_H is now defined,
+// so it skips the content between #ifndef and #endif.
+#include "math_utils.h"
 
 int main() {
-    // 2. Allocate memory for one Student struct
-    struct Student *s1 = (struct Student*)malloc(sizeof(struct Student));
-
-    // 3. Check for allocation failure
-    if (s1 == NULL) {
-        printf("Memory allocation failed!\n");
-        return 1;
-    }
-
-    // 4. Populate the fields using the arrow operator
-    s1->id = 101;
-    strcpy(s1->name, "Alice");
-
-    // 5. Print the data
-    printf("Student ID: %d\n", s1->id);
-    printf("Student Name: %s\n", s1->name);
-
-    // 6. Free the allocated memory
-    free(s1);
-
+    printf("The value of PI is: %f\n", PI);
     return 0;
 }
 ```
 
-**Answer:** The program will allocate memory for a student, set its ID to 101 and name to "Alice", print these details, and then correctly deallocate the memory.
+**Explanation:** Without the include guard, the preprocessor would try to `#define PI` twice, causing a compilation error. With the guard, the second `#include` does nothing, and the program compiles and runs correctly.
+
+**Answer:** The program will compile successfully and print **`The value of PI is: 3.141590`**.
+
 </details>

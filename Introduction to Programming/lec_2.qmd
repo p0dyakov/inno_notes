@@ -1,367 +1,388 @@
 ---
-title: "2. Pointers, Strings, Arrays, Memory Model"
+title: "Pointers, Strings, and Arrays in C"
 author: "Zakhar Podyakov"
-date: "September 16, 2025"
+date: "September 17, 25 25"
 format: html
 engine: knitr
 ---
 
-#### 1. Summary
+#### **1. Summary**
 
-##### 1.1 Program Execution and Compilation
+##### **1.1 Memory, Values, and Addresses**
+In computing, a program's data is stored in **memory**. It's helpful to visualize memory as a huge, single sequence of cells, much like a long row of mailboxes. Each cell has two key attributes:
+1.  An **address**: This is a unique numerical identifier for the cell's location, similar to a mailbox number. Addresses are typically represented in hexadecimal format (e.g., `0x7ffc...`).
+2.  A **value**: This is the actual data stored inside the cell, like the letter inside a mailbox.
 
-A program written in a **high-level language** like C is not directly understood by a computer's processor. It must be translated into **machine language**, which consists of binary instructions. This translation process involves several stages, primarily compilation, assembly, and linking.
+Every variable you declare in a program, whether it's an integer, a character, or something more complex, occupies one or more of these memory cells. The crucial concept is to *distinguish between the address of a variable and the value it holds*. For instance, an integer variable `x` with a value of `100` might be located at memory address `0x23451`.
 
-1.  **Source Code**: This is the human-readable code written by the programmer (e.g., in a `.c` file).
-2.  **Compiler**: A compiler translates the high-level source code into a lower-level language called **assembly code**. This step checks for syntax errors and begins the process of optimization.
-3.  **Assembler**: An assembler takes the assembly code and translates it into **object code** (or machine code). This code is almost ready for execution but may be missing pieces if it relies on other files or libraries. Each source file is typically compiled into its own object file.
-4.  **Linker**: The linker's job is to take one or more object files and combine them into a single **executable program**. It resolves references between different files (e.g., when one file calls a function defined in another) and links in necessary code from system libraries.
+<!-- DIAGRAM HERE -->
 
-This multi-stage process allows for *separate compilation*, where large projects can be broken into smaller, manageable source files that are compiled independently.
+##### **1.2 Pointers**
+A **pointer** is a special type of variable designed to hold a *memory address* as its value. Instead of storing data like an integer or a character directly, it stores the location of *other* data. This makes pointers an incredibly powerful tool for indirect data manipulation.
 
-```{tikz}
-#| label: fig-compilation-flow
-#| fig-cap: "The C compilation pipeline from source code to an executable program."
-#| echo: false
-#| lang: tex
+A pointer is declared by specifying the type of data it will point to, followed by an asterisk (`*`). For example, `int* p;` declares a pointer `p` that is intended to hold the address of an integer.
 
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+There are two fundamental operators associated with pointers:
+*   The **address-of operator (`&`)**: This is a unary operator that, when placed before a variable name, returns its memory address. For example, `&var1` gives the address where `var1` is stored.
+*   The **dereference operator (`*`)**: This is also a unary operator that, when placed before a pointer variable, accesses the value *at the address the pointer is holding*. It essentially says, "go to the address stored in this pointer and get the value from there."
 
-\begin{document}
-\begin{tikzpicture}[
-  node distance=2cm,
-  block/.style={rectangle, draw, fill=blue!10, text width=7em, text centered, rounded corners, minimum height=3em},
-  arrow/.style={-Latex, thick}
-]
+For example, to make a pointer `p` point to an integer `x`, you would write `p = &x;`. To then retrieve the value of `x` using the pointer `p`, you would write `*p`.
 
-  \node[block] (source) {High-Level Code (e.g., `main.c`)};
-  \node[block, below=of source] (assembly) {Assembly Code};
-  \node[block, below=of assembly] (object) {Object Code (`main.o`)};
-  \node[block, below=of object] (executable) {Executable Program};
-  
-  \node[right=0.5cm of source, text width=5em] (compiler) {Compiler};
-  \node[right=0.5cm of assembly, text width=5em] (assembler) {Assembler};
-  \node[right=0.5cm of object, text width=5em] (linker) {Linker};
-  
-  \draw[arrow] (source) -- (assembly) node[midway, right] {Compilation};
-  \draw[arrow] (assembly) -- (object) node[midway, right] {Assembly};
-  \draw[arrow] (object) -- (executable) node[midway, right] {Linking};
+##### **1.3 Arrays**
+An **array** is a data structure that stores a *fixed-size, sequential collection of elements of the same data type*. Imagine an array as a connected block of memory cells. You can access individual elements by their position, or **index**, which starts at `0`.
 
-\end{tikzpicture}
-\end{document}
-```
+For example, `double balance[10];` declares an array named `balance` that can hold 10 elements of type `double`. The first element is `balance[0]` and the last is `balance[9]`.
 
-##### 1.2 The C Memory Model
+A critical concept in C is the close relationship between arrays and pointers. *The name of an array, when used in most expressions, decays into a pointer to its first element*. This means that the expressions `balance` and `&balance[0]` are equivalent; both yield the memory address of the first element of the array.
 
-When a C program runs, it organizes its memory usage into distinct segments. The two most important are the **stack** and the **heap**. At a more fundamental level, all memory is just a vast sequence of numbered boxes, or *bytes*.
+Because of this, you can use pointer arithmetic to navigate an array. If `p` is a pointer to the first element of an array, then `*(p + i)` is equivalent to `array[i]`. It's important to note that pointer arithmetic is automatically scaled by the size of the data type. If `p` is an `int*`, `p + 1` increments the address not by 1 byte, but by `sizeof(int)` bytes to point to the next integer in memory.
 
-*   **Address**: Each byte in memory has a unique number, like a house number on a street. This is its **address**. Addresses are typically represented in hexadecimal format (e.g., `0x7ffc...`).
-*   **Value**: The **value** is the actual data stored inside that byte or sequence of bytes.
+##### **1.4 Strings in C**
+In the C programming language, a **string** is not a built-in data type. Instead, a string is implemented as a *one-dimensional array of characters that is terminated by a special character called the **null terminator***.
 
-It is crucial to distinguish between a variable's address (where it lives) and its value (what it holds).
-
-```{tikz}
-#| label: fig-memory-address
-#| fig-cap: "Memory as a sequence of cells, each with an address and a value."
-#| echo: false
-#| lang: tex
-
-\usepackage{tikz}
-\usetikzlibrary{positioning, shapes.multipart}
-
-\begin{document}
-\begin{tikzpicture}[
-  cell/.style={
-    rectangle, 
-    draw, 
-    minimum width=2cm, 
-    minimum height=1cm, 
-    text centered
-  }
-]
-  % Memory cells
-  \node[cell] (cell1) at (0,0) {17};
-  \node[cell] (cell2) at (2.2,0) {42};
-  \node[cell] (cell3) at (4.4,0) {'A'};
-  \node[cell] (cell4) at (6.6,0) {3.14};
-
-  % Addresses
-  \node[above=0.1cm of cell1] (addr1) {\footnotesize\texttt{0xbff5a400}};
-  \node[above=0.1cm of cell2] (addr2) {\footnotesize\texttt{0xbff5a404}};
-  \node[above=0.1cm of cell3] (addr3) {\footnotesize\texttt{0xbff5a408}};
-  \node[above=0.1cm of cell4] (addr4) {\footnotesize\texttt{0xbff5a40C}};
-
-  % Labels
-  \node[below=0.5cm of cell1] {Value};
-  \node[above=0.5cm of addr1] {Address};
-  
-  % Braces and labels
-  \draw[decorate, decoration={brace, amplitude=5pt}] (cell1.south west) -- (cell1.south east) node[midway, below=0.2cm] {`int var1`};
-  \draw[decorate, decoration={brace, amplitude=5pt}] (cell2.south west) -- (cell2.south east) node[midway, below=0.2cm] {`int var2`};
-
-\end{tikzpicture}
-\end{document}
-```
-
-**The Stack**
-The stack is a region of memory used for static memory allocation. It operates on a *Last-In, First-Out (LIFO)* principle.
-
-*   It stores **local variables** (variables declared inside functions).
-*   When a function is called, a new **stack frame** (or **activation record**) is "pushed" onto the stack. This frame contains the function's parameters, local variables, and the return address (where to go back to after the function finishes).
-*   When the function returns, its stack frame is "popped" off, and all its local variables are destroyed.
-*   Stack memory management is *automatic* and very fast.
-
-**The Heap**
-The heap is used for dynamic memory allocation.
-
-*   It is a large pool of memory available to the programmer to use as needed during runtime.
-*   Memory on the heap must be *explicitly* requested (e.g., using `malloc` in C) and *explicitly* freed (using `free`).
-*   Failure to free memory that is no longer needed leads to a **memory leak**.
-*   Heap memory is not managed automatically and is slightly slower to access than stack memory.
-
-##### 1.3 Pointers
-
-A **pointer** is one of the most fundamental and powerful concepts in C. A pointer is a variable whose value is the **memory address** of another variable. It "points to" the location where another piece of data is stored.
-
-*   **Declaration**: A pointer is declared with an asterisk `*` between the data type and the variable name. The type indicates what kind of data the pointer will point to. For example, `int* p;` declares `p` as a pointer that can point to an integer.
-
-*   **Address-Of Operator (`&`)**: To get the memory address of a variable, you use the ampersand `&` operator. For example, if `int var = 10;`, then `p = &var;` stores the address of `var` into the pointer `p`.
-
-*   **Dereference Operator (`*`)**: To access the value stored at the address a pointer is pointing to, you use the asterisk `*` operator. This is called **dereferencing**. Following the previous example, `*p` would evaluate to `10`. You can also use it to modify the value: `*p = 20;` would change the value of `var` to `20`.
-
-```{tikz}
-#| label: fig-pointer
-#| fig-cap: "Pointer `p` stores the address of variable `var`."
-#| echo: false
-#| lang: tex
-
-\usepackage{tikz}
-\usetikzlibrary{positioning, arrows.meta}
-
-\begin{document}
-\begin{tikzpicture}[
-    box/.style={rectangle, draw, minimum width=2.5cm, minimum height=1cm, text centered},
-    addr/.style={font=\tiny\texttt, anchor=west}
-]
-    % Variable 'var'
-    \node[box] (var) {10};
-    \node[above=0.1cm of var] (var_label) {`int var`};
-    \node[addr, left=0.1cm of var] (var_addr) {0xbff5a400};
-
-    % Pointer 'p'
-    \node[box, below=2cm of var] (p) {0xbff5a400};
-    \node[above=0.1cm of p] (p_label) {`int* p`};
-    \node[addr, left=0.1cm of p] (p_addr) {0xbff5a3f6};
-    
-    % Arrow
-    \draw[-{Stealth[length=2mm, width=2mm]}, thick, red] (p.east) .. controls +(0.5,0) and +(0.5,-1) .. (var.east);
-\end{tikzpicture}
-\end{document}
-```
-
-##### 1.4 Arrays
-
-An **array** is a data structure that stores a fixed-size, sequential collection of elements of the same type.
-
-*   **Declaration**: An array is declared by specifying its type, name, and size in square brackets. Example: `double balance[10];` creates an array named `balance` that can hold 10 `double` values.
-*   **Indexing**: Elements in an array are accessed via an **index**, which is a zero-based integer. The first element is at index `0`, the second at `1`, and so on. The last element of `balance[10]` is at index `9`.
-*   **Initialization**: Arrays can be initialized at declaration using curly braces: `int numbers[5] = {10, 20, 30, 40, 50};`.
-
-**Arrays and Pointers**
-In C, arrays and pointers are very closely related.
-*   The name of an array (without brackets) can be treated as a **pointer to its first element**.
-*   For an array `int arr[5];`, the expression `arr` is equivalent to `&arr[0]`.
-*   This allows for **pointer arithmetic**. If `p` points to `arr[0]`, then `p + 1` points to `arr[1]`, `p + 2` points to `arr[2]`, and so on. The compiler automatically scales the addition by the size of the data type (e.g., by 4 bytes for an `int`).
-
-##### 1.5 C-Style Strings
-
-In C, a **string** is not a built-in type. Instead, it is implemented as an **array of characters** that is terminated by a special character called the **null character** (`\0`). This null terminator is crucial; it acts as a sentinel value that marks the end of the string for library functions like `printf` or `strlen`.
+The **null terminator**, represented as `\0`, is a character with the ASCII value 0. It serves as a marker to signal the end of the string. Standard library functions that work with strings (like printing or calculating length) rely on this null character to know where to stop processing.
 
 There are two common ways to initialize a string:
+1.  **As a character array**: `char greeting[] = {'H', 'e', 'l', 'l', 'o', '\0'};`. In this case, you *must explicitly include the `\0`* at the end.
+2.  **As a string literal**: `char greeting[] = "Hello";`. This is the more common and convenient method. When you use double quotes, the compiler automatically allocates enough space for the characters and *appends the `\0` terminator for you*. This is why "Hello" requires an array of 6 characters, not 5.
 
-1.  **As a character array**: `char greeting1[6] = {'H', 'e', 'l', 'l', 'o', '\0'};`
-    *   Here, you must *explicitly* include the null character `\0`.
-    *   You must also ensure the array is large enough to hold all characters plus the null terminator.
+Failure to properly null-terminate a character array will lead to undefined behavior when it is treated as a string, as functions will read past the end of the intended data into adjacent memory.
 
-2.  **Using a string literal**: `char greeting2[] = "Hello";`
-    *   This is the preferred method. The compiler *automatically* adds the null character at the end.
-    *   The compiler also automatically calculates the required array size (6 in this case).
+#### **2. Definitions**
+*   **Pointer**: A variable that stores the memory address of another variable or a location in memory.
+*   **Array**: A data structure consisting of a fixed-size, contiguous collection of elements of the same data type, accessed by an integer index.
+*   **C-Style String**: A sequence of characters stored in a character array and terminated by a null character (`\0`).
+*   **Null Terminator (`\0`)**: A special character with an ASCII value of zero that marks the end of a C-style string.
+*   **Address-of Operator (`&`)**: A unary operator that returns the memory address of its operand (the variable it is applied to).
+*   **Dereference Operator (`*`)**: A unary operator that accesses the value stored at the memory address held by a pointer. It is used to "de-reference" the pointer to get to the data it points to.
+*   **Dangling Pointer**: A pointer that refers to a memory location that has already been freed or is otherwise no longer valid (e.g., pointing to a local variable that has gone out of scope).
 
-```{tikz}
-#| label: fig-c-string
-#| fig-cap: "Memory layout of the string \"Hello\"."
-#| echo: false
-#| lang: tex
+#### **3. Mistakes**
+*   **Forgetting the Null Terminator:** When manually building a string character by character in an array, it's easy to forget to add the `\0` at the end. **Why it's wrong:** Standard string functions will not know where the string ends and will continue reading into adjacent memory, causing bugs and potential crashes.
+*   **Dereferencing an Uninitialized Pointer:** Declaring a pointer like `int* p;` and then immediately trying to use it like `*p = 10;`. **Why it's wrong:** The pointer `p` holds a garbage memory address. Writing to this random location corrupts memory and leads to undefined behavior. A pointer must first be assigned a valid address.
+*   **Returning a Pointer to a Local Variable:** A function creates a local variable and returns its address. **Why it's wrong:** The local variable exists on the function's stack frame, which is destroyed upon the function's return. The returned pointer becomes a "dangling pointer" that points to invalid memory.
+*   **Array Out-of-Bounds Access:** Trying to access an element beyond the defined size of an array, such as accessing `arr[10]` in an array declared as `int arr[10];`. **Why it's wrong:** The valid indices are 0 through 9. Accessing `arr[10]` reads from or writes to memory that is not part of the array, which can corrupt other variables or cause the program to crash.
+*   **Confusing Pointer Assignment with Value Assignment:** Writing `p = q;` when you meant `*p = *q;`. **Why it's wrong:** `p = q;` makes pointer `p` point to the same memory address as pointer `q`. In contrast, `*p = *q;` copies the *value* from the location pointed to by `q` to the location pointed to by `p`. These are fundamentally different operations.
+*   **Assuming `sizeof` gives the length of a string:** Using `sizeof(my_string)` to find the number of characters in a string. **Why it's wrong:** `sizeof` is a compile-time operator that returns the total memory size of the array in bytes, not the number of characters before the null terminator. To get the string length at runtime, you must use the `strlen()` function.
 
-\usepackage{tikz}
-\usetikzlibrary{positioning, chains}
+#### **4. Examples**
 
-\begin{document}
-\begin{tikzpicture}[
-    start chain,
-    node distance=0,
-    cell/.style={rectangle, draw, minimum size=1cm, on chain}
-]
-    \node[cell] {'H'};
-    \node[cell] {'e'};
-    \node[cell] {'l'};
-    \node[cell] {'l'};
-    \node[cell] {'o'};
-    \node[cell] (null) {'\textbackslash 0'};
-
-    \node[above=0.1cm of null, font=\tiny, xshift=-2.5cm] (indices) {
-        \begin{tabular}{ccccc c}
-        0 & 1 & 2 & 3 & 4 & 5 \\
-        \end{tabular}
-    };
-    \node[above=0.3cm of indices] {Index};
-
-    \node[below=0.1cm of null, font=\tiny\texttt, xshift=-2.5cm] (addresses) {
-        \begin{tabular}{@{}c@{\hspace{0.25cm}}c@{\hspace{0.25cm}}c@{\hspace{0.25cm}}c@{\hspace{0.25cm}}c@{\hspace{0.25cm}}c@{}}
-        0x23451 & 0x23452 & 0x23453 & 0x23454 & 0x23455 & 0x23456 \\
-        \end{tabular}
-    };
-    \node[below=0.3cm of addresses] {Address};
-\end{tikzpicture}
-\end{document}
-```
-
-##### 1.6 Scope and Lifetime of Variables
-
-The **scope** of a variable determines where in the source code it can be accessed. The **lifetime** of a variable is the period during program execution when it exists in memory.
-
-*   **Local Variables**: Declared inside a block (e.g., a function).
-    *   **Scope**: From the point of declaration to the end of the block (`}`).
-    *   **Lifetime**: They are created when the block is entered and destroyed when the block is exited. They typically reside on the **stack**. These are also known as *automatic* variables.
-
-*   **Static Variables**: Declared with the `static` keyword.
-    *   **`static` local variables**: Declared inside a function. Their scope is local to the function, but their lifetime is the *entire duration of the program*. They are initialized only once.
-    *   **`static` global variables**: Declared outside any function. Their scope is limited to the single source file in which they are declared. Their lifetime is the entire program duration.
-
-*   **Global Variables**: Declared outside of any function.
-    *   **Scope**: Accessible from any file in the program (unless declared `static`).
-    *   **Lifetime**: The entire duration of the program. Overuse of global variables is generally discouraged as it makes code harder to reason about.
-
-#### 2. Definitions
-
-*   **Pointer**: A variable that stores the memory address of another variable.
-*   **Array**: A fixed-size, contiguous block of memory holding elements of the same data type.
-*   **String (C-Style)**: An array of characters terminated by a null character (`\0`).
-*   **Null Character**: A special character (`\0`) used to mark the end of a C-style string.
-*   **Address**: A unique identifier (typically a hexadecimal number) for a location in computer memory.
-*   **Dereference**: The act of accessing the value stored at the memory address held by a pointer, using the `*` operator.
-*   **Scope**: The region of the source code where a variable or function is visible and can be accessed.
-*   **Lifetime**: The duration for which a variable exists in memory during the program's execution.
-*   **Stack**: A region of memory used for managing function calls and storing local (automatic) variables. It follows a Last-In, First-Out (LIFO) access pattern.
-*   **Heap**: A region of memory used for dynamic memory allocation, where the programmer explicitly requests and releases memory blocks.
-*   **Activation Record (Stack Frame)**: A data structure pushed onto the call stack for each function call, containing its parameters, local variables, and return information.
-
-#### 3. Mistakes
-
-*   **Dereferencing an uninitialized or NULL pointer:** Accessing the memory location pointed to by a pointer that hasn't been assigned a valid address or is explicitly set to `NULL`. **Why it's wrong:** This leads to undefined behavior, which often manifests as a program crash (segmentation fault), as you are trying to read from or write to a memory location that your program does not own.
-*   **Returning a pointer to a local variable:** A function's local variables exist on the stack and are destroyed when the function returns. **Why it's wrong:** The returned pointer becomes a "dangling pointer" because it points to memory that is no longer valid. Accessing it later will read garbage data or crash the program.
-*   **Forgetting the null terminator (`\0`) in a string:** When manually constructing a string character by character, failing to add the `\0` at the end. **Why it's wrong:** Standard string functions (`printf`, `strcpy`, etc.) will not know where the string ends. They will continue reading past the intended end of the string into adjacent memory, leading to buffer over-reads and unpredictable behavior.
-*   **Going out of bounds of an array:** Accessing an array element with an index that is less than 0 or greater than or equal to the array's size (e.g., accessing `arr[10]` in an array `arr` of size 10). **Why it's wrong:** This is a buffer overflow. It reads from or writes to memory that is not part of the array, potentially corrupting other variables, the stack, or program control data, which is a major security vulnerability.
-*   **Confusing pointer assignment with value assignment:** Writing `p = q` when you meant `*p = *q`. **Why it's wrong:** `p = q` makes the pointer `p` point to the same memory address as `q`. `*p = *q` copies the *value* from the location `q` points to into the location `p` points to. Confusing them can lead to unintended side effects or memory leaks if `p` was the only pointer to a dynamically allocated block.
-
-#### 4. Examples
-
-##### Example 1: Reverse a String
-**Question:** Write a C program that takes a string and reverses it in place using pointers.
-
+##### **4.1. Swap Two Integers using Pointers**
+**Question:** Write a C function `swap` that takes pointers to two integers as arguments and swaps their values.
 <details>
 <summary>Click to see the solution</summary>
 
 ```c
 #include <stdio.h>
-#include <string.h>
 
-void reverseString(char* str) {
-    if (str == NULL) {
-        return; // Handle null input
+void swap(int* a, int* b) {
+    // 1. Declare a temporary integer variable to hold one of the values.
+    int temp;
+
+    // 2. Dereference pointer 'a' to get its value and store it in 'temp'.
+    temp = *a;
+
+    // 3. Dereference pointer 'b' to get its value, then dereference 'a' again
+    //    to assign this value to the variable 'a' points to.
+    *a = *b;
+
+    // 4. Assign the value stored in 'temp' (the original value of *a) to the
+    //    variable that 'b' points to.
+    *b = temp;
+}
+
+int main() {
+    int x = 10;
+    int y = 20;
+    printf("Before swap: x = %d, y = %d\n", x, y);
+    swap(&x, &y); // Pass the addresses of x and y
+    printf("After swap: x = %d, y = %d\n", x, y);
+    return 0;
+}
+```
+
+**Answer:** The function uses a temporary variable to hold the value of the first integer. It then uses the dereference operator `*` to access and modify the values at the memory addresses passed into it, effectively swapping them in the `main` function's scope.
+The output will be:
+Before swap: x = 10, y = 20
+After swap: x = 20, y = 10
+
+</details>
+
+##### **4.2. Calculate String Length**
+**Question:** Write a C function `my_strlen` that takes a constant character pointer (a string) and returns its length, excluding the null terminator. Do not use the standard `strlen` library function.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int my_strlen(const char* str) {
+    // 1. Initialize a counter for the length to 0.
+    int length = 0;
+
+    // 2. Use a while loop that continues as long as the character
+    //    at the current pointer location is not the null terminator ('\0').
+    //    The expression *(str + length) is equivalent to str[length].
+    while (*(str + length) != '\0') {
+        // 3. Increment the length counter for each non-null character.
+        length++;
     }
-    
+
+    // 4. Return the final count.
+    return length;
+}
+
+int main() {
+    char my_string[] = "Hello, World!";
+    int len = my_strlen(my_string);
+    printf("The length of the string is: %d\n", len);
+    return 0;
+}
+```
+
+**Answer:** The function iterates through the character array using pointer arithmetic, incrementing a counter until it encounters the `\0` character. The final count is the length of the string. The output will be `19`.
+The output will be:
+The length of the string is: 13
+
+</details>
+
+##### **4.3. Reverse a String in Place**
+**Question:** Write a C function that takes a character array (string) and reverses it in place using pointers.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <string.h> // For strlen to find the end
+
+void reverse_string(char* str) {
+    // 1. Create two pointers. 'start' points to the beginning of the string.
     char* start = str;
+    
+    // 2. 'end' points to the last character of the string (before the null terminator).
     char* end = str + strlen(str) - 1;
+    
     char temp;
 
-    // Swap characters from the beginning and end, moving inwards
+    // 3. Loop as long as the start pointer is before the end pointer.
     while (start < end) {
-        // 1. Store the character at the start
+        // 4. Swap the characters pointed to by 'start' and 'end'.
         temp = *start;
-        // 2. Move the character from the end to the start
         *start = *end;
-        // 3. Move the stored character to the end
         *end = temp;
 
-        // 4. Move pointers inward
+        // 5. Move the 'start' pointer forward and the 'end' pointer backward.
         start++;
         end--;
     }
 }
 
 int main() {
-    char myString[] = "Hello, World!";
-    printf("Original: %s\n", myString);
-    reverseString(myString);
-    printf("Reversed: %s\n", myString);
+    char my_string[] = "Quarto";
+    printf("Original string: %s\n", my_string);
+    reverse_string(my_string);
+    printf("Reversed string: %s\n", my_string);
     return 0;
 }
 ```
 
-1.  **Initialize Pointers:** Create two `char` pointers, `start` pointing to the first character of the string and `end` pointing to the last character (before the null terminator).
-2.  **Loop and Swap:** Use a `while` loop that continues as long as the `start` pointer is behind the `end` pointer.
-3.  **Swap Characters:** Inside the loop, use a temporary variable `temp` to swap the character pointed to by `start` with the character pointed to by `end`.
-4.  **Move Pointers:** After each swap, increment the `start` pointer and decrement the `end` pointer to move them closer to the middle of the string.
-5.  **Termination:** The loop stops when `start` and `end` either meet or cross, at which point the entire string has been reversed.
+**Answer:** The function uses two pointers, one at the beginning and one at the end of the string. It swaps the characters they point to and then moves the pointers toward the center until they meet or cross, effectively reversing the entire string.
+The output will be:
+Original string: Quarto
+Reversed string: otrauQ
 
-**Answer:** The program will output:
-Original: `Hello, World!`
-Reversed: `!dlroW ,olleH`
 </details>
 
-##### Example 2: Swap Two Integers
-**Question:** Write a C function that swaps the values of two integer variables from the `main` function using pointers.
-
+##### **4.4. Sum Array Elements using a Pointer**
+**Question:** Write a C function that calculates the sum of all elements in an integer array using only pointer arithmetic to iterate through the array. The function should take a pointer to the first element and the size of the array.
 <details>
 <summary>Click to see the solution</summary>
 
 ```c
 #include <stdio.h>
 
-// The function takes pointers to integers as arguments
-void swap(int* ptrA, int* ptrB) {
-    // 1. Store the value at the first address in a temporary variable
-    int temp = *ptrA;
+int sum_array(int* arr, int size) {
+    // 1. Initialize a sum variable to 0.
+    int sum = 0;
     
-    // 2. Copy the value from the second address to the first
-    *ptrA = *ptrB;
+    // 2. Create a pointer 'ptr' and initialize it with the starting address of the array.
+    int* ptr = arr;
     
-    // 3. Copy the stored value to the second address
-    *ptrB = temp;
+    // 3. Create a pointer 'end' that points to the memory location just after the last element.
+    //    This will serve as our loop termination condition.
+    int* end = arr + size;
+
+    // 4. Loop while the current pointer 'ptr' has not reached the 'end' pointer.
+    for (; ptr < end; ptr++) {
+        // 5. Dereference the current pointer to get the integer value and add it to the sum.
+        sum += *ptr;
+    }
+
+    return sum;
 }
 
 int main() {
-    int a = 10;
-    int b = 20;
+    int numbers[] = {10, 20, 30, 40, 50};
+    int total = sum_array(numbers, 5);
+    printf("The sum of the array elements is: %d\n", total);
+    return 0;
+}
+```
+**Answer:** The function iterates through the array by incrementing a pointer from the start of the array to one element past the end. In each iteration, it dereferences the pointer to add the current element's value to a running total.
+The output will be:
+The sum of the array elements is: 150
+
+</details>
+
+##### **4.5. Find the Maximum Value in an Array**
+**Question:** Write a C function `find_max` that finds the largest integer in an array using pointers. The function should return a pointer to the element containing the maximum value.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int* find_max(int* arr, int size) {
+    // 1. Handle the edge case of an empty or invalid array.
+    if (arr == NULL || size <= 0) {
+        return NULL;
+    }
+
+    // 2. Create a pointer to hold the address of the maximum element found so far.
+    //    Initialize it to point to the first element of the array.
+    int* max_ptr = arr;
     
-    printf("Before swap: a = %d, b = %d\n", a, b);
+    // 3. Loop through the array from the second element to the end.
+    for (int i = 1; i < size; i++) {
+        // 4. Compare the value at the current position (arr[i]) with the value
+        //    at the current maximum's position (*max_ptr).
+        if (arr[i] > *max_ptr) {
+            // 5. If the current element is larger, update max_ptr to point to it.
+            max_ptr = &arr[i];
+        }
+    }
+
+    // 6. Return the pointer to the largest element.
+    return max_ptr;
+}
+
+int main() {
+    int numbers[] = {1, 99, 23, 56, 88};
+    int* max_element_ptr = find_max(numbers, 5);
     
-    // Pass the addresses of 'a' and 'b' to the function
-    swap(&a, &b);
-    
-    printf("After swap: a = %d, b = %d\n", a, b);
+    if (max_element_ptr != NULL) {
+        printf("The maximum value in the array is: %d\n", *max_element_ptr);
+    }
     
     return 0;
 }
 ```
 
-1.  **Define the `swap` function:** The function is declared to accept two integer pointers, `int* ptrA` and `int* ptrB`. This allows it to modify the original variables.
-2.  **Pass addresses from `main`:** In `main`, the `swap` function is called with `&a` and `&b`. The `&` operator gets the memory addresses of `a` and `b`, which are then passed to the function.
-3.  **Dereference and Swap:** Inside `swap`, the `*` operator is used to dereference the pointers. `*ptrA` accesses the value of the original `a`, and `*ptrB` accesses the value of the original `b`. The values are then swapped using a temporary variable. Because the function is modifying the data *at the original addresses*, the changes are reflected back in the `main` function.
+**Answer:** The function assumes the first element is the maximum, then iterates through the rest of the array. If it finds a larger element, it updates its `max_ptr` to point to that new maximum element. It returns the final pointer.
+The output will be:
+The maximum value in the array is: 99
 
-**Answer:** The program will output:
-Before swap: `a = 10, b = 20`
-After swap: `a = 20, b = 10`
+</details>
+
+##### **4.6. Concatenate Two Strings**
+**Question:** Write a C function `my_strcat` that appends the source string to the end of the destination string. Assume the destination array has enough space. The function should return a pointer to the destination string.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+char* my_strcat(char* dest, const char* src) {
+    // 1. Create a pointer to the start of the destination string to return later.
+    char* ptr = dest;
+
+    // 2. Move the pointer 'dest' to the end of the destination string.
+    //    The loop stops when it finds the null terminator.
+    while (*dest != '\0') {
+        dest++;
+    }
+
+    // 3. Copy characters from the source 'src' to the destination 'dest'
+    //    until the null terminator of the source is reached.
+    while (*src != '\0') {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+
+    // 4. Add the null terminator to the end of the newly combined string.
+    *dest = '\0';
+
+    // 5. Return the original starting address of the destination string.
+    return ptr;
+}
+
+int main() {
+    char str1 = "Hello, ";
+    char str2[] = "World!";
+    
+    printf("String 1 before: %s\n", str1);
+    my_strcat(str1, str2);
+    printf("String 1 after: %s\n", str1);
+    
+    return 0;
+}
+```
+
+**Answer:** The function first finds the end of the `dest` string by locating its null terminator. Then, it copies characters one by one from the `src` string to the end of the `dest` string. Finally, it adds a new null terminator to mark the end of the concatenated string.
+The output will be:
+String 1 before: Hello, 
+String 1 after: Hello, World!
+
+</details>
+
+##### **4.7. Initialize and Print a 2D Array using Pointers**
+**Question:** Declare a 2x3 integer array. Write a function that takes a pointer to this 2D array, its number of rows, and its number of columns to initialize it with sequential numbers. Write another function to print it using pointer notation.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// Note the function parameter: int (*arr) is a pointer to an array of 3 integers.
+void initialize_array(int (*arr), int rows, int cols) {
+    int count = 1;
+    // 1. Iterate through each row.
+    for (int i = 0; i < rows; i++) {
+        // 2. Iterate through each column in the current row.
+        for (int j = 0; j < cols; j++) {
+            // 3. Use pointer notation to access the element.
+            //    arr[i] is the i-th array (row).
+            //    *(arr + i) is also a pointer to the i-th row.
+            //    *(*(arr + i) + j) is the element at row i, col j.
+            *(*(arr + i) + j) = count++;
+        }
+    }
+}
+
+void print_array(int (*arr), int rows, int cols) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            // 4. Print the element using the same pointer notation.
+            printf("%d\t", *(*(arr + i) + j));
+        }
+        printf("\n");
+    }
+}
+
+int main() {
+    int my_array;
+    
+    initialize_array(my_array, 2, 3);
+    print_array(my_array, 2, 3);
+    
+    return 0;
+}
+```
+
+**Answer:** The key is the function signature `int (*arr)[3]`, which correctly declares a pointer to a complete row (an array of 3 integers). Inside the functions, the expression `*(*(arr + i) + j)` is used. `arr + i` moves the pointer to the `i`-th row, `*(arr + i)` dereferences it to get a pointer to the first element of that row, and adding `j` moves it to the `j`-th column. The final dereference `*` gets the value.
+The output will be:
+1       2       3
+4       5       6
+
 </details>
