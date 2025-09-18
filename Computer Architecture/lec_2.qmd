@@ -1,7 +1,7 @@
 ---
-title: "2. Hierarchy of Memories, Moore's Law, Parallelism, Pipelining"
+title: "2. Hierarchy of Memories, Moore's Law, Parallelism, Pipelining, and Design Principles"
 author: "Zakhar Podyakov"
-date: "September 17, 2025"
+date: "September 18, 2025"
 format: html
 engine: knitr
 ---
@@ -9,14 +9,14 @@ engine: knitr
 #### **1. Summary**
 
 ##### **1.1 The Hierarchy of Memories**
-In computer architecture, the **memory hierarchy** is a fundamental concept that organizes a computer's storage into a pyramid-like structure. This organization is necessary to balance three competing factors: *speed*, *capacity*, and *cost*. Processors are extremely fast, but high-speed memory is expensive and thus has a small capacity. Conversely, large-capacity storage is affordable but much slower. The memory hierarchy solves this problem by creating layers of memory, where each level is smaller, faster, and more expensive per byte than the level below it.
+In computer architecture, the **memory hierarchy** is a fundamental concept that organizes a computer's storage into a pyramid-like structure. This organization is necessary to balance three competing factors: *speed*, *capacity*, and *cost*. Processors are extremely fast, but high-speed memory is expensive and thus has a small capacity. Conversely, large-capacity storage is affordable but much slower. The memory hierarchy solves this problem by creating layers of memory, where each level is smaller, faster, and more expensive per byte than the level below it. The closer a memory level is to the CPU, the faster the CPU can access it.
 
 The typical levels of the memory hierarchy, from fastest to slowest, are:
 
-1.  **CPU Registers**: These are the fastest and smallest memory units, located directly inside the CPU. They hold the data that the CPU is currently processing. Access is virtually instantaneous.
-2.  **Cache Memory**: This is a small, very fast memory that sits between the CPU and the main system memory. It stores frequently accessed data and instructions, allowing the CPU to retrieve them much faster than from the main memory. Caches are typically divided into levels (L1, L2, L3), with L1 being the smallest and fastest.
+1.  **CPU Registers**: These are the fastest and smallest memory units, located directly inside the CPU. They hold the data that the CPU is actively manipulating at any given moment, such as the results of arithmetic operations. Access is virtually instantaneous, occurring within a single CPU clock cycle.
+2.  **Cache Memory**: This is a small, very fast memory that sits between the CPU and the main system memory. It stores frequently accessed data and instructions, allowing the CPU to retrieve them much faster than from the main memory. This process of storing data in a cache is known as **caching**. Caches are typically divided into levels (L1, L2, L3), with L1 being the smallest and fastest.
 3.  **System Memory (RAM - Random Access Memory)**: This is the computer's main working memory, where the operating system, applications, and data in current use are kept so that they can be quickly reached by the computer's processor. It is significantly larger than cache but also slower.
-4.  **Storage Devices (Secondary Storage)**: This includes devices like Solid-State Drives (SSDs) and Hard Disk Drives (HDDs). They provide long-term, high-capacity storage for data and programs. This is the slowest but largest level of the hierarchy.
+4.  **Storage Devices (Secondary Storage)**: This includes devices like Solid-State Drives (SSDs) and Flash Memory. They provide long-term, high-capacity storage for data and programs. This is the slowest but largest level of the hierarchy and is used to store data persistently.
 
 <!-- DIAGRAM HERE -->
 
@@ -30,9 +30,9 @@ An important distinction within the hierarchy is between **volatile** and **non-
 
 For example, a CPU can be viewed at several levels of abstraction:
 
-*   **Highest Level:** A programmer sees the CPU as a single block that executes instructions.
-*   **Intermediate Level:** An architect sees the CPU as a collection of major components, such as the Control Unit (CU), Arithmetic Logic Unit (ALU), and registers.
-*   **Lowest Level:** An engineer sees the CPU as a detailed diagram of logic gates and transistors that implement its functions.
+*   **Highest Level (Simplest):** A programmer views the CPU as a single, opaque block that executes instructions. They interact with it through a defined instruction set without needing to know how the instructions are physically carried out.
+*   **Intermediate Level:** An architect sees the CPU as a collection of major functional components, such as the **Control Unit (CU)**, **Arithmetic Logic Unit (ALU)**, and **registers**. This level describes *what* the components do and how they connect.
+*   **Lowest Level (Most Detailed):** An engineer sees the CPU as a detailed diagram of logic gates, transistors, and wires that implement its functions. This level describes *how* the components are built.
 
 By using abstraction, a complex system like a computer can be designed, built, and programmed in manageable layers.
 
@@ -41,68 +41,68 @@ By using abstraction, a complex system like a computer can be designed, built, a
 
 However, since around 2008, the growth in single-thread performance and CPU clock speed has significantly slowed down, leading to what is often called the stagnation of Moore's Law. This is not because transistor density has stopped increasing, but because of two fundamental physical limits:
 
-1.  **Heat Dissipation:** As transistors become smaller and more densely packed, the heat they generate becomes a major problem. Increasing clock speed further leads to higher power consumption and excessive heat, which can damage the chip. This is known as the end of *Dennard scaling*.
-2.  **Speed of Light Limitation:** Signals within a CPU chip travel at nearly the speed of light. As chips get faster, the time it takes for a signal to travel across the chip becomes a significant limiting factor.
+1.  **Heat Dissipation:** As transistors become smaller and more densely packed, the heat they generate becomes a major problem. Increasing clock speed further leads to higher power consumption and excessive heat, which can damage the chip and requires complex cooling solutions. This is known as the *power wall*.
+2.  **Speed of Light Limitation:** Signals within a CPU chip travel at nearly the speed of light. As chips get faster and more complex, the time it takes for a signal to travel across the chip becomes a significant limiting factor in how quickly the chip can operate.
 
-Because of these limitations, the industry has shifted its focus from making single processors faster to adding more processors (or **cores**) to a single chip. This has led to the rise of *multicore* and *multiprocessor* systems.
+Because of these limitations, the industry has shifted its focus from making single processors faster to adding more processors (or **cores**) to a single chip. This has led to the rise of *multicore* and *multiprocessor* systems, where performance is increased through parallelism rather than raw clock speed.
 
 ##### **1.4 Performance via Parallelism**
-**Parallelism**, or parallel processing, involves using multiple processing units to execute multiple tasks or parts of a single task simultaneously. This contrasts with a single-processor system, which executes instructions sequentially (one after another).
+**Parallelism**, or parallel processing, involves using multiple processing units to execute multiple tasks or parts of a single task simultaneously. This contrasts with a uniprocessor system, which executes instructions sequentially (one after another). A computer with multiple CPUs or a single CPU with multiple cores is a parallel system.
 
-The goal of multiprocessing is to speed up computation by dividing work among multiple cores. This is highly effective for tasks that can be broken down into independent sub-tasks. However, a major challenge is *instruction dependency*, where one instruction needs the result of a previous one before it can execute, forcing a sequential execution and limiting the benefits of parallelism.
+The goal of multiprocessing is to speed up computation by dividing work among multiple cores. This is highly effective for tasks that can be broken down into independent sub-tasks. However, a major challenge is *instruction dependency*, where one instruction needs the result of a previous one before it can execute. Such dependencies force a sequential execution and limit the benefits of parallelism, a concept formalized by Amdahl's Law.
 
 ##### **1.5 Performance via Pipelining**
-**Pipelining** is another technique to improve performance, but it works differently from parallelism. Instead of using multiple processors, pipelining uses a single processor and breaks down the execution of an instruction into several stages. It then overlaps these stages for different instructions, much like an assembly line.
+**Pipelining** is another technique to improve performance, but it works differently from parallelism. Instead of using multiple processors, pipelining uses a single processor and breaks down the execution of an instruction into several stages. It then overlaps these stages for different instructions, much like an assembly line. This increases the *instruction throughput* (the number of instructions completed per unit of time).
 
 A classic five-stage pipeline includes:
 
-1.  **Instruction Fetch (IF):** Fetch the instruction from memory.
-2.  **Instruction Decode (ID):** Decode the instruction to see what it does.
-3.  **Execute (EX):** Perform the calculation.
-4.  **Memory Access (MEM):** Read from or write to memory.
-5.  **Write Back (WB):** Write the result back to a register.
+1.  **Instruction Fetch (IF):** Fetch the next instruction from memory.
+2.  **Instruction Decode (ID):** Decode the instruction to determine the required action.
+3.  **Execute (EX):** Perform the calculation using the ALU.
+4.  **Memory Access (MEM):** Read from or write to system memory if required.
+5.  **Write Back (WB):** Write the result back to a CPU register.
 
-While one instruction is being executed (EX stage), the next one is being decoded (ID), and the one after that is being fetched (IF). This allows the CPU to work on multiple instructions at once, increasing throughput. *Pipelining improves performance by increasing instruction throughput, while parallelism improves performance by running multiple instructions simultaneously on different hardware.*
+While one instruction is in the Execute stage, the next one is being decoded, and the one after that is being fetched. *Pipelining improves performance by increasing instruction throughput on a single processor, while parallelism improves performance by running multiple instructions truly simultaneously on different hardware units.*
 
 ##### **1.6 Performance via Speculation (Prediction)**
-**Speculative execution** is an optimization technique where a processor makes an educated guess about the future execution path of a program and begins executing instructions from that predicted path before it's certain the path will be taken. This is most commonly used for *branch prediction*.
+**Speculative execution** is an optimization technique where a processor makes an educated guess about the future execution path of a program and begins executing instructions from that predicted path before it's certain the path will be taken. This is most commonly used for **branch prediction**.
 
-When the CPU encounters a conditional branch (e.g., an `if` statement), instead of waiting to see which branch is taken, the *branch predictor* guesses the outcome. The CPU then speculatively executes instructions along the predicted path.
+When the CPU encounters a conditional branch (e.g., an `if` statement), instead of waiting to see which branch is taken (which would stall the pipeline), the *branch predictor* guesses the outcome. The CPU then speculatively executes instructions along the predicted path.
 *   If the prediction was **correct**, the results are kept, and time was saved by avoiding a pipeline stall.
-*   If the prediction was **incorrect**, the speculative results are discarded, and the CPU starts executing from the correct path. This incurs a performance penalty, but since modern predictors are highly accurate (>95%), the overall performance gain is significant.
+*   If the prediction was **incorrect**, the speculative results are discarded, and the CPU starts executing from the correct path. This incurs a performance penalty, but since modern predictors are highly accurate (often >95%), the overall performance gain is significant.
 
 ##### **1.7 Other Fundamental Ideas**
-*   **Dependability via Redundancy**: This principle involves adding spare components (e.g., extra CPUs, memory, or power supplies) to a system to increase its reliability. If a primary component fails, a redundant one can take over, ensuring the system continues to operate. This is critical in applications like spacecraft or servers.
-*   **Make the Common Case Fast**: This design philosophy prioritizes optimizing the performance of the most frequent operations. By focusing resources on making common tasks as fast as possible, the overall system performance is improved, even if less common tasks are not as optimized.
-*   **Finite State Machines (FSM)**: An FSM is a mathematical model of computation used to design both hardware and software. It consists of a finite number of *states* and the *transitions* between them in response to inputs. FSMs are a powerful tool for modeling the behavior of systems like network protocols, compilers, and hardware components like processor caches.
+*   **Dependability via Redundancy**: This principle involves adding spare components (e.g., extra CPUs, memory units, or power supplies) to a system to increase its reliability. If a primary component fails, a redundant one can take over, ensuring the system continues to operate without interruption. This is critical in applications like spacecraft, servers, and other mission-critical systems.
+*   **Make the Common Case Fast**: This is a design philosophy that prioritizes optimizing the performance of the most frequent operations or use cases. By focusing engineering resources on making common tasks as fast as possible, the overall system performance is improved, even if less common tasks are not as highly optimized.
+*   **Finite State Machines (FSM)**: An FSM is a mathematical model of computation used to design both hardware and software systems. It consists of a finite number of *states* and the *transitions* between them, which are triggered by inputs. FSMs are a powerful and convenient tool for modeling the behavior of systems like network protocols, compilers, and hardware components like processor caches.
 
 #### **2. Definitions**
 
-*   **Computer Architecture**: The design and fundamental operational structure of a computer system. It defines the system's parts and their interrelationships, especially the instruction set architecture (ISA), microarchitecture, and system design.
+*   **Computer Architecture**: The design and fundamental operational structure of a computer system. It defines the system's parts and their interrelationships, including the instruction set, microarchitecture, and overall system design.
 *   **CPU (Central Processing Unit)**: The primary component of a computer that executes instructions. It contains the Control Unit and the Arithmetic Logic Unit.
-*   **ALU (Arithmetic Logic Unit)**: The part of the CPU that performs arithmetic (addition, subtraction) and logic (AND, OR, NOT) operations.
-*   **Control Unit (CU)**: The part of the CPU that directs the operation of the processor. It tells the other parts of the computer system how to carry out a program's instructions.
-*   **Register**: A small, extremely fast memory location directly inside the CPU used to hold a single piece of data during processing.
-*   **Cache Memory**: A small amount of very fast, expensive memory used to store frequently accessed data from the main memory, reducing the average time to access data.
-*   **System Memory (RAM)**: Volatile hardware in a computing device where the operating system, application programs, and data in current use are kept so they can be quickly reached by the device's processor.
+*   **ALU (Arithmetic Logic Unit)**: The part of the CPU that performs arithmetic (e.g., addition, subtraction) and logic (e.g., AND, OR, NOT) operations.
+*   **Control Unit (CU)**: The part of the CPU that directs the operation of the processor. It fetches instructions, decodes them, and tells the other parts of the computer system how to carry them out.
+*   **Register**: A small, extremely fast memory location located directly inside the CPU used to hold a single piece of data (like a number or an instruction) during processing.
+*   **Cache Memory**: A small amount of very fast, volatile memory that stores frequently accessed data from the main memory, reducing the average time to access data by avoiding slower RAM access.
+*   **System Memory (RAM)**: The main volatile hardware memory in a computing device where the operating system, application programs, and data in current use are kept for quick access by the processor.
 *   **Volatile Memory**: Memory that requires constant power to maintain stored information; its contents are lost when power is turned off.
 *   **Non-Volatile Memory**: Memory that can retain stored information even after power is removed.
-*   **Abstraction**: The technique of hiding complex implementation details and showing only the necessary features of an object or system.
-*   **Moore's Law**: The observation that the number of transistors in an integrated circuit doubles about every two years.
+*   **Abstraction**: The technique of hiding complex implementation details and showing only the necessary features of an object or system to simplify its use and design.
+*   **Moore's Law**: The observation that the number of transistors in an integrated circuit doubles about every two years, which historically led to exponential growth in computing power.
 *   **Parallelism**: The simultaneous execution of multiple instructions or tasks on multiple processing units (cores) to achieve faster computation.
-*   **Pipelining**: A technique where a single processor overlaps the execution of multiple instructions by breaking each into stages and processing them in an assembly-line fashion.
-*   **Speculative Execution**: An optimization technique where a processor performs a task before it is known to be needed, such as executing instructions after a predicted branch.
-*   **Redundancy**: The inclusion of extra components that are not strictly necessary to functioning, in case of failure in other components.
-*   **Finite State Machine (FSM)**: A computational model consisting of a finite number of states and transitions between them, used to model the behavior of systems.
+*   **Pipelining**: A technique where a single processor overlaps the execution of multiple instructions by breaking each into stages and processing them in an assembly-line fashion to increase instruction throughput.
+*   **Speculative Execution**: An optimization technique where a processor performs a task before it is known whether the task is actually needed, most often used for branch prediction.
+*   **Redundancy**: The inclusion of extra components in a system that are not strictly necessary for its basic functioning, intended to increase reliability in case of component failure.
+*   **Finite State Machine (FSM)**: A computational model consisting of a finite number of states and transitions between them in response to inputs, used to model the behavior of dynamic systems.
 
 #### **3. Mistakes**
 
-*   **Confusing Parallelism and Pipelining:** Thinking these are the same concept. **Why it's wrong:** Parallelism involves using multiple, independent processing units (like multiple cores) to execute different tasks simultaneously. Pipelining involves a single processing unit breaking instructions into stages and overlapping these stages to increase throughput. Pipelining is a form of instruction-level parallelism, but it doesn't use multiple CPUs.
-*   **Believing Moore's Law Guarantees Faster Clock Speeds:** Assuming that the doubling of transistors automatically translates to a doubling of CPU clock frequency. **Why it's wrong:** While historically correlated, clock speeds have stagnated since the mid-2000s due to power and heat dissipation limits. Moore's Law now primarily results in more cores on a chip rather than faster individual cores.
-*   **Assuming All Memory is Equal:** Ignoring the vast performance differences between registers, cache, RAM, and SSDs. **Why it's wrong:** The memory hierarchy exists because there is a trade-off between speed and cost. An algorithm that frequently accesses data from RAM or disk will be orders of magnitude slower than one that keeps its working data in the cache.
-*   **Ignoring the Cost of a Branch Misprediction:** Believing that speculative execution is a "free" performance boost. **Why it's wrong:** When a branch is mispredicted, the entire pipeline must be flushed of the incorrect, speculatively executed instructions, and the correct instructions must be fetched. This incurs a significant performance penalty. The technique is only effective because modern predictors are correct most of the time.
-*   **Thinking More Cores Always Means a Faster Program:** Assuming that doubling the number of CPU cores will cut a program's execution time in half. **Why it's wrong:** This is only true for perfectly parallelizable tasks. Most programs have sequential parts and dependencies between threads, which limit the speedup gained from adding more cores, a concept described by Amdahl's Law.
-*   **Treating Abstraction as Just "Dumbing Down":** Viewing abstraction as merely a simplification that loses important information. **Why it's wrong:** Abstraction is a critical tool for managing complexity. It allows engineers and programmers to work effectively at different levels of a system without being overwhelmed by irrelevant detail, which is essential for building and maintaining complex modern computers.
+*   **Confusing Parallelism and Pipelining:** Thinking these are the same concept. **Why it's wrong:** Parallelism involves using multiple, independent processing units (like multiple cores) to execute different tasks truly simultaneously. Pipelining involves a single processing unit breaking instructions into stages and overlapping these stages to increase throughput. Pipelining is about making one "assembly line" more efficient, while parallelism is about setting up multiple assembly lines.
+*   **Believing Moore's Law Still Guarantees Faster Clock Speeds:** Assuming that the doubling of transistors automatically translates to a doubling of CPU clock frequency. **Why it's wrong:** While historically correlated, clock speeds have stagnated since the mid-2000s due to the physical limitations of power consumption and heat dissipation. Moore's Law now primarily results in more cores on a chip rather than faster individual cores.
+*   **Assuming All Memory Access Is Equally Fast:** Ignoring the vast performance differences between registers, cache, RAM, and SSDs. **Why it's wrong:** The memory hierarchy exists precisely because there is a trade-off between speed and cost. An algorithm that frequently accesses data from RAM or disk will be orders of magnitude slower than one that is designed to keep its working data in the much faster cache.
+*   **Ignoring the Cost of a Branch Misprediction:** Believing that speculative execution is a "free" performance boost without any drawbacks. **Why it's wrong:** When a branch is mispredicted, the entire pipeline must be flushed of the incorrect, speculatively executed instructions, and the correct instructions must be fetched and started from scratch. This incurs a significant performance penalty. The technique is only effective because modern predictors are correct most of the time.
+*   **Thinking More Cores Always Means a Faster Program:** Assuming that doubling the number of CPU cores will cut a program's execution time in half. **Why it's wrong:** This is only true for perfectly parallelizable tasks (often called "embarrassingly parallel"). Most programs have sequential parts that cannot be run in parallel and require synchronization between threads, which limits the speedup gained from adding more cores.
+*   **Treating Cache as Manually Managed Memory:** Assuming a programmer needs to explicitly write code to move data into and out of the L1/L2 cache. **Why it's wrong:** Caching is an automatic process managed by the hardware. The CPU's memory controller automatically fetches data into the cache based on access patterns (like locality of reference). While programmers can write "cache-friendly" code, they do not manage the cache directly.
 
 #### **4. Examples**
 
@@ -112,103 +112,102 @@ When the CPU encounters a conditional branch (e.g., an `if` statement), instead 
 <details>
 <summary>Click to see the solution</summary>
 
-1.  **Identify the fastest level:** The memory closest to the CPU's processing units is the fastest. CPU registers are physically part of the CPU core.
-2.  **Consider the cache levels:** Cache is the next fastest level, acting as a buffer for RAM.
-3.  **Place the main memory:** System RAM is the primary working memory but is slower than the cache.
-4.  **Place the storage device:** Secondary storage like an SSD is the slowest level in this list, as it is accessed via I/O controllers and not directly by the CPU in the same way as RAM.
+1.  **Identify the fastest level:** The memory physically located inside the CPU's core is the fastest. CPU registers fit this description.
+2.  **Consider the cache levels:** Cache memory is the next fastest level, acting as a high-speed buffer between the CPU and RAM. L2 cache is extremely fast.
+3.  **Place the main memory:** System RAM is the primary working memory but is significantly slower than on-chip cache because the signals must travel off the CPU chip to a separate set of memory modules.
+4.  **Place the storage device:** Secondary storage like an SSD is the slowest level in this list. It is an I/O device, and accessing it is orders of magnitude slower than accessing RAM.
 
 **Answer:** The correct order from fastest to slowest is: **CPU Register, L2 Cache, System RAM, SSD.**
 </details>
 
 ##### **4.2. Pipelining Throughput**
-**Question:** A non-pipelined processor takes 5 clock cycles to execute one instruction. A 5-stage pipelined processor has a clock cycle time of 1 ns and can complete one stage per cycle. Ignoring any pipeline stalls, how long would it take the pipelined processor to execute 10 instructions?
+**Question:** A non-pipelined processor takes 5 clock cycles to execute one instruction. A 5-stage pipelined processor has a clock cycle time of 1 ns and can complete one stage per cycle. Ignoring any pipeline stalls or hazards, how long would it take the pipelined processor to execute 10 instructions?
 
 <details>
 <summary>Click to see the solution</summary>
 
-1.  **Calculate the time to fill the pipeline:** The first instruction will take the full number of stages to complete because the pipeline starts empty. Time for the first instruction = 5 stages * 1 ns/stage = 5 ns.
-2.  **Calculate the time for subsequent instructions:** Once the pipeline is full, a new instruction completes every clock cycle. So, the remaining (10 - 1) = 9 instructions will each take 1 ns to emerge from the pipeline.
+1.  **Calculate the time for the first instruction:** The first instruction must pass through all 5 stages to complete. Since each stage takes one 1 ns clock cycle, the first instruction takes 5 stages * 1 ns/stage = 5 ns to exit the pipeline.
+2.  **Calculate the time for subsequent instructions:** Once the pipeline is full (after the first instruction has reached the final stage), a new instruction will complete every clock cycle. Therefore, the remaining (10 - 1) = 9 instructions will each take only 1 additional clock cycle (1 ns) to emerge from the pipeline.
 3.  **Sum the times:** Total time = (Time for first instruction) + (Time for the remaining 9 instructions) = 5 ns + (9 * 1 ns) = 14 ns.
 
 **Answer:** It would take **14 ns** to execute 10 instructions.
 </details>
 
 ##### **4.3. Identifying Parallelism vs. Pipelining**
-**Question:** A server is running a web application and a database simultaneously. The server's CPU has 8 cores, and the operating system assigns the web application to run on 4 cores and the database to run on the other 4 cores. Is this an example of performance via parallelism or pipelining?
+**Question:** A server is running a video encoding application. The application is designed to process multiple frames of the video at the same time. The server's CPU has 16 cores, and the application spawns 16 separate threads, with each thread independently encoding a different frame on its own core. Is this an example of performance via parallelism or pipelining?
 
 <details>
 <summary>Click to see the solution</summary>
 
-1.  **Analyze the resource allocation:** The system is using multiple, distinct processing units (8 cores).
-2.  **Analyze the task distribution:** Two separate, large-scale tasks (web application and database) are being executed at the same time on different sets of cores.
-3.  **Compare with definitions:** This matches the definition of parallelism, which uses multiple processors to handle different tasks concurrently. It is not pipelining, which involves overlapping stages of instructions on a single processor.
+1.  **Analyze the resource allocation:** The system is using multiple, distinct hardware processing units (16 cores).
+2.  **Analyze the task distribution:** Multiple independent tasks (encoding different frames) are being executed at the exact same time on these different cores.
+3.  **Compare with definitions:** This perfectly matches the definition of parallelism, which uses multiple processors to handle different tasks concurrently. It is not pipelining, which is an optimization to overlap instruction stages on a single processor core.
 
 **Answer:** This is an example of **performance via parallelism**.
 </details>
 
 ##### **4.4. Applying Moore's Law**
-**Question:** In 2023, you buy a laptop with a CPU that has 8 cores. Based on the modern interpretation of Moore's Law (where performance gains come from more cores rather than faster clock speeds), what would be a reasonable expectation for a similar-class laptop CPU you might buy in 2027 (4 years later)?
+**Question:** In 2024, a high-end consumer CPU has 16 cores. Based on the modern interpretation of Moore's Law (where the transistor budget is used for more cores), what would be a reasonable expectation for the core count of a similar-class high-end CPU in 2028 (4 years later)?
 
 <details>
 <summary>Click to see the solution</summary>
 
-1.  **Recall Moore's Law:** The number of transistors doubles roughly every 2 years. In the multicore era, this often translates to a doubling of cores.
-2.  **Calculate the number of doubling periods:** The time frame is 4 years, which is two 2-year periods.
-3.  **Apply the doubling:**
-    *   After the first 2 years (2025), the core count would be expected to double from 8 to 16.
-    *   After the second 2 years (2027), the core count would be expected to double again from 16 to 32.
+1.  **Recall Moore's Law:** The number of transistors doubles roughly every 2 years. In the multicore era, this often translates to a doubling of cores on the highest-end chips.
+2.  **Calculate the number of doubling periods:** The time frame is 4 years, which consists of two 2-year periods.
+3.  **Apply the doubling for each period:**
+    *   After the first 2 years (by 2026), the core count would be expected to double from 16 to 32.
+    *   After the second 2 years (by 2028), the core count would be expected to double again from 32 to 64.
 
-**Answer:** A reasonable expectation would be a CPU with **32 cores**.
+**Answer:** A reasonable expectation would be a CPU with **64 cores**.
 </details>
 
 ##### **4.5. Levels of Abstraction**
-**Question:** Describe a modern car at three different levels of abstraction, from highest (simplest) to lowest (most detailed).
+**Question:** Describe a web browser application (like Chrome or Firefox) at three different levels of abstraction, from highest (simplest) to lowest (most detailed).
 
 <details>
 <summary>Click to see the solution</summary>
 
-1.  **Highest Level (The Driver's View):** At this level, the car is a simple machine with a few key interfaces: a steering wheel to change direction, pedals for acceleration and braking, and a gear selector. The complex mechanics of the engine, transmission, and electronics are hidden. The car is an object that transports you from one place to another.
-2.  **Intermediate Level (The Mechanic's View):** A mechanic sees the car as a system of interconnected components: the engine, the transmission, the braking system, the exhaust system, the electrical system, etc. They understand how these major parts work together and can diagnose problems within a specific system, but they might not know the internal details of the engine control unit (ECU).
-3.  **Lowest Level (The Engineer's View):** An automotive engineer sees the car at a highly detailed level. They are concerned with the physics of combustion inside an engine cylinder, the material science of the brake pads, the specific algorithms running on the ECU, and the design of individual transistors on a microchip. This is the most complex and detailed view, where the fundamental principles of operation are designed and analyzed.
+1.  **Highest Level (The User's View):** At this level, the web browser is a simple application with a graphical user interface. The user interacts with an address bar to type URLs, clicks on links, and views rendered web pages. The underlying complexity of network requests, HTML parsing, and JavaScript execution is completely hidden. The browser is a tool to access information on the internet.
+2.  **Intermediate Level (The Web Developer's View):** A web developer sees the browser as a collection of engines and APIs. They work with the rendering engine (which processes HTML/CSS), the JavaScript engine (which executes code), the networking stack (for HTTP requests), and various APIs for storage, graphics, etc. They understand how these components interact to turn their code into a functional web page, but they do not need to know the specific algorithms used by the rendering engine.
+3.  **Lowest Level (The Browser Engineer's View):** An engineer working on the browser itself sees the most detailed view. They are concerned with the C++ code that implements the rendering engine, optimizing the just-in-time (JIT) compiler in the JavaScript engine, managing memory allocation efficiently, and implementing network protocols according to RFC standards. This is the most complex view, where the application's core logic is built.
 
-**Answer:** The three levels are **Driver (highest abstraction)**, **Mechanic (intermediate abstraction)**, and **Engineer (lowest abstraction)**.
+**Answer:** The three levels are **User (highest abstraction)**, **Web Developer (intermediate abstraction)**, and **Browser Engineer (lowest abstraction)**.
 </details>
 
 ##### **4.6. Speculative Execution Scenario**
-**Question:** Consider the following piece of code. Explain how a CPU with speculative execution and branch prediction would handle the `if` statement to improve performance.
-`if (user_input > 100) { perform_complex_calculation(); } else { perform_simple_task(); }`
+**Question:** Consider the following piece of code inside a loop that runs thousands of times. Explain how a CPU with speculative execution and an adaptive branch predictor would handle the `if` statement to optimize performance over time.
+`if (data[i] < 0) { handle_negative_value(); } else { handle_positive_value(); }`
 
 <details>
 <summary>Click to see the solution</summary>
 
-1.  **Encounter the Branch:** When the CPU's pipeline reaches the `if` statement, it encounters a conditional branch. It needs to know the result of `user_input > 100` to decide which block of code to execute next.
-2.  **Predict the Outcome:** Instead of waiting for the comparison to complete, the branch predictor makes a guess. Based on past behavior of this branch, it might predict that the condition is usually `false`.
-3.  **Speculatively Execute:** The CPU will speculatively start fetching and executing the instructions for `perform_simple_task()` from the `else` block. It will do this *before* it officially knows the value of `user_input`.
-4.  **Verify the Prediction:** In parallel, the CPU completes the `user_input > 100` comparison.
-    *   **If the prediction was correct (`false`):** The results of `perform_simple_task()` are kept, and the pipeline continues without any delay. Performance was gained.
-    *   **If the prediction was incorrect (`true`):** The CPU discards all the work it did on `perform_simple_task()`, flushes the pipeline, and begins fetching and executing instructions from the correct path: `perform_complex_calculation()`. Performance was lost compared to a perfect guess, but the system still functions correctly.
+1.  **Encounter the Branch:** The first time the loop runs, the CPU's branch predictor may not have any history for this `if` statement, so it might make a static guess (e.g., predict the `else` branch is always taken).
+2.  **Speculatively Execute and Learn:** The CPU executes the predicted path. When the actual result of the comparison is known, it compares it to the prediction.
+    *   If the guess was correct, it reinforces its prediction.
+    *   If the guess was wrong (a misprediction), it flushes the pipeline, executes the correct path, and updates its prediction history to note that the guess was wrong.
+3.  **Adapt Over Time:** Let's say the `data` array contains mostly positive numbers. After the first few iterations, the branch predictor's history will show that the condition `data[i] < 0` is almost always `false`. The predictor will adapt and strongly predict the `else` branch.
+4.  **Optimize Performance:** For the remaining thousands of iterations, the CPU will speculatively execute `handle_positive_value()` each time. Since this prediction is correct most of the time, the pipeline continues without stalling, leading to a significant performance improvement. It only pays the misprediction penalty on the rare occasions when a negative value is encountered.
 
-**Answer:** The CPU predicts the outcome of the `if` condition, executes the predicted code path (e.g., the `else` block) immediately, and only discards the work if the prediction was wrong.
+**Answer:** The CPU's adaptive branch predictor learns the program's behavior over time. It will predict that the `else` block is the most likely path and speculatively execute it, avoiding pipeline stalls on the vast majority of loop iterations.
 </details>
 
 ##### **4.7. Finite State Machine Design**
-**Question:** Design a simple Finite State Machine (FSM) for an automatic door. The door has a sensor that detects a person. It should have three states: `CLOSED`, `OPENING`, and `OPEN`. Describe the states and the transitions between them.
+**Question:** Design a simple Finite State Machine (FSM) for a traffic light at a simple intersection. It should cycle through `Green`, `Yellow`, and `Red` states. The only input is a timer.
 
 <details>
 <summary>Click to see the solution</summary>
 
 1.  **Define the States:**
-    *   **`CLOSED`**: The initial state. The door is fully closed and is waiting for a trigger.
-    *   **`OPENING`**: The door is in the process of opening. This is a transient state.
-    *   **`OPEN`**: The door is fully open. It will wait here for a period before attempting to close.
+    *   **`Green`**: The initial state. The light is green, allowing traffic to pass.
+    *   **`Yellow`**: The light is yellow, warning that the light is about to turn red.
+    *   **`Red`**: The light is red, stopping traffic.
 
-2.  **Define the Transitions:**
-    *   **`CLOSED` to `OPENING`**: This transition occurs when the input `person_detected` is `true`.
-    *   **`OPENING` to `OPEN`**: This transition occurs automatically once the door has finished its opening motion (e.g., an `opening_complete` signal becomes `true`).
-    *   **`OPEN` to `CLOSED`**: This transition occurs after a timer expires and the input `person_detected` is `false`. The door starts closing. (For simplicity, we can assume it transitions directly to `CLOSED`, though a `CLOSING` state could also be added).
-    *   **`OPEN` to `OPEN`**: If the timer expires but a person is still detected (`person_detected` is `true`), the FSM should remain in the `OPEN` state and reset its timer to avoid closing on someone.
+2.  **Define the Transitions:** The transitions are all triggered by a timer expiring.
+    *   **`Green` to `Yellow`**: This transition occurs when the FSM is in the `Green` state and the `green_timer_expired` input becomes true.
+    *   **`Yellow` to `Red`**: This transition occurs when the FSM is in the `Yellow` state and the `yellow_timer_expired` input becomes true.
+    *   **`Red` to `Green`**: This transition occurs when the FSM is in the `Red` state and the `red_timer_expired` input becomes true, completing the cycle.
 
 <!-- DIAGRAM HERE -->
 
-**Answer:** The FSM has three states: **`CLOSED`**, **`OPENING`**, and **`OPEN`**. Transitions are triggered by a person being detected by the sensor and internal timers for the opening/closing process.
+**Answer:** The FSM has three states: **`Green`**, **`Yellow`**, and **`Red`**. It transitions sequentially from `Green` to `Yellow`, `Yellow` to `Red`, and `Red` back to `Green`, with each transition triggered by the expiration of a timer associated with the current state.
 </details>
