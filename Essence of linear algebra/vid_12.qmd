@@ -1,0 +1,230 @@
+---
+title: "12. Linear Systems, Cramer's Rule, Determinants"
+author: "Zakhar Podyakov"
+date: "September 18, 2025"
+format: html
+engine: knitr
+---
+
+{{< video https://www.youtube.com/watch?v=jBsC34PxzoM&list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab&index=13 >}}
+
+<!-- [QUIZ]() | [FLASHCARDS]() -->
+
+#### **1. Summary**
+##### **1.1 Introduction to Cramer's Rule**
+**Cramer's Rule** is an explicit formula for the solution of a system of linear equations with as many equations as unknowns, valid whenever the system has a unique solution. While it is a powerful theoretical tool, for practical computation, methods like **Gaussian elimination** are significantly faster and more efficient, especially for larger systems.
+
+The primary value in learning Cramer's Rule lies in the deep geometric intuition it provides. It connects the concept of the **determinant** directly to the solution of linear systems, reinforcing the idea that the determinant represents a scaling factor for area or volume. Understanding this rule helps to consolidate various concepts from linear algebra, such as linear transformations, determinants, and geometric vectors, by showing how they interrelate to solve a fundamental problem.
+
+##### **1.2 Geometric Intuition of Cramer's Rule**
+###### **1.2.1 The 2D Case**
+Consider a 2D linear system of equations, which can be written in matrix form as $A\vec{x} = \vec{v}$, where we want to find the unknown vector $\vec{x} = \begin{pmatrix} x \\ y \end{pmatrix}$.
+
+-   **Geometric View of the `y`-coordinate:** The `y`-coordinate of a vector $\vec{x}$ can be interpreted as the *signed area* of the parallelogram formed by the standard basis vector $\hat{i} = \begin{pmatrix} 1 \\ 0 \end{pmatrix}$ and the vector $\vec{x}$ itself. The area is `base × height` = $1 \times y = y$. The sign depends on the orientation of the vectors.
+
+-   **Transformation:** When we apply the linear transformation represented by matrix $A$, this parallelogram is transformed into a new parallelogram.
+    -   The vector $\hat{i}$ is transformed into the first column of matrix A, let's call it $\vec{c}_1$.
+    -   The vector $\vec{x}$ is transformed into the output vector $\vec{v}$.
+    -   The new parallelogram is spanned by $\vec{c}_1$ and $\vec{v}$.
+
+-   **Scaling of Area:** A key property of determinants is that they describe how much a linear transformation scales areas. The area of the transformed parallelogram is the original area multiplied by the determinant of the transformation matrix, `det(A)`.
+    -   Area of new parallelogram = `det(A)` * (Area of original parallelogram)
+    -   `Area(spanned by` $\vec{c}_1, \vec{v}$) = `det(A)` * $y$
+
+-   **Solving for `y`:** We can rearrange this to solve for `y`. The area of the parallelogram spanned by $\vec{c}_1$ and $\vec{v}$ is given by the determinant of a matrix whose columns are these two vectors. This is equivalent to our original matrix $A$, but with its second column replaced by $\vec{v}$.
+    $$ y = \frac{\text{Area}(\vec{c}_1, \vec{v})}{\det(A)} = \frac{\det\begin{pmatrix} a & v_1 \\ c & v_2 \end{pmatrix}}{\det\begin{pmatrix} a & b \\ c & d \end{pmatrix}} $$
+
+-   **Solving for `x`:** A similar logic applies to the `x`-coordinate. The `x`-coordinate is the signed area of the parallelogram formed by $\vec{x}$ and the basis vector $\hat{j} = \begin{pmatrix} 0 \\ 1 \end{pmatrix}$.
+    -   After the transformation, this becomes a parallelogram spanned by $\vec{v}$ and $\vec{c}_2$ (the second column of A).
+    -   `Area(spanned by` $\vec{v}, \vec{c}_2$) = `det(A)` * $x$
+    -   This leads to the formula for `x`:
+    $$ x = \frac{\text{Area}(\vec{v}, \vec{c}_2)}{\det(A)} = \frac{\det\begin{pmatrix} v_1 & b \\ v_2 & d \end{pmatrix}}{\det\begin{pmatrix} a & b \\ c & d \end{pmatrix}} $$
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.2 The 3D Case and Generalization**
+This geometric reasoning extends to three dimensions, where we use signed volumes instead of areas.
+
+-   For a 3x3 system, the `z`-coordinate of the unknown vector $\vec{x}$ is the signed volume of the parallelepiped formed by $\hat{i}$, $\hat{j}$, and $\vec{x}$.
+-   After applying the transformation `A`, this shape becomes a new parallelepiped spanned by the first two columns of `A` and the output vector $\vec{v}$.
+-   The volume of this transformed shape is `det(A)` times the original volume (`z`).
+-   The volume of the transformed shape can also be found by taking the determinant of a new matrix, where the first two columns are from `A` and the third column is the output vector $\vec{v}$.
+-   This gives the general formula for any component $x_i$ of the solution vector.
+
+##### **1.3 Prerequisites for Understanding**
+To fully grasp the concepts behind Cramer's Rule, a solid understanding of the following topics in linear algebra is recommended:
+-   **Determinants:** Especially their geometric interpretation as scaling factors for area and volume.
+-   **Dot Products and Duality:** Understanding how dot products can project vectors.
+-   **Inverse Matrices, Rank, and Null Space:** Concepts related to the properties of matrices and the existence of unique solutions.
+-   **Linear Systems of Equations:** The fundamental problem that Cramer's Rule addresses.
+
+#### **2. Definitions**
+*   **Cramer's Rule**: A theorem in linear algebra that gives the solution to a system of linear equations in terms of determinants.
+*   **Determinant**: A scalar value that is a function of the entries of a square matrix. It characterizes some properties of the matrix and the linear map represented by the matrix. Geometrically, it's the volume scaling factor of the linear transformation.
+*   **Linear System of Equations**: A set of two or more linear equations with the same variables. The solution is the set of values that satisfy all equations simultaneously.
+*   **Coefficient Matrix**: A matrix containing the coefficients of the variables in a system of linear equations.
+*   **Gaussian Elimination**: A systematic method for solving systems of linear equations by transforming the system's augmented matrix into row-echelon form. It is generally much more computationally efficient than Cramer's rule.
+
+#### **3. Formulas**
+For a general linear system $A\vec{x} = \vec{v}$ with $n$ equations and $n$ unknowns:
+*   **General Formula for Cramer's Rule**: The unique solution for the variable $x_i$ is given by:
+    $$ x_i = \frac{\det(A_i)}{\det(A)} $$
+    where $A_i$ is the matrix formed by replacing the $i$-th column of the coefficient matrix $A$ with the constant vector $\vec{v}$.
+
+*   **For a 3x3 System**:
+    $$
+    A = \begin{pmatrix} a_{11} & a_{12} & a_{13} \\ a_{21} & a_{22} & a_{23} \\ a_{31} & a_{32} & a_{33} \end{pmatrix}, \quad
+    \vec{x} = \begin{pmatrix} x \\ y \\ z \end{pmatrix}, \quad
+    \vec{v} = \begin{pmatrix} v_1 \\ v_2 \\ v_3 \end{pmatrix}
+    $$
+    The solutions are:
+    $$
+    x = \frac{\det\begin{pmatrix} v_1 & a_{12} & a_{13} \\ v_2 & a_{22} & a_{23} \\ v_3 & a_{32} & a_{33} \end{pmatrix}}{\det(A)}, \quad
+    y = \frac{\det\begin{pmatrix} a_{11} & v_1 & a_{13} \\ a_{21} & v_2 & a_{23} \\ a_{31} & v_3 & a_{33} \end{pmatrix}}{\det(A)}, \quad
+    z = \frac{\det\begin{pmatrix} a_{11} & a_{12} & v_1 \\ a_{21} & a_{22} & v_2 \\ a_{31} & a_{32} & v_3 \end{pmatrix}}{\det(A)}
+    $$
+
+#### **4. Mistakes**
+*   **Applying Cramer's Rule when `det(A) = 0`:** The formula involves division by `det(A)`. **Why it's wrong:** If the determinant is zero, the system either has no solution or infinitely many solutions, but not a unique one. The rule is not applicable in this case.
+*   **Using Cramer's Rule for Practical Computation:** While elegant, calculating determinants is computationally intensive, growing factorially with the size of the matrix. **Why it's wrong:** For systems larger than 3x3 or 4x4, methods like Gaussian elimination are orders of magnitude faster and more numerically stable.
+*   **Incorrectly Replacing the Column Vector:** When solving for a specific variable, for example, `y` (the second variable), the constant vector $\vec{v}$ must replace the second column of the matrix `A`. **Why it's wrong:** Placing the vector $\vec{v}$ in any other column will calculate the value for a different variable, leading to an incorrect result.
+*   **Assuming Dot Products are Preserved:** The geometric proof relies on how areas/volumes scale, not on the preservation of angles or lengths. **Why it's wrong:** General linear transformations (those that are not orthonormal/rotations) will stretch and shear space, altering the dot product between vectors. The relationship `T(v) ⋅ T(w) = v ⋅ w` does not hold for most transformations.
+
+#### **5. Examples**
+##### **5.1. 2x2 System**
+**Question:** Solve the following system using Cramer's Rule:
+$2x - y = 4$
+$x + y = 2$
+
+<details>
+<summary>Click to see the solution</summary>
+1. **Write the system in matrix form $A\vec{x} = \vec{v}$:**
+    $$ \begin{pmatrix} 2 & -1 \\ 1 & 1 \end{pmatrix} \begin{pmatrix} x \\ y \end{pmatrix} = \begin{pmatrix} 4 \\ 2 \end{pmatrix} $$
+2. **Calculate the determinant of the coefficient matrix `A`:**
+    $$ \det(A) = (2)(1) - (-1)(1) = 2 + 1 = 3 $$
+3. **Solve for `x`:** Replace the first column of `A` with $\vec{v}$ to create $A_x$, then find its determinant.
+    $$ A_x = \begin{pmatrix} 4 & -1 \\ 2 & 1 \end{pmatrix} \implies \det(A_x) = (4)(1) - (-1)(2) = 4 + 2 = 6 $$
+    $$ x = \frac{\det(A_x)}{\det(A)} = \frac{6}{3} = 2 $$
+4. **Solve for `y`:** Replace the second column of `A` with $\vec{v}$ to create $A_y$, then find its determinant.
+    $$ A_y = \begin{pmatrix} 2 & 4 \\ 1 & 2 \end{pmatrix} \implies \det(A_y) = (2)(2) - (4)(1) = 4 - 4 = 0 $$
+    $$ y = \frac{\det(A_y)}{\det(A)} = \frac{0}{3} = 0 $$
+
+**Answer:** The solution is $x=2, y=0$.
+</details>
+
+##### **5.2. Another 2x2 System**
+**Question:** Solve using Cramer's Rule:
+$3x + 2y = 7$
+$x - 5y = -9$
+
+<details>
+<summary>Click to see the solution</summary>
+1. **Matrix form:**
+    $$ \begin{pmatrix} 3 & 2 \\ 1 & -5 \end{pmatrix} \begin{pmatrix} x \\ y \end{pmatrix} = \begin{pmatrix} 7 \\ -9 \end{pmatrix} $$
+2. **Calculate `det(A)`:**
+    $$ \det(A) = (3)(-5) - (2)(1) = -15 - 2 = -17 $$
+3. **Solve for `x`:**
+    $$ \det(A_x) = \det\begin{pmatrix} 7 & 2 \\ -9 & -5 \end{pmatrix} = (7)(-5) - (2)(-9) = -35 + 18 = -17 $$
+    $$ x = \frac{-17}{-17} = 1 $$
+4. **Solve for `y`:**
+    $$ \det(A_y) = \det\begin{pmatrix} 3 & 7 \\ 1 & -9 \end{pmatrix} = (3)(-9) - (7)(1) = -27 - 7 = -34 $$
+    $$ y = \frac{-34}{-17} = 2 $$
+
+**Answer:** The solution is $x=1, y=2$.
+</details>
+
+##### **5.3. 3x3 System**
+**Question:** Solve for `z` in the following system using Cramer's Rule:
+$x + 2y + z = 3$
+$2x - y - z = 0$
+$x + y + z = 2$
+
+<details>
+<summary>Click to see the solution</summary>
+1. **Matrix form $A\vec{x} = \vec{v}$:**
+    $$ A = \begin{pmatrix} 1 & 2 & 1 \\ 2 & -1 & -1 \\ 1 & 1 & 1 \end{pmatrix}, \quad \vec{v} = \begin{pmatrix} 3 \\ 0 \\ 2 \end{pmatrix} $$
+2. **Calculate `det(A)`:**
+    $$ \det(A) = 1((-1)(1) - (-1)(1)) - 2((2)(1) - (-1)(1)) + 1((2)(1) - (-1)(1)) $$
+    $$ \det(A) = 1(0) - 2(3) + 1(3) = -6 + 3 = -3 $$
+3. **Solve for `z`:** We need $\det(A_z)$. Replace the third column of `A` with $\vec{v}$.
+    $$ A_z = \begin{pmatrix} 1 & 2 & 3 \\ 2 & -1 & 0 \\ 1 & 1 & 2 \end{pmatrix} $$
+    $$ \det(A_z) = 1((-1)(2) - (0)(1)) - 2((2)(2) - (0)(1)) + 3((2)(1) - (-1)(1)) $$
+    $$ \det(A_z) = 1(-2) - 2(4) + 3(3) = -2 - 8 + 9 = -1 $$
+4. **Calculate `z`:**
+    $$ z = \frac{\det(A_z)}{\det(A)} = \frac{-1}{-3} = \frac{1}{3} $$
+
+**Answer:** $z = \frac{1}{3}$.
+</details>
+
+##### **5.4. Geometric Interpretation Example**
+**Question:** For the system in Example 5.1, what is the area of the parallelogram spanned by the vectors $\begin{pmatrix} 2 \\ 1 \end{pmatrix}$ and $\begin{pmatrix} 4 \\ 2 \end{pmatrix}$? How does it relate to the solution `y`?
+<details>
+<summary>Click to see the solution</summary>
+1.  The area is the determinant of the matrix formed by these vectors:
+    $$ \text{Area} = \det\begin{pmatrix} 2 & 4 \\ 1 & 2 \end{pmatrix} = (2)(2) - (4)(1) = 0 $$
+2.  From Cramer's rule, we know $y = \frac{\det(A_y)}{\det(A)}$. The area we just calculated is $\det(A_y)$.
+3.  Since $\det(A_y) = 0$, the value of `y` is $\frac{0}{3} = 0$.
+
+**Answer:** The area is 0. This is the numerator in Cramer's Rule for `y`, and it confirms that the y-coordinate of the solution is 0.
+</details>
+
+##### **5.5. System with No Unique Solution**
+**Question:** Try to solve the following system using Cramer's Rule:
+$2x + 4y = 6$
+$x + 2y = 3$
+
+<details>
+<summary>Click to see the solution</summary>
+1. **Matrix form:**
+    $$ A = \begin{pmatrix} 2 & 4 \\ 1 & 2 \end{pmatrix}, \quad \vec{v} = \begin{pmatrix} 6 \\ 3 \end{pmatrix} $$
+2. **Calculate `det(A)`:**
+    $$ \det(A) = (2)(2) - (4)(1) = 4 - 4 = 0 $$
+
+**Answer:** Since `det(A) = 0`, Cramer's Rule cannot be applied. The system does not have a unique solution. (In this case, it has infinitely many solutions).
+</details>
+
+##### **5.6. Another 3x3 System**
+**Question:** Solve for `x` using Cramer's Rule:
+$-4x + 2y + 3z = 7$
+$-x + 2z = -8$
+$-4x + 6y - 9z = 3$
+
+<details>
+<summary>Click to see the solution</summary>
+1. **Matrix form $A\vec{x} = \vec{v}$:**
+    $$ A = \begin{pmatrix} -4 & 2 & 3 \\ -1 & 0 & 2 \\ -4 & 6 & -9 \end{pmatrix}, \quad \vec{v} = \begin{pmatrix} 7 \\ -8 \\ 3 \end{pmatrix} $$
+2. **Calculate `det(A)`:**
+    $$ \det(A) = -4((0)(-9) - (2)(6)) - 2((-1)(-9) - (2)(-4)) + 3((-1)(6) - (0)(-4)) $$
+    $$ \det(A) = -4(-12) - 2(9 + 8) + 3(-6) = 48 - 2(17) - 18 = 48 - 34 - 18 = -4 $$
+3. **Solve for `x`:** We need $\det(A_x)$. Replace the first column of `A` with $\vec{v}$.
+    $$ A_x = \begin{pmatrix} 7 & 2 & 3 \\ -8 & 0 & 2 \\ 3 & 6 & -9 \end{pmatrix} $$
+    $$ \det(A_x) = 7((0)(-9) - (2)(6)) - 2((-8)(-9) - (2)(3)) + 3((-8)(6) - (0)(3)) $$
+    $$ \det(A_x) = 7(-12) - 2(72 - 6) + 3(-48) = -84 - 2(66) - 144 = -84 - 132 - 144 = -360 $$
+4. **Calculate `x`:**
+    $$ x = \frac{\det(A_x)}{\det(A)} = \frac{-360}{-4} = 90 $$
+
+**Answer:** $x = 90$.
+</details>
+
+##### **5.7. A third 3x3 System**
+**Question:** Solve for `y` using Cramer's Rule:
+$x + z = 3$
+$y - z = 1$
+$x - y = 0$
+
+<details>
+<summary>Click to see the solution</summary>
+1. **Matrix form $A\vec{x} = \vec{v}$:**
+    $$ A = \begin{pmatrix} 1 & 0 & 1 \\ 0 & 1 & -1 \\ 1 & -1 & 0 \end{pmatrix}, \quad \vec{v} = \begin{pmatrix} 3 \\ 1 \\ 0 \end{pmatrix} $$
+2. **Calculate `det(A)`:**
+    $$ \det(A) = 1((1)(0) - (-1)(-1)) - 0(...) + 1((0)(-1) - (1)(1)) $$
+    $$ \det(A) = 1(-1) + 1(-1) = -2 $$
+3. **Solve for `y`:** We need $\det(A_y)$. Replace the second column of `A` with $\vec{v}$.
+    $$ A_y = \begin{pmatrix} 1 & 3 & 1 \\ 0 & 1 & -1 \\ 1 & 0 & 0 \end{pmatrix} $$
+    $$ \det(A_y) = 1((1)(0) - (-1)(0)) - 3((0)(0) - (-1)(1)) + 1((0)(0) - (1)(1)) $$
+    $$ \det(A_y) = 1(0) - 3(1) + 1(-1) = -3 - 1 = -4 $$
+4. **Calculate `y`:**
+    $$ y = \frac{\det(A_y)}{\det(A)} = \frac{-4}{-2} = 2 $$
+
+**Answer:** $y = 2$.
+</details>
