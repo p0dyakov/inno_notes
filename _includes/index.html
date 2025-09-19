@@ -1,0 +1,167 @@
+<style>
+    .article-buttons {
+        margin-top: 1rem;
+    }
+
+    .mark-read {
+        padding: 6px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+        color: #212529;
+        font-family: sans-serif;
+        cursor: pointer;
+        transition: background-color .2s, border-color .2s, color .2s;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+
+    .mark-read:hover {
+        background-color: #e9ecef;
+        border-color: #bdbdbd;
+    }
+
+    .mark-read.active {
+        background-color: #4285F4;
+        color: white;
+        border-color: #4285F4;
+    }
+
+    /* Strikethrough for read titles */
+    .read-title {
+        text-decoration: line-through;
+        opacity: 0.7;
+    }
+
+    /* Mark read titles in sidebar */
+    .sidebar-link.read-title {
+        text-decoration: line-through;
+        opacity: 0.7;
+    }
+</style>
+
+<div class="article-buttons">
+    <button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Hide button on homepage
+        const currentPath = window.location.pathname.replace(/index\.html$/, '');
+        if (currentPath === '/' || currentPath === '') {
+            document.querySelector('.article-buttons')?.remove();
+            return;
+        }
+
+        // Get current page URL for matching
+        const currentUrl = window.location.href;
+        const btn = document.querySelector('.mark-read');
+        const title = document.querySelector('h1');
+
+        // Find sidebar link matching current URL
+        const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+        const currentSidebarLink = Array.from(sidebarLinks).find(link => {
+            const href = link.getAttribute('data-original-href') || link.getAttribute('href') || '';
+            return href === currentUrl;
+        });
+
+        // Get read status from localStorage
+        const getReadStatus = () => {
+            return localStorage.getItem(`read_${currentUrl}`);
+        };
+
+        const updateReadState = (isRead) => {
+            if (isRead) {
+                btn.classList.add('active');
+                btn.textContent = 'Read';
+                title?.classList.add('read-title');
+                currentSidebarLink?.classList.add('read-title');
+
+                // Update all sidebar links with same URL
+                sidebarLinks.forEach(link => {
+                    const href = link.getAttribute('data-original-href') || link.getAttribute('href') || '';
+                    if (href === currentUrl) {
+                        link.classList.add('read-title');
+                    }
+                });
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = 'Mark as Read';
+                title?.classList.remove('read-title');
+                currentSidebarLink?.classList.remove('read-title');
+
+                // Remove read class from all sidebar links with same URL
+                sidebarLinks.forEach(link => {
+                    const href = link.getAttribute('data-original-href') || link.getAttribute('href') || '';
+                    if (href === currentUrl) {
+                        link.classList.remove('read-title');
+                    }
+                });
+            }
+        };
+
+        // Initialize read state
+        const isRead = getReadStatus();
+        updateReadState(isRead);
+
+        // Toggle read status
+        btn?.addEventListener('click', () => {
+            const currentReadStatus = getReadStatus();
+            if (currentReadStatus) {
+                localStorage.removeItem(`read_${currentUrl}`);
+                updateReadState(false);
+            } else {
+                localStorage.setItem(`read_${currentUrl}`, 'true');
+                updateReadState(true);
+            }
+        });
+
+        // Initialize sidebar read states on load
+        sidebarLinks.forEach(link => {
+            const href = link.getAttribute('data-original-href') || link.getAttribute('href') || '';
+            if (localStorage.getItem(`read_${href}`)) {
+                link.classList.add('read-title');
+            }
+        });
+
+        // Sidebar state persistence
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+            const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+            sections.forEach((section, index) => {
+                const toggle = section.querySelector('.sidebar-item-toggle');
+                if (!toggle) return;
+
+                // Restore expanded state
+                const saved = localStorage.getItem(`sidebar_section_${index}`);
+                const targetId = toggle.getAttribute('data-bs-target');
+                const targetSection = document.querySelector(targetId);
+
+                if (saved === 'open' && targetSection) {
+                    targetSection.classList.add('show');
+                    toggle.setAttribute('aria-expanded', 'true');
+                }
+
+                // Save state on toggle
+                toggle.addEventListener('click', () => {
+                    setTimeout(() => {
+                        if (targetSection?.classList.contains('show')) {
+                            localStorage.setItem(`sidebar_section_${index}`, 'open');
+                        } else {
+                            localStorage.setItem(`sidebar_section_${index}`, 'closed');
+                        }
+                    }, 100);
+                });
+            });
+
+            // Preserve sidebar scroll
+            const scrollKey = 'sidebar_scroll_top';
+            const savedScroll = localStorage.getItem(scrollKey);
+            if (savedScroll) sidebar.scrollTop = parseInt(savedScroll, 10);
+
+            sidebar.addEventListener('scroll', () => {
+                localStorage.setItem(scrollKey, sidebar.scrollTop);
+            });
+        }
+    });
+</script>
