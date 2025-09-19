@@ -696,7 +696,7 @@ Click to see the solution
 </section>
 
 </main> <!-- /main -->
-<!-- Mark Read Button + Sidebar State (Cosmo-style, client-side) -->
+<!-- Mark Read Button + Sidebar State + Scroll Persistence (Cosmo-style) -->
 <style>
     .article-buttons {
         margin-top: 1rem;
@@ -727,7 +727,7 @@ Click to see the solution
         border-color: #4285F4;
     }
 
-    /* Strikethrough title */
+    /* Strikethrough for read titles */
     .read-title {
         text-decoration: line-through;
         opacity: 0.6;
@@ -748,13 +748,13 @@ Click to see the solution
             return;
         }
 
-        // ----- Mark as Read -----
+        // ----- Mark as Read functionality -----
         const pageTitle = document.querySelector('h1')?.textContent?.trim();
         const key = `read_${pageTitle}`;
         const btn = document.querySelector('.mark-read');
         const title = document.querySelector('h1');
 
-        // Sidebar link for this page
+        // Find sidebar link corresponding to this page
         const sidebarLinks = document.querySelectorAll('.sidebar nav a');
         const sidebarLink = Array.from(sidebarLinks).find(link => {
             const href = link.getAttribute('href') || '';
@@ -792,15 +792,15 @@ Click to see the solution
         // ----- Sidebar state persistence -----
         const sidebar = document.querySelector('.sidebar');
         if (sidebar) {
-            const sections = sidebar.querySelectorAll('nav > ul > li'); // adjust if your structure is different
+            const sections = sidebar.querySelectorAll('nav > ul > li'); // adjust if structure differs
             sections.forEach((section, index) => {
                 const toggle = section.querySelector('a'); // clickable link
                 if (!toggle) return;
 
-                // Restore state from localStorage
+                // Restore expanded state
                 const saved = localStorage.getItem(`sidebar_section_${index}`);
                 if (saved === 'open') {
-                    section.classList.add('open'); // class that Quarto uses for expanded sections
+                    section.classList.add('open'); // Quarto uses 'open' for expanded sections
                 }
 
                 // Save state on click
@@ -811,8 +811,19 @@ Click to see the solution
                         } else {
                             localStorage.setItem(`sidebar_section_${index}`, 'closed');
                         }
-                    }, 100); // wait for DOM to update
+                    }, 100);
                 });
+            });
+
+            // ----- Preserve sidebar scroll -----
+            const scrollKey = 'sidebar_scroll_top';
+            // Restore scroll
+            const savedScroll = localStorage.getItem(scrollKey);
+            if (savedScroll) sidebar.scrollTop = parseInt(savedScroll, 10);
+
+            // Save scroll on scroll events
+            sidebar.addEventListener('scroll', () => {
+                localStorage.setItem(scrollKey, sidebar.scrollTop);
             });
         }
     });
@@ -890,7 +901,7 @@ Click to see the solution
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp('/' + window.location.host + '/');
+        var filterRegex = new RegExp("https:\/\/p0dyakov\.github\.io\/inno_notes\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
