@@ -673,7 +673,6 @@ Click to see the solution
 </section>
 
 </main> <!-- /main -->
-<!-- Mark Read Button + Sidebar State + Scroll Persistence (Cosmo-style) -->
 <style>
     .article-buttons {
         margin-top: 1rem;
@@ -699,7 +698,6 @@ Click to see the solution
 
     .mark-read.active {
         background-color: #4285F4;
-        /* Cosmo primary */
         color: white;
         border-color: #4285F4;
     }
@@ -707,7 +705,13 @@ Click to see the solution
     /* Strikethrough for read titles */
     .read-title {
         text-decoration: line-through;
-        opacity: 0.6;
+        opacity: 0.7;
+    }
+
+    /* Mark read titles in sidebar */
+    .sidebar-link.read-title {
+        text-decoration: line-through;
+        opacity: 0.7;
     }
 </style>
 
@@ -717,73 +721,106 @@ Click to see the solution
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // ----- Hide button on homepage -----
+        // Hide button on homepage
         const currentPath = window.location.pathname.replace(/index\.html$/, '');
         if (currentPath === '/' || currentPath === '') {
-            const btnContainer = document.querySelector('.article-buttons');
-            btnContainer?.remove();
+            document.querySelector('.article-buttons')?.remove();
             return;
         }
 
-        // ----- Mark as Read functionality -----
-        const pageTitle = document.querySelector('h1')?.textContent?.trim();
-        const key = `read_${pageTitle}`;
+        // Get current page URL for matching
+        const currentUrl = window.location.href;
         const btn = document.querySelector('.mark-read');
         const title = document.querySelector('h1');
 
-        // Find sidebar link corresponding to this page
-        const sidebarLinks = document.querySelectorAll('.sidebar nav a');
-        const sidebarLink = Array.from(sidebarLinks).find(link => {
-            const href = link.getAttribute('href') || '';
-            const normalizedHref = href.replace(/index\.html$/, '');
-            return normalizedHref === currentPath || normalizedHref === '.' || normalizedHref === './';
+        // Find sidebar link matching current URL
+        const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+        const currentSidebarLink = Array.from(sidebarLinks).find(link => {
+            const href = link.getAttribute('data-original-href') || link.getAttribute('href') || '';
+            return href === currentUrl;
         });
+
+        // Get read status from localStorage
+        const getReadStatus = () => {
+            return localStorage.getItem(`read_${currentUrl}`);
+        };
 
         const updateReadState = (isRead) => {
             if (isRead) {
                 btn.classList.add('active');
                 btn.textContent = 'Read';
                 title?.classList.add('read-title');
-                sidebarLink?.classList.add('read-title');
+                currentSidebarLink?.classList.add('read-title');
+
+                // Update all sidebar links with same URL
+                sidebarLinks.forEach(link => {
+                    const href = link.getAttribute('data-original-href') || link.getAttribute('href') || '';
+                    if (href === currentUrl) {
+                        link.classList.add('read-title');
+                    }
+                });
             } else {
                 btn.classList.remove('active');
                 btn.textContent = 'Mark as Read';
                 title?.classList.remove('read-title');
-                sidebarLink?.classList.remove('read-title');
+                currentSidebarLink?.classList.remove('read-title');
+
+                // Remove read class from all sidebar links with same URL
+                sidebarLinks.forEach(link => {
+                    const href = link.getAttribute('data-original-href') || link.getAttribute('href') || '';
+                    if (href === currentUrl) {
+                        link.classList.remove('read-title');
+                    }
+                });
             }
         };
 
-        updateReadState(localStorage.getItem(key));
+        // Initialize read state
+        const isRead = getReadStatus();
+        updateReadState(isRead);
 
+        // Toggle read status
         btn?.addEventListener('click', () => {
-            const isRead = localStorage.getItem(key);
-            if (isRead) {
-                localStorage.removeItem(key);
+            const currentReadStatus = getReadStatus();
+            if (currentReadStatus) {
+                localStorage.removeItem(`read_${currentUrl}`);
                 updateReadState(false);
             } else {
-                localStorage.setItem(key, 'true');
+                localStorage.setItem(`read_${currentUrl}`, 'true');
                 updateReadState(true);
             }
         });
 
-        // ----- Sidebar state persistence -----
+        // Initialize sidebar read states on load
+        sidebarLinks.forEach(link => {
+            const href = link.getAttribute('data-original-href') || link.getAttribute('href') || '';
+            if (localStorage.getItem(`read_${href}`)) {
+                link.classList.add('read-title');
+            }
+        });
+
+        // Sidebar state persistence
         const sidebar = document.querySelector('.sidebar');
         if (sidebar) {
-            const sections = sidebar.querySelectorAll('nav > ul > li'); // adjust if structure differs
+            const sections = sidebar.querySelectorAll('li.sidebar-item-section');
             sections.forEach((section, index) => {
-                const toggle = section.querySelector('a'); // clickable link
+                const toggle = section.querySelector('.sidebar-item-toggle');
                 if (!toggle) return;
 
                 // Restore expanded state
                 const saved = localStorage.getItem(`sidebar_section_${index}`);
-                if (saved === 'open') {
-                    section.classList.add('open'); // Quarto uses 'open' for expanded sections
+                const targetId = toggle.getAttribute('data-bs-target');
+                const targetSection = document.querySelector(targetId);
+
+                if (saved === 'open' && targetSection) {
+                    targetSection.classList.add('show');
+                    toggle.setAttribute('aria-expanded', 'true');
                 }
 
-                // Save state on click
+                // Save state on toggle
                 toggle.addEventListener('click', () => {
                     setTimeout(() => {
-                        if (section.classList.contains('open')) {
+                        if (targetSection?.classList.contains('show')) {
                             localStorage.setItem(`sidebar_section_${index}`, 'open');
                         } else {
                             localStorage.setItem(`sidebar_section_${index}`, 'closed');
@@ -792,13 +829,11 @@ Click to see the solution
                 });
             });
 
-            // ----- Preserve sidebar scroll -----
+            // Preserve sidebar scroll
             const scrollKey = 'sidebar_scroll_top';
-            // Restore scroll
             const savedScroll = localStorage.getItem(scrollKey);
             if (savedScroll) sidebar.scrollTop = parseInt(savedScroll, 10);
 
-            // Save scroll on scroll events
             sidebar.addEventListener('scroll', () => {
                 localStorage.setItem(scrollKey, sidebar.scrollTop);
             });
