@@ -43,7 +43,7 @@ ul.task-list li input[type="checkbox"] {
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-dc55a5b9e770e841cd82e46aadbfb9b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-3750c54518e0d805f385e0b1591401ab.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-bcb4737e8fbcf1e9dfc00b59f8305558.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <link href="../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "sidebar",
@@ -691,6 +691,138 @@ Click to see the solution
 </section>
 
 </main> <!-- /main -->
+<!-- Mark Read Button + Sidebar State + Scroll Persistence (Cosmo-style) -->
+<style>
+    .article-buttons {
+        margin-top: 1rem;
+    }
+
+    .mark-read {
+        padding: 6px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+        color: #212529;
+        font-family: sans-serif;
+        cursor: pointer;
+        transition: background-color .2s, border-color .2s, color .2s;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+
+    .mark-read:hover {
+        background-color: #e9ecef;
+        border-color: #bdbdbd;
+    }
+
+    .mark-read.active {
+        background-color: #4285F4;
+        /* Cosmo primary */
+        color: white;
+        border-color: #4285F4;
+    }
+
+    /* Strikethrough for read titles */
+    .read-title {
+        text-decoration: line-through;
+        opacity: 0.6;
+    }
+</style>
+
+<div class="article-buttons">
+    <button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // ----- Hide button on homepage -----
+        const currentPath = window.location.pathname.replace(/index\.html$/, '');
+        if (currentPath === '/' || currentPath === '') {
+            const btnContainer = document.querySelector('.article-buttons');
+            btnContainer?.remove();
+            return;
+        }
+
+        // ----- Mark as Read functionality -----
+        const pageTitle = document.querySelector('h1')?.textContent?.trim();
+        const key = `read_${pageTitle}`;
+        const btn = document.querySelector('.mark-read');
+        const title = document.querySelector('h1');
+
+        // Find sidebar link corresponding to this page
+        const sidebarLinks = document.querySelectorAll('.sidebar nav a');
+        const sidebarLink = Array.from(sidebarLinks).find(link => {
+            const href = link.getAttribute('href') || '';
+            const normalizedHref = href.replace(/index\.html$/, '');
+            return normalizedHref === currentPath || normalizedHref === '.' || normalizedHref === './';
+        });
+
+        const updateReadState = (isRead) => {
+            if (isRead) {
+                btn.classList.add('active');
+                btn.textContent = 'Read';
+                title?.classList.add('read-title');
+                sidebarLink?.classList.add('read-title');
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = 'Mark as Read';
+                title?.classList.remove('read-title');
+                sidebarLink?.classList.remove('read-title');
+            }
+        };
+
+        updateReadState(localStorage.getItem(key));
+
+        btn?.addEventListener('click', () => {
+            const isRead = localStorage.getItem(key);
+            if (isRead) {
+                localStorage.removeItem(key);
+                updateReadState(false);
+            } else {
+                localStorage.setItem(key, 'true');
+                updateReadState(true);
+            }
+        });
+
+        // ----- Sidebar state persistence -----
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+            const sections = sidebar.querySelectorAll('nav > ul > li'); // adjust if structure differs
+            sections.forEach((section, index) => {
+                const toggle = section.querySelector('a'); // clickable link
+                if (!toggle) return;
+
+                // Restore expanded state
+                const saved = localStorage.getItem(`sidebar_section_${index}`);
+                if (saved === 'open') {
+                    section.classList.add('open'); // Quarto uses 'open' for expanded sections
+                }
+
+                // Save state on click
+                toggle.addEventListener('click', () => {
+                    setTimeout(() => {
+                        if (section.classList.contains('open')) {
+                            localStorage.setItem(`sidebar_section_${index}`, 'open');
+                        } else {
+                            localStorage.setItem(`sidebar_section_${index}`, 'closed');
+                        }
+                    }, 100);
+                });
+            });
+
+            // ----- Preserve sidebar scroll -----
+            const scrollKey = 'sidebar_scroll_top';
+            // Restore scroll
+            const savedScroll = localStorage.getItem(scrollKey);
+            if (savedScroll) sidebar.scrollTop = parseInt(savedScroll, 10);
+
+            // Save scroll on scroll events
+            sidebar.addEventListener('scroll', () => {
+                localStorage.setItem(scrollKey, sidebar.scrollTop);
+            });
+        }
+    });
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
