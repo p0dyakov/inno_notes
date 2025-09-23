@@ -1,0 +1,364 @@
+---
+title: "4. Statements, Expressions, Structures, and Unions"
+author: "Zakhar Podyakov"
+date: "September 23, 2025"
+format: html
+engine: knitr
+---
+
+<!-- [Quiz]() | [Flashcards]() -->
+
+#### **1. Summary**
+##### **1.1 Statements in C**
+###### **1.1.1 What is a Statement?**
+In C, a **statement** is a complete instruction that tells the computer to perform an action. Every statement in C ends with a semicolon (`;`). The general rule is that *statements do not produce values*; their purpose is to control the flow of execution or to cause a side effect, such as modifying a variable's value.
+
+###### **1.1.2 Categories of Statements**
+C statements can be grouped into several categories:
+
+-   **Selection Statements:** These statements choose which code path to execute based on a condition.
+    -   `if-else`: Executes a block of code if a condition is true, and an optional `else` block if it is false.
+    -   `switch`: Evaluates an integer expression and jumps to the `case` that matches the value. A `break` statement is typically used to exit the `switch`; otherwise, execution "falls through" to the next case.
+
+-   **Iteration Statements (Loops):** These statements execute a block of code repeatedly as long as a condition is met.
+    -   `while`: Evaluates the condition *before* each execution of the loop body.
+    -   `do-while`: Executes the loop body *at least once* and then evaluates the condition after each execution.
+    -   `for`: A compact loop structure that combines initialization, condition checking, and a post-iteration action in one line.
+
+-   **Jump Statements:** These statements unconditionally transfer control to another part of the program.
+    -   `break`: Exits the innermost loop or `switch` statement.
+    -   `continue`: Skips the remainder of the current loop iteration and proceeds to the next one.
+    -   `return`: Exits the current function and optionally returns a value to the caller.
+    -   `goto`: Transfers control to a labeled statement within the same function. Its use is generally discouraged as it can make code difficult to read and debug.
+
+-   **Compound Statements (Blocks):** A group of zero or more statements enclosed in curly braces (`{}`). A block can be used anywhere a single statement is expected, allowing you to group multiple instructions. A declaration within a block is considered a statement.
+
+-   **Special Statements:**
+    -   **Expression Statement:** An expression followed by a semicolon. The expression is evaluated, and its result is discarded. Its main purpose is for the *side effect* it produces (e.g., assignment `a = b + c;` or a function call `printf("hello");`).
+    -   **Declaration Statement:** A statement that introduces a new variable (e.g., `int x = 10;`). In modern C, declarations can appear anywhere a statement is allowed, not just at the beginning of a block.
+
+##### **1.2 Expressions in C**
+###### **1.2.1 What is an Expression?**
+An **expression** is a formula—a combination of variables, constants, operators, and function calls—that is evaluated to produce a single value. Almost every expression in C produces a value.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.2 Building Blocks of Expressions**
+Expressions are constructed from various elements, ordered by complexity:
+
+1.  **Primary Expressions:** The most basic elements.
+    -   *Identifier*: The name of a variable or function.
+    -   *Literal*: A constant value (e.g., `123`, `0.01E-2`, `"string"`).
+    -   *Parenthesized expression*: An expression enclosed in parentheses, like `(a + b)`.
+
+2.  **Postfix Expressions:** Built on primary expressions.
+    -   Array subscripting: `arr[i+j]`.
+    -   Function call: `func(*p, 777)`.
+    -   Member access: `s.m` (for `struct`/`union`) or `ptr->m` (for pointer to `struct`/`union`).
+    -   Postfix increment/decrement: `x++`, `x--`.
+
+3.  **Unary Expressions:** Operators that act on a single operand.
+    -   Prefix increment/decrement: `++x`, `--x`.
+    -   Address-of (`&`) and indirection (`*`): `&x`, `*p`.
+    -   Unary plus/minus: `+x`, `-x`.
+    -   Logical NOT (`!`) and bitwise NOT (`~`).
+    -   `sizeof`: An operator that returns the size, in bytes, of a type or variable.
+
+4.  **Binary Expressions:** Operators that act on two operands (e.g., `a + b`, `c * d`).
+
+5.  **Ternary Expression:** The conditional operator (`? :`), which takes three operands (`condition ? value_if_true : value_if_false`).
+
+###### **1.2.3 Operator Precedence and Associativity**
+-   **Precedence:** Determines the order in which operators are evaluated in a complex expression. For example, `*` and `/` have higher precedence than `+` and `-`, so `a + b * c` is evaluated as `a + (b * c)`.
+-   **Associativity:** Determines the order for operators of the *same* precedence. Most binary operators are left-to-right associative (e.g., `x - y + z` is `(x - y) + z`). Unary operators and the assignment operator are right-to-left associative (e.g., `x = y = 5` is `x = (y = 5)`).
+
+###### **1.2.4 Side Effects**
+A **side effect** is any change in the state of the program, such as modifying a variable or performing I/O. Expressions like `x++` are valued for their side effect. The expression `x++` evaluates to the *original* value of `x`, and as a side effect, `x` is incremented.
+
+##### **1.3 Recursive Functions**
+A **recursive function** is a function that calls itself to solve a problem. This is effective for problems that can be divided into smaller, self-similar subproblems.
+
+###### **1.3.1 Core Components of Recursion**
+To prevent infinite execution, a recursive function must have two parts:
+
+-   **Base Case:** A simple condition where the function does not call itself and returns a direct answer. This is the stopping point.
+-   **Recursive Step:** The part of the function that calls itself, but with a modified argument that brings it closer to the base case.
+
+###### **1.3.2 The Call Stack in Recursion**
+When a function is called, a frame containing its local variables is pushed onto the **call stack**. In recursion, a new frame is added for each self-call. The stack grows until a base case is reached. Then, as each function returns its result to its caller, its frame is popped off the stack, and the stack unwinds.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.4 Structures (`struct`)**
+A **structure** is a user-defined data type that groups related variables of different types into a single logical unit.
+
+###### **1.4.1 Declaration and Memory**
+Each member of a `struct` is stored in its own unique memory location. The total size is the sum of the sizes of its members plus any **memory padding**.
+
+-   **Memory Padding:** Compilers insert unused bytes between members to align them on memory addresses that are optimal for the hardware (e.g., a 4-byte `int` on an address divisible by 4). This speeds up access but increases the structure's size.
+-   **Packed Structures:** A non-standard feature (`__attribute__((packed))`) that removes padding. This saves memory but can cause slower performance or crashes on some architectures.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.4.2 Accessing Members**
+-   **Dot Operator (`.`):** Used to access members of a structure variable directly (e.g., `student.id`).
+-   **Arrow Operator (`->`):** Used to access members via a pointer to a structure (e.g., `studentPtr->id`). This is equivalent to `(*studentPtr).id`.
+
+##### **1.5 Unions (`union`)**
+A **union** is a special data type where all members share the *same memory location*.
+
+###### **1.5.1 Shared Memory**
+A union is only allocated enough memory to hold its largest member. When you assign a value to one member, it may alter the data of any other member, because they all occupy the same bytes. This is useful for saving memory or for interpreting the same data in multiple ways (type punning). You can only meaningfully use one member at a time.
+
+<!-- DIAGRAM HERE -->
+
+#### **2. Definitions**
+*   **Statement:** A complete instruction in a C program, ending with a semicolon.
+*   **Expression:** A combination of values, variables, operators, and functions that evaluates to a single value.
+*   **Expression Statement:** An expression followed by a semicolon, executed for its side effects.
+*   **Declaration Statement:** A statement that declares and optionally initializes a new variable.
+*   **Operator Precedence:** The rules that define the order in which different operators are evaluated in an expression.
+*   **Side Effect:** An action by a function or expression that modifies state, such as changing a variable's value or performing I/O.
+*   **Recursion:** A technique where a function calls itself to solve a problem.
+*   **Base Case:** The condition in a recursive function that terminates the recursion.
+*   **Structure (`struct`):** A data type that groups variables of different types, with each member stored in a separate memory location.
+*   **Union (`union`):** A data type where all members share the same memory location.
+*   **Memory Padding:** Empty bytes inserted by a compiler into a structure to align its members for more efficient memory access.
+*   **Typedef:** A keyword used to create an alias for a data type, often used to simplify struct and union declarations.
+*   **Call Stack:** A data structure that stores information about the active subroutines of a computer program.
+
+#### **4. Mistakes**
+*   **Forgetting `break` in `switch` Cases:** If a `break` is omitted, execution "falls through" to the next `case` block, which is usually not the intended behavior.
+*   **Confusing Assignment (`=`) with Equality (`==`):** Using `=` in a condition (e.g., `if (x = 5)`) assigns 5 to `x` and the expression evaluates to 5 (true), which is a common logical error. The correct operator for comparison is `==`.
+*   **Missing Recursive Base Case:** A recursive function without a proper stopping condition will call itself indefinitely, causing a stack overflow error.
+*   **Ignoring Struct Padding:** Assuming `sizeof(struct)` is simply the sum of the sizes of its members can lead to bugs, especially in memory-sensitive operations. The actual size may be larger due to padding.
+*   **Mishandling Union Data:** Storing a value in a union as one type and reading it as another without understanding the underlying byte representation will produce a reinterpreted, not a converted, value.
+*   **Using the Dot (`.`) Operator with Pointers:** Attempting to access a struct member with `pointer.member` is incorrect. The arrow operator (`->`) must be used for pointers (`pointer->member`).
+
+#### **5. Examples**
+##### **5.1. `switch` Statement with Fall-Through**
+**Question:** Predict the output of the following C code, which demonstrates `switch` statement fall-through.
+```c
+#include <stdio.h>
+
+int main() {
+    int day = 2;
+    switch (day) {
+        case 1:
+            printf("Start of week. ");
+        case 2:
+            printf("Work day. ");
+        case 3:
+            printf("Mid-week. ");
+            break;
+        case 4:
+            printf("Almost there. ");
+        default:
+            printf("Weekend!\n");
+    }
+    return 0;
+}
+```
+<details>
+<summary>Click to see the solution</summary>
+1. The `switch` evaluates `day`, which is `2`.
+2. It jumps to `case 2:`.
+3. It prints `"Work day. "`.
+4. There is no `break` statement in `case 2`, so execution *falls through* to the next case.
+5. It executes the code in `case 3:`, printing `"Mid-week. "`.
+6. It encounters the `break` statement in `case 3` and exits the `switch`.
+
+**Answer:** The program prints: **`Work day. Mid-week. `**
+</details>
+
+##### **5.2. `for` Loop Scope and the Comma Operator**
+**Question:** What is the final value of `sum` printed by this program?
+```c
+#include <stdio.h>
+
+int main() {
+    int sum = 0;
+    int max = 5;
+    for (int i = 0, j = 1; i < max; i++, j *= 2) {
+        sum += j;
+    }
+    // printf("%d\n", i); // This would cause a compile error because i is out of scope.
+    printf("Sum: %d\n", sum);
+    return 0;
+}
+```
+<details>
+<summary>Click to see the solution</summary>
+The loop initializes `i` to 0 and `j` to 1. It continues as long as `i < 5`. In each iteration, `i` is incremented and `j` is doubled. `sum` accumulates the value of `j` from each iteration.
+
+-   **Iteration 1:** `i=0`, `j=1`. `sum` becomes `0 + 1 = 1`. Then `i` becomes 1, `j` becomes 2.
+-   **Iteration 2:** `i=1`, `j=2`. `sum` becomes `1 + 2 = 3`. Then `i` becomes 2, `j` becomes 4.
+-   **Iteration 3:** `i=2`, `j=4`. `sum` becomes `3 + 4 = 7`. Then `i` becomes 3, `j` becomes 8.
+-   **Iteration 4:** `i=3`, `j=8`. `sum` becomes `7 + 8 = 15`. Then `i` becomes 4, `j` becomes 16.
+-   **Iteration 5:** `i=4`, `j=16`. `sum` becomes `15 + 16 = 31`. Then `i` becomes 5, `j` becomes 32.
+-   The loop condition `i < 5` is now false, so the loop terminates.
+
+**Answer:** The program prints **`Sum: 31`**.
+</details>
+
+##### **5.3. Expression with Side Effects**
+**Question:** What are the final values of `a`, `b`, and `c` after the expression is evaluated?
+```c
+#include <stdio.h>
+
+int main() {
+    int a;
+    int b = 5;
+    int c = 10;
+    a = ++b + c--;
+    printf("a = %d, b = %d, c = %d\n", a, b, c);
+    return 0;
+}
+```
+<details>
+<summary>Click to see the solution</summary>
+The expression is `a = ++b + c--`.
+1.  **`++b` (prefix increment):** `b` is incremented to `6` *before* its value is used in the expression. The value used is `6`.
+2.  **`c--` (postfix decrement):** The *original* value of `c` (`10`) is used in the expression. *After* the expression is evaluated, `c` is decremented.
+3.  **Addition:** The values used are `6` and `10`, so `6 + 10` is `16`.
+4.  **Assignment:** `a` is assigned the value `16`.
+5.  **Side effect of `c--` completes:** `c` becomes `9`.
+
+**Answer:** The program prints **`a = 16, b = 6, c = 9`**.
+</details>
+
+##### **5.4. Recursive Fibonacci**
+**Question:** Write a recursive function to find the Nth number in the Fibonacci sequence (where `fib(0)=0`, `fib(1)=1`).
+<details>
+<summary>Click to see the solution</summary>
+```c
+#include <stdio.h>
+
+int fibonacci(int n) {
+    // Base case 1
+    if (n == 0) {
+        return 0;
+    }
+    // Base case 2
+    if (n == 1) {
+        return 1;
+    }
+    // Recursive step
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+int main() {
+    int n = 9;
+    printf("The %dth Fibonacci number is %d\n", n, fibonacci(n));
+    return 0;
+}
+```
+**Answer:** The program will print `The 9th Fibonacci number is 34`. The function defines two base cases for `n=0` and `n=1`. For all other numbers, it recursively calls itself to sum the previous two Fibonacci numbers.
+</details>
+
+##### **5.5. `sizeof(struct)` with Padding**
+**Question:** Given the structure definition below, what is the most likely output of `sizeof(Employee)`, assuming a 64-bit system where `int` is 4 bytes, `char` is 1 byte, and `double` is 8 bytes?
+```c
+#include <stdio.h>
+
+typedef struct {
+    int id;       // 4 bytes
+    char initial; // 1 byte
+    double salary; // 8 bytes
+} Employee;
+
+int main() {
+    printf("Size of Employee: %zu bytes\n", sizeof(Employee));
+    return 0;
+}
+```
+<details>
+<summary>Click to see the solution</summary>
+The compiler needs to align the members. The `double` member requires 8-byte alignment.
+-   `id` (4 bytes) is placed at offset 0.
+-   `initial` (1 byte) is placed at offset 4.
+-   The next member, `salary`, is 8 bytes and must start at an address divisible by 8. The next such address after offset 5 is offset 8.
+-   The compiler adds **7 bytes of padding** after `initial` to align `salary` correctly.
+-   `salary` (8 bytes) is placed at offset 8.
+-   The total size is `4 (id) + 1 (initial) + 7 (padding) + 8 (salary) = 20`. However, the entire struct itself is often padded to the alignment of its largest member.
+- To ensure that in an array of `Employee`, each `salary` is properly aligned, the total size of the struct must be a multiple of 8.
+- The size calculated so far is `4 + 1 + 7 + 8 = 20`. This is incorrect because padding is added after `initial`. The correct layout is `4 (id) + 1 (initial) + 3 (padding) + 8 (salary) = 16`
+- **Correction:** The `double` (salary) has the largest alignment requirement (8 bytes).
+  - `id` (4 bytes) at offset 0.
+  - `initial` (1 byte) at offset 4.
+  - The next available offset is 5. To align `salary` on an 8-byte boundary, the compiler must advance to the next multiple of 8, which is 8. Therefore, **3 bytes of padding** are inserted after `initial`.
+  - `salary` (8 bytes) is placed at offset 8.
+  - Total size is now `8 (for id, initial, padding) + 8 (salary) = 16`. This size is a multiple of 8, so no further padding is needed at the end.
+
+**Answer:** The most likely output is **`Size of Employee: 16 bytes`**.
+</details>
+
+##### **5.6. Union for Data Reinterpretation**
+**Question:** What is the output of this program that uses a union to inspect the bytes of a floating-point number?
+```c
+#include <stdio.h>
+
+typedef union {
+    float f;
+    unsigned int u;
+} FloatUnion;
+
+int main() {
+    FloatUnion data;
+    data.f = 1.0f;
+    // The IEEE 754 representation for 1.0 is 0x3F800000
+    printf("As float: %f\n", data.f);
+    printf("As hexadecimal integer: 0x%X\n", data.u);
+    return 0;
+}
+```
+<details>
+<summary>Click to see the solution</summary>
+1. A union `data` is created. Both `f` and `u` members share the same 4 bytes of memory.
+2. `data.f` is assigned the value `1.0f`. The hardware stores the IEEE 754 single-precision binary representation of `1.0` into those 4 bytes.
+3. This specific bit pattern, when interpreted as a 32-bit unsigned integer, corresponds to the hexadecimal value `3F800000`.
+4. The first `printf` reads the shared memory as a `float`, printing `1.000000`.
+5. The second `printf` reads the exact same bits but interprets them as an `unsigned int` and prints the hexadecimal representation.
+
+**Answer:**```
+As float: 1.000000
+As hexadecimal integer: 0x3F800000
+```
+</details>
+
+##### **5.7. Modifying a Struct with a Pointer**
+**Question:** Create a `Point` struct and a function `movePoint` that takes a pointer to a `Point` and modifies its `x` and `y` coordinates.
+<details>
+<summary>Click to see the solution</summary>
+```c
+#include <stdio.h>
+
+typedef struct {
+    int x;
+    int y;
+} Point;
+
+void movePoint(Point *p, int deltaX, int deltaY) {
+    // Use the arrow operator to access and modify members via the pointer
+    p->x += deltaX;
+    p->y += deltaY;
+}
+
+int main() {
+    Point myPoint = {10, 20};
+    printf("Original position: (%d, %d)\n", myPoint.x, myPoint.y);
+
+    // Pass the address of myPoint to the function
+    movePoint(&myPoint, 5, -10);
+
+    printf("New position: (%d, %d)\n", myPoint.x, myPoint.y);
+    return 0;
+}
+```
+**Answer:** The program initializes a `Point` at (10, 20). The `movePoint` function receives a pointer to this `Point` and uses the arrow operator (`->`) to add `5` to `x` and `-10` to `y`. The `main` function then prints the modified coordinates.
+Output:
+```
+Original position: (10, 20)
+New position: (15, 10)
+```
+</details>
