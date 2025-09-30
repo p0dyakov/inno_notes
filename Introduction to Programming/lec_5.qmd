@@ -1,0 +1,412 @@
+---
+title: "5. Expressions in C, Structures, Bit-fields, Alignment, Unions, Enumerations"
+author: "Zakhar Podyakov"
+date: "September 30, 2025"
+format: html
+engine: knitr
+---
+
+### **1. Summary**
+##### **1.1 Expressions in C**
+An **expression** in C is a combination of variables, constants, operators, and function calls that the compiler evaluates to produce a single value. Almost every expression returns a value, which distinguishes it from a **statement**, which performs an action but does not necessarily return a value.
+
+Expressions are constructed from building blocks arranged in a hierarchy of complexity.
+
+###### **1.1.1 Primary Expressions**
+These are the most fundamental building blocks of expressions.
+
+-   **Identifiers**: Names that refer to variables, functions, or constants (e.g., `myVariable`, `calculateSum`, `PI`).
+-   **Literals**: Constant values written directly in the code, such as integers (`123`, `0xFE`), floating-point numbers (`0.01E-2`), or strings (`"string"`).
+-   **Parenthesized Expressions**: Any expression enclosed in parentheses, like `(a + b)`, is itself a primary expression. Parentheses are used to control the order of evaluation.
+
+###### **1.1.2 Secondary (Postfix) Expressions**
+These expressions are built upon primary expressions and involve an operator that appears *after* the operand.
+
+-   **Array Subscripting**: Accessing an element of an array, e.g., `myArray[i + 1]`.
+-   **Function Call**: Invoking a function with arguments, e.g., `printf("Hello")`.
+-   **Member Access**: Accessing a member of a `struct` or `union` using the dot (`.`) operator for objects (e.g., `student.id`) or the arrow (`->`) operator for pointers to objects (e.g., `studentPtr->id`).
+-   **Postfix Increment/Decrement**: Increasing or decreasing a variable's value by one after its current value is used in the expression, e.g., `x++`, `y--`.
+
+###### **1.1.3 Unary Expressions**
+These expressions involve a single operand with an operator that appears *before* it.
+
+-   **Prefix Increment/Decrement**: Increasing or decreasing a variable's value by one before its value is used in the expression, e.g., `++x`, `--y`.
+-   **Address-of (`&`)**: Returns the memory address of a variable, e.g., `&myVar`.
+-   **Indirection (`*`)**: Accesses the value stored at a memory address held by a pointer, e.g., `*ptr`.
+-   **Unary Plus/Minus**: Indicates the sign of a numeric value, e.g., `+10`, `-x`.
+-   **Logical NOT (`!`)**: Inverts the boolean value of its operand, e.g., `!isComplete`.
+-   **Bitwise NOT (`~`)**: Flips all the bits of its integer operand.
+-   **`sizeof`**: Returns the size of a data type or a variable in bytes, e.g., `sizeof(int)`.
+
+###### **1.1.4 Binary Expressions**
+These expressions combine two operands with an operator in between and form the highest level of expression building blocks.
+
+-   **Multiplicative**: `*` (multiplication), `/` (division), `%` (modulo).
+-   **Additive**: `+` (addition), `-` (subtraction).
+-   **Bitwise Shift**: `<<` (left shift), `>>` (right shift).
+-   **Relational and Equality**: `<`, `<=`, `>`, `>=`, `==` (equal to), `!=` (not equal to).
+-   **Bitwise Logical**: `&` (AND), `|` (OR), `^` (XOR).
+-   **Logical**: `&&` (AND), `||` (OR).
+
+##### **1.2 Structures (`struct`)**
+A **structure** is a user-defined data type that groups together variables of different data types under a single name. This allows you to create complex data records. For instance, a `struct` for a `Person` could contain their name (a string), age (an integer), and height (a float).
+
+###### **1.2.1 Declaration and Usage**
+Structures can be created statically (on the stack) or dynamically (on the heap).
+
+-   **Static Declaration**: `struct Person p1;` creates a `Person` object on the stack.
+-   **Dynamic Declaration**: `struct Person *p2 = (struct Person*)malloc(sizeof(struct Person));` allocates memory for a `Person` object on the heap and returns a pointer to it.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.2 Member Access**
+To access the members (the variables inside the `struct`), you use:
+
+-   **Dot Operator (`.`)**: For `struct` objects. Example: `p1.age = 30;`.
+-   **Arrow Operator (`->`)**: For pointers to `struct` objects. Example: `p2->age = 30;`.
+
+###### **1.2.3 Initialization**
+You can initialize a structure's members when declaring it. C99 introduced *designated initializers*, which allow you to initialize specific members by name, making the code more readable.
+
+-   **Standard Initialization**: `struct Point p = {10, 20};`
+-   **Designated Initializer**: `struct Point p = {.x = 10, .y = 20};`
+
+##### **1.3 Bit-fields**
+A **bit-field** is a special feature within a structure that allows you to specify the exact number of bits a member should occupy. This is extremely useful for memory conservation when you know a variable will only hold a small range of values.
+
+For example, if a variable only needs to store values from 0 to 7, you only need 3 bits ($2^3=8$), whereas a standard `unsigned int` would use 32 bits.
+
+###### **1.3.1 Syntax and Use Cases**
+The syntax is `type member_name : width;`.
+
+```c
+struct Flags {
+    unsigned int isActive : 1;  // 1 bit: can be 0 or 1
+    unsigned int level    : 3;  // 3 bits: can hold values 0-7
+    unsigned int category : 4;  // 4 bits: can hold values 0-15
+};
+```
+
+Common uses for bit-fields include:
+
+-   Packing data to fit into a specific memory size (e.g., for network packets).
+-   Representing hardware registers where specific bits have specific meanings.
+-   Storing multiple boolean flags compactly in a single byte or integer.
+
+###### **1.3.2 Limitations**
+-   You cannot take the address (`&`) of a bit-field member because it may not align to a byte boundary.
+-   Arrays of bit-fields are not allowed.
+-   The exact memory layout can be *implementation-defined*, meaning it can vary between compilers.
+
+##### **1.4 Alignment**
+**Alignment** is the way data is arranged and accessed in computer memory. Modern processors read memory in chunks (e.g., 4 or 8 bytes at a time) and perform best when a data type of size *N* is located at a memory address that is a multiple of *N*.
+
+To enforce this, compilers often insert unused bytes, called **padding**, between members of a structure. Because of padding, the size of a structure is not always the sum of the sizes of its members.
+
+<!-- DIAGRAM HERE -->
+
+For example, in a `struct` with a `char` (1 byte) followed by an `int` (4 bytes), the compiler might insert 3 padding bytes after the `char` so the `int` starts on a 4-byte boundary.
+
+##### **1.5 Unions (`union`)**
+A **union** is a user-defined data type, similar to a `struct`, but with a key difference: all its members share the *same memory location*. A `union` is only large enough to hold its largest member.
+
+This means you can only use one member of the union at a time. Unions are useful for:
+
+-   Saving memory when you know you will only need one of several potential members at any given time.
+-   Interpreting the same block of memory in different ways, a technique known as **type punning**. For example, you can store a 32-bit integer and then read its individual bytes by accessing a `char[4]` member of the same union.
+
+##### **1.6 Enumerations (`enum`)**
+An **enumeration** provides a way to create a user-defined integer type with a set of named constant values called **enumerators**. This makes code more readable and self-documenting by replacing "magic numbers" (e.g., 0, 1, 2) with descriptive names (e.g., `RED`, `YELLOW`, `GREEN`).
+
+By default, the first enumerator has a value of 0, and each subsequent enumerator is one greater than the previous one. You can also assign explicit integer values.
+
+```c
+enum TrafficLight {
+    RED,         // Value is 0
+    YELLOW,      // Value is 1
+    GREEN        // Value is 2
+};
+
+enum Status {
+    SUCCESS = 0,
+    ERROR_FILE_NOT_FOUND = 101,
+    ERROR_ACCESS_DENIED  = 102
+};
+```
+
+### **2. Definitions**
+*   **Expression**: A combination of variables, constants, operators, and function calls that evaluates to a single value.
+*   **Structure (`struct`)**: A composite data type that groups variables of potentially different types into a single unit.
+*   **Bit-field**: A structure member that is defined with a specific number of bits, allowing for memory optimization.
+*   **Alignment**: The constraint on how data is positioned in memory, typically requiring data of size N to be at an address that is a multiple of N.
+*   **Padding**: Unused bytes inserted by a compiler between structure members to ensure proper alignment.
+*   **Union (`union`)**: A composite data type where all members share the same memory location. Its size is determined by its largest member.
+*   **Enumeration (`enum`)**: A user-defined integer type that consists of a set of named constants (enumerators).
+
+### **4. Mistakes**
+*   **Confusing `->` and `.` operators**: Using the dot operator (`.`) on a pointer to a struct, or the arrow operator (`->`) on a struct object itself. **Why it's wrong**: The `.` operator is for direct member access on an object, while `->` is syntactic sugar for dereferencing a pointer and then accessing a member (e.g., `p->m` is equivalent to `(*p).m`).
+*   **Assuming `sizeof(struct)` is the sum of its members' sizes**: This ignores the effect of memory alignment and padding, which often makes the structure larger than the sum of its parts.
+*   **Incorrectly using a `union`**: Writing to one member of a union and then reading from another without understanding that this overwrites the data. This is a common source of bugs unless used intentionally for type punning.
+*   **Assigning out-of-range values to bit-fields**: Assigning a value to a bit-field that requires more bits than allocated. **Why it's wrong**: The behavior is undefined by the C standard and can lead to unpredictable results or data truncation.
+*   **Attempting to get the address of a bit-field**: Using the `&` operator on a bit-field (e.g., `&myStruct.myBitField`). **Why it's wrong**: Bit-fields may not start on a byte boundary, so they don't have a direct memory address in the way other variables do.
+*   **Treating `enum` as a string**: An `enum` provides named integer constants, but you cannot print the name itself (e.g., `printf("%s", RED)`). You must create a function or use a `switch` statement to map the integer value back to a string representation.
+
+### **5. Examples**
+##### **5.1. Defining and Using a Structure**
+**Question:** Define a `struct` named `Book` to store a title (string), author (string), and publication year (integer). Create an instance of this `struct`, initialize it, and print its details.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+// Define the structure
+struct Book {
+    char title;
+    char author;
+    int year;
+};
+
+int main() {
+    // Create an instance of the struct
+    struct Book myBook;
+
+    // Initialize its members using strcpy for strings
+    strcpy(myBook.title, "The C Programming Language");
+    strcpy(myBook.author, "Kernighan & Ritchie");
+    myBook.year = 1978;
+
+    // Access and print the members
+    printf("Title: %s\n", myBook.title);
+    printf("Author: %s\n", myBook.author);
+    printf("Year: %d\n", myBook.year);
+
+    return 0;
+}
+```
+**Answer:** The program defines the `Book` structure, initializes an instance named `myBook`, and prints its contents to the console.
+
+</details>
+
+##### **5.2. Packing a Date Using Bit-fields**
+**Question:** Create a `struct` that packs a date (day, month, year) into 2 bytes (16 bits) using bit-fields. Assume the year can be stored as an offset from 2000 (0-127), the month is 1-12, and the day is 1-31.
+<details>
+<summary>Click to see the solution</summary>
+
+To fit within 16 bits:
+-   Day (1-31) needs 5 bits ($2^5 = 32$).
+-   Month (1-12) needs 4 bits ($2^4 = 16$).
+-   Year (0-127) needs 7 bits ($2^7 = 128$).
+Total bits: $5 + 4 + 7 = 16$ bits (2 bytes).
+
+```c
+#include <stdio.h>
+
+// Struct using bit-fields, total size is 16 bits
+struct Date {
+    unsigned int day   : 5;
+    unsigned int month : 4;
+    unsigned int year  : 7; // Year offset from 2000
+};
+
+int main() {
+    struct Date today;
+
+    // Assign a date
+    today.day = 30;
+    today.month = 9;
+    today.year = 25; // Represents the year 2025
+
+    printf("Date: %u/%u/%u\n", today.day, today.month, today.year + 2000);
+    printf("Size of Date struct: %zu bytes\n", sizeof(struct Date));
+
+    return 0;
+}
+```
+**Answer:** The program packs the date into a 2-byte structure. The output correctly displays the date and confirms the size of the structure is 2 bytes.
+</details>
+
+##### **5.3. Interpreting Data with a Union**
+**Question:** Use a `union` to store a 4-byte integer and then access its individual bytes. Initialize the integer to the hexadecimal value `0x12345678`.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+union IntBytes {
+    unsigned int integer;
+    unsigned char bytes;
+};
+
+int main() {
+    union IntBytes data;
+    data.integer = 0x12345678;
+
+    // The order of bytes depends on the system's endianness
+    // On a little-endian system (most common):
+    // byte = 0x78, byte = 0x56, byte = 0x34, byte = 0x12
+    printf("Integer value: 0x%X\n", data.integer);
+    printf("Bytes are: ");
+    for (int i = 0; i < 4; i++) {
+        printf("0x%02X ", data.bytes[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+**Answer:** The program demonstrates how the `union` allows the same 4 bytes of memory to be treated as both a single `unsigned int` and an array of 4 `unsigned char`s, revealing the byte-level representation of the integer.
+</details>
+
+##### **5.4. Using an Enumeration for Weekdays**
+**Question:** Create an `enum` for the days of the week. Write a function that takes a day from this `enum` as input and returns whether it is a weekday or a weekend.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+typedef enum {
+    SUNDAY, MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY
+} DayOfWeek;
+
+const char* getDayType(DayOfWeek day) {
+    switch (day) {
+        case SATURDAY:
+        case SUNDAY:
+            return "Weekend";
+        case MONDAY:
+        case TUESDAY:
+        case WEDNESDAY:
+        case THURSDAY:
+        case FRIDAY:
+            return "Weekday";
+        default:
+            return "Invalid Day";
+    }
+}
+
+int main() {
+    DayOfWeek today = WEDNESDAY;
+    DayOfWeek weekendDay = SATURDAY;
+
+    printf("Wednesday is a %s.\n", getDayType(today));
+    printf("Saturday is a %s.\n", getDayType(weekendDay));
+
+    return 0;
+}
+```
+**Answer:** The program uses an `enum` to represent days of the week clearly. The `getDayType` function uses a `switch` statement to check the day and return the appropriate string, making the logic easy to read and maintain.
+</details>
+
+##### **5.5. Demonstrating Structure Padding**
+**Question:** Define a `struct` with a `char`, an `int`, and another `char`. Predict its size based on the sum of its members, then print the actual `sizeof` the struct to observe the effect of padding.
+<details>
+<summary>Click to see the solution</summary>
+
+The sum of members is `sizeof(char)` (1) + `sizeof(int)` (4) + `sizeof(char)` (1) = 6 bytes. However, due to alignment, the `int` will likely be padded to start on a 4-byte boundary.
+
+```c
+#include <stdio.h>
+
+struct PaddedStruct {
+    char c1;
+    int i;
+    char c2;
+};
+
+int main() {
+    // The compiler will likely add 3 bytes of padding after c1
+    // and 3 bytes of padding after c2 to align the total struct size
+    // to a multiple of the largest member's alignment (which is 4 for int).
+    // Layout: [c1 (1), pad (3)] [i (4)] [c2 (1), pad (3)]
+    // Total size = 12 bytes
+    
+    printf("Predicted size (sum of members): %zu bytes\n",
+           sizeof(char) + sizeof(int) + sizeof(char));
+    printf("Actual size with padding: %zu bytes\n", sizeof(struct PaddedStruct));
+
+    return 0;
+}
+```
+**Answer:** The output will likely show that the sum of members is 6 bytes, but the actual size of the structure is 12 bytes. This difference is due to the padding bytes added by the compiler for alignment purposes.
+</details>
+
+##### **5.6. Structure Initialization with Designated Initializers**
+**Question:** Define a `Player` struct with `name`, `score`, and `health`. Create and initialize an instance using designated initializers, but initialize the members in a different order than they are defined.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+struct Player {
+    char name;
+    int health;
+    int score;
+};
+
+int main() {
+    // Using designated initializers to set values by name
+    struct Player p1 = {
+        .score = 1500,
+        .name = "Alex",
+        .health = 95
+    };
+
+    printf("Player: %s\n", p1.name);
+    printf("Health: %d\n", p1.health);
+    printf("Score: %d\n", p1.score);
+
+    return 0;
+}
+```
+**Answer:** The program successfully initializes the `Player` struct even though the initializers are not in the same order as the member declarations. This C99 feature makes initialization code clearer and less prone to errors.
+</details>
+
+##### **5.7. Parsing an IPv4 Header with Bit-fields and a Union**
+**Question:** The first 32 bits of an IPv4 header contain several fields: Version (4 bits), IHL (4 bits), DSCP (6 bits), ECN (2 bits), and Total Length (16 bits). Write a program to parse a 32-bit integer into these fields using a `union` and a `struct` with bit-fields.
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <stdint.h>
+
+// A struct with bit-fields matching the IPv4 header layout
+// Note: Bit-field order can be compiler-dependent (MSVC vs GCC)
+// This example assumes a little-endian system where fields are laid out from LSB to MSB in memory
+struct IPv4HeaderFields {
+    uint32_t ihl     : 4;
+    uint32_t version : 4;
+    uint32_t ecn     : 2;
+    uint32_t dscp    : 6;
+    uint32_t total_length : 16;
+};
+
+// Union to interpret a 32-bit integer as a set of header fields
+union IPv4Header {
+    uint32_t raw_header;
+    struct IPv4HeaderFields fields;
+};
+
+int main() {
+    union IPv4Header packet;
+    // Example 32-bit header value (in network byte order, but we'll parse it as a host integer)
+    // 0x4500003c is a common example for a simple IPv4 packet
+    packet.raw_header = 0x3c000045; // Stored in little-endian for this example to work
+
+    printf("Parsing raw header: 0x%08X\n", packet.raw_header);
+    printf("Version: %u\n", packet.fields.version);
+    printf("IHL (Header Length): %u (words)\n", packet.fields.ihl);
+    printf("DSCP: %u\n", packet.fields.dscp);
+    printf("ECN: %u\n", packet.fields.ecn);
+    printf("Total Length: %u (bytes)\n", packet.fields.total_length);
+
+    return 0;
+}
+```
+**Answer:** This program effectively uses a `union` to overlay a bit-field `struct` onto a 32-bit integer. This allows for efficient parsing of the integer into its distinct protocol fields, a common technique in network programming and embedded systems.
+</details>
