@@ -31,7 +31,7 @@ Solving a problem with a computer involves multiple layers of abstraction, from 
 
 *Computer architecture* is the study of the layers from the Instruction Set Architecture down to the logic circuits, including how they interact with system software.
 
-![image](lec_1_1.png){width=80%}
+![](lec_1_1.png){width=80%}
 
 ##### **1.3 What is Computer Architecture?**
 **Computer Architecture** is a field of computer science and engineering that covers three main areas:
@@ -83,7 +83,7 @@ To balance speed, cost, and capacity, computers organize memory in a hierarchy. 
 3.  **System Memory (RAM)**: Much larger capacity (gigabytes) but significantly slower than cache.
 4.  **Storage Devices (SSD/HDD)**: Largest capacity (terabytes) but the slowest access speeds.
 
-![image](lec_1_2.png){width=80%}
+![](lec_1_2.png){width=80%}
 
 ##### **1.6 CPU Architectures and Multicore Systems**
 A CPU's design is defined by its **Instruction Set Architecture (ISA)**.
@@ -145,168 +145,3 @@ Educational boards like the **DE10-Lite MAX 10** include an FPGA chip along with
 *   **Treating Verilog like a software programming language**: Writing Verilog code sequentially and expecting it to execute line by line. **Why it's wrong:** Verilog is a hardware description language. It describes physical circuits that operate in parallel. This misunderstanding leads to designs that don't synthesize into working hardware or behave unexpectedly.
 *   **Believing a processor's functionality can be changed with software**: Thinking you can add new hardware-level instructions to a CPU through a software update. **Why it's wrong:** A CPU's instruction set is physically etched into its silicon circuits during manufacturing and cannot be altered.
 *   **Underestimating the Communication Bus**: Focusing only on CPU speed while ignoring the performance of the bus connecting the CPU to RAM. **Why it's wrong:** A slow bus will starve a fast CPU of data, creating a massive bottleneck. The entire system's performance depends on the ability of the bus to transfer data efficiently.
-
-#### **4. Examples**
-
-##### **4.1 Simple Logic in Verilog**
-**Question:** Write a Verilog module that implements a simple AND gate. It should take two single-bit inputs, `a` and `b`, and produce one single-bit output, `y`.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Define the module:** Start by declaring a module with a name (e.g., `simple_and`) and list its input and output ports.
-    ```verilog
-    module simple_and(
-        input  logic a,
-        input  logic b,
-        output logic y
-    );
-    ```
-2.  **Assign the logic:** Use a continuous `assign` statement to describe the relationship between the inputs and the output. The `&` operator performs a bitwise AND operation.
-    ```verilog
-    assign y = a & b;
-    ```
-3.  **End the module:** Close the module definition.
-    ```verilog
-    endmodule
-    ```
-
-**Answer:** The complete Verilog module is:
-```verilog
-module simple_and(
-    input  logic a,
-    input  logic b,
-    output logic y
-);
-
-assign y = a & b;
-
-endmodule
-```
-</details>
-
-##### **4.2 Controlling an LED with a Switch**
-**Question:** On an FPGA board like the DE10-Lite, you have a switch (`SW0`) and an LED (`LED0`). Write a Verilog module to make the LED turn on when the switch is on, and turn off when the switch is off.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Define the module and ports:** Create a module named `led_control` with one input for the switch and one output for the LED.
-    ```verilog
-    module led_control(
-        input  logic SW0,
-        output logic LED0
-    );
-    ```
-2.  **Connect the switch to the LED:** The simplest way to achieve this is to directly connect the input to the output. An `assign` statement creates a "wire" between the two.
-    ```verilog
-    assign LED0 = SW0;
-    ```
-3.  **End the module:** Close the module definition.
-    ```verilog
-    endmodule
-    ```
-**Answer:** The Verilog module directly connects the switch's state to the LED's state:
-```verilog
-module led_control(
-    input  logic SW0,
-    output logic LED0
-);
-
-assign LED0 = SW0;
-
-endmodule
-```
-</details>
-
-##### **4.3 CPU vs. FPGA Application Choice**
-**Question:** You are designing a system for real-time video encoding that needs to process 4K video at 60 frames per second with very low latency. Would a general-purpose CPU or an FPGA be a better choice for the core processing unit? Explain why.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Analyze the task requirements:** The task involves processing a massive, continuous stream of data (4K video) with strict timing constraints (60 fps, low latency). The operations are highly repetitive and can be broken down into many small, parallel steps.
-2.  **Evaluate the CPU's suitability:** A CPU would process the video frames using software. While powerful, it executes instructions sequentially (even with multiple cores) and has overhead from the operating system. Achieving consistent low latency for every single frame would be extremely challenging.
-3.  **Evaluate the FPGA's suitability:** An FPGA can be configured to have a dedicated hardware pipeline for video processing. Multiple stages of the encoding algorithm can run simultaneously on different parts of the chip. This massive parallelism is ideal for video streams and guarantees consistent, low-latency processing.
-**Answer:** An **FPGA** is the better choice. **Why:** Video encoding is a highly parallel task. An FPGA allows for the creation of a custom hardware pipeline where many calculations happen simultaneously, which is far more efficient and provides the low, predictable latency required for real-time processing, something a general-purpose CPU struggling with OS and other overheads cannot guarantee.
-</details>
-
-##### **4.4 Memory Hierarchy Access**
-**Question:** A program is executing a `for` loop that repeatedly adds two numbers. The machine code instruction for the addition operation is currently being executed by the CPU. In which level of the memory hierarchy would you most likely find this instruction?
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Consider the CPU's immediate needs:** The CPU can only execute instructions that are physically inside it.
-2.  **Recall the fastest memory level:** The fastest and closest memory to the ALU and CU are the registers. The Control Unit fetches instructions from memory into a special-purpose register (often called the Instruction Register) just before decoding and execution.
-3.  **Consider the role of cache:** Since the instruction is part of a loop, it's being used repeatedly. Therefore, it is almost certain to have been copied from the slower main memory (RAM) into the much faster L1 instruction cache for quick access on subsequent loop iterations.
-4.  **Combine the points:** The instruction must be in a register to be executed. Given it's in a loop, it would also reside in the L1 cache to avoid fetching it from slow RAM every time. The most immediate location is a register.
-**Answer:** The instruction would be found in a **CPU register** (specifically, the instruction register) at the moment of execution. A copy of it would also reside in the **L1 cache** for fast re-access during the next iteration of the loop.
-</details>
-
-##### **4.5 2-to-1 Multiplexer in Verilog**
-**Question:** A 2-to-1 multiplexer (MUX) is a circuit that selects one of two inputs (`a` or `b`) to pass to the output (`y`) based on a selector signal (`sel`). If `sel` is 0, `y` should be `a`. If `sel` is 1, `y` should be `b`. Implement this in a Verilog module.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Define the module and its ports:** The module requires three inputs (`a`, `b`, `sel`) and one output (`y`).
-    ```verilog
-    module mux_2_to_1(
-        input  logic a,
-        input  logic b,
-        input  logic sel,
-        output logic y
-    );
-    ```
-2.  **Implement the selection logic:** A conditional `assign` statement using the ternary operator (`? :`) is a concise way to model this. The structure is `condition ? value_if_true : value_if_false`.
-    ```verilog
-    assign y = (sel == 1) ? b : a;
-    ```
-    This line reads as: "Assign `y` the value of `b` if `sel` is 1; otherwise, assign it the value of `a`."
-3.  **End the module:** Close the module definition.
-    ```verilog
-    endmodule
-    ```
-**Answer:** The complete Verilog module for a 2-to-1 MUX is:
-```verilog
-module mux_2_to_1(
-    input  logic a,
-    input  logic b,
-    input  logic sel,
-    output logic y
-);
-
-assign y = sel ? b : a; // A more compact way of writing (sel == 1)
-
-endmodule
-```
-</details>
-
-##### **4.6 Processor Instruction Set Limitation**
-**Question:** Imagine a very simple processor whose instruction set only contains `ADD`, `SUBTRACT`, and `STORE`. You need to perform a multiplication, for example, 5 * 3. How could you accomplish this using only the available instructions?
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Understand the core concept of multiplication:** Multiplication is repeated addition. For example, 5 * 3 is the same as 5 + 5 + 5.
-2.  **Formulate an algorithm using available instructions:**
-    *   Initialize a result variable (in a register, let's call it `R1`) to 0.
-    *   Use the `ADD` instruction to add 5 to `R1`.
-    *   Use the `ADD` instruction again to add 5 to `R1`. `R1` now holds 10.
-    *   Use the `ADD` instruction a third time to add 5 to `R1`. `R1` now holds 15.
-    *   Use the `STORE` instruction to save the value from `R1` to a memory location.
-3.  **Structure the process:** This would be implemented as a software loop. The program would use the `ADD` instruction three times.
-**Answer:** You can perform multiplication by implementing it as a series of additions. To calculate 5 * 3, you would write a short program that uses a loop to execute the `ADD 5` instruction three times, accumulating the result in a register.
-</details>
-
-##### **4.7 Identifying FPGA Board Components**
-**Question:** You are looking at a DE10-Lite FPGA board. You see a large, square chip in the center labeled "MAX 10". What is the function of this component?
-
-<details>
-<summary>Click to see the solution</summary>
-1.  **Analyze the component's description:** The chip is large, centrally located, and has a specific model name ("MAX 10").
-2.  **Recall the purpose of an FPGA board:** The primary purpose of an FPGA development board is to provide a platform for programming and testing an FPGA.
-3.  **Connect the information:** The central, most prominent chip on an FPGA board is almost always the FPGA itself. The "MAX 10" is a product family of FPGAs made by Altera (now Intel).
-**Answer:** The chip labeled "MAX 10" is the **FPGA (Field-Programmable Gate Array)** itself. It is the main component that you program with your hardware design using a language like Verilog.
-</details>
