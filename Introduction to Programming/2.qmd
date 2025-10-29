@@ -1,0 +1,460 @@
+---
+title: "W2. Pointers, Strings, and Arrays in C"
+author: "Zakhar Podyakov"
+date: "September 18, 25 25"
+format: html
+engine: knitr
+---
+
+{{< video 2.mp4 >}}
+
+[Quiz](https://notebooklm.google.com/notebook/d94773cc-fb37-47cc-9006-4d367fff55f4?artifactId=c6bb672c-ab95-4ba4-9b03-174e17c1826c) | [Flashcards](https://notebooklm.google.com/notebook/d94773cc-fb37-47cc-9006-4d367fff55f4?artifactId=92d009ac-aabd-457e-9716-11b83aa32ac6)
+
+#### **1. Summary**
+##### **1.1 Memory, Values, and Addresses**
+In computing, a program's data is stored in **memory**. It is helpful to visualize memory as a vast, single sequence of cells, much like a long row of mailboxes. Each cell has two key attributes:
+
+1.  An **address**: This is a unique numerical identifier for the cell's location, similar to a mailbox number. Addresses are typically represented in hexadecimal format (e.g., `0x7ffc...`).
+2.  A **value**: This is the actual data stored inside the cell, like the letter inside a mailbox.
+
+Every variable you declare in a program occupies one or more of these memory cells. The crucial concept is to *distinguish between the address of a variable and the value it holds*. For instance, an integer variable `var1` with a value of `100` might be located at memory address `0xbff5a400`.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.2 The Program Stack and Local Variables**
+When a program runs, a region of memory called the **stack** is used to manage function calls. The stack operates on a *last-in, first-out (LIFO)* basis. Each time a function is called, a new block of memory, called a **stack frame** or **activation record**, is pushed onto the top of the stack.
+
+This stack frame contains all the information needed for that specific function call, including:
+
+*   Its **local variables** (variables declared inside the function).
+*   The function's parameters.
+*   The return address (where to resume execution after the function finishes).
+
+When the function completes, its entire stack frame is popped off the stack, and all of its local variables are destroyed. This process is automatic. This is why a local variable's lifetime is limited to the execution of the function it was declared in.
+
+##### **1.3 The Heap and Dynamic Memory Allocation**
+Separate from the stack is another memory region called the **heap**. The heap is used for **dynamic memory allocation**, which allows a program to request blocks of memory at runtime, when the exact size may not be known at compile time.
+
+Unlike stack variables, the lifetime of memory allocated on the heap is *not tied to the scope of any function*. The programmer has full control and responsibility for managing this memory.
+
+*   To allocate memory on the heap, you use the `malloc()` function (short for memory allocate). It takes the number of bytes to allocate as an argument and returns a **generic pointer** (`void*`) to the start of that allocated block.
+*   To release the memory once it's no longer needed, you must explicitly call the `free()` function, passing it the same pointer.
+
+Failure to call `free()` results in a **memory leak**, where the program holds onto memory it no longer uses, which can exhaust available memory and crash the application.
+
+##### **1.4 Pointers**
+A **pointer** is a special type of variable designed to hold a *memory address* as its value. Instead of storing data like an integer or a character directly, it stores the location of *other* data. This makes pointers a powerful tool for indirect data manipulation, managing dynamic memory, and efficiently passing large data structures to functions.
+
+A pointer is declared by specifying the type of data it will point to, followed by an asterisk (`*`). For example, `int* p;` declares a pointer `p` that is intended to hold the address of an integer.
+
+There are two fundamental operators for pointers:
+
+*   The **address-of operator (`&`)**: This unary operator, when placed before a variable name, returns its memory address. For example, `&var1` gives the address where `var1` is stored.
+*   The **dereference operator (`*`)**: This unary operator, when placed before a pointer variable, accesses the value *at the address the pointer is holding*. It essentially says, "go to the address stored in this pointer and get the value from there."
+
+For example, to make a pointer `p` point to an integer `x`, you would write `p = &x;`. To retrieve the value of `x` using the pointer, you would write `*p`.
+
+A pointer of type `void*` is a generic pointer that can hold the address of any data type but cannot be dereferenced directly. It must first be **cast** to a specific pointer type, like `(int*)`, before the data it points to can be accessed.
+
+##### **1.5 Arrays**
+An **array** is a data structure that stores a *fixed-size, sequential collection of elements of the same data type*. Imagine an array as a connected block of memory cells. You can access individual elements by their position, or **index**, which starts at `0`.
+
+For example, `double balance[10];` declares an array named `balance` that can hold 10 elements of type `double`. The first element is `balance[0]` and the last is `balance[9]`.
+
+A critical concept in C is the close relationship between arrays and pointers. *The name of an array, when used in most expressions, decays into a pointer to its first element*. This means that the expressions `balance` and `&balance[0]` are equivalent; both yield the memory address of the first element.
+
+Because of this, you can use **pointer arithmetic** to navigate an array. If `p` is a pointer to the first element of an array, then `*(p + i)` is equivalent to `array[i]`. It's important to note that pointer arithmetic is automatically scaled by the size of the data type. If `p` is an `int*`, `p + 1` increments the address not by 1 byte, but by `sizeof(int)` bytes to point to the next integer in memory.
+
+##### **1.6 Strings in C**
+In the C programming language, a **string** is not a built-in data type. Instead, a string is implemented as a *one-dimensional array of characters that is terminated by a special character called the **null terminator***.
+
+The **null terminator**, represented as `\0`, is a character with the ASCII value 0. It serves as a marker to signal the end of the string. Standard library functions that work with strings (like printing or calculating length) rely on this null character to know where to stop processing.
+
+There are two common ways to initialize a string:
+
+1.  **As a character array**: `char greeting[] = {'H', 'e', 'l', 'l', 'o', '\0'};`. In this case, you *must explicitly include the `\0`* at the end.
+2.  **As a string literal**: `char greeting[] = "Hello";`. This is the more common method. When you use double quotes, the compiler automatically allocates enough space for the characters and *appends the `\0` terminator for you*. This is why "Hello" requires an array of 6 characters, not 5.
+
+Failure to properly null-terminate a character array will lead to undefined behavior when it is treated as a string, as functions will read past the end of the intended data into adjacent memory.
+
+##### **1.7 Pointers to Functions**
+Just as pointers can store the address of data, they can also store the address of functions. A **function pointer** can be used to call the function it points to indirectly. This is useful for implementing callbacks, creating function tables (e.g., for state machines), and passing functions as arguments to other functions.
+
+The syntax for declaring a function pointer must match the function's signature (return type and parameter types). For example, a pointer to a function that takes two integers and returns an integer is declared as: `int (*my_func_ptr)(int, int);`.
+
+#### **2. Definitions**
+*   **Pointer**: A variable that stores the memory address of another variable or a location in memory.
+*   **Array**: A data structure consisting of a fixed-size, contiguous collection of elements of the same data type, accessed by an integer index.
+*   **C-Style String**: A sequence of characters stored in a character array and terminated by a null character (`\0`).
+*   **Null Terminator (`\0`)**: A special character with an ASCII value of zero that marks the end of a C-style string.
+*   **Address-of Operator (`&`)**: A unary operator that returns the memory address of its operand (the variable it is applied to).
+*   **Dereference Operator (`*`)**: A unary operator that accesses the value stored at the memory address held by a pointer. It is used to "de-reference" the pointer to get to the data it points to.
+*   **Stack**: A region of memory where local variables and function call information are stored in a last-in, first-out manner. Memory is managed automatically.
+*   **Heap**: A region of memory for dynamically allocated data, whose lifetime is controlled manually by the programmer using `malloc()` and `free()`.
+*   **Dynamic Memory Allocation**: The process of allocating memory from the heap at runtime.
+*   **Memory Leak**: A memory management error where a program allocates memory on the heap but fails to release it with `free()`, making it unusable for the remainder of the program's execution.
+*   **Dangling Pointer**: A pointer that refers to a memory location that has already been freed or is otherwise no longer valid (e.g., pointing to a local variable that has gone out of scope).
+*   **Pointer Arithmetic**: The use of arithmetic operators on pointers, which is scaled by the size of the data type they point to. For example, incrementing an `int` pointer moves it forward by `sizeof(int)` bytes.
+
+#### **3. Examples**
+##### **3.1. Reverse a String** (Lab 2, Exercise 1)
+Write a program that prompts the user for a string, and prints its reverse.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    // Declare a character array to store the user's string.
+    // We'll set a maximum length, for example, 100 characters.
+    char inputString[100];
+    char reversedString[100];
+
+    // Prompt the user to enter a string.
+    printf("Enter a string: ");
+
+    // Read the string from the user.
+    // fgets is used instead of scanf to handle strings with spaces.
+    fgets(inputString, sizeof(inputString), stdin);
+
+    // Remove the newline character that fgets() often appends.
+    inputString[strcspn(inputString, "\n")] = 0;
+
+    // Find the length of the input string.
+    int length = strlen(inputString);
+    int endIndex = length - 1;
+    int i;
+
+    // Loop through the input string from beginning to end,
+    // and build the reversed string from end to beginning.
+    for (i = 0; i < length; i++) {
+        reversedString[i] = inputString[endIndex];
+        endIndex--;
+    }
+    // Add the null terminator to the end of the reversed string.
+    reversedString[i] = '\0';
+
+    // Print the reversed string.
+    printf("Reversed string: %s\n", reversedString);
+
+    return 0;
+}
+```
+</details>
+
+##### **3.2. Print an Isosceles Triangle** (Lab 2, Exercise 2)
+Write a function that outputs an isosceles triangle of height $n$ and width $2n-1$. Your program must accept $n$ as a command line parameter.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <stdlib.h> // Required for atoi()
+
+// Function to print the triangle
+void printTriangle(int height) {
+    // Loop for each row (from 1 to height)
+    for (int i = 1; i <= height; i++) {
+        // Calculate the number of spaces and asterisks for the current row
+        int spaces = height - i;
+        int stars = 2 * i - 1;
+
+        // Print the leading spaces
+        for (int j = 0; j < spaces; j++) {
+            printf(" ");
+        }
+
+        // Print the asterisks
+        for (int j = 0; j < stars; j++) {
+            printf("*");
+        }
+
+        // Move to the next line after printing each row
+        printf("\n");
+    }
+}
+
+// The main function accepts command line arguments
+// argc: argument count (number of strings passed)
+// argv: argument vector (array of strings)
+int main(int argc, char *argv[]) {
+    // Check if the user provided exactly one command line argument (plus the program name).
+    if (argc != 2) {
+        printf("Usage: %s <height>\n", argv[0]);
+        // Return 1 to indicate an error
+        return 1;
+    }
+
+    // Convert the command line argument (which is a string) to an integer.
+    // argv[0] is the program name, argv[1] is the first argument.
+    int n = atoi(argv[1]);
+
+    // Check if the number is positive.
+    if (n <= 0) {
+        printf("Height must be a positive integer.\n");
+        return 1;
+    }
+
+    // Call the function to print the triangle
+    printTriangle(n);
+
+    // Return 0 to indicate successful execution
+    return 0;
+}
+
+/*
+--- How to Compile and Run ---
+1. Save the code as a .c file (e.g., triangle.c).
+2. Open a terminal or command prompt.
+3. Compile the code: gcc triangle.c -o triangle
+4. Run the program with a command line argument: ./triangle 6
+*/
+```
+</details>
+
+##### **3.3. Print Various Figures** (Lab 2, Exercise 3)
+Add several functions to your previous solution, so the user could print different figures on his/her choice.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+// --- Figure Drawing Functions ---
+
+// 1. Right-angled triangle, increasing
+void printTriangleRightAngle(int height) {
+    printf("Right-Angled Triangle:\n");
+    for (int i = 1; i <= height; i++) {
+        for (int j = 1; j <= i; j++) {
+            printf("*");
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+// 2. Right-angled triangle, decreasing
+void printTriangleRightAngleInverted(int height) {
+    printf("Inverted Right-Angled Triangle:\n");
+    for (int i = height; i >= 1; i--) {
+        for (int j = 1; j <= i; j++) {
+            printf("*");
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+// 3. Square
+void printSquare(int size) {
+    printf("Square:\n");
+    for (int i = 1; i <= size; i++) {
+        for (int j = 1; j <= size; j++) {
+            printf("*");
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+// 4. Isosceles triangle (from previous exercise)
+void printTriangleIsosceles(int height) {
+    printf("Isosceles Triangle:\n");
+    for (int i = 1; i <= height; i++) {
+        for (int j = 0; j < height - i; j++) {
+            printf(" ");
+        }
+        for (int j = 0; j < 2 * i - 1; j++) {
+            printf("*");
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+
+// --- Main Program Logic ---
+
+int main(int argc, char *argv[]) {
+    // Check for correct command line argument usage
+    if (argc != 2) {
+        printf("Usage: %s <size>\n", argv[0]);
+        return 1;
+    }
+
+    // Convert size argument from string to integer
+    int size = atoi(argv[1]);
+
+    if (size <= 0) {
+        printf("Size must be a positive integer.\n");
+        return 1;
+    }
+
+    // Variable to store user's choice
+    int choice;
+
+    // Loop until the user chooses to exit
+    while (1) {
+        // Display menu
+        printf("Choose a figure to print:\n");
+        printf("1. Right-Angled Triangle\n");
+        printf("2. Inverted Right-Angled Triangle\n");
+        printf("3. Square\n");
+        printf("4. Isosceles Triangle\n");
+        printf("0. Exit\n");
+        printf("Your choice: ");
+
+        // Get user input
+        scanf("%d", &choice);
+
+        // Process user choice
+        switch (choice) {
+            case 1:
+                printTriangleRightAngle(size);
+                break;
+            case 2:
+                printTriangleRightAngleInverted(size);
+                break;
+            case 3:
+                printSquare(size);
+                break;
+            case 4:
+                printTriangleIsosceles(size);
+                break;
+            case 0:
+                printf("Exiting program.\n");
+                return 0; // Exit the program
+            default:
+                printf("Invalid choice. Please try again.\n\n");
+        }
+    }
+
+    return 0;
+}
+```
+</details>
+
+##### **3.4. Swap Two Integers** (Lab 2, Exercise 4)
+Write a program that asks the user to input two integers and swaps them using a separate function.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// This function swaps the values of two integers.
+// It takes 'pointers' to the variables as arguments.
+// A pointer is a variable that stores the memory address of another variable.
+// By using pointers, the function can modify the original variables in main().
+void swapIntegers(int *ptrA, int *ptrB) {
+    // Create a temporary variable to hold one of the values.
+    int temp;
+
+    // 1. Store the value at the address pointed to by ptrA in temp.
+    // The '*' operator here is the 'dereference' operator. It gets the value
+    // stored at the memory address.
+    temp = *ptrA;
+
+    // 2. Copy the value at the address pointed to by ptrB into the address of ptrA.
+    *ptrA = *ptrB;
+
+    // 3. Copy the value from temp into the address of ptrB.
+    *ptrB = temp;
+}
+
+int main() {
+    // Declare two integer variables.
+    int num1, num2;
+
+    // Prompt the user for the first integer.
+    printf("Enter the first integer: ");
+    // Read the user's input and store it in num1.
+    scanf("%d", &num1);
+
+    // Prompt the user for the second integer.
+    printf("Enter the second integer: ");
+    // Read the user's input and store it in num2.
+    scanf("%d", &num2);
+
+    // Print the values before swapping.
+    printf("\nBefore swap: num1 = %d, num2 = %d\n", num1, num2);
+
+    // Call the swap function.
+    // We pass the memory addresses of num1 and num2 using the '&' (address-of) operator.
+    swapIntegers(&num1, &num2);
+
+    // Print the values after swapping.
+    printf("After swap:  num1 = %d, num2 = %d\n", num1, num2);
+
+    return 0;
+}
+```
+</details>
+
+##### **3.5. Write User Input to a File** (Lab 2, Exercise 5)
+Write a program that asks the user to input a line of text and writes the input into a text file (spaces should be included in the user input). *Hint: you will need to use fopen, fgets, fputs.*
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    // Declare a character array to hold the user's text input.
+    // Let's allow for up to 255 characters plus the null terminator.
+    char userInput[256];
+
+    // Declare a file pointer. This will be used to reference the file.
+    FILE *filePtr;
+
+    // Prompt the user to enter a line of text.
+    printf("Please enter a line of text to save to a file:\n");
+
+    // Read a line of text from the standard input (the keyboard).
+    // - userInput: the buffer to store the text.
+    // - sizeof(userInput): the maximum number of characters to read.
+    // - stdin: the standard input stream.
+    // fgets is used because it can handle spaces in the input.
+    fgets(userInput, sizeof(userInput), stdin);
+
+    // --- File Handling ---
+
+    // 1. Open the file.
+    // - "output.txt": the name of the file to create/open.
+    // - "w": the mode to open the file in. "w" stands for "write".
+    //   If the file exists, its contents are overwritten. If it doesn't exist, it's created.
+    filePtr = fopen("output.txt", "w");
+
+    // 2. Check if the file was opened successfully.
+    // If fopen() fails (e.g., due to permissions issues), it returns NULL.
+    if (filePtr == NULL) {
+        printf("Error: Could not open the file for writing.\n");
+        return 1; // Exit with an error code.
+    }
+
+    // 3. Write the user's input string to the file.
+    // - userInput: the string to write.
+    // - filePtr: the pointer to the file where the string will be written.
+    fputs(userInput, filePtr);
+
+    // 4. Close the file.
+    // This is a crucial step to ensure all data is written to the disk
+    // and to release the file handle back to the operating system.
+    fclose(filePtr);
+
+    // Inform the user that the operation was successful.
+    printf("\nYour input has been written to 'output.txt'.\n");
+
+    return 0; // Exit successfully.
+}
+```
+</details>

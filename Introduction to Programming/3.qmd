@@ -1,0 +1,895 @@
+---
+title: "W3. Pointers, Declarations, Preprocessing, and File I/O in C"
+author: "Zakhar Podyakov"
+date: "September 18, 2025"
+format: html
+engine: knitr
+---
+
+{{< video 3.mp4 >}}
+
+[Quiz](https://notebooklm.google.com/notebook/75225fb6-1a48-403e-9915-9d6a13e235e8?artifactId=fa65ba46-1add-46ba-a3bf-cd41d72dbd71) | [Flashcards](https://notebooklm.google.com/notebook/75225fb6-1a48-403e-9915-9d6a13e235e8?artifactId=fd8509c1-a167-4239-8e93-88ca1e684017)
+
+#### **1. Summary**
+##### **1.1 The C Memory Model: Stack, Heap, and Global Storage**
+
+To understand pointers and variables in C, it's crucial to know how a program organizes its memory. A C program typically divides memory into three main regions:
+
+1.  **Global (or Static) Storage Area**: This area holds **global variables** (declared outside any function) and **static variables** (declared with the `static` keyword). These objects are created when the program starts and exist for the entire duration of the program's execution. They have a fixed, known memory address.
+2.  **The Stack**: The stack is a region of memory used for managing function calls. When a function is called, a new *stack frame* is created. This frame holds all the function's **local variables** (also called *automatic variables*), its parameters, and the return address. The stack operates on a Last-In, First-Out (LIFO) basis. When a function returns, its stack frame is destroyed, and all its local variables cease to exist. This process is managed automatically by the compiler.
+3.  **The Heap**: The heap is a large pool of memory available for use during the program's execution. Unlike the stack, the heap's memory is not managed automatically. The programmer must explicitly request memory from the heap and is responsible for releasing it once it's no longer needed. This is known as **dynamic memory allocation** and is used for creating objects whose size or lifetime is not known at compile time.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.2 Pointers: The Foundation**
+
+A **pointer** is a special type of variable that does not hold data directly but instead holds the *memory address* of another variable. It "points to" the location where the actual data is stored. This mechanism allows for powerful features like dynamic memory management and efficient manipulation of arrays and data structures.
+
+The two fundamental pointer operators are:
+
+*   **Address-of operator (`&`)**: When placed before a variable name, it returns the memory address of that variable. For example, `&my_var` gives the address where `my_var` is stored.
+*   **Dereference operator (`*`)**: When placed before a pointer variable, it accesses the value stored at the memory address the pointer is holding. For instance, if `p` holds the address of `my_var`, then `*p` is equivalent to `my_var` itself.
+
+##### **1.3 Pointer Arithmetic and Arrays**
+
+In C, pointers and arrays are intimately related. An array's name, when used in an expression, is treated as a *constant pointer* to its first element. This means `array` is equivalent to `&array[0]`.
+
+This relationship enables **pointer arithmetic**, which allows you to perform mathematical operations on pointer addresses. When you add an integer `n` to a pointer `p`, the result is not `p + n` bytes. Instead, the address is advanced by `n * sizeof(type)`, where `type` is the data type the pointer points to. This makes it easy to navigate through arrays.
+
+*   `p + i`: Points to the i-th element after the one `p` currently points to.
+*   `*(p + i)`: Is equivalent to accessing the array element `p[i]`.
+*   `p++`: Increments the pointer to point to the next element in memory.
+
+Because of this, the C standard defines the array subscript operation `E1[E2]` as being identical to `(*((E1)+(E2)))`. Since addition is commutative, this means `*(E1+E2)` is the same as `*(E2+E1)`, which leads to the surprising but valid syntax `E2[E1]`. For example, if `arr` is an array, `arr[5]` is the same as `5[arr]`.
+
+##### **1.4 Dynamic Memory Management**
+
+Dynamic memory is allocated on the **heap** using functions from the `<stdlib.h>` library.
+
+1.  **Allocation (`malloc`)**: The `malloc` function reserves a block of memory.
+    *   It takes one argument: the number of bytes to allocate. The `sizeof` operator is essential here to ensure portability and correctness (e.g., `malloc(10 * sizeof(int))` for an array of 10 integers).
+    *   It returns a generic pointer of type `void*` to the first byte of the allocated block. If allocation fails (e.g., the system is out of memory), it returns `NULL`.
+    *   This `void*` must be **cast** to the appropriate pointer type (e.g., `int*`) before it can be used, to inform the compiler how to interpret the data and perform correct pointer arithmetic.
+2.  **Deallocation (`free`)**: The `free` function releases a block of dynamically allocated memory back to the heap.
+    *   It takes a single argument: the pointer that was returned by `malloc`.
+    *   It is the **programmer's absolute responsibility** to call `free` for every `malloc`. Failure to do so results in a **memory leak**.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.5 Common Pointer Pitfalls**
+
+Pointers are powerful but introduce risks if not managed carefully. Scott Meyer identified several common categories of pointer problems:
+
+*   **Ownership and Destruction**: A pointer itself doesn't carry information about who is responsible for freeing the memory it points to. This can lead to **memory leaks** (if no one frees the memory) or **double frees** (if multiple parts of the code try to free it), which can corrupt the heap.
+*   **Dangling Pointers**: A **dangling pointer** is a pointer that refers to a memory location that has already been deallocated with `free`. Using (dereferencing) a dangling pointer results in *undefined behavior*, as that memory may now contain garbage or be in use by another part of the program.
+*   **Pointer vs. Array Ambiguity**: A pointer of type `T*` can point either to a single object or to the first element of an array of objects. The language itself provides no way to know which it is, or the size of the array, from the pointer alone.
+*   **Uninitialized Pointers**: A pointer that has been declared but not assigned a valid address contains a garbage value. Dereferencing it will access a random memory location, almost always leading to a crash.
+
+##### **1.6 C Declarations**
+
+A **declaration** introduces an identifier (like a variable or function name) and specifies its properties. A declaration can contain up to four parts: a **storage class** (`static`), a **type specifier** (`int`), an **entity name** (`a`), and an **initializer** (`= 1`).
+
+C's declaration syntax is famously complex because it follows the rule "declaration follows use." This means the declaration mimics how the identifier would be used in an expression.
+
+*   `int *p;`: "*p gives an int," so `p` is a pointer to an `int`.
+*   `int arr[10];`: "arr[i] gives an int," so `arr` is an array of 10 ints.
+*   `void (*f)(int);`: "*f called with an int gives void," so `f` is a **pointer to a function** that takes an `int` parameter and returns `void`.
+
+The `typedef` keyword allows you to create an alias for a data type, which is invaluable for simplifying complex declarations and improving code readability. For instance, `typedef int (*MathFunc)(int, int);` creates a type `MathFunc` for a pointer to a function that takes two integers and returns one.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.7 The C Preprocessor**
+
+The C preprocessor is a text-processing tool that runs *before* the compiler. It scans the source code for lines beginning with `#`, known as **preprocessor directives**.
+
+*   `#include <filename>` or `#include "filename"`: Replaces this line with the content of the specified header file.
+*   `#define MACRO_NAME value`: Defines a **macro**. The preprocessor will replace every subsequent occurrence of `MACRO_NAME` with `value`. Function-like macros with parameters are also possible, but they are a common source of bugs if not written carefully (parameters and the body should always be enclosed in parentheses).
+*   **Conditional Compilation**: Directives like `#if`, `#ifdef`, `#ifndef`, `#else`, and `#endif` allow blocks of code to be included or excluded from compilation based on a condition. Their most important use is creating **include guards** in header files to prevent errors from multiple inclusions. An include guard typically looks like this:
+    ```c
+    #ifndef MY_HEADER_H
+    #define MY_HEADER_H
+    // ... header content ...
+    #endif
+    ```
+
+<!-- DIAGRAM HERE -->
+
+##### **1.8 File I/O in C**
+
+File Input/Output (I/O) in C is handled by a set of standard library functions declared in `<stdio.h>`. Operations are performed on **streams**, which are represented by a `FILE*` pointer, also known as a **file handle**.
+
+The standard workflow is:
+
+1.  **Open**: Use `fopen("filename", "mode")` to open a file. The **mode** string specifies the operation:
+    *   `"r"`: Read text.
+    *   `"w"`: Write text (discards existing content).
+    *   `"a"`: Append text.
+    *   `"rb"`, `"wb"`, `"ab"`: Corresponding operations for binary files.
+    *   `"r+"`, `"w+"`, `"a+"`: Update modes (both reading and writing).
+    `fopen` returns a `FILE*` on success or `NULL` on failure. Always check for `NULL`.
+2.  **Read/Write**: Use functions like `fprintf`, `fscanf`, `fgetc`, `fputc`, `fgets`, `fputs`, `fread`, and `fwrite` to interact with the file.
+3.  **Close**: Use `fclose(file_handle)` to close the stream. This flushes any buffered data to the disk and releases system resources. Failing to close a file can lead to data loss.
+
+#### **2. Definitions**
+*   **Pointer**: A variable that stores the memory address of another object.
+*   **Dereferencing**: The action of accessing the value stored at the memory address pointed to by a pointer, using the `*` operator.
+*   **Pointer Arithmetic**: Performing arithmetic operations (like addition or subtraction) on a pointer, which scales the result by the size of the pointed-to data type.
+*   **Dynamic Memory Allocation**: The process of requesting and managing memory on the heap at runtime using functions like `malloc()` and `free()`.
+*   **Heap**: A region of a program's memory used for dynamic allocation.
+*   **Stack**: A region of memory used to store local variables and manage function calls in a Last-In, First-Out (LIFO) manner.
+*   **Memory Leak**: A situation where dynamically allocated memory is no longer needed but is not deallocated, making it unusable for the program's lifetime.
+*   **Dangling Pointer**: A pointer that refers to a memory location that has been freed or is otherwise no longer valid.
+*   **Preprocessor**: A program that processes source code before compilation, performing tasks like file inclusion, macro expansion, and conditional compilation.
+*   **Macro**: An identifier defined with `#define` that is replaced by its corresponding value or code block by the preprocessor.
+*   **Include Guard**: A preprocessor construct used in header files to prevent their content from being included more than once in a single compilation unit.
+*   **Typedef**: A keyword used to create a synonym or alias for an existing data type.
+*   **File Handle**: A pointer to a `FILE` structure (`FILE*`), which represents an open file stream and holds information needed to manage it.
+
+#### **3. Examples**
+##### **3.1. Find Strong Numbers in a Range** (Lab 3, Exercise 1)
+Write a program to find Strong Numbers within a range of numbers. The program will receive 2 integers indicating the start and end of the range and calculates the strong numbers in the given range. A strong number is a number in which the sum of the factorial of its digits is equal to the number itself.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// Function to calculate the factorial of a single digit.
+// Factorials are pre-calculated for efficiency since we only need 0! to 9!.
+long long factorial(int n) {
+    long long facts[] = {1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880};
+    return facts[n];
+}
+
+// Function to check if a number is a Strong Number.
+int isStrong(int num) {
+    // A quick check: single-digit numbers 1 and 2 are strong. 0 is not.
+    if (num < 0) return 0;
+    if (num == 0) return 0;
+
+    int originalNum = num;
+    long long sumOfFacts = 0;
+
+    // Loop through each digit of the number.
+    while (num > 0) {
+        // Extract the last digit.
+        int digit = num % 10;
+        // Add its factorial to the sum.
+        sumOfFacts += factorial(digit);
+        // Remove the last digit.
+        num /= 10;
+    }
+
+    // A number is strong if the sum of factorials of its digits is equal to itself.
+    if (sumOfFacts == originalNum) {
+        return 1; // True
+    } else {
+        return 0; // False
+    }
+}
+
+int main() {
+    int start, end;
+
+    // Get the start and end of the range from the user.
+    printf("Input:\n");
+    scanf("%d", &start);
+    scanf("%d", &end);
+
+    printf("\nOutput:\n");
+    printf("The strong numbers are: ");
+
+    // Iterate through each number in the specified range.
+    for (int i = start; i <= end; i++) {
+        // If the current number is a strong number, print it.
+        if (isStrong(i)) {
+            printf("%d ", i);
+        }
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+</details>
+
+##### **3.2. Print a Character Frequency Histogram** (Lab 3, Exercise 2)
+Write a program to print a vertical histogram of the frequencies of different characters ordered by their frequency. The input is a string containing only lower case characters.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    char input[256];
+    // Array to store the frequency of each character ('a' to 'z').
+    int frequencies[26] = {0};
+
+    printf("Input: ");
+    fgets(input, sizeof(input), stdin);
+
+    // --- Step 1: Calculate character frequencies ---
+    for (int i = 0; input[i] != '\0'; i++) {
+        char c = input[i];
+        // Check if the character is a lowercase letter.
+        if (c >= 'a' && c <= 'z') {
+            // Increment the count for that letter.
+            // (c - 'a') gives an index from 0 to 25.
+            frequencies[c - 'a']++;
+        }
+    }
+
+    // --- Step 2: Find the maximum frequency for the histogram height ---
+    int maxFreq = 0;
+    for (int i = 0; i < 26; i++) {
+        if (frequencies[i] > maxFreq) {
+            maxFreq = frequencies[i];
+        }
+    }
+
+    printf("\nOutput:\n");
+
+    // --- Step 3: Print the histogram from top to bottom ---
+    // Loop for each level of frequency, from the highest to the lowest.
+    for (int level = maxFreq; level > 0; level--) {
+        // Loop through all possible characters.
+        for (int i = 0; i < 26; i++) {
+            // Only consider characters that actually appeared in the text.
+            if (frequencies[i] > 0) {
+                 // If the frequency of this character is at least the current level, print a dot.
+                if (frequencies[i] >= level) {
+                    printf(". ");
+                } else {
+                    // Otherwise, print empty space to maintain alignment.
+                    printf("  ");
+                }
+            }
+        }
+        // Go to the next line for the next level of the histogram.
+        printf("\n");
+    }
+
+    // --- Step 4: Print the character labels at the bottom ---
+    for (int i = 0; i < 26; i++) {
+        if (frequencies[i] > 0) {
+            printf("%c ", 'a' + i);
+        }
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+</details>
+
+##### **3.3. Brute-force a Password** (Lab 3, Exercise 3)
+Write a program that will try to find a user password using bruteforce. The user password can be at least 1 symbol and at most 3 symbols and contains only ASCII characters from 32 until 126.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    // Array to store the password to find. Max length is 3 + 1 for null terminator.
+    char password[4];
+    // Array to build our guesses.
+    char guess[4];
+    // Counter for the number of attempts.
+    long long attempts = 0;
+
+    // Prompt the user and read the password.
+    printf("Input:\n");
+    scanf("%3s", password); // Read at most 3 characters.
+
+    // --- Brute-force for length 1 ---
+    for (char c1 = 32; c1 <= 126; c1++) {
+        guess[0] = c1;
+        guess[1] = '\0'; // Null-terminate for a 1-char string.
+        attempts++;
+        // strcmp returns 0 if the strings are identical.
+        if (strcmp(password, guess) == 0) {
+            printf("found = %s!\n", guess);
+            printf("number of attempts = %lld\n", attempts);
+            return 0; // Exit after finding the password.
+        }
+    }
+
+    // --- Brute-force for length 2 ---
+    for (char c1 = 32; c1 <= 126; c1++) {
+        for (char c2 = 32; c2 <= 126; c2++) {
+            guess[0] = c1;
+            guess[1] = c2;
+            guess[2] = '\0'; // Null-terminate for a 2-char string.
+            attempts++;
+            if (strcmp(password, guess) == 0) {
+                printf("found = %s!\n", guess);
+                printf("number of attempts = %lld\n", attempts);
+                return 0;
+            }
+        }
+    }
+
+    // --- Brute-force for length 3 ---
+    for (char c1 = 32; c1 <= 126; c1++) {
+        for (char c2 = 32; c2 <= 126; c2++) {
+            for (char c3 = 32; c3 <= 126; c3++) {
+                guess[0] = c1;
+                guess[1] = c2;
+                guess[2] = c3;
+                guess[3] = '\0'; // Null-terminate for a 3-char string.
+                attempts++;
+                if (strcmp(password, guess) == 0) {
+                    printf("found = %s!\n", guess);
+                    printf("number of attempts = %lld\n", attempts);
+                    return 0;
+                }
+            }
+        }
+    }
+
+    printf("Password not found (it might be longer than 3 characters or use other characters).\n");
+    return 0;
+}```
+</details>
+
+##### **3.4. Pointer Output Analysis** (Lab 3, Exercise 4)
+What will be the output of the programs?
+```c
+// Case A
+#include <stdio.h>
+void swap(int *ap, int *bp) {
+    int temp = *ap;
+    *ap = *bp;
+    *bp = temp;
+}
+int main() {
+    int a = 1, *ap = &a;
+    int b = 2, *bp = &b;
+    swap(ap, bp);
+    printf("%d %d\n", a, b);
+    return 0;
+}
+``````c
+// Case B
+#include <stdio.h>
+void swap(int *ap, int *bp) {
+    int *temp = ap;
+    ap = bp;
+    bp = temp;
+}
+int main() {
+    int a = 1, *ap = &a;
+    int b = 2, *bp = &b;
+    swap(ap, bp);
+    printf("%d %d\n", a, b);
+    return 0;
+}
+``````c
+// Case C
+#include <stdio.h>
+int main() {
+    int a = 1, *ap = &a;
+    int b = 2, *bp = &b;
+    int *temp = ap;
+    ap = bp;
+    bp = temp;
+    printf("%d %d\n", a, b);
+    return 0;
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+/*
+--- Analysis of Case A ---
+This is the correct way to swap two numbers using a function in C.
+1. `main` creates `a=1` and `b=2`. Pointers `ap` and `bp` store their addresses.
+2. `swap(ap, bp)` passes these addresses to the function.
+3. Inside `swap`, `*ap` and `*bp` dereference the pointers, accessing the original `a` and `b` variables in `main`.
+4. The values of `a` and `b` are correctly swapped.
+5. The `printf` in `main` prints the modified values of `a` and `b`.
+Output for Case A: 2 1
+*/
+
+/*
+--- Analysis of Case B ---
+This is a classic example of "pass-by-value" with pointers.
+1. `main` creates `a=1` and `b=2`. Pointers `ap` and `bp` store their addresses.
+2. `swap(ap, bp)` passes COPIES of these addresses to the function. The function's local `ap` and `bp` variables hold the same addresses, but they are separate variables.
+3. Inside `swap`, the code swaps the function's LOCAL pointer variables. `ap` now points to where `b` is, and `bp` points to where `a` is.
+4. THIS HAS NO EFFECT on the original `ap` and `bp` pointers in `main`.
+5. The function finishes, and its local variables are destroyed. The variables `a` and `b` in `main` were never touched.
+6. The `printf` in `main` prints the original, unmodified values of `a` and `b`.
+Output for Case B: 1 2
+*/
+
+/*
+--- Analysis of Case C ---
+This code block is entirely within the `main` function.
+1. `main` creates `a=1` and `b=2`. Pointers `ap` and `bp` store their addresses.
+2. `int *temp = ap; ap = bp; bp = temp;` This code swaps the addresses that the pointers `ap` and `bp` are holding.
+3. After the swap, `ap` now holds the address of `b`, and `bp` now holds the address of `a`.
+4. The `printf` statement prints the values of the original variables `a` and `b`, which have not been changed.
+Output for Case C: 1 2
+*/
+```
+</details>
+
+##### **3.5. Pointer Output Analysis** (Lab 3, Exercise 5)
+What will be the output of the program?
+```c
+#include <stdio.h>
+
+int main() {
+    int array[] = {10, 20, 30};
+    int *pointer = array;
+
+    printf("%d\n", *pointer);
+    printf("%p\n", pointer);
+    printf("%d\n", *array);
+    printf("%p\n", array);
+
+    printf("%d\n", ++*pointer);
+    printf("%d\n", *++pointer);
+    
+    int *pointer1 = array;
+    int *pointer2 = array;
+    printf("%d\n", *pointer1++ + ++*++pointer2);
+    return 0;
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+/*
+This analysis assumes an integer is 4 bytes. Memory addresses are illustrative.
+
+Initial state:
+array is at address (e.g.) 1000. It contains {10, 20, 30}.
+pointer also holds the address 1000.
+
+1. `printf("%d\n", *pointer);`
+   - Dereferences `pointer`, gets the value at address 1000.
+   - Output: 10
+
+2. `printf("%p\n", pointer);`
+   - Prints the memory address stored in `pointer`.
+   - Output: The address of the start of the array (e.g., 0x...1000)
+
+3. `printf("%d\n", *array);`
+   - The array name `array` decays to a pointer to its first element.
+   - Dereferencing it gives the value of the first element.
+   - Output: 10
+
+4. `printf("%p\n", array);`
+   - Prints the starting address of the array.
+   - Output: The same address as line 2.
+
+5. `printf("%d\n", ++*pointer);`
+   - `*pointer` is evaluated first (value is 10).
+   - `++` (prefix increment) increments this value to 11.
+   - The value at `array[0]` is now 11.
+   - The result of the expression (11) is printed.
+   - Output: 11
+
+6. `printf("%d\n", *++pointer);`
+   - `++pointer` is evaluated first. The pointer `pointer` is incremented to point to the next integer in memory (address 1004).
+   - `*` then dereferences this new address, getting the value of `array[1]`, which is 20.
+   - The value 20 is printed.
+   - Output: 20
+
+7. `printf("%d\n", *pointer1++ + ++*++pointer2);`
+   - This line has multiple side effects. Evaluation order of operands to `+` is unspecified, but for most compilers it's right-to-left.
+   - Sub-expression 1: `++*++pointer2`
+     - `pointer2` starts at `array` (address 1000).
+     - `++pointer2`: `pointer2` now points to `array[1]` (address 1004).
+     - `*++pointer2`: The value at this address is 20.
+     - `++*...`: The value 20 is incremented to 21. The value of `array[1]` is now 21. The result of this whole sub-expression is 21.
+   - Sub-expression 2: `*pointer1++`
+     - `pointer1` starts at `array` (address 1000).
+     - `*pointer1`: The value at this address is `array[0]`, which was changed to 11 earlier. The result of this sub-expression is 11.
+     - `pointer1++`: The pointer `pointer1` is incremented AFTER the value is fetched. It now points to `array[1]`.
+   - The `printf` will compute `11 + 21`.
+   - Output: 32
+*/
+```</details>
+
+##### **3.6. Pointer Statement Analysis** (Lab 3, Exercise 6)
+Consider the following statements:
+```c
+int *p;
+int i;
+int k;
+i = 42;
+k = i;
+p = &i;
+```
+After these statements, which of the following statements will change the value of `i` to 75?
+A) `k = 75;`
+B) `*k = 75;`
+C) `p = 75;`
+D) `*p = 75;`
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+/*
+Initial state after the code runs:
+- i = 42
+- k = 42 (k is a separate variable that just received a copy of i's value)
+- p holds the memory address of i (p points to i)
+
+Let's analyze the options:
+
+A) k = 75;
+   - This statement changes the value of the variable 'k' to 75.
+   - It has no effect on the variable 'i'. 'i' will remain 42.
+
+B) *k = 75;
+   - This is a compile-time error. The variable 'k' is an integer, not a pointer.
+   - The dereference operator '*' cannot be applied to an integer.
+
+C) p = 75;
+   - This statement tries to change the memory address stored in the pointer 'p'.
+   - It attempts to make 'p' point to memory address 75, which is almost certainly invalid and dangerous.
+   - It does not change the value stored inside the variable 'i'.
+
+D) *p = 75;
+   - 'p' holds the address of 'i'.
+   - The dereference operator '*' means "the value at the address that p points to".
+   - So, `*p = 75` means "set the value at the address of i to 75".
+   - This directly changes the value of 'i' to 75. This is the correct statement.
+*/
+```
+</details>
+
+##### **3.7. String Output Analysis** (Lab 3, Exercise 7)
+What will be the output of the program?
+```c
+#include <stdio.h>
+#include <string.h>
+int main() {
+    char buf1[100] = "Hello";
+    char buf2[100] = "World";
+    char *ptr1 = buf1 + 2;
+    char *ptr2 = buf2 + 3;
+    strcpy(ptr1, buf2);
+    strcpy(ptr2, buf1);
+    printf("%s\n", buf1);
+    printf("%s\n", ptr1);
+    printf("%s\n", buf2);
+    printf("%s\n", ptr2);
+    return 0;
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+/*
+Let's trace the state of the strings `buf1` and `buf2` step-by-step.
+A string in C is terminated by a null character `\0`.
+
+1. Initial state:
+   buf1: H e l l o \0
+   buf2: W o r l d \0
+
+2. `char *ptr1 = buf1 + 2;`
+   - `ptr1` now points to the 3rd character of `buf1` (the first 'l').
+   - `buf1`: H e [l] l o \0  ( [ ] indicates where ptr1 points )
+
+3. `char *ptr2 = buf2 + 3;`
+   - `ptr2` now points to the 4th character of `buf2` (the 'l').
+   - `buf2`: W o r [l] d \0
+
+4. `strcpy(ptr1, buf2);`
+   - This copies the entire string from `buf2` ("World") to the memory location where `ptr1` points.
+   - The original contents of `buf1` from that point onwards are overwritten.
+   - `buf1` becomes: H e W o r l d \0
+   - `ptr1` still points to the 'W'.
+
+5. `strcpy(ptr2, buf1);`
+   - This copies the current string from `buf1` ("HeWorld") to the memory location where `ptr2` points.
+   - The original contents of `buf2` from that point onwards are overwritten.
+   - `buf2` becomes: W o r H e W o r l d \0
+   - `ptr2` still points to the 'H'.
+
+6. `printf("%s\n", buf1);`
+   - Prints the entire string in `buf1`.
+   - Output: HeWorld
+
+7. `printf("%s\n", ptr1);`
+   - Prints the string starting from where `ptr1` points inside `buf1`.
+   - Output: World
+
+8. `printf("%s\n", buf2);`
+   - Prints the entire string in `buf2`.
+   - Output: WorHeWorld
+
+9. `printf("%s\n", ptr2);`
+   - Prints the string starting from where `ptr2` points inside `buf2`.
+   - Output: HeWorld
+*/
+```
+</details>
+
+##### **3.8. Find String Length using Pointer** (Lab 3, Exercise 8)
+Write a program to find the length of a string using a pointer. Do not use strlen().
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// Function that takes a pointer to the beginning of a string.
+int stringLength(char *startPtr) {
+    // Create a second pointer to traverse the string.
+    char *endPtr = startPtr;
+
+    // Loop until the traversing pointer finds the null terminator character '\0',
+    // which marks the end of the string.
+    while (*endPtr != '\0') {
+        // Increment the pointer to move to the next character's memory address.
+        endPtr++;
+    }
+
+    // The length of the string is the difference between the final address (endPtr)
+    // and the starting address (startPtr). In C, subtracting pointers gives the
+    // number of elements between them.
+    return endPtr - startPtr;
+}
+
+int main() {
+    char myString[100];
+
+    printf("Enter a string: ");
+    // Read a line of input from the user, including spaces.
+    fgets(myString, sizeof(myString), stdin);
+
+    // fgets includes the newline character ('\n') in the string.
+    // We need to find and remove it before calculating the length.
+    char *newline = myString;
+    while(*newline != '\n' && *newline != '\0') {
+        newline++;
+    }
+    *newline = '\0'; // Replace newline with null terminator.
+
+
+    // The array name `myString` automatically acts as a pointer to its first element.
+    int length = stringLength(myString);
+
+    printf("The length of the string is: %d\n", length);
+
+    return 0;
+}
+```
+</details>
+
+##### **3.9. Print a Number Pyramid** (Homework, Exercise 1)
+Write a program to make such a pattern like a pyramid with numbers increased by 1. For an input of 4, the output should be:
+1
+23
+456
+78910
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    int rows;
+    // Initialize a counter for the numbers to be printed.
+    int currentNumber = 1;
+
+    // Get the desired number of rows from the user.
+    printf("Input: ");
+    scanf("%d", &rows);
+
+    printf("Output:\n");
+
+    // The outer loop controls the number of rows.
+    for (int i = 1; i <= rows; i++) {
+        // The inner loop controls the number of elements printed in each row.
+        // Row 'i' has 'i' numbers.
+        for (int j = 1; j <= i; j++) {
+            // Print the current number.
+            printf("%d", currentNumber);
+            // Increment the number for the next position.
+            currentNumber++;
+        }
+        // After printing all numbers in a row, move to the next line.
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+</details>
+
+##### **3.10. Delete Duplicate Elements from an Array** (Homework, Exercise 2)
+Write a program which deletes duplicate elements from an array of integers.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    int n; // Number of elements in the original array.
+    int arr[1000]; // The original array.
+
+    // Read the size of the array.
+    printf("Input:\n");
+    scanf("%d", &n);
+
+    // Read the n elements into the array.
+    for (int i = 0; i < n; i++) {
+        scanf("%d", &arr[i]);
+    }
+
+    // --- In-place removal of duplicates ---
+    // If the array is empty or has one element, there are no duplicates.
+    if (n == 0 || n == 1) {
+        // The size of the unique array is just n.
+        // The printing loop below will handle this.
+    } else {
+        // Sort the array first. This makes finding duplicates much easier,
+        // as they will all be adjacent to each other.
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = i + 1; j < n; j++) {
+                if (arr[i] > arr[j]) {
+                    int temp = arr[i];
+                    arr[i] = arr[j];
+                    arr[j] = temp;
+                }
+            }
+        }
+        
+        int uniqueIndex = 0; // Index for the next unique element.
+        // Traverse the sorted array.
+        for (int i = 0; i < n - 1; i++) {
+            // If the current element is different from the next element,
+            // it's a unique value (or the last of a group of duplicates).
+            if (arr[i] != arr[i+1]) {
+                arr[uniqueIndex++] = arr[i];
+            }
+        }
+        // Add the very last element of the sorted array.
+        arr[uniqueIndex++] = arr[n-1];
+        
+        // The new size of the array (number of unique elements) is uniqueIndex.
+        n = uniqueIndex;
+    }
+
+    // Print the modified array, which now contains only unique elements.
+    printf("\nOutput:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+</details>
+
+##### **3.11. Copy a String using Pointers** (Homework, Exercise 3)
+Write a program to copy one string to another using a pointer. Do not use strcpy().
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// Function that takes a pointer to the destination and a pointer to the source string.
+void copyString(char *destination, const char *source) {
+    // The loop continues as long as the character pointed to by 'source' is not
+    // the null terminator ('\0').
+    while (*source != '\0') {
+        // Copy the character from the source to the destination,
+        // then increment both pointers to move to the next character.
+        *destination++ = *source++;
+    }
+    // After the loop finishes, the null terminator from the source has not been copied.
+    // We must add it to the end of the destination string to make it a valid string.
+    *destination = '\0';
+}
+
+int main() {
+    char sourceString[] = "Copy this string using pointers!";
+    // Make sure the destination buffer is large enough to hold the source string.
+    char destinationString[100];
+
+    printf("Source:      '%s'\n", sourceString);
+
+    // Call the copy function. The array names automatically act as pointers
+    // to their first elements.
+    copyString(destinationString, sourceString);
+
+    printf("Destination: '%s'\n", destinationString);
+
+    return 0;
+}
+```
+</details>
+
+##### **3.12. Manipulate a 2D Array with Pointers and Functions** (Homework, Exercise 4)
+Write a program to input and print elements of a two-dimensional array using pointers and functions.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// Define constants for the dimensions of the array for clarity and easy modification.
+#define ROWS 3
+#define COLS 4
+
+// Function to input elements into a 2D array.
+// The parameter `int (*arr)[COLS]` declares `arr` as a pointer to an array of `COLS` integers.
+// This allows us to pass a 2D array and maintain its column information.
+void inputMatrix(int (*arr)[COLS], int rows) {
+    printf("Enter the elements of the %d x %d matrix:\n", rows, COLS);
+    
+    // Loop through each row.
+    for (int i = 0; i < rows; i++) {
+        // Loop through each column in the current row.
+        for (int j = 0; j < COLS; j++) {
+            // `(*(arr + i) + j)` is the pointer arithmetic equivalent of `&arr[i][j]`.
+            // `arr + i` points to the start of the i-th row.
+            // `*(arr + i)` gives the address of the first element in the i-th row.
+            // `(*(arr + i) + j)` then gives the address of the j-th element in that row.
+            printf("Enter element [%d][%d]: ", i, j);
+            scanf("%d", (*(arr + i) + j));
+        }
+    }
+}
+
+// Function to print the elements of a 2D array.
+void printMatrix(const int (*arr)[COLS], int rows) {
+    printf("\nThe matrix you entered is:\n");
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < COLS; j++) {
+            // `*(*(arr + i) + j)` dereferences the pointer to get the value,
+            // equivalent to `arr[i][j]`.
+            printf("%-5d", *(*(arr + i) + j)); // Use %-5d for aligned output.
+        }
+        printf("\n"); // Print a newline at the end of each row.
+    }
+}
+
+int main() {
+    // Declare the 2D array.
+    int matrix[ROWS][COLS];
+
+    // Call the function to get user input for the matrix.
+    // The array name 'matrix' decays into a pointer to its first element (the first row).
+    inputMatrix(matrix, ROWS);
+
+    // Call the function to print the matrix.
+    printMatrix(matrix, ROWS);
+
+    return 0;
+}
+```
+</details>
