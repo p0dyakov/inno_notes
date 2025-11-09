@@ -1,0 +1,2335 @@
+---
+title: "W10. Abstract Classes, Interfaces, UML Class Diagrams, Packages"
+author: "Zakhar Podyakov"
+date: "November 9, 2025"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+##### **1.1 Abstract Classes and Methods**
+An **abstract class** is a class declared with the `abstract` keyword that cannot be instantiated directly. Think of it as a blueprint or template that defines common characteristics and behaviors, but is too general to exist on its own. For example, you never see "food" in real life—you see specific foods like apples, carrots, or chocolate. Similarly, you never create a generic "Vehicle" object—you create specific vehicles like cars, motorcycles, or planes.
+
+###### **1.1.1 Why Abstract Classes?**
+Abstract classes serve two critical purposes:
+
+1. **Logical Grouping:** They organize related classes under a common conceptual umbrella. For instance, `Lion`, `Cat`, and `Dog` can all be grouped under an abstract `Animal` class.
+
+2. **Enforcing Implementation:** They can declare **abstract methods**—methods without a body (no implementation). Any concrete (non-abstract) subclass *must* implement these methods. This ensures that all subclasses provide certain behaviors while allowing each to implement them differently.
+
+###### **1.1.2 Defining Abstract Classes**
+An abstract class is declared using the `abstract` keyword:
+
+```java
+abstract class Vehicle {
+    // Regular fields (common to all vehicles)
+    Color color;
+    int numWheels;
+    
+    // Abstract method - no implementation
+    abstract void startEngine();
+    
+    // Concrete method - has implementation
+    void honk() {
+        System.out.println("Beep beep!");
+    }
+}
+```
+
+###### **1.1.3 Abstract Methods**
+An **abstract method** is a method declaration without a body (no curly braces with code). It's declared using the `abstract` keyword and ends with a semicolon:
+
+```java
+abstract void startEngine();
+```
+
+This tells developers: "Every vehicle must have a way to start its engine, but *how* it starts depends on the specific type of vehicle."
+
+###### **1.1.4 Key Rules for Abstract Classes**
+Several important rules govern abstract classes:
+
+-   An abstract class **cannot be instantiated** directly. You cannot write `new Vehicle()`.
+-   A class containing **any** abstract method must be declared abstract.
+-   An abstract class can have both abstract and concrete (regular) methods.
+-   An abstract class **does not** need to have abstract methods (though this is uncommon).
+-   A concrete subclass must implement **all** abstract methods from its parent, or it must also be declared abstract.
+-   Abstract classes can have constructors, static methods, and final methods.
+-   Abstract classes can have fields of any access level (`private`, `protected`, `public`, package-private).
+
+###### **1.1.5 Implementing Abstract Classes**
+When a non-abstract class extends an abstract class, it must provide implementations for all abstract methods:
+
+```java
+class Motorcycle extends Vehicle {
+    @Override
+    void startEngine() {
+        System.out.println("Kick start!");
+    }
+}
+```
+
+Now `Motorcycle` is a concrete class and can be instantiated: `Motorcycle bike = new Motorcycle();`
+
+If a subclass doesn't implement all abstract methods, it remains abstract:
+
+```java
+abstract class FlyingVehicle extends Vehicle {
+    // startEngine() is still not implemented
+    // So FlyingVehicle must be abstract
+}
+```
+
+##### **1.2 Final Classes and Methods**
+The `final` keyword serves as the opposite of extensibility—it **prevents** inheritance and modification.
+
+###### **1.2.1 Final Classes**
+A **final class** cannot be subclassed. Once a class is declared `final`, no other class can extend it:
+
+```java
+final class Human extends Animal {
+    // ... implementation
+}
+
+// This would cause a compiler error:
+// class SuperHuman extends Human { }  // ERROR!
+```
+
+###### **1.2.2 Final Methods**
+A **final method** cannot be overridden by subclasses. This is useful when you want to guarantee that a specific behavior remains unchanged in all descendants:
+
+```java
+class Animal {
+    final void breathe() {
+        System.out.println("Breathing oxygen");
+    }
+}
+
+class Dog extends Animal {
+    // This would cause a compiler error:
+    // void breathe() { }  // ERROR! Cannot override final method
+}
+```
+
+###### **1.2.3 Final Fields**
+A **final field** (or **constant**) is a variable that can only be assigned once. After initialization, its value cannot be changed:
+
+```java
+public class Circle {
+    private final double radius;  // Must be initialized
+    
+    public Circle(double r) {
+        radius = r;  // Initialization in constructor
+    }
+    
+    // radius cannot be changed after this point
+}
+```
+
+By convention, static final fields (class constants) are written in `UPPER_SNAKE_CASE`:
+
+```java
+public static final double PI = 3.14159265359;
+```
+
+##### **1.3 Interfaces**
+An **interface** is a reference type in Java that defines a contract—a set of method signatures that implementing classes must provide. Unlike abstract classes, interfaces represent *pure abstraction*: they define *what* must be done, not *how* to do it.
+
+###### **1.3.1 Why Interfaces?**
+Interfaces serve several purposes:
+
+1. **Multiple "Inheritance":** Java doesn't support multiple inheritance of classes, but a class can implement multiple interfaces. A `Duck` can be both `Swimmable` and `Flyable`.
+2. **Standardization:** Interfaces establish contracts. If a class implements `Comparable`, you know it can be compared to other objects.
+3. **Decoupling:** Code can depend on interfaces rather than concrete implementations, making it more flexible and testable.
+
+###### **1.3.2 Defining Interfaces**
+An interface is declared using the `interface` keyword:
+
+```java
+interface Swimmable {
+    void swim();           // Abstract method (implicitly public abstract)
+    void stopSwimming();   // Abstract method
+}
+
+interface Flyable {
+    void fly();
+    void stopFlying();
+}
+```
+
+In Java 8 and later, interfaces can also have:
+
+-   **Default methods:** Methods with a default implementation using the `default` keyword.
+-   **Static methods:** Utility methods that belong to the interface itself.
+
+```java
+interface Living {
+    default void live() {
+        System.out.println(this.getClass().getSimpleName() + " lives");
+    }
+}
+```
+
+###### **1.3.3 Implementing Interfaces**
+A class uses the `implements` keyword to implement one or more interfaces (separated by commas):
+
+```java
+class Duck implements Swimmable, Flyable, Living {
+    @Override
+    public void swim() {
+        System.out.println("Duck is swimming");
+    }
+    
+    @Override
+    public void stopSwimming() {
+        System.out.println("Duck stopped swimming");
+    }
+    
+    @Override
+    public void fly() {
+        System.out.println("Duck is flying");
+    }
+    
+    @Override
+    public void stopFlying() {
+        System.out.println("Duck stopped flying");
+    }
+    
+    // live() method is inherited from Living interface (default method)
+}
+```
+
+###### **1.3.4 Interface Characteristics**
+Key properties of interfaces:
+
+-   All methods in an interface are **implicitly public and abstract** (unless they are default or static).
+-   All fields in an interface are **implicitly public, static, and final** (constants).
+-   A class can implement **multiple interfaces**, but can extend only **one class**.
+-   An interface can **extend** another interface (or multiple interfaces).
+-   An interface **cannot** extend a class.
+-   An interface **cannot** be instantiated directly.
+
+##### **1.4 Abstract Classes vs. Interfaces**
+Understanding when to use abstract classes versus interfaces is crucial for good design.
+
+###### **1.4.1 Key Differences**
+
+| Aspect | Abstract Class | Interface |
+|--------|---------------|-----------|
+| **Methods** | Can have both abstract and non-abstract methods | Only abstract methods (before Java 8); can have default and static methods (Java 8+) |
+| **Fields** | Can have final, non-final, static, and non-static variables | Only static and final variables (constants) |
+| **Multiple Inheritance** | A class can extend only one abstract class | A class can implement multiple interfaces |
+| **Implementation** | Can provide implementation of interface | Cannot provide implementation of abstract class |
+| **Keyword** | Uses `abstract` keyword | Uses `interface` keyword |
+| **Extension** | Uses `extends` keyword | Uses `implements` keyword (for classes) or `extends` (for interfaces) |
+| **Access Modifiers** | Members can have any access modifier | Members are public by default |
+| **When to Use** | When classes share code and have a "is-a" relationship | When unrelated classes share behavior |
+
+###### **1.4.2 Choosing Between Them**
+**Use an abstract class when:**
+
+-   You have code that should be shared among several closely related classes
+-   Classes extending the abstract class have many common methods or fields
+-   You need to declare non-public (private, protected) members
+-   You want to use non-final or non-static fields (state)
+
+**Use an interface when:**
+
+-   You expect unrelated classes to implement your interface
+-   You want to specify behavior for a particular data type, but don't care how it's implemented
+-   You want to take advantage of multiple inheritance of type
+-   You want to define a contract without any implementation details
+
+##### **1.5 Type Checking and Casting**
+
+###### **1.5.1 Static vs. Dynamic Types**
+Every object reference in Java has two types:
+
+-   **Static Type:** The type declared in the code at compile time. This never changes.
+-   **Dynamic Type:** The actual type of the object the reference points to at runtime. This can change through assignment.
+
+```java
+Animal a = new Lion();  // Static type: Animal, Dynamic type: Lion
+a = new Frog();         // Static type: Animal, Dynamic type: Frog
+```
+
+###### **1.5.2 Upcasting**
+**Upcasting** is converting a reference from a subclass type to a superclass type. This is always safe and happens implicitly because every subclass object "is-a" superclass object:
+
+```java
+Lion lion = new Lion();
+Animal animal = lion;  // Upcasting (implicit) - always safe
+```
+
+###### **1.5.3 Downcasting**
+**Downcasting** is converting a reference from a superclass type to a subclass type. This requires an explicit cast and can fail at runtime if the object is not actually an instance of the target type:
+
+```java
+Animal animal = new Lion();
+Lion lion = (Lion) animal;  // Downcasting (explicit) - safe here
+
+Animal animal2 = new Frog();
+Lion lion2 = (Lion) animal2;  // Runtime error! ClassCastException
+```
+
+###### **1.5.4 The instanceof Operator**
+To safely downcast, use the `instanceof` operator to check the dynamic type at runtime:
+
+```java
+instanceof_operator: obj instanceof ClassName
+```
+
+Returns `true` if `obj` is an instance of `ClassName` or any of its subclasses, `false` otherwise.
+
+```java
+Animal a = new Lion();
+
+if (a instanceof Lion) {
+    Lion lion = (Lion) a;  // Safe to cast
+    // Use lion-specific methods
+} else if (a instanceof Frog) {
+    Frog frog = (Frog) a;  // Safe to cast
+    // Use frog-specific methods
+}
+```
+
+##### **1.6 UML Class Diagrams**
+**UML (Unified Modeling Language)** is a standardized visual language for designing and documenting software systems. The **Class Diagram** is one of the most important UML diagram types, showing classes, their attributes, methods, and relationships.
+
+###### **1.6.1 Representing a Class**
+A class in UML is represented as a rectangle divided into three sections:
+
+1. **Top section:** Class name (in bold)
+2. **Middle section:** Attributes (fields)
+3. **Bottom section:** Methods
+
+<!-- DIAGRAM HERE -->
+
+**Access Modifiers:**
+
+-   `+` (plus) = `public`
+-   `-` (minus) = `private`
+-   `#` (hash) = `protected`
+-   `~` (tilde) = package-private (default)
+
+Example:
+```
+Person
+-name: String
+-age: int
++Person(initialName: String)
++printPerson(): void
++getName(): String
+```
+
+###### **1.6.2 Abstract Classes and Methods**
+Abstract classes are marked with `<<abstract>>` or written in *italics*. Abstract methods are written in *italics*:
+
+```
+<<abstract>> Shape
+-coords: Coords
++move(): void
++draw(): void
+```
+
+###### **1.6.3 Interfaces**
+Interfaces are marked with `<<interface>>`:
+
+```
+<<interface>> Movable
++moveUp(): void
++moveDown(): void
++moveLeft(): void
++moveRight(): void
+```
+
+###### **1.6.4 Static and Final Members**
+-   **Static** members (methods and fields) are <u>underlined</u>
+-   **Final** fields are followed by `{readOnly}` or written in `UPPER_SNAKE_CASE`
+-   **Final** methods are followed by `{leaf}`
+
+###### **1.6.5 Class Relationships**
+UML defines several types of relationships between classes:
+
+**1. Association**
+A general connection between classes. One class uses or interacts with another.
+
+-   **Arrow direction:** Shows which class knows about the other
+-   **Cardinality:** Numbers indicating how many objects participate
+    -   `1` = exactly one
+    -   `0..1` = zero or one
+    -   `*` or `0..*` = zero or more
+    -   `1..*` = one or more
+-   **Label:** Optional text describing the relationship
+
+<!-- DIAGRAM HERE -->
+
+**2. Inheritance (Generalization)**
+Represents an "is-a" relationship. Uses a solid line with a hollow triangle arrow pointing to the superclass.
+
+<!-- DIAGRAM HERE -->
+
+**3. Realization (Implementation)**
+Shows that a class implements an interface. Uses a dashed line with a hollow triangle arrow pointing to the interface.
+
+<!-- DIAGRAM HERE -->
+
+**4. Composition**
+A strong "has-a" relationship where the part cannot exist without the whole. If the whole is destroyed, the parts are destroyed too. Uses a solid line with a filled diamond at the whole end.
+
+Example: A `Building` has `Room`s. If the building is demolished, the rooms cease to exist.
+
+<!-- DIAGRAM HERE -->
+
+**5. Aggregation**
+A weak "has-a" relationship where the part can exist independently of the whole. Uses a solid line with an empty diamond at the whole end.
+
+Example: A `Car` has `Wheel`s. You can remove wheels from a car, and they still exist.
+
+<!-- DIAGRAM HERE -->
+
+**6. Dependency**
+A "uses" relationship where one class depends on another, typically as a method parameter or local variable. Uses a dashed arrow pointing to the dependency.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.7 Packages**
+**Packages** are namespaces that organize classes and interfaces into logical groups, preventing naming conflicts and controlling access.
+
+###### **1.7.1 Why Packages?**
+In large projects, multiple programmers might create classes with the same name. Packages solve this by creating separate namespaces. They also help organize thousands of classes into manageable, logical units.
+
+###### **1.7.2 Declaring Packages**
+A package is declared at the very beginning of a Java file using the `package` keyword:
+
+```java
+package myPackage;
+
+public class MyClass {
+    // ...
+}
+```
+
+The **fully-qualified name** of this class is `myPackage.MyClass`.
+
+###### **1.7.3 Nested Packages**
+Packages can be nested using dot notation:
+
+```java
+package company.department.lab.math;
+
+public class Calculator {
+    // ...
+}
+```
+
+Fully-qualified name: `company.department.lab.math.Calculator`
+
+###### **1.7.4 Package Access Control**
+Packages work with access modifiers to control visibility:
+
+-   `public` class: Accessible from any package
+-   Package-private class (no modifier): Accessible only within the same package
+
+```java
+package myPackage;
+
+public class PublicClass {    // Visible everywhere
+    // ...
+}
+
+class PackageClass {          // Visible only in myPackage
+    // ...
+}
+```
+
+###### **1.7.5 Importing Packages**
+To use a public class from another package, you can:
+
+1. **Use the fully-qualified name:**
+```java
+util.math.MathVector v = new util.math.MathVector();
+```
+
+2. **Import the specific class:**
+```java
+import util.math.MathVector;
+
+MathVector v = new MathVector();  // Can now use short name
+```
+
+3. **Import all classes from a package (import-on-demand):**
+```java
+import util.math.*;
+
+MathVector v = new MathVector();
+Calculator c = new Calculator();
+```
+
+Standard Java libraries are typically imported this way:
+```java
+import java.util.*;
+import java.io.*;
+```
+
+###### **1.7.6 Naming Conventions**
+For widely distributed packages, use the reverse Internet domain name of your organization:
+
+```
+org.wonderful.very.util.math
+```
+
+This prevents naming conflicts worldwide.
+
+###### **1.7.7 Packages and File System**
+Package names correspond to directory structures. A package named `company.department.project` must be stored in the directory structure:
+
+```
+base_directory/company/department/project/
+```
+
+On Windows: `base_directory\company\department\project\`
+
+##### **1.8 Accessibility Rules Summary**
+Java's access control provides four levels of visibility:
+
+| Modifier | Class | Package | Subclass | World |
+|----------|-------|---------|----------|-------|
+| `public` | ✓ | ✓ | ✓ | ✓ |
+| `protected` | ✓ | ✓ | ✓ | ✗ |
+| *default* (no modifier) | ✓ | ✓ | ✗ | ✗ |
+| `private` | ✓ | ✗ | ✗ | ✗ |
+
+**Summary:**
+
+-   **private:** Accessible only within the same class
+-   **default (package-private):** Accessible within the same package
+-   **protected:** Accessible within the same package and by all subclasses
+-   **public:** Accessible from anywhere
+
+#### **2. Definitions**
+*   **Abstract Class**: A class declared with the `abstract` keyword that cannot be instantiated and may contain abstract methods.
+*   **Abstract Method**: A method declared without an implementation (no body), ending with a semicolon. Must be overridden by concrete subclasses.
+*   **Concrete Class**: A non-abstract class that provides implementations for all inherited abstract methods and can be instantiated.
+*   **Final Class**: A class declared with the `final` keyword that cannot be extended (subclassed).
+*   **Final Method**: A method declared with the `final` keyword that cannot be overridden by subclasses.
+*   **Final Field**: A variable declared with the `final` keyword that can only be assigned once (a constant).
+*   **Interface**: A reference type that defines a contract of methods that implementing classes must provide. Declared with the `interface` keyword.
+*   **Default Method**: A method in an interface with a default implementation, declared with the `default` keyword (Java 8+).
+*   **Static Type**: The declared type of a reference variable at compile time, which never changes.
+*   **Dynamic Type**: The actual type of the object a reference variable points to at runtime, which can change through assignment.
+*   **Upcasting**: Converting a reference from a subclass type to a superclass type. Always safe and implicit.
+*   **Downcasting**: Converting a reference from a superclass type to a subclass type. Requires explicit casting and may fail at runtime.
+*   **instanceof**: An operator that checks whether an object is an instance of a specific class or interface at runtime.
+*   **UML (Unified Modeling Language)**: A standardized visual language for modeling software systems.
+*   **Class Diagram**: A UML diagram showing classes, their attributes, methods, and relationships.
+*   **Association**: A relationship between classes where one class uses or interacts with another.
+*   **Inheritance (Generalization)**: An "is-a" relationship where a subclass inherits from a superclass.
+*   **Realization (Implementation)**: A relationship where a class implements an interface.
+*   **Composition**: A strong "has-a" relationship where the part cannot exist without the whole.
+*   **Aggregation**: A weak "has-a" relationship where the part can exist independently.
+*   **Dependency**: A "uses" relationship where one class depends on another.
+*   **Cardinality**: Numbers in UML indicating how many objects participate in a relationship.
+*   **Package**: A namespace that organizes related classes and interfaces, preventing naming conflicts.
+*   **Fully-Qualified Name**: The complete name of a class including its package path (e.g., `java.util.ArrayList`).
+*   **Import Statement**: A statement that makes classes from other packages accessible by their short names.
+
+#### **3. Examples**
+##### **3.1. Abstract Classes - Creature Hierarchy** (Lab 9, Exercise 1)
+Create the abstract class `Creature` with abstract methods `bear()` and `die()` and String field `name` equal to null and boolean `isAlive` equal to false. Also, create non-abstract method `shoutName()`, which should print the name, if it's not equal to null. Otherwise, it should print error message.
+
+Create classes `Human`, `Dog` and `Alien` which should inherit the `Creature`. Override all abstract methods for all 3 classes differently:
+
+-   For `bear()` method each of them should assign the name and print the message "The [class name] [name] was born"
+-   For `die()` method each of them should print the message "The [class name] [name] has died"
+
+Add a method `bark()` to a class `Dog`.
+
+Create the `AbstractClassDemonstration` class to demonstrate the functionality.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Abstract classes define a template with common behavior while allowing subclasses to provide specific implementations for abstract methods.
+
+```java
+// Creature.java
+abstract class Creature {
+    // Fields common to all creatures
+    String name = null;
+    boolean isAlive = false;
+    
+    // Abstract methods - must be implemented by subclasses
+    abstract void bear();
+    abstract void die();
+    
+    // Non-abstract method with implementation
+    void shoutName() {
+        if (name != null) {
+            System.out.println(name);
+        } else {
+            System.out.println("Error: Creature has no name!");
+        }
+    }
+}
+
+// Human.java
+class Human extends Creature {
+    @Override
+    void bear() {
+        System.out.print("Enter human name: ");
+        // For demonstration, we'll assign directly
+        this.name = "Alice";
+        this.isAlive = true;
+        System.out.println("The Human " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Human " + name + " has died");
+    }
+}
+
+// Dog.java
+class Dog extends Creature {
+    @Override
+    void bear() {
+        System.out.print("Enter dog name: ");
+        // For demonstration, we'll assign directly
+        this.name = "Buddy";
+        this.isAlive = true;
+        System.out.println("The Dog " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Dog " + name + " has died");
+    }
+    
+    // Dog-specific method
+    void bark() {
+        System.out.println(name + " says: Woof! Woof!");
+    }
+}
+
+// Alien.java
+class Alien extends Creature {
+    @Override
+    void bear() {
+        System.out.print("Enter alien name: ");
+        // For demonstration, we'll assign directly
+        this.name = "Zorg";
+        this.isAlive = true;
+        System.out.println("The Alien " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Alien " + name + " has died");
+    }
+}
+
+// AbstractClassDemonstration.java
+public class AbstractClassDemonstration {
+    public static void main(String[] args) {
+        // Create different creatures
+        Human human = new Human();
+        Dog dog = new Dog();
+        Alien alien = new Alien();
+        
+        // Demonstrate birth
+        human.bear();
+        dog.bear();
+        alien.bear();
+        
+        System.out.println("\n--- Shouting Names ---");
+        // Demonstrate shoutName()
+        human.shoutName();
+        dog.shoutName();
+        alien.shoutName();
+        
+        // Demonstrate dog-specific behavior
+        System.out.println("\n--- Dog Behavior ---");
+        dog.bark();
+        
+        System.out.println("\n--- Death ---");
+        // Demonstrate death
+        human.die();
+        dog.die();
+        alien.die();
+        
+        // Test shoutName with no name
+        System.out.println("\n--- Unnamed Creature ---");
+        Creature unnamed = new Human();  // Not born yet
+        unnamed.shoutName();  // Should print error
+    }
+}
+```
+
+**Discussion:** Why does `Creature dog = new Dog(); dog.bark();` cause a compilation error?
+
+**Answer:** Because the static type of `dog` is `Creature`, and the compiler only knows about methods defined in `Creature`. Even though the dynamic type is `Dog`, the compiler checks method calls against the static type. To call `bark()`, you would need to downcast: `((Dog) dog).bark();` or declare the variable as `Dog` type.
+
+</details>
+
+##### **3.2. Array of Creatures with Polymorphism** (Lab 9, Exercise 1 continued)
+Modify Exercise 1 `AbstractClassDemonstration` class, so that array of creatures of different types (`Human`, `Dog`, `Alien`) is created. For each element of the array call methods `bear()` and `die()`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Polymorphism allows us to store different subclass objects in an array of the superclass type and call overridden methods dynamically.
+
+```java
+import java.util.ArrayList;
+
+public class AbstractClassDemonstration {
+    public static void main(String[] args) {
+        // Using ArrayList for flexibility (can also use array)
+        ArrayList<Creature> creatures = new ArrayList<>();
+        
+        // Add different types of creatures
+        creatures.add(new Human());
+        creatures.add(new Dog());
+        creatures.add(new Alien());
+        creatures.add(new Human());
+        creatures.add(new Dog());
+        
+        System.out.println("=== Birth of Creatures ===");
+        // Call bear() for each creature
+        for (Creature creature : creatures) {
+            creature.bear();  // Dynamic dispatch - correct method called
+        }
+        
+        System.out.println("\n=== Creatures Shouting Their Names ===");
+        for (Creature creature : creatures) {
+            creature.shoutName();
+        }
+        
+        System.out.println("\n=== Death of Creatures ===");
+        // Call die() for each creature
+        for (Creature creature : creatures) {
+            creature.die();  // Dynamic dispatch - correct method called
+        }
+        
+        // Alternative using traditional array
+        System.out.println("\n\n=== Using Array Instead ===");
+        Creature[] creatureArray = new Creature[3];
+        creatureArray[0] = new Human();
+        creatureArray[1] = new Dog();
+        creatureArray[2] = new Alien();
+        
+        for (int i = 0; i < creatureArray.length; i++) {
+            creatureArray[i].bear();
+        }
+        
+        for (int i = 0; i < creatureArray.length; i++) {
+            creatureArray[i].die();
+        }
+    }
+}
+```
+
+**Answer:** The beauty of polymorphism is that we don't need to know the specific type of each creature at compile time. The correct `bear()` and `die()` methods are called based on the dynamic type of each object in the array.
+
+</details>
+
+##### **3.3. Final Classes and Animal Hierarchy** (Lab 9, Exercise 2)
+Extend the previous exercise solution to include the following:
+
+-   Create class `Animal` which should inherit the `Creature`.
+-   Make classes `Human` and `Dog` inherit the `Animal` instead of `Creature`.
+-   Modify classes `Human` and `Dog` to prohibit them from being inherited further.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The `final` keyword prevents a class from being extended, which is useful when you want to guarantee that no one can modify the behavior of your class through inheritance.
+
+```java
+// Creature.java (unchanged)
+abstract class Creature {
+    String name = null;
+    boolean isAlive = false;
+    
+    abstract void bear();
+    abstract void die();
+    
+    void shoutName() {
+        if (name != null) {
+            System.out.println(name);
+        } else {
+            System.out.println("Error: Creature has no name!");
+        }
+    }
+}
+
+// Animal.java - intermediate abstract class
+abstract class Animal extends Creature {
+    // Can add animal-specific fields or methods here
+    int age = 0;
+    
+    void eat() {
+        System.out.println(name + " is eating");
+    }
+}
+
+// Human.java - now inherits from Animal and is final
+final class Human extends Animal {
+    @Override
+    void bear() {
+        this.name = "Alice";
+        this.isAlive = true;
+        System.out.println("The Human " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Human " + name + " has died");
+    }
+}
+
+// Dog.java - now inherits from Animal and is final
+final class Dog extends Animal {
+    @Override
+    void bear() {
+        this.name = "Buddy";
+        this.isAlive = true;
+        System.out.println("The Dog " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Dog " + name + " has died");
+    }
+    
+    void bark() {
+        System.out.println(name + " says: Woof! Woof!");
+    }
+}
+
+// Alien.java - still inherits from Creature directly
+class Alien extends Creature {
+    @Override
+    void bear() {
+        this.name = "Zorg";
+        this.isAlive = true;
+        System.out.println("The Alien " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Alien " + name + " has died");
+    }
+}
+
+// This would cause a compilation error:
+// class SuperHuman extends Human { }  // ERROR: Cannot subclass final class
+
+// This would also cause an error:
+// class SuperDog extends Dog { }  // ERROR: Cannot subclass final class
+
+// Demonstration
+public class FinalClassDemonstration {
+    public static void main(String[] args) {
+        Human human = new Human();
+        Dog dog = new Dog();
+        Alien alien = new Alien();
+        
+        human.bear();
+        dog.bear();
+        alien.bear();
+        
+        System.out.println("\n--- Using Animal Methods ---");
+        human.eat();  // Inherited from Animal
+        dog.eat();    // Inherited from Animal
+        // alien.eat(); // ERROR: Alien is not an Animal
+        
+        System.out.println("\n--- Death ---");
+        human.die();
+        dog.die();
+        alien.die();
+    }
+}
+```
+
+**Answer:** By making `Human` and `Dog` final, we ensure that their implementations cannot be changed through inheritance. This is useful for security, design integrity, or performance optimization.
+
+</details>
+
+##### **3.4. Interfaces - Swimmable, Flyable, and Living** (Lab 9, Exercise 3)
+Create an interface `Swimmable` with methods `swim()` and `stopSwimming()`.
+
+Create an interface `Flyable` with methods `fly()` and `stopFlying()`.
+
+Create an interface `Living` with default method `live()` that prints "[class name] lives".
+
+Create class `Submarine` which implements `Swimmable` and override methods.
+
+Create class `Duck` which implements `Swimmable`, `Flyable` and `Living`, and override non-default methods.
+
+Create class `Penguin` which implements `Swimmable` and `Living`, and override non-default methods.
+
+Create the `InterfaceDemonstration` class to demonstrate the functionality.
+
+Hint: to stop swimming/flying creature has to be swimming/flying.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Interfaces allow classes to implement multiple behaviors, and default methods provide a base implementation that can be inherited.
+
+```java
+// Swimmable.java
+interface Swimmable {
+    void swim();
+    void stopSwimming();
+}
+
+// Flyable.java
+interface Flyable {
+    void fly();
+    void stopFlying();
+}
+
+// Living.java
+interface Living {
+    default void live() {
+        System.out.println(this.getClass().getSimpleName() + " lives");
+    }
+}
+
+// Submarine.java
+class Submarine implements Swimmable {
+    private boolean isSwimming = false;
+    
+    @Override
+    public void swim() {
+        if (!isSwimming) {
+            isSwimming = true;
+            System.out.println("Submarine is submerging and swimming underwater");
+        } else {
+            System.out.println("Submarine is already swimming");
+        }
+    }
+    
+    @Override
+    public void stopSwimming() {
+        if (isSwimming) {
+            isSwimming = false;
+            System.out.println("Submarine has surfaced and stopped swimming");
+        } else {
+            System.out.println("Submarine is not swimming");
+        }
+    }
+}
+
+// Duck.java
+class Duck implements Swimmable, Flyable, Living {
+    private boolean isSwimming = false;
+    private boolean isFlying = false;
+    
+    @Override
+    public void swim() {
+        if (isFlying) {
+            System.out.println("Duck cannot swim while flying!");
+            return;
+        }
+        if (!isSwimming) {
+            isSwimming = true;
+            System.out.println("Duck is swimming on the water");
+        } else {
+            System.out.println("Duck is already swimming");
+        }
+    }
+    
+    @Override
+    public void stopSwimming() {
+        if (isSwimming) {
+            isSwimming = false;
+            System.out.println("Duck stopped swimming");
+        } else {
+            System.out.println("Duck is not swimming");
+        }
+    }
+    
+    @Override
+    public void fly() {
+        if (isSwimming) {
+            System.out.println("Duck cannot fly while swimming!");
+            return;
+        }
+        if (!isFlying) {
+            isFlying = true;
+            System.out.println("Duck is flying in the sky");
+        } else {
+            System.out.println("Duck is already flying");
+        }
+    }
+    
+    @Override
+    public void stopFlying() {
+        if (isFlying) {
+            isFlying = false;
+            System.out.println("Duck stopped flying and landed");
+        } else {
+            System.out.println("Duck is not flying");
+        }
+    }
+    
+    // live() method is inherited from Living interface (default method)
+}
+
+// Penguin.java
+class Penguin implements Swimmable, Living {
+    private boolean isSwimming = false;
+    
+    @Override
+    public void swim() {
+        if (!isSwimming) {
+            isSwimming = true;
+            System.out.println("Penguin is swimming gracefully underwater");
+        } else {
+            System.out.println("Penguin is already swimming");
+        }
+    }
+    
+    @Override
+    public void stopSwimming() {
+        if (isSwimming) {
+            isSwimming = false;
+            System.out.println("Penguin stopped swimming and waddled to shore");
+        } else {
+            System.out.println("Penguin is not swimming");
+        }
+    }
+    
+    // live() method is inherited from Living interface (default method)
+}
+
+// InterfaceDemonstration.java
+public class InterfaceDemonstration {
+    public static void main(String[] args) {
+        System.out.println("=== Submarine Demonstration ===");
+        Submarine sub = new Submarine();
+        sub.swim();
+        sub.stopSwimming();
+        sub.stopSwimming();  // Try to stop when not swimming
+        
+        System.out.println("\n=== Duck Demonstration ===");
+        Duck duck = new Duck();
+        duck.live();          // Using default method from Living
+        duck.swim();
+        duck.fly();           // Cannot fly while swimming
+        duck.stopSwimming();
+        duck.fly();
+        duck.swim();          // Cannot swim while flying
+        duck.stopFlying();
+        duck.swim();          // Now can swim
+        duck.stopSwimming();
+        
+        System.out.println("\n=== Penguin Demonstration ===");
+        Penguin penguin = new Penguin();
+        penguin.live();       // Using default method from Living
+        penguin.swim();
+        penguin.swim();       // Already swimming
+        penguin.stopSwimming();
+    }
+}
+```
+
+**Answer:** This demonstrates how interfaces enable multiple inheritance of behavior. A `Duck` can both swim and fly because it implements both interfaces, while a `Penguin` can only swim. The `Submarine` shows that non-living things can also implement behavioral interfaces.
+
+</details>
+
+##### **3.5. Array of Living Objects** (Lab 9, Exercise 3 continued)
+Modify `InterfaceDemonstration` class, so that array of living objects of different types (`Duck`, `Penguin`) is created. For each element of the array call method `live()`.
+
+**Discussion:**
+
+-   What should happen if `swim()` is called for the elements of this array?
+-   Can instance of a `Submarine` be added to this array?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** We can create an array of interface type, allowing polymorphic behavior based on shared interfaces.
+
+```java
+public class InterfaceDemonstration {
+    public static void main(String[] args) {
+        // Create array of Living objects
+        Living[] livingThings = new Living[2];
+        livingThings[0] = new Duck();
+        livingThings[1] = new Penguin();
+        
+        System.out.println("=== All Living Things ===");
+        for (Living thing : livingThings) {
+            thing.live();  // All Living things have this method
+        }
+        
+        // Discussion Question 1: What if we call swim()?
+        System.out.println("\n=== Attempting to Swim ===");
+        for (Living thing : livingThings) {
+            // This won't compile directly:
+            // thing.swim();  // ERROR: Living doesn't have swim()
+            
+            // We need to check and cast:
+            if (thing instanceof Swimmable) {
+                ((Swimmable) thing).swim();
+            } else {
+                System.out.println(thing.getClass().getSimpleName() + 
+                                   " cannot swim");
+            }
+        }
+        
+        // Discussion Question 2: Can Submarine be added?
+        System.out.println("\n=== Can Submarine be in Living array? ===");
+        
+        // This won't compile:
+        // livingThings[0] = new Submarine();  // ERROR!
+        // Submarine doesn't implement Living interface
+        
+        System.out.println("No, Submarine cannot be added to Living[] " +
+                          "because Submarine doesn't implement Living interface");
+        
+        // But we can create a Swimmable array:
+        System.out.println("\n=== Swimmable Array ===");
+        Swimmable[] swimmers = new Swimmable[3];
+        swimmers[0] = new Duck();
+        swimmers[1] = new Penguin();
+        swimmers[2] = new Submarine();  // This works!
+        
+        for (Swimmable swimmer : swimmers) {
+            swimmer.swim();
+        }
+        
+        for (Swimmable swimmer : swimmers) {
+            swimmer.stopSwimming();
+        }
+    }
+}
+```
+
+**Answers to Discussion Questions:**
+
+1. **What should happen if `swim()` is called?**
+   Since the static type is `Living`, which doesn't define `swim()`, we cannot directly call `swim()`. We must first check if the object implements `Swimmable` using `instanceof`, then downcast to `Swimmable` to call the method.
+
+2. **Can instance of a Submarine be added to this array?**
+   No! The array is of type `Living[]`, which means it can only hold objects that implement the `Living` interface. Since `Submarine` doesn't implement `Living`, attempting to add it would cause a compilation error. However, `Submarine` could be added to a `Swimmable[]` array.
+
+</details>
+
+##### **3.6. Type Checking with instanceof** (Lecture 10, Type Checks)
+Demonstrate the use of the `instanceof` operator for safe downcasting with an `Animal` hierarchy containing `Lion`, `Frog`, and `Car` classes.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The `instanceof` operator performs runtime type identification (RTTI), allowing us to safely check an object's dynamic type before downcasting.
+
+```java
+// Base class
+class Animal {
+    public int f1 = 100;
+    
+    public void makeSound() {
+        System.out.println("Some animal sound");
+    }
+}
+
+// Derived classes
+class Lion extends Animal {
+    public int f2 = 200;
+    
+    @Override
+    public void makeSound() {
+        System.out.println("Roar!");
+    }
+    
+    public void hunt() {
+        System.out.println("Lion is hunting");
+    }
+}
+
+class Frog extends Animal {
+    public int f3 = 300;
+    
+    @Override
+    public void makeSound() {
+        System.out.println("Ribbit!");
+    }
+    
+    public void jump() {
+        System.out.println("Frog is jumping");
+    }
+}
+
+// Unrelated class
+class Car {
+    public void drive() {
+        System.out.println("Car is driving");
+    }
+}
+
+// Demonstration
+public class TypeCheckDemo {
+    public static void main(String[] args) {
+        // Creating objects with different dynamic types
+        Animal a1 = new Lion();
+        Animal a2 = new Frog();
+        
+        System.out.println("=== Type Checking ===");
+        
+        // Check what a1 is
+        boolean r1 = a1 instanceof Animal;  // true
+        boolean r2 = a1 instanceof Lion;    // true
+        boolean r3 = a1 instanceof Frog;    // false
+        
+        System.out.println("a1 instanceof Animal: " + r1);
+        System.out.println("a1 instanceof Lion: " + r2);
+        System.out.println("a1 instanceof Frog: " + r3);
+        
+        System.out.println("\n=== Safe Downcasting ===");
+        
+        // Safe downcasting using instanceof
+        if (a1 instanceof Lion) {
+            Lion lion = (Lion) a1;  // Safe to cast
+            System.out.println("a1 is a Lion, accessing f2: " + lion.f2);
+            lion.hunt();
+        } else if (a1 instanceof Frog) {
+            Frog frog = (Frog) a1;
+            System.out.println("a1 is a Frog, accessing f3: " + frog.f3);
+            frog.jump();
+        }
+        
+        if (a2 instanceof Lion) {
+            Lion lion = (Lion) a2;
+            lion.hunt();
+        } else if (a2 instanceof Frog) {
+            Frog frog = (Frog) a2;  // Safe to cast
+            System.out.println("a2 is a Frog, accessing f3: " + frog.f3);
+            frog.jump();
+        }
+        
+        System.out.println("\n=== Unsafe Downcasting ===");
+        
+        // This would compile but throw ClassCastException at runtime:
+        try {
+            Lion lion = (Lion) a2;  // a2 is actually a Frog!
+            lion.hunt();
+        } catch (ClassCastException e) {
+            System.out.println("Error: Cannot cast Frog to Lion - " + 
+                             e.getMessage());
+        }
+        
+        System.out.println("\n=== Checking Unrelated Types ===");
+        
+        // Checking against unrelated type
+        // Note: This might not compile in newer Java versions due to 
+        // compile-time type checking improvements
+        // boolean r4 = a1 instanceof Car;  // Compilation error in newer Java
+        System.out.println("Cannot check if Animal is Car - " +
+                          "they are unrelated types");
+        
+        System.out.println("\n=== Polymorphism ===");
+        
+        // Array of animals with polymorphic method calls
+        Animal[] animals = {new Lion(), new Frog(), new Lion()};
+        
+        for (Animal animal : animals) {
+            animal.makeSound();  // Polymorphic call
+            
+            // Access specific features based on actual type
+            if (animal instanceof Lion) {
+                ((Lion) animal).hunt();
+            } else if (animal instanceof Frog) {
+                ((Frog) animal).jump();
+            }
+        }
+    }
+}
+```
+
+**Answer:** The `instanceof` operator is essential for safe downcasting. It returns `true` if the object's dynamic type is the specified class or any of its subclasses, preventing `ClassCastException` at runtime. This is an example of Runtime Type Identification (RTTI).
+
+</details>
+
+##### **3.7. Shape Hierarchy with Abstract Class** (Lecture 10, Abstract Classes)
+Rewrite the `Shape` class hierarchy using abstract classes. The base `Shape` class should define abstract methods for common shape operations: `Move()`, `Rotate()`, `Draw()`, and `Increase()`. Implement `Circle` and `Rectangle` as concrete subclasses.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Abstract classes are ideal for representing abstract concepts that shouldn't be instantiated, while enforcing that all concrete subclasses implement required behavior.
+
+```java
+// Abstract base class
+abstract class Shape {
+    // Data common to all shapes
+    protected int x, y;  // coordinates
+    
+    // Constructor
+    public Shape(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+    
+    // Abstract methods - behavior common to all shapes but implemented differently
+    abstract void Move(int dx, int dy);
+    abstract void Rotate(double angle);
+    abstract void Draw();
+    abstract void Increase(double factor);
+}
+
+// Concrete implementation for Circle
+class Circle extends Shape {
+    private double radius;
+    
+    public Circle(int x, int y, double radius) {
+        super(x, y);
+        this.radius = radius;
+    }
+    
+    @Override
+    void Move(int dx, int dy) {
+        this.x += dx;
+        this.y += dy;
+        System.out.println("Circle moved to (" + x + ", " + y + ")");
+    }
+    
+    @Override
+    void Rotate(double angle) {
+        // Circle rotation doesn't change appearance
+        System.out.println("Circle rotated by " + angle + " degrees " +
+                          "(no visible change)");
+    }
+    
+    @Override
+    void Draw() {
+        System.out.println("Drawing Circle at (" + x + ", " + y + 
+                          ") with radius " + radius);
+    }
+    
+    @Override
+    void Increase(double factor) {
+        radius *= factor;
+        System.out.println("Circle radius increased to " + radius);
+    }
+}
+
+// Concrete implementation for Rectangle
+class Rectangle extends Shape {
+    private double width, height;
+    private double rotationAngle = 0;
+    
+    public Rectangle(int x, int y, double width, double height) {
+        super(x, y);
+        this.width = width;
+        this.height = height;
+    }
+    
+    @Override
+    void Move(int dx, int dy) {
+        this.x += dx;
+        this.y += dy;
+        System.out.println("Rectangle moved to (" + x + ", " + y + ")");
+    }
+    
+    @Override
+    void Rotate(double angle) {
+        rotationAngle += angle;
+        rotationAngle %= 360;  // Keep angle in [0, 360)
+        System.out.println("Rectangle rotated by " + angle + " degrees " +
+                          "(total rotation: " + rotationAngle + "°)");
+    }
+    
+    @Override
+    void Draw() {
+        System.out.println("Drawing Rectangle at (" + x + ", " + y + 
+                          ") with width " + width + ", height " + height +
+                          ", rotation " + rotationAngle + "°");
+    }
+    
+    @Override
+    void Increase(double factor) {
+        width *= factor;
+        height *= factor;
+        System.out.println("Rectangle size increased to " + width + 
+                          "x" + height);
+    }
+}
+
+// Demonstration
+public class ShapeDemo {
+    public static void main(String[] args) {
+        // Cannot instantiate abstract class:
+        // Shape shape = new Shape(0, 0);  // ERROR!
+        
+        // Create array of shapes
+        Shape[] figures = new Shape[3];
+        figures[0] = new Circle(10, 20, 5.0);
+        figures[1] = new Rectangle(30, 40, 10.0, 20.0);
+        figures[2] = new Circle(50, 60, 7.5);
+        
+        System.out.println("=== Drawing All Shapes ===");
+        for (Shape figure : figures) {
+            figure.Draw();  // Polymorphic call
+        }
+        
+        System.out.println("\n=== Increasing All Shapes ===");
+        for (Shape figure : figures) {
+            figure.Increase(1.5);  // Polymorphic call
+        }
+        
+        System.out.println("\n=== Drawing After Increase ===");
+        for (Shape figure : figures) {
+            figure.Draw();
+        }
+        
+        System.out.println("\n=== Moving and Rotating ===");
+        figures[0].Move(5, 5);
+        figures[0].Rotate(45);
+        
+        figures[1].Move(-10, 10);
+        figures[1].Rotate(90);
+        
+        System.out.println("\n=== Final State ===");
+        for (Shape figure : figures) {
+            figure.Draw();
+        }
+        
+        System.out.println("\n=== Adding New Shape (Triangle) ===");
+        // The beauty: we can add Triangle without modifying existing code!
+        System.out.println("If we add a Triangle class, all the loops above");
+        System.out.println("will work without any modification!");
+    }
+}
+```
+
+**Answer:** Abstract classes are perfect for this scenario because:
+
+1. We never want to create a generic "Shape" - only specific shapes
+2. All shapes share common data (coordinates) and behavior (move, rotate, draw, increase)
+3. Each specific shape implements these behaviors differently
+4. The code is extensible - we can add new shapes without modifying existing code (Open/Closed Principle)
+
+</details>
+
+##### **3.8. Vehicle Abstract Class Hierarchy** (Lecture 10, Abstract Classes)
+Create an abstract class `Vehicle` with abstract method `startEngine()`. Create concrete classes `Motorbike` and abstract class `FlyingVehicle` to demonstrate that derived classes can also be abstract.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** If a derived class doesn't implement all abstract methods from its superclass, it must also be declared abstract.
+
+```java
+// Abstract base class
+abstract class Vehicle {
+    // Common features for all vehicles
+    protected String color;
+    protected int numWheels;
+    
+    public Vehicle(String color, int numWheels) {
+        this.color = color;
+        this.numWheels = numWheels;
+    }
+    
+    // Abstract method - must be implemented by concrete subclasses
+    abstract void startEngine();
+    
+    // Concrete method - available to all vehicles
+    void honk() {
+        System.out.println("Honk honk!");
+    }
+    
+    void displayInfo() {
+        System.out.println("Color: " + color + ", Wheels: " + numWheels);
+    }
+}
+
+// Concrete class - implements all abstract methods
+class Motorbike extends Vehicle {
+    public Motorbike(String color) {
+        super(color, 2);
+    }
+    
+    @Override
+    void startEngine() {
+        System.out.println("Motorbike: Kick start! Vroom vroom!");
+    }
+}
+
+// Abstract class - doesn't implement abstract methods
+abstract class FlyingVehicle extends Vehicle {
+    protected int maxAltitude;
+    
+    public FlyingVehicle(String color, int numWheels, int maxAltitude) {
+        super(color, numWheels);
+        this.maxAltitude = maxAltitude;
+    }
+    
+    // Doesn't implement startEngine() - remains abstract
+    
+    // Adds new abstract method
+    abstract void takeOff();
+    
+    // Concrete method specific to flying vehicles
+    void displayAltitude() {
+        System.out.println("Max altitude: " + maxAltitude + " meters");
+    }
+}
+
+// Concrete flying vehicle - must implement ALL abstract methods
+class Airplane extends FlyingVehicle {
+    public Airplane(String color) {
+        super(color, 3, 12000);
+    }
+    
+    @Override
+    void startEngine() {
+        System.out.println("Airplane: Starting jet engines... Engines running!");
+    }
+    
+    @Override
+    void takeOff() {
+        System.out.println("Airplane: Accelerating down runway... Taking off!");
+    }
+}
+
+class Helicopter extends FlyingVehicle {
+    public Helicopter(String color) {
+        super(color, 0, 6000);
+    }
+    
+    @Override
+    void startEngine() {
+        System.out.println("Helicopter: Starting rotors... Whop whop whop!");
+    }
+    
+    @Override
+    void takeOff() {
+        System.out.println("Helicopter: Lifting off vertically!");
+    }
+}
+
+// Demonstration
+public class VehicleDemo {
+    public static void main(String[] args) {
+        // Cannot instantiate abstract classes:
+        // Vehicle v = new Vehicle("red", 4);          // ERROR!
+        // FlyingVehicle fv = new FlyingVehicle(...);  // ERROR!
+        
+        // Can instantiate concrete classes:
+        Motorbike bike = new Motorbike("Black");
+        Airplane plane = new Airplane("White");
+        Helicopter heli = new Helicopter("Green");
+        
+        System.out.println("=== Motorbike ===");
+        bike.displayInfo();
+        bike.startEngine();
+        bike.honk();
+        
+        System.out.println("\n=== Airplane ===");
+        plane.displayInfo();
+        plane.displayAltitude();
+        plane.startEngine();
+        plane.takeOff();
+        plane.honk();
+        
+        System.out.println("\n=== Helicopter ===");
+        heli.displayInfo();
+        heli.displayAltitude();
+        heli.startEngine();
+        heli.takeOff();
+        
+        System.out.println("\n=== Polymorphism with Vehicles ===");
+        Vehicle[] vehicles = {bike, plane, heli};
+        
+        for (Vehicle vehicle : vehicles) {
+            vehicle.startEngine();  // Polymorphic call
+        }
+        
+        System.out.println("\n=== Polymorphism with Flying Vehicles ===");
+        FlyingVehicle[] flyers = {plane, heli};
+        
+        for (FlyingVehicle flyer : flyers) {
+            flyer.takeOff();  // Polymorphic call
+        }
+    }
+}
+```
+
+**Answer:** This example demonstrates:
+
+1. A concrete class (`Motorbike`) must implement all abstract methods
+2. An abstract class (`FlyingVehicle`) can extend another abstract class without implementing its abstract methods
+3. A concrete class (`Airplane`, `Helicopter`) that extends an abstract class must implement ALL abstract methods from the entire inheritance chain
+4. You cannot instantiate abstract classes, regardless of their position in the hierarchy
+
+</details>
+
+##### **3.9. Package Organization and Import** (Lecture 10, Packages)
+Demonstrate how to create and use packages, including nested packages and import statements.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Packages organize classes into namespaces, prevent naming conflicts, and control access. The package structure must match the directory structure.
+
+**File Structure:**
+```
+project/
+├── company/
+│   └── department/
+│       └── lab/
+│           └── math/
+│               ├── MathVector.java
+│               └── Calculator.java
+├── myPackage/
+│   ├── PublicClass.java
+│   └── PackageClass.java
+└── Main.java
+```
+
+**MathVector.java:**
+```java
+package company.department.lab.math;
+
+public class MathVector {
+    private double x, y;
+    
+    public MathVector(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+    
+    public void display() {
+        System.out.println("Vector: (" + x + ", " + y + ")");
+    }
+    
+    public double magnitude() {
+        return Math.sqrt(x * x + y * y);
+    }
+}
+```
+
+**Calculator.java:**
+```java
+package company.department.lab.math;
+
+public class Calculator {
+    public static double add(double a, double b) {
+        return a + b;
+    }
+    
+    public static double multiply(double a, double b) {
+        return a * b;
+    }
+}
+```
+
+**PublicClass.java:**
+```java
+package myPackage;
+
+public class PublicClass {
+    public void publicMethod() {
+        System.out.println("This is a public class - accessible everywhere");
+    }
+}
+```
+
+**PackageClass.java:**
+```java
+package myPackage;
+
+// No public modifier - package-private (default access)
+class PackageClass {
+    void packageMethod() {
+        System.out.println("This is package-private - " +
+                          "only accessible in myPackage");
+    }
+}
+```
+
+**Main.java:**
+```java
+// Three ways to use classes from other packages:
+
+// 1. Import specific class
+import company.department.lab.math.MathVector;
+
+// 2. Import all classes from a package (import-on-demand)
+import myPackage.*;
+
+// 3. Use fully-qualified name (no import needed)
+// company.department.lab.math.Calculator
+
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("=== Method 1: Imported Specific Class ===");
+        // Can use short name because we imported it
+        MathVector v1 = new MathVector(3.0, 4.0);
+        v1.display();
+        System.out.println("Magnitude: " + v1.magnitude());
+        
+        System.out.println("\n=== Method 2: Import-on-Demand ===");
+        // Can use short name because we imported myPackage.*
+        PublicClass pc = new PublicClass();
+        pc.publicMethod();
+        
+        // This won't work - PackageClass is not public:
+        // PackageClass pkc = new PackageClass();  // ERROR!
+        
+        System.out.println("\n=== Method 3: Fully-Qualified Name ===");
+        // No import needed - use full name
+        double sum = company.department.lab.math.Calculator.add(10, 20);
+        double product = company.department.lab.math.Calculator.multiply(5, 6);
+        System.out.println("Sum: " + sum);
+        System.out.println("Product: " + product);
+        
+        System.out.println("\n=== Standard Java Library ===");
+        // java.lang is automatically imported
+        String str = "Hello";  // String is from java.lang
+        System.out.println(str);
+        
+        // Need to import other packages
+        java.util.ArrayList<Integer> list = new java.util.ArrayList<>();
+        list.add(1);
+        list.add(2);
+        System.out.println("List: " + list);
+        
+        // Better to import:
+        // import java.util.ArrayList;
+        // or import java.util.*;
+    }
+}
+```
+
+**PackageDemo.java (Inside myPackage):**
+```java
+package myPackage;
+
+public class PackageDemo {
+    public static void main(String[] args) {
+        // Inside the same package, we can access package-private classes
+        PackageClass pkc = new PackageClass();
+        pkc.packageMethod();  // This works!
+        
+        PublicClass pc = new PublicClass();
+        pc.publicMethod();
+    }
+}
+```
+
+**Compiling and Running:**
+```bash
+# Compile (from project root)
+javac company/department/lab/math/*.java
+javac myPackage/*.java
+javac Main.java
+
+# Run
+java Main
+```
+
+**Output:**
+```
+=== Method 1: Imported Specific Class ===
+Vector: (3.0, 4.0)
+Magnitude: 5.0
+
+=== Method 2: Import-on-Demand ===
+This is a public class - accessible everywhere
+
+=== Method 3: Fully-Qualified Name ===
+Sum: 30.0
+Product: 30.0
+
+=== Standard Java Library ===
+Hello
+List: [1, 2]
+```
+
+**Answer:** Packages provide:
+
+1. **Organization:** Logical grouping of related classes
+2. **Namespace management:** Prevent name conflicts (two classes can have the same name in different packages)
+3. **Access control:** Package-private classes are hidden from outside packages
+4. **Naming conventions:** Using reverse domain names (e.g., `com.example.project`) ensures worldwide uniqueness
+
+</details>
+
+##### **3.10. UML Class Diagram - Book and Person** (Tutorial 10, Association)
+Create a UML class diagram and corresponding Java code showing the association between `Book` and `Person` (authors).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Association represents a "uses" or "has" relationship between classes. The arrow direction shows which class knows about the other.
+
+**UML Diagram:**
+
+```
+Book                                Person
+-name: String                      -name: String
+-publisher: String                 -age: int
+-authors: Person[]                 +Person(initialName: String)
++addAuthor(author: Person): void   +printPerson(): void
++getAuthors(): Person[]            +getName(): String
+```
+
+**Arrow:** Book → Person (Book knows about Person, but Person doesn't know about Book)
+
+**Java Implementation:**
+
+```java
+// Person.java
+class Person {
+    private String name;
+    private int age;
+    
+    public Person(String initialName) {
+        this.name = initialName;
+        this.age = 0;
+    }
+    
+    public Person(String initialName, int initialAge) {
+        this.name = initialName;
+        this.age = initialAge;
+    }
+    
+    public void printPerson() {
+        System.out.println(name + ", age: " + age + " years");
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+
+// Book.java
+class Book {
+    private String name;
+    private String publisher;
+    private Person[] authors;
+    private int authorCount = 0;
+    
+    public Book(String name, String publisher, int maxAuthors) {
+        this.name = name;
+        this.publisher = publisher;
+        this.authors = new Person[maxAuthors];
+    }
+    
+    public void addAuthor(Person author) {
+        if (authorCount < authors.length) {
+            authors[authorCount] = author;
+            authorCount++;
+        } else {
+            System.out.println("Cannot add more authors - array is full");
+        }
+    }
+    
+    public Person[] getAuthors() {
+        // Return only the filled portion of the array
+        Person[] result = new Person[authorCount];
+        for (int i = 0; i < authorCount; i++) {
+            result[i] = authors[i];
+        }
+        return result;
+    }
+    
+    public void displayBook() {
+        System.out.println("Book: " + name);
+        System.out.println("Publisher: " + publisher);
+        System.out.println("Authors:");
+        for (int i = 0; i < authorCount; i++) {
+            System.out.print("  - ");
+            authors[i].printPerson();
+        }
+    }
+}
+
+// Demo
+public class AssociationDemo {
+    public static void main(String[] args) {
+        // Create persons (potential authors)
+        Person author1 = new Person("Alice Johnson", 45);
+        Person author2 = new Person("Bob Smith", 38);
+        Person author3 = new Person("Carol White", 52);
+        
+        // Create a book
+        Book book = new Book("Java Programming Essentials", 
+                            "Tech Books Publishing", 3);
+        
+        // Add authors to the book
+        book.addAuthor(author1);
+        book.addAuthor(author2);
+        book.addAuthor(author3);
+        
+        // Display book information
+        book.displayBook();
+        
+        System.out.println("\n=== Getting Authors ===");
+        Person[] bookAuthors = book.getAuthors();
+        for (Person author : bookAuthors) {
+            author.printPerson();
+        }
+    }
+}
+```
+
+**Bidirectional Association (Many-to-Many):**
+
+If both Book and Person need to know about each other:
+
+```java
+class Person {
+    private String name;
+    private int age;
+    private Book[] books;  // Books this person authored
+    private int bookCount = 0;
+    
+    public Person(String initialName, int maxBooks) {
+        this.name = initialName;
+        this.age = 0;
+        this.books = new Book[maxBooks];
+    }
+    
+    public void addBook(Book book) {
+        if (bookCount < books.length) {
+            books[bookCount] = book;
+            bookCount++;
+        }
+    }
+    
+    public void printPerson() {
+        System.out.println(name + ", age: " + age + " years");
+    }
+    
+    public String getName() {
+        return name;
+    }
+    
+    public Book[] getBooks() {
+        Book[] result = new Book[bookCount];
+        for (int i = 0; i < bookCount; i++) {
+            result[i] = books[i];
+        }
+        return result;
+    }
+}
+
+class Book {
+    private String name;
+    private String publisher;
+    private Person[] authors;
+    private int authorCount = 0;
+    
+    public Book(String name, String publisher, int maxAuthors) {
+        this.name = name;
+        this.publisher = publisher;
+        this.authors = new Person[maxAuthors];
+    }
+    
+    public void addAuthor(Person author) {
+        if (authorCount < authors.length) {
+            authors[authorCount] = author;
+            authorCount++;
+            author.addBook(this);  // Bidirectional link
+        }
+    }
+    
+    public String getName() {
+        return name;
+    }
+    
+    public Person[] getAuthors() {
+        Person[] result = new Person[authorCount];
+        for (int i = 0; i < authorCount; i++) {
+            result[i] = authors[i];
+        }
+        return result;
+    }
+}
+```
+
+**UML for Bidirectional:**
+```
+Book <--------*------*--------> Person
+```
+(No arrows = both know about each other; * on both ends = many-to-many)
+
+**Answer:** Association shows how classes collaborate. The arrow direction indicates dependency (who knows about whom), and cardinality shows the numerical relationship between objects.
+
+</details>
+
+##### **3.11. UML Composition - Building and Rooms** (Tutorial 10, Composition)
+Demonstrate composition where `Room` is part of `Building` and cannot exist independently.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Composition is a strong ownership relationship. When the owner (Building) is destroyed, the parts (Rooms) are also destroyed.
+
+**UML Diagram:**
+```
+Building ◆-------- Room
+-rooms: Room[]
+~address: String
+```
+(Filled diamond at Building end indicates composition)
+
+**Java Implementation:**
+
+```java
+class Building {
+    private String address;
+    private Room[] rooms;
+    
+    // Inner class - Room cannot exist outside Building
+    class Room {
+        private int roomNumber;
+        private double area;
+        
+        public Room(int roomNumber, double area) {
+            this.roomNumber = roomNumber;
+            this.area = area;
+        }
+        
+        // Room can access Building's members
+        String getBuildingAddress() {
+            return Building.this.address;
+        }
+        
+        void displayRoom() {
+            System.out.println("  Room " + roomNumber + 
+                             ": " + area + " sq meters " +
+                             "in building at " + getBuildingAddress());
+        }
+    }
+    
+    public Building(String address, int numRooms) {
+        this.address = address;
+        this.rooms = new Room[numRooms];
+        
+        // Create rooms - they are part of the building
+        for (int i = 0; i < numRooms; i++) {
+            rooms[i] = new Room(i + 1, 15.0 + i * 5);
+        }
+    }
+    
+    public void displayBuilding() {
+        System.out.println("Building at: " + address);
+        System.out.println("Rooms:");
+        for (Room room : rooms) {
+            room.displayRoom();
+        }
+    }
+    
+    // When building is demolished, rooms cease to exist
+    public void demolish() {
+        System.out.println("Demolishing building at " + address);
+        rooms = null;  // Rooms are destroyed with the building
+        System.out.println("Building and all its rooms are destroyed");
+    }
+}
+
+public class CompositionDemo {
+    public static void main(String[] args) {
+        System.out.println("=== Creating Building ===");
+        Building building = new Building("123 Main Street", 4);
+        building.displayBuilding();
+        
+        System.out.println("\n=== Demolishing Building ===");
+        building.demolish();
+        
+        // After demolition, we cannot access rooms
+        // They were composed within the building
+        
+        System.out.println("\n=== Key Point ===");
+        System.out.println("Rooms cannot exist without their building");
+        System.out.println("When the building is destroyed, rooms are destroyed too");
+        System.out.println("This is COMPOSITION");
+    }
+}
+```
+
+**Alternative using regular classes (still composition):**
+
+```java
+class Room {
+    private int roomNumber;
+    private double area;
+    private Building building;  // Back-reference to owner
+    
+    // Package-private constructor - only Building can create rooms
+    Room(int roomNumber, double area, Building building) {
+        this.roomNumber = roomNumber;
+        this.area = area;
+        this.building = building;
+    }
+    
+    String getBuildingAddress() {
+        return building.getAddress();
+    }
+    
+    void displayRoom() {
+        System.out.println("  Room " + roomNumber + 
+                         ": " + area + " sq meters");
+    }
+}
+
+class Building {
+    private String address;
+    private Room[] rooms;
+    
+    public Building(String address, int numRooms) {
+        this.address = address;
+        this.rooms = new Room[numRooms];
+        
+        // Building creates and owns its rooms
+        for (int i = 0; i < numRooms; i++) {
+            rooms[i] = new Room(i + 1, 15.0 + i * 5, this);
+        }
+    }
+    
+    String getAddress() {
+        return address;
+    }
+    
+    public void displayBuilding() {
+        System.out.println("Building at: " + address);
+        System.out.println("Rooms:");
+        for (Room room : rooms) {
+            room.displayRoom();
+        }
+    }
+}
+```
+
+**Answer:** Composition represents a "part-of" relationship with strong ownership. The key characteristics are:
+
+1. The part (Room) is created by the whole (Building)
+2. The part cannot exist independently
+3. When the whole is destroyed, all parts are destroyed
+4. Typically implemented with inner classes or careful encapsulation
+
+</details>
+
+##### **3.12. UML Aggregation - Car and Wheels** (Tutorial 10, Aggregation)
+Demonstrate aggregation where `Wheel` can exist independently of `Car`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Aggregation is a weak "has-a" relationship where the part can exist independently of the whole.
+
+**UML Diagram:**
+```
+Car ◇-------- Wheel
+-wheels: Wheel[]
+```
+(Empty diamond at Car end indicates aggregation)
+
+**Java Implementation:**
+
+```java
+// Wheel.java - Can exist independently
+class Wheel {
+    private double diameter;
+    private String brand;
+    private String condition;
+    
+    public Wheel(double diameter, String brand) {
+        this.diameter = diameter;
+        this.brand = brand;
+        this.condition = "new";
+    }
+    
+    public void displayWheel() {
+        System.out.println("  " + brand + " wheel, " + 
+                         diameter + " inches, condition: " + condition);
+    }
+    
+    public void wear() {
+        condition = "worn";
+    }
+    
+    public String getBrand() {
+        return brand;
+    }
+}
+
+// Car.java - Has wheels but doesn't own them
+class Car {
+    private String model;
+    private Wheel[] wheels;
+    
+    public Car(String model) {
+        this.model = model;
+        this.wheels = new Wheel[4];
+    }
+    
+    // Mount existing wheels
+    public void mountWheel(Wheel wheel, int position) {
+        if (position >= 0 && position < 4) {
+            wheels[position] = wheel;
+            System.out.println("Mounted wheel at position " + position);
+        }
+    }
+    
+    // Remove a wheel - it still exists after removal
+    public Wheel removeWheel(int position) {
+        if (position >= 0 && position < 4) {
+            Wheel removed = wheels[position];
+            wheels[position] = null;
+            System.out.println("Removed wheel from position " + position);
+            return removed;
+        }
+        return null;
+    }
+    
+    public void displayCar() {
+        System.out.println("Car: " + model);
+        System.out.println("Wheels:");
+        for (int i = 0; i < 4; i++) {
+            System.out.print("  Position " + i + ": ");
+            if (wheels[i] != null) {
+                wheels[i].displayWheel();
+            } else {
+                System.out.println("No wheel");
+            }
+        }
+    }
+}
+
+public class AggregationDemo {
+    public static void main(String[] args) {
+        System.out.println("=== Creating Wheels (Independent) ===");
+        Wheel wheel1 = new Wheel(17, "Michelin");
+        Wheel wheel2 = new Wheel(17, "Bridgestone");
+        Wheel wheel3 = new Wheel(17, "Michelin");
+        Wheel wheel4 = new Wheel(17, "Bridgestone");
+        
+        wheel1.displayWheel();
+        wheel2.displayWheel();
+        
+        System.out.println("\n=== Creating Car ===");
+        Car car1 = new Car("Toyota Camry");
+        
+        System.out.println("\n=== Mounting Wheels ===");
+        car1.mountWheel(wheel1, 0);
+        car1.mountWheel(wheel2, 1);
+        car1.mountWheel(wheel3, 2);
+        car1.mountWheel(wheel4, 3);
+        
+        System.out.println();
+        car1.displayCar();
+        
+        System.out.println("\n=== Removing a Wheel ===");
+        Wheel removedWheel = car1.removeWheel(0);
+        car1.displayCar();
+        
+        System.out.println("\n=== Removed Wheel Still Exists ===");
+        System.out.println("The removed wheel:");
+        removedWheel.displayWheel();
+        System.out.println("It can be mounted on another car!");
+        
+        System.out.println("\n=== Creating Second Car ===");
+        Car car2 = new Car("Honda Civic");
+        car2.mountWheel(removedWheel, 0);
+        System.out.println();
+        car2.displayCar();
+        
+        System.out.println("\n=== Spare Wheels ===");
+        Wheel spareWheel1 = new Wheel(17, "Goodyear");
+        Wheel spareWheel2 = new Wheel(17, "Pirelli");
+        System.out.println("These wheels exist but aren't mounted on any car:");
+        spareWheel1.displayWheel();
+        spareWheel2.displayWheel();
+        
+        System.out.println("\n=== Key Point ===");
+        System.out.println("Wheels can exist without a car");
+        System.out.println("Wheels can be removed and installed on different cars");
+        System.out.println("If a car is destroyed, its wheels still exist");
+        System.out.println("This is AGGREGATION");
+    }
+}
+```
+
+**Output:**
+```
+=== Creating Wheels (Independent) ===
+  Michelin wheel, 17.0 inches, condition: new
+  Bridgestone wheel, 17.0 inches, condition: new
+
+=== Creating Car ===
+
+=== Mounting Wheels ===
+Mounted wheel at position 0
+Mounted wheel at position 1
+Mounted wheel at position 2
+Mounted wheel at position 3
+
+Car: Toyota Camry
+Wheels:
+  Position 0:   Michelin wheel, 17.0 inches, condition: new
+  Position 1:   Bridgestone wheel, 17.0 inches, condition: new
+  Position 2:   Michelin wheel, 17.0 inches, condition: new
+  Position 3:   Bridgestone wheel, 17.0 inches, condition: new
+
+=== Removing a Wheel ===
+Removed wheel from position 0
+Car: Toyota Camry
+Wheels:
+  Position 0: No wheel
+  Position 1:   Bridgestone wheel, 17.0 inches, condition: new
+  Position 2:   Michelin wheel, 17.0 inches, condition: new
+  Position 3:   Bridgestone wheel, 17.0 inches, condition: new
+
+=== Removed Wheel Still Exists ===
+The removed wheel:
+  Michelin wheel, 17.0 inches, condition: new
+It can be mounted on another car!
+
+=== Creating Second Car ===
+Mounted wheel at position 0
+
+Car: Honda Civic
+Wheels:
+  Position 0:   Michelin wheel, 17.0 inches, condition: new
+  Position 1: No wheel
+  Position 2: No wheel
+  Position 3: No wheel
+
+=== Spare Wheels ===
+These wheels exist but aren't mounted on any car:
+  Goodyear wheel, 17.0 inches, condition: new
+  Pirelli wheel, 17.0 inches, condition: new
+
+=== Key Point ===
+Wheels can exist without a car
+Wheels can be removed and installed on different cars
+If a car is destroyed, its wheels still exist
+This is AGGREGATION
+```
+
+**Answer:** Aggregation differs from composition in that:
+
+1. The part (Wheel) can exist independently
+2. The part can be created before the whole
+3. The part can be shared between different wholes
+4. When the whole is destroyed, parts remain
+5. Lifecycle of parts is independent of the whole
+
+</details>
+
