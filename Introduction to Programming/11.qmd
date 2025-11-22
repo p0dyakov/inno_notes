@@ -1,0 +1,997 @@
+---
+title: "W12. Exceptions, Version Control Systems"
+author: "Zakhar Podyakov"
+date: "November 19, 2025"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+##### **1.1 Introduction to Exceptions**
+In programming, we must accept a fundamental truth: **any code of significant length has bugs**. Good programming is not about avoiding bugs entirely, but about designing code that can handle errors gracefully. This involves three key capabilities:
+
+1. **Fault awareness**: Detecting errors when they occur without crashing the program or system
+2. **Fault recovery**: Recovering from errors and giving users the ability to continue working and save their progress
+3. **Fault tolerance**: Continuing to run consistently despite errors, performing activities not affected by the problem
+
+An **exception** is a problem that arises during program execution. When an exception occurs, the normal flow of the program is disrupted. Exceptions can occur for many reasons:
+
+*   A user enters invalid data
+*   A required file cannot be found
+*   A network connection is lost during communication
+*   The JVM runs out of memory
+
+Some exceptions result from user error, others from programmer error, and still others from physical resource failures.
+
+##### **1.2 Historical Context: Classic Error Handling**
+Before modern exception mechanisms, programmers used **error codes** to handle errors. Functions would return special values (like `-1` or `0`) to indicate failure, or use output parameters to communicate error states.
+
+This approach had severe problems:
+
+*   **Error-prone**: Programmers often forgot to check error codes, leading to programs continuing in inconsistent states
+*   **Excess locality**: The immediate caller might not have enough information to handle the error properly
+*   **Code complexity**: Normal program logic became heavily intermixed with error-checking code, making programs obscure and difficult to read
+*   **Poor error propagation**: Errors had to be manually passed up the calling chain using return values, global variables, or goto-like instructions
+
+<!-- DIAGRAM HERE -->
+
+The classic approach resulted in code where error handling was tightly coupled with business logic, reducing readability and maintainability.
+
+##### **1.3 The Concept of Exception**
+An exception is **any event that does not belong to the normal flow of control** of a program. Whether something should be considered an exception depends on the specific application and level of abstraction.
+
+An exception could be:
+
+*   An **error** (e.g., running out of memory, wrong argument value)
+*   An **unusual result** from a computation
+*   An **unexpected but not wrong request** to the operating system
+*   The **detection of external input** (interrupt request, login request, power shortage)
+
+##### **1.4 Exceptions in Object-Oriented Programming**
+While exceptions are not intrinsic to object-oriented philosophy, every modern OO language implements exception handling. In OO languages, **exceptions are objects**—instances of classes that pass information about unusual events between different parts of the program.
+
+Exception handling in OO languages has three aspects:
+
+1. **An event** that breaks the normal flow of program control (caused by runtime or by the program itself)
+2. **Transfer of control** to some other program point (defined by language semantics)
+3. **An object** that is passed together with the control transfer (an instance of some exception class)
+
+##### **1.5 Java Exception Hierarchy**
+Java organizes exceptions into a hierarchy rooted at the `java.lang.Throwable` class. There are three main categories:
+
+###### **1.5.1 Checked Exceptions**
+**Checked exceptions** are exceptions that the compiler checks at compilation time. These are also called **compile-time exceptions**. The programmer must handle these exceptions—they cannot simply be ignored.
+
+Any method that may throw a checked exception must either:
+
+*   Catch the exception using a `try-catch` block
+*   Declare the exception in its `throws` clause
+
+Checked exceptions are derived from `java.lang.Throwable` (but not from `RuntimeException` or `Error`). Common examples include `IOException`, `SQLException`, and `ClassNotFoundException`.
+
+###### **1.5.2 Unchecked Exceptions (Runtime Exceptions)**
+**Unchecked exceptions** occur at execution time and are also called **runtime exceptions**. These include programming bugs such as logic errors or improper API usage. The compiler ignores these exceptions at compilation time.
+
+Unchecked exceptions are derived from `java.lang.RuntimeException`. Common examples include:
+
+*   `NullPointerException`: Accessing members of a null object
+*   `ArithmeticException`: Division by zero
+*   `ArrayIndexOutOfBoundsException`: Accessing an array with an invalid index
+*   `NumberFormatException`: Converting an invalid string to a number
+
+###### **1.5.3 Errors**
+**Errors** are problems that arise beyond the control of the user or programmer. Errors are typically ignored in code because you can rarely do anything about them. For example, `StackOverflowError` or `OutOfMemoryError` indicate serious system-level problems.
+
+Errors are derived from `java.lang.Error` and are also ignored at compilation time.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.6 Exception Mechanism**
+###### **1.6.1 Throwing Exceptions**
+Exceptions can be thrown in two ways:
+
+1. **By the runtime system**: When runtime detects an error (e.g., division by zero)
+2. **Explicitly by the program**: Using the `throw` keyword with an exception object
+
+```java
+throw new ExceptionType("Error message");
+```
+
+When an exception is thrown, the current method immediately stops executing.
+
+###### **1.6.2 Exception Propagation and Stack Unwinding**
+When an exception is thrown, control is transferred sequentially through **dynamically enclosing scopes** (from the current scope up to the outermost scope) until a suitable exception handler is found. This process is called **stack unwinding**.
+
+If no handler is found in the current method, the exception propagates to the calling method, and so on up the call stack. If no handler exists anywhere, the program terminates.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.6.3 Catching Exceptions: try-catch Blocks**
+The `try-catch` block specifies where exceptions are caught and how they are handled:
+
+```java
+try {
+    // Code that might throw exceptions
+} catch (ExceptionType1 e) {
+    // Handle ExceptionType1
+} catch (ExceptionType2 e) {
+    // Handle ExceptionType2
+}
+```
+
+Key rules:
+
+*   The `try` block contains code where exceptions might occur
+*   Each `catch` handler processes exceptions of its specified type or any subclass thereof
+*   The exception object is passed to the handler like a method parameter
+*   Multiple `catch` blocks are evaluated in order—the first matching handler is executed
+*   After a handler executes, program execution continues normally after the try-catch structure
+
+**Important**: Catch blocks must be ordered from most specific to most general exception types. A catch for a parent class will also catch all child classes, so putting it first makes subsequent child class catches unreachable (this is a compilation error in Java).
+
+###### **1.6.4 The finally Block**
+The `finally` block contains code that executes regardless of whether an exception occurred:
+
+```java
+try {
+    // Code that might throw exceptions
+} catch (ExceptionType e) {
+    // Handle exception
+} finally {
+    // Always executed
+}
+```
+
+The `finally` block executes:
+
+*   After the `try` block (if no exception occurred)
+*   After any `catch` handler (if an exception was caught)
+*   Even during stack unwinding (if no suitable handler was found)
+
+In Java, `finally` can be present without `catch` blocks. The `finally` block is typically used for cleanup actions that must occur regardless of success or failure (e.g., closing files, releasing resources).
+
+###### **1.6.5 Multi-Catch (Java 7+)**
+Since Java 7, a single `catch` block can handle multiple exception types:
+
+```java
+try {
+    // Code
+} catch (IOException | SQLException ex) {
+    // Handle both exception types
+}
+```
+
+This feature reduces code duplication and helps avoid catching overly broad exception types.
+
+##### **1.7 Try-with-Resources Statement**
+The **try-with-resources** statement (introduced in Java 7) automatically manages resources that must be closed after use. A resource is any object implementing the `AutoCloseable` interface.
+
+```java
+try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+    return br.readLine();
+}
+```
+
+The resource declared in the try statement is automatically closed when the try block completes, whether normally or abruptly. This eliminates the need for explicit `finally` blocks for resource cleanup.
+
+**Before Java 7**, you had to use `finally` blocks manually:
+
+```java
+BufferedReader br = new BufferedReader(new FileReader(path));
+try {
+    return br.readLine();
+} finally {
+    br.close();
+}
+```
+
+##### **1.8 Suppressed Exceptions**
+When multiple exceptions can occur (e.g., one in the try block and another when closing resources), one exception can **suppress** another. Consider this code:
+
+```java
+FileInputStream fileIn = null;
+try {
+    fileIn = new FileInputStream(filePath);
+} catch (FileNotFoundException e) {
+    throw new IOException(e);
+} finally {
+    fileIn.close();  // NullPointerException if file not found!
+}
+```
+
+If the file doesn't exist, `FileNotFoundException` is thrown and caught. But then the `finally` block tries to close a null `fileIn`, throwing `NullPointerException`. The calling method only sees the `NullPointerException`, obscuring the original problem.
+
+The `Throwable.addSuppressed()` method allows you to preserve the original exception:
+
+```java
+Throwable firstException = null;
+FileInputStream fileIn = null;
+try {
+    fileIn = new FileInputStream(filePath);
+} catch (IOException e) {
+    firstException = e;
+} finally {
+    try {
+        fileIn.close();
+    } catch (NullPointerException npe) {
+        if (firstException != null) {
+            npe.addSuppressed(firstException);
+        }
+        throw npe;
+    }
+}
+```
+
+Try-with-resources handles suppressed exceptions automatically.
+
+##### **1.9 Exception Specification**
+In Java, methods can declare which exceptions they might throw using the **throws clause**:
+
+```java
+void f(int x) throws IOException, SQLException {
+    // Method body
+}
+```
+
+This declaration indicates that the method may throw `IOException` or `SQLException`. Callers must handle these exceptions or declare them in their own throws clauses.
+
+**Note**: This requirement applies only to checked exceptions. Unchecked exceptions (runtime exceptions and errors) do not need to be declared.
+
+##### **1.10 File Streams in Java**
+###### **1.10.1 FileOutputStream**
+`FileOutputStream` writes binary data to files. Key methods:
+
+*   `void write(byte[] ary)`: Writes all bytes from the array
+*   `void write(byte[] ary, int off, int len)`: Writes `len` bytes starting at offset `off`
+*   `void write(int b)`: Writes a single byte
+*   `void close()`: Closes the stream
+
+###### **1.10.2 FileInputStream**
+`FileInputStream` reads binary data from files. Key methods:
+
+*   `int available()`: Returns estimated number of bytes available to read
+*   `int read()`: Reads a single byte
+*   `int read(byte[] b)`: Reads up to `b.length` bytes into the array
+*   `int read(byte[] b, int off, int len)`: Reads up to `len` bytes starting at offset `off`
+*   `long skip(long x)`: Skips over `x` bytes
+*   `void close()`: Closes the stream
+
+##### **1.11 Version Control Systems**
+**Version control systems (VCS)** are software tools that record changes to files over time, tracking modifications to source code. They are essential for software development teams, especially when developers are distributed across locations and each contributes specific functionality.
+
+A VCS helps the developer team efficiently communicate and manage changes to source code, including information about who made changes and what was changed. Key benefits:
+
+*   Maintains history of all changes
+*   Enables collaboration without conflicts
+*   Allows reverting to previous versions
+*   Provides separate branches for different features
+*   Improves productivity through organized development
+
+##### **1.12 Types of Version Control Systems**
+###### **1.12.1 Local Version Control Systems (LVCS)**
+The simplest form, with a database keeping all file changes under revision control. **RCS** (Revision Control System) is a common example—it keeps patch sets (differences between files) in a special format on disk and can recreate any file at any point in time.
+
+**Limitation**: Simultaneous work on files is not provided.
+
+###### **1.12.2 Centralized Version Control Systems (CVCS)**
+CVCS contains **one global repository** and every user commits changes to this central repository. Others see changes by updating from the repository.
+
+<!-- DIAGRAM HERE -->
+
+**Benefits**:
+
+*   Collaboration among developers
+*   Visibility into what others are doing
+
+**Downsides**:
+
+*   **Single point of failure**: If the central server goes down, collaboration and saving versioned changes becomes impossible
+*   **Data loss risk**: If the central database is corrupted without proper backups, everything can be lost
+
+Examples: SVN, CVS
+
+###### **1.12.3 Distributed Version Control Systems (DVCS)**
+DVCS contains **multiple repositories**. Each user has their own repository and working copy. Committing changes only affects your local repository—you must **push** changes to make them visible on the central repository. Similarly, you must **pull** changes from others into your repository before you can see them with an update.
+
+<!-- DIAGRAM HERE -->
+
+**Advantages**:
+
+*   Full repository copy on every machine (complete backup)
+*   Can work offline
+*   No single point of failure
+*   Flexible workflows (branches, merging)
+
+The most popular distributed version control systems are **Git** and **Mercurial**.
+
+##### **1.13 Git Basics**
+###### **1.13.1 Git vs GitHub**
+**Git** is a distributed version control system that manages and tracks source code history. It is installed and maintained locally on your computer.
+
+**GitHub** is a cloud-based hosting service for Git repositories. It enables code sharing and collaboration. While Git is local software, GitHub provides cloud-based services built around Git.
+
+###### **1.13.2 Essential Git Commands**
+*   `git init`: Initialize a new repository
+*   `git clone <from> <to>`: Clone a repository from a remote source
+*   `git pull`: Update local repository from remote
+*   `git status`: Check current status and see which files have changed
+*   `git add <files>`: Stage files for commit
+*   `git commit -m "MESSAGE"`: Commit staged changes with a message
+*   `git push`: Push local commits to remote repository
+*   `git revert`: Undo a commit
+*   `git checkout <BRANCH>`: Switch to a different branch
+*   `git merge`: Merge branches together
+
+###### **1.13.3 Basic Git Workflow**
+1. **Install Git** on your system
+2. **Configure credentials** globally:
+   ```bash
+   git config --global user.name "Your Name"
+   git config --global user.email "youremail@example.com"
+   ```
+3. **Set up SSH key** in GitHub settings (Settings → SSH and GPG keys)
+4. **Create local repository** and track changes
+5. **Add and commit** changes regularly
+6. **Push** to remote repository to share with others
+
+#### **2. Definitions**
+*   **Exception**: A problem that arises during program execution, disrupting the normal flow and potentially causing abnormal termination if not handled.
+*   **Checked Exception**: An exception that the compiler verifies at compilation time, requiring the programmer to handle it or declare it in a throws clause.
+*   **Unchecked Exception (Runtime Exception)**: An exception that occurs at execution time, typically due to programming bugs, and is not checked by the compiler.
+*   **Error**: A serious problem beyond the control of the user or programmer, typically indicating system-level issues that cannot be recovered from.
+*   **try block**: A code block that encloses statements where exceptions might occur.
+*   **catch block**: An exception handler that specifies what to do when a particular type of exception is thrown.
+*   **finally block**: A code block that always executes after a try-catch structure, regardless of whether an exception occurred.
+*   **throw**: A keyword used to explicitly throw an exception object.
+*   **throws**: A keyword used in method declarations to specify which checked exceptions the method might throw.
+*   **Stack Unwinding**: The process of propagating an exception up through the call stack, removing stack frames until a suitable handler is found.
+*   **Suppressed Exception**: An exception that occurs during exception handling but is attached to another exception rather than replacing it.
+*   **Try-with-Resources**: A try statement that declares resources to be automatically closed when the block completes.
+*   **Version Control System (VCS)**: Software that tracks changes to files over time, recording modifications and enabling collaboration.
+*   **Centralized VCS (CVCS)**: A version control system with a single central repository that all users commit to and update from.
+*   **Distributed VCS (DVCS)**: A version control system where each user has a complete repository copy, with changes pushed and pulled between repositories.
+*   **Git**: A distributed version control system designed for speed, data integrity, and support for distributed, non-linear workflows.
+*   **GitHub**: A cloud-based hosting service for Git repositories that enables code sharing and collaboration.
+*   **Repository**: A data structure that stores metadata for a set of files and tracks their history.
+*   **Commit**: A snapshot of changes to the repository, creating a new version in the history.
+*   **Push**: The operation of sending local commits to a remote repository.
+*   **Pull**: The operation of fetching changes from a remote repository and merging them into the local repository.
+
+#### **3. Examples**
+##### **3.1. Legal try-finally without catch** (Tutorial 12, Warm-up 1)
+Is the following code legal?
+
+```java
+try {
+} finally {
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** In Java, the `catch` block is not mandatory in a try-catch-finally structure.
+
+**Answer:** Yes, this code is legal. The `catch` block is optional—you can have a `try` block followed directly by a `finally` block. This is useful when you want cleanup code to run regardless of exceptions, but don't need to handle specific exception types.
+
+</details>
+
+##### **3.2. Catching with Exception Class** (Tutorial 12, Warm-up 2)
+What exception types can be caught by the following handler? What is wrong with using this type of exception handler?
+
+```java
+catch (Exception e) {
+    e.printStackTrace();
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Answer:** 
+
+**What it catches:** This handler catches anything derived from `Exception`, which includes all checked exceptions and all runtime exceptions. It does NOT catch `Error` or its subclasses.
+
+**What's wrong:**
+
+1.  **Missing try block**: This catch block cannot exist alone—it needs an accompanying `try` block.
+2.  **Too general**: Using `Exception` as the catch type is too broad. It's better practice to catch specific exception types so you can handle different error conditions appropriately. Catching `Exception` makes it hard to distinguish between different problems and may inadvertently catch exceptions you didn't intend to handle.
+
+</details>
+
+##### **3.3. Catch Block Ordering** (Tutorial 12, Warm-up 3)
+Is there anything wrong with the following exception handler as written? Will this code compile?
+
+```java
+try {
+} catch (Exception e) {
+} catch (ArithmeticException a) {
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Catch blocks must be ordered from most specific to most general exception types.
+
+**Answer:** This code will NOT compile. The problem is the ordering of the catch blocks:
+
+*   `ArithmeticException` is a subclass of `Exception`
+*   The first catch block (for `Exception`) will also catch `ArithmeticException` objects
+*   This makes the second catch block unreachable—it will never execute
+*   Java does not allow unreachable catch blocks
+
+**Fix:** Reverse the order—put the more specific `ArithmeticException` catch before the more general `Exception` catch:
+
+```java
+try {
+} catch (ArithmeticException a) {
+} catch (Exception e) {
+}
+```
+
+</details>
+
+##### **3.4. Create VCS Account and Repository** (Lab 11, Exercise 1)
+1. Create a VCS account if you don't have one (e.g., GitHub account)
+2. Create a repository for ITP course exercises (not assignments)
+3. Add at least previous week's exercises to this repository
+4. Keep doing this constantly for the remaining part of the course
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Version control is essential for tracking your work, demonstrating progress, and building professional development habits.
+
+**Step-by-step guide:**
+
+1.  **Create GitHub account:**
+    *   Go to [github.com](https://github.com)
+    *   Click "Sign up" and follow the registration process
+
+2.  **Create repository:**
+    *   Click the "+" icon in the top-right corner
+    *   Select "New repository"
+    *   Name it (e.g., "ITP-Exercises")
+    *   Choose Public or Private
+    *   Initialize with a README (optional)
+    *   Click "Create repository"
+
+3.  **Set up Git locally:**
+    ```bash
+    git config --global user.name "Your Name"
+    git config --global user.email "youremail@example.com"
+    ```
+
+4.  **Clone repository to your computer:**
+    ```bash
+    git clone https://github.com/yourusername/ITP-Exercises.git
+    cd ITP-Exercises
+    ```
+
+5.  **Add previous exercises:**
+    *   Copy your exercise files into the repository folder
+    *   Stage the files:
+    ```bash
+    git add .
+    ```
+    *   Commit the changes:
+    ```bash
+    git commit -m "Add previous week's exercises"
+    ```
+    *   Push to GitHub:
+    ```bash
+    git push
+    ```
+
+6.  **Maintain the habit:**
+    *   After completing each new exercise, repeat steps from stage/commit/push
+    *   Use meaningful commit messages describing what you added
+
+</details>
+
+##### **3.5. File Copy with Exception Handling** (Lab 11, Exercise 2)
+Write a program that reads data from a text file and writes it into another text file. Handle the following exceptions:
+
+*   Input file does not exist
+*   No write permission for the output file
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** File operations can fail in various ways, so we must handle exceptions like `FileNotFoundException` and `IOException`.
+
+```java
+import java.io.*;
+
+public class FileCopier {
+    public static void main(String[] args) {
+        // Define input and output file paths
+        String inputFile = "input.txt";
+        String outputFile = "output.txt";
+        
+        // Try-with-resources automatically closes streams
+        try (FileInputStream in = new FileInputStream(inputFile);
+             FileOutputStream out = new FileOutputStream(outputFile)) {
+            
+            // Create buffer to hold file data
+            byte[] buffer = new byte[in.available()];
+            
+            // Read all data from input file into buffer
+            in.read(buffer, 0, buffer.length);
+            
+            // Write all data from buffer to output file
+            out.write(buffer, 0, buffer.length);
+            
+            System.out.println("File copied successfully!");
+            
+        } catch (FileNotFoundException e) {
+            // Input file doesn't exist OR no write permission for output
+            System.out.println("File error: " + e.getMessage());
+            System.out.println("Check that input file exists and you have write permissions.");
+        } catch (IOException e) {
+            // Other I/O errors during read/write
+            System.out.println("I/O error occurred: " + e.getMessage());
+        }
+    }
+}
+```
+
+**Explanation:**
+
+1.  **Try-with-resources**: Automatically closes both input and output streams
+2.  **FileNotFoundException**: Thrown if input file doesn't exist or there's no write permission for output location
+3.  **IOException**: Catches any other I/O errors during reading or writing
+4.  **Buffer approach**: Reads entire file into memory (suitable for small files)
+
+**Commit to repository:**
+```bash
+git add FileCopier.java
+git commit -m "Add file copy program with exception handling"
+git push
+```
+
+</details>
+
+##### **3.6. Division with Multiple Exception Handling** (Lab 11, Exercise 3)
+Write a program that reads input from a file which contains two integer parameters, and divides the first integer by the second. Catch all possible exceptions (parsing errors, non-integer errors, and arithmetic errors) and print appropriate messages.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Multiple types of exceptions can occur: file access errors, parsing errors, and arithmetic errors. We need to handle each appropriately.
+
+```java
+import java.io.*;
+import java.util.Scanner;
+
+public class FileDivision {
+    public static void main(String[] args) {
+        String filename = "numbers.txt";
+        
+        try (Scanner scanner = new Scanner(new File(filename))) {
+            // Read two numbers from file
+            String firstLine = scanner.nextLine();
+            String secondLine = scanner.nextLine();
+            
+            // Parse strings to integers
+            int numerator = Integer.parseInt(firstLine.trim());
+            int denominator = Integer.parseInt(secondLine.trim());
+            
+            // Perform division
+            int result = numerator / denominator;
+            
+            System.out.println("Result: " + numerator + " / " + denominator + " = " + result);
+            
+        } catch (FileNotFoundException e) {
+            System.out.println("Error: File '" + filename + "' not found.");
+            System.out.println("Please ensure the file exists in the current directory.");
+            
+        } catch (NumberFormatException e) {
+            System.out.println("Error: Invalid number format in file.");
+            System.out.println("The file must contain exactly two integers, one per line.");
+            System.out.println("Details: " + e.getMessage());
+            
+        } catch (ArithmeticException e) {
+            System.out.println("Error: Cannot divide by zero.");
+            System.out.println("The second number in the file must be non-zero.");
+            
+        } catch (IOException e) {
+            System.out.println("Error: Problem reading from file.");
+            System.out.println("Details: " + e.getMessage());
+            
+        } catch (Exception e) {
+            System.out.println("Error: Unexpected problem occurred.");
+            System.out.println("Details: " + e.getMessage());
+        }
+    }
+}
+```
+
+**Test cases:**
+
+Create `numbers.txt` with different contents to test each exception:
+
+1.  **Normal case:**
+   ```
+   10
+   2
+   ```
+   Output: `Result: 10 / 2 = 5`
+
+2.  **Division by zero:**
+   ```
+   10
+   0
+   ```
+   Output: `Error: Cannot divide by zero.`
+
+3.  **Invalid number:**
+   ```
+   10
+   abc
+   ```
+   Output: `Error: Invalid number format in file.`
+
+4.  **Missing file:** Delete `numbers.txt`
+   Output: `Error: File 'numbers.txt' not found.`
+
+**Answer:** The program successfully handles all possible exceptions with specific, helpful error messages for each case.
+
+</details>
+
+##### **3.7. Division with Suppressed Exceptions** (Lab 11, Exercise 4)
+Update the code from the previous task to throw suppressed exceptions after printing the error messages.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Suppressed exceptions allow us to preserve information about multiple exceptions that occur, particularly useful when cleanup operations also fail.
+
+```java
+import java.io.*;
+import java.util.Scanner;
+
+public class FileDivisionWithSuppressed {
+    public static void main(String[] args) {
+        String filename = "numbers.txt";
+        Scanner scanner = null;
+        Throwable primaryException = null;
+        
+        try {
+            scanner = new Scanner(new File(filename));
+            
+            // Read two numbers from file
+            String firstLine = scanner.nextLine();
+            String secondLine = scanner.nextLine();
+            
+            // Parse strings to integers
+            int numerator = Integer.parseInt(firstLine.trim());
+            int denominator = Integer.parseInt(secondLine.trim());
+            
+            // Perform division
+            int result = numerator / denominator;
+            
+            System.out.println("Result: " + numerator + " / " + denominator + " = " + result);
+            
+        } catch (FileNotFoundException e) {
+            System.out.println("Error: File '" + filename + "' not found.");
+            primaryException = e;
+            
+        } catch (NumberFormatException e) {
+            System.out.println("Error: Invalid number format in file.");
+            primaryException = e;
+            
+        } catch (ArithmeticException e) {
+            System.out.println("Error: Cannot divide by zero.");
+            primaryException = e;
+            
+        } catch (Exception e) {
+            System.out.println("Error: Unexpected problem occurred.");
+            primaryException = e;
+            
+        } finally {
+            // Try to close scanner in finally block
+            if (scanner != null) {
+                try {
+                    scanner.close();
+                } catch (Exception closeException) {
+                    System.out.println("Error: Failed to close file.");
+                    
+                    // If we had a previous exception, add this as suppressed
+                    if (primaryException != null) {
+                        primaryException.addSuppressed(closeException);
+                    } else {
+                        // If no primary exception, this becomes the primary
+                        primaryException = closeException;
+                    }
+                }
+            }
+            
+            // Re-throw the primary exception if one occurred
+            if (primaryException != null) {
+                if (primaryException instanceof RuntimeException) {
+                    throw (RuntimeException) primaryException;
+                } else {
+                    throw new RuntimeException(primaryException);
+                }
+            }
+        }
+    }
+}
+```
+
+**Explanation:**
+
+1.  **Store primary exception**: We save the first exception that occurs in `primaryException`
+2.  **Handle cleanup exceptions**: In the `finally` block, if closing the scanner fails, we catch that exception
+3.  **Add suppressed exception**: If we already have a primary exception, we add the close exception as suppressed using `addSuppressed()`
+4.  **Preserve all information**: This approach ensures that both the original problem and any cleanup issues are recorded
+
+**Better approach (try-with-resources):**
+
+```java
+import java.io.*;
+import java.util.Scanner;
+
+public class FileDivisionBetter {
+    public static void main(String[] args) {
+        String filename = "numbers.txt";
+        
+        // Try-with-resources automatically handles suppressed exceptions
+        try (Scanner scanner = new Scanner(new File(filename))) {
+            String firstLine = scanner.nextLine();
+            String secondLine = scanner.nextLine();
+            
+            int numerator = Integer.parseInt(firstLine.trim());
+            int denominator = Integer.parseInt(secondLine.trim());
+            int result = numerator / denominator;
+            
+            System.out.println("Result: " + numerator + " / " + denominator + " = " + result);
+            
+        } catch (FileNotFoundException e) {
+            System.out.println("Error: File not found.");
+            throw new RuntimeException(e);
+        } catch (NumberFormatException e) {
+            System.out.println("Error: Invalid number format.");
+            throw new RuntimeException(e);
+        } catch (ArithmeticException e) {
+            System.out.println("Error: Division by zero.");
+            throw new RuntimeException(e);
+        }
+    }
+}
+```
+
+**Answer:** Try-with-resources is the preferred approach as it automatically handles suppressed exceptions when both the main code and resource closing throw exceptions.
+
+</details>
+
+##### **3.8. Download Image with Exception Handling** (Lab 11, Exercise 5)
+The method below downloads an image (actually any file). Edit the code so that it handles all possible exceptions.
+
+```java
+public static void saveImage(String imageUrl) {
+    URL url = new URL(imageUrl);
+    String fileName = url.getFile();
+    String destName = "./figures" + fileName.substring(fileName.lastIndexOf("/"));
+    System.out.println(destName);
+    
+    InputStream is = url.openStream();
+    OutputStream os = new FileOutputStream(destName);
+    
+    byte[] b = new byte[2048];
+    int length;
+    
+    while ((length = is.read(b)) != -1) {
+        os.write(b, 0, length);
+    }
+    
+    is.close();
+    os.close();
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Network and file operations can fail in multiple ways. Use try-with-resources for automatic resource management and handle specific exception types.
+
+```java
+import java.io.*;
+import java.net.*;
+import java.nio.file.*;
+
+public class ImageDownloader {
+    /**
+     * Downloads a file from a URL and saves it locally.
+     * @param imageUrl The URL of the file to download
+     * @throws IllegalArgumentException if imageUrl is null or empty
+     */
+    public static void saveImage(String imageUrl) {
+        // Validate input
+        if (imageUrl == null || imageUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Image URL cannot be null or empty");
+        }
+        
+        try {
+            // Parse URL
+            URL url = new URL(imageUrl);
+            
+            // Extract filename from URL
+            String fileName = url.getFile();
+            if (fileName == null || fileName.isEmpty() || !fileName.contains("/")) {
+                throw new IllegalArgumentException("Invalid URL: cannot extract filename");
+            }
+            
+            // Create destination path
+            String destName = "./figures" + fileName.substring(fileName.lastIndexOf("/"));
+            System.out.println("Downloading to: " + destName);
+            
+            // Ensure the figures directory exists
+            File directory = new File("./figures");
+            if (!directory.exists()) {
+                if (!directory.mkdirs()) {
+                    throw new IOException("Failed to create directory: " + directory.getPath());
+                }
+            }
+            
+            // Download and save file using try-with-resources
+            try (InputStream is = url.openStream();
+                 OutputStream os = new FileOutputStream(destName)) {
+                
+                byte[] buffer = new byte[2048];
+                int length;
+                int totalBytes = 0;
+                
+                // Read from URL and write to file
+                while ((length = is.read(buffer)) != -1) {
+                    os.write(buffer, 0, length);
+                    totalBytes += length;
+                }
+                
+                System.out.println("Download completed successfully!");
+                System.out.println("Total bytes downloaded: " + totalBytes);
+                
+            }
+            
+        } catch (MalformedURLException e) {
+            // Invalid URL format
+            System.err.println("Error: Invalid URL format");
+            System.err.println("Please check the URL: " + imageUrl);
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (FileNotFoundException e) {
+            // Cannot create output file (permission issues or invalid path)
+            System.err.println("Error: Cannot create output file");
+            System.err.println("Check that you have write permissions for the destination directory");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (UnknownHostException e) {
+            // Cannot resolve hostname (no internet or invalid domain)
+            System.err.println("Error: Cannot reach the server");
+            System.err.println("Check your internet connection and verify the URL");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (SocketTimeoutException e) {
+            // Connection timed out
+            System.err.println("Error: Connection timed out");
+            System.err.println("The server took too long to respond");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (IOException e) {
+            // Other I/O errors (network problems, disk full, etc.)
+            System.err.println("Error: I/O problem occurred during download");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (IllegalArgumentException e) {
+            // Invalid arguments
+            System.err.println("Error: Invalid argument");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (Exception e) {
+            // Catch any other unexpected exceptions
+            System.err.println("Error: Unexpected problem occurred");
+            System.err.println("Details: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    // Example usage
+    public static void main(String[] args) {
+        // Test with a valid image URL
+        String imageUrl = "https://example.com/image.jpg";
+        saveImage(imageUrl);
+        
+        // Test with invalid URL
+        saveImage("not_a_valid_url");
+        
+        // Test with null
+        try {
+            saveImage(null);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught expected exception for null URL");
+        }
+    }
+}
+```
+
+**Key improvements:**
+
+1.  **Try-with-resources**: Automatically closes input and output streams, even if exceptions occur
+2.  **Specific exception handling**: Different catch blocks for different types of errors
+3.  **Directory creation**: Checks if the destination directory exists and creates it if needed
+4.  **Input validation**: Validates URL before attempting download
+5.  **Informative error messages**: Each exception type gets a specific, helpful message
+6.  **Progress reporting**: Shows destination path and total bytes downloaded
+
+**Test scenarios:**
+
+```java
+// Valid image download
+saveImage("https://example.com/photo.jpg");
+
+// Malformed URL
+saveImage("htp://invalid.url");
+
+// Network error (no internet)
+saveImage("https://nonexistent-domain-12345.com/image.jpg");
+
+// File permission error
+saveImage("https://example.com/image.jpg");  // with read-only destination directory
+```
+
+**Commit to repository:**
+```bash
+git add ImageDownloader.java
+git commit -m "Add image downloader with comprehensive exception handling"
+git push
+```
+
+**Extra: Add README.md:**
+
+Create `README.md` in repository root:
+
+```markdown
+# ITP Course Exercises
+
+This repository contains exercises from the Introduction to Programming course.
+
+## Structure
+
+- Lab exercises organized by week
+- Practice problems and solutions
+- Code examples from lectures
+
+## Lab 11: Exception Handling
+
+- FileCopier.java: File copy with exception handling
+- FileDivision.java: Division with multiple exception types
+- ImageDownloader.java: Network file download with comprehensive error handling
+
+## How to Use
+
+1. Clone the repository
+2. Navigate to the desired exercise
+3. Compile and run the Java files
+
+## Author
+
+[Your Name]
+
+## Course
+
+Introduction to Programming - Innopolis University
+```
+
+Commit the README:
+```bash
+git add README.md
+git commit -m "Add README with repository description"
+git push
+```
+
+**Answer:** The enhanced code handles all possible exceptions (network errors, file errors, invalid URLs) with specific error messages and uses try-with-resources for automatic resource management.
+
+</details>
+
