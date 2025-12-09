@@ -1,0 +1,3043 @@
+---
+title: "W14. Lambda Expressions, Functional Interfaces, Stream API, Concurrency"
+author: "Zakhar Podyakov"
+date: "December 9, 2025"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+##### **1.1 Functional Programming Paradigm**
+**Functional programming** is a programming paradigm that treats computation as the evaluation of mathematical functions and avoids changing state and mutable data. Unlike **imperative programming**, which focuses on describing *how* a program operates through a sequence of statements that change program state, functional programming emphasizes *what* the program should accomplish through the evaluation of expressions.
+
+###### **1.1.1 Imperative vs Functional Approaches**
+In imperative programming (which dominates languages like C, C++, Java, and C#), programs are built around:
+
+*   **Mutable state**: Variables can change their values throughout program execution
+*   **Side effects**: Functions can modify global data or class attributes
+*   **Iteration**: Loops (`for`, `while`) are used for repetition
+*   **Statements**: The program is a sequence of commands
+
+In contrast, functional programming emphasizes:
+
+*   **Immutable data**: Once a variable is assigned, it never changes
+*   **Pure functions**: Functions whose output depends *only* on their input parameters, with no side effects
+*   **Recursion**: Recursive function calls replace iterative loops
+*   **Expressions**: The program is built from expressions that evaluate to values
+*   **Functions as first-class objects**: Functions can be assigned to variables, passed as arguments, and returned from other functions
+
+###### **1.1.2 Pure Functions and Their Advantages**
+A **pure function** is one that:
+
+1.  Has no side effects (doesn't modify anything outside its scope)
+2.  Always returns the same output for the same input (referential transparency)
+
+For example, consider these two Java functions:
+
+```java
+// NOT a pure function - has side effects
+public class Example1 {
+    private int value;
+    public int add(int next) {
+        this.value += next;  // Modifies object state!
+        return this.value;
+    }
+}
+
+// Pure function - no side effects
+public class Example2 {
+    public int sum(int x, int y) {
+        return x + y;  // Only depends on inputs
+    }
+}
+```
+
+Pure functions offer several advantages:
+
+*   **Easier to test**: No need to set up complex state
+*   **Thread-safe**: Multiple threads can call pure functions simultaneously without synchronization
+*   **Cacheable**: Results can be memoized (cached) since the same inputs always produce the same output
+*   **Parallelizable**: Pure function calls can be reordered or executed in parallel without affecting correctness
+
+###### **1.1.3 Example: Imperative vs Functional GCD**
+Consider calculating the greatest common divisor (GCD) using Euclid's algorithm:
+
+**Imperative approach** (iterative with mutable variables):
+
+```java
+int gcd(int x, int y) {
+    int a = x, b = y;
+    while (a != 0) {
+        int temp = a;
+        a = b % a;
+        b = temp;
+    }
+    return b;
+}
+```
+
+**Functional approach** (recursive with no mutation):
+
+```java
+int gcd(int x, int y) {
+    return (y == 0) ? x : gcd(y, x % y);
+}
+```
+
+The functional version is more concise, has no local variables, and uses recursion instead of iteration.
+
+##### **1.2 Lambda Expressions in Java**
+**Lambda expressions** (introduced in Java 8) allow you to write anonymous functions - functions without names that can be passed around as values. They provide a clear and concise way to represent functional interfaces using an expression.
+
+###### **1.2.1 Lambda Syntax**
+The basic syntax of a lambda expression is:
+
+```
+(parameters) -> expression
+```
+
+or for multi-statement bodies:
+
+```
+(parameters) -> { statements; }
+```
+
+**Examples of lambda syntax variations:**
+
+*   **Zero parameters**: `() -> System.out.println("Hello")`
+*   **Single parameter** (parentheses optional): `x -> x * x` or `(x) -> x * x`
+*   **Multiple parameters**: `(x, y) -> x + y`
+*   **Type inference**: `(x, y) -> x + y` (types inferred) vs `(int x, int y) -> x + y` (explicit types)
+*   **Multi-line body**: `(x, y) -> { int sum = x + y; return sum; }`
+
+###### **1.2.2 Functions as First-Class Objects**
+In functional programming, **functions are values** just like integers, strings, or arrays. This means:
+
+*   Functions can be assigned to variables
+*   Functions can be passed as arguments to other functions
+*   Functions can be returned from functions
+*   Anonymous (unnamed) functions can be created
+
+Consider a regular function declaration:
+
+```java
+int sum(int x, int y) { return x + y; }
+```
+
+The lambda expression equivalent treats the function parameters and body as a value:
+
+```java
+(int x, int y) -> { return x + y; }
+```
+
+This value can be bound to a variable:
+
+```java
+var fun = (int x, int y) -> { return x + y; };
+```
+
+##### **1.3 Functional Interfaces**
+A **functional interface** is an interface with exactly one abstract method (though it may have multiple default or static methods). Lambda expressions can only be used to implement functional interfaces.
+
+###### **1.3.1 Defining Functional Interfaces**
+The `@FunctionalInterface` annotation (optional but recommended) marks an interface as functional:
+
+```java
+@FunctionalInterface
+interface Func {
+    int action(int x, int y);  // Single abstract method
+}
+```
+
+Now a lambda can implement this interface:
+
+```java
+Func lambda = (int x, int y) -> { return x + y; };
+```
+
+The type of a lambda expression is the functional interface whose single abstract method matches the lambda's signature.
+
+###### **1.3.2 Built-in Functional Interfaces**
+The `java.util.function` package provides many standard functional interfaces:
+
+*   **`Predicate<T>`**: Takes an argument of type `T`, returns `boolean`
+    *   Method: `boolean test(T t)`
+    *   Example: `Predicate<Integer> isPositive = x -> x > 0;`
+
+*   **`UnaryOperator<T>`**: Takes an argument of type `T`, returns type `T`
+    *   Method: `T apply(T t)`
+    *   Example: `UnaryOperator<Integer> square = x -> x * x;`
+
+*   **`BinaryOperator<T>`**: Takes two arguments of type `T`, returns type `T`
+    *   Method: `T apply(T t1, T t2)`
+    *   Example: `BinaryOperator<Integer> multiply = (x, y) -> x * y;`
+
+*   **`Function<T,R>`**: Takes an argument of type `T`, returns type `R`
+    *   Method: `R apply(T t)`
+    *   Example: `Function<Integer, String> convert = x -> String.valueOf(x) + " dollars";`
+
+*   **`Consumer<T>`**: Takes an argument of type `T`, returns nothing (void)
+    *   Method: `void accept(T t)`
+    *   Example: `Consumer<Integer> printer = x -> System.out.println(x);`
+
+*   **`Supplier<T>`**: Takes no arguments, returns type `T`
+    *   Method: `T get()`
+    *   Example: `Supplier<Integer> random = () -> (int)(Math.random() * 100);`
+
+###### **1.3.3 Method References**
+When a lambda expression only calls an existing method, you can use a **method reference** as a shorthand. The syntax is `ClassName::methodName` or `object::methodName`.
+
+**Static method reference:**
+
+```java
+// Lambda version
+Finder finder = (s1, s2) -> MyClass.doFind(s1, s2);
+// Method reference version
+Finder finder = MyClass::doFind;
+```
+
+**Instance method reference:**
+
+```java
+StringConverter converter = new StringConverter();
+// Lambda version
+Deserializer des = (v1) -> converter.convertToInt(v1);
+// Method reference version
+Deserializer des = converter::convertToInt;
+```
+
+**Constructor reference:**
+
+```java
+// Lambda version
+Factory factory = chars -> new String(chars);
+// Constructor reference version
+Factory factory = String::new;
+```
+
+**Built-in method reference:**
+
+```java
+// Lambda version
+MyPrinter printer = s -> System.out.println(s);
+// Method reference version
+MyPrinter printer = System.out::println;
+```
+
+The notation `String::valueOf` refers to the static `valueOf` method of the `String` class.
+
+###### **1.3.4 Capturing Variables (Closures)**
+A lambda can reference variables declared outside its body. When it does, the lambda **captures** those variables, and is called a **closure**.
+
+```java
+String myString = "Test";
+Factory myFactory = (chars) -> myString + ":" + new String(chars);
+```
+
+**Important restriction**: Captured variables must be **effectively final**, meaning they cannot change their value after initialization. If you try to modify a captured variable, the compiler will produce an error. (Note: static variables don't follow this rule.)
+
+##### **1.4 Stream API**
+The **Stream API** (introduced in Java 8) provides a functional approach to processing collections of data. A **stream** represents a sequence of elements that supports sequential and parallel aggregate operations.
+
+###### **1.4.1 Creating Streams**
+Collections have a `stream()` method that returns a stream:
+
+```java
+List<Integer> numbers = Arrays.asList(5, 9, 8, 8, 1);
+Stream<Integer> numberStream = numbers.stream();
+```
+
+###### **1.4.2 Stream Operations**
+Stream operations are divided into two categories:
+
+**Intermediate operations** (return a new stream, allowing chaining):
+
+*   `filter(Predicate)`: Keeps only elements matching a condition
+*   `map(Function)`: Transforms each element
+*   `flatMap(Function)`: Flattens nested structures
+*   `sorted()`: Sorts elements
+*   `distinct()`: Removes duplicates
+*   `peek(Consumer)`: Performs an action without modifying the stream
+*   `skip(n)`: Skips first `n` elements
+*   `limit(n)`: Takes only first `n` elements
+
+**Terminal operations** (produce a result or side effect, ending the stream):
+
+*   `forEach(Consumer)`: Performs an action for each element
+*   `toArray()`: Collects elements into an array
+*   `collect(Collector)`: Collects elements into a collection
+*   `findFirst()`: Returns the first element
+*   `findAny()`: Returns any element (useful in parallel streams)
+*   `count()`: Counts elements
+*   `reduce()`: Combines elements into a single value
+
+Each stream pipeline consists of:
+
+1.  A source (e.g., a collection)
+2.  Zero or more intermediate operations
+3.  Exactly one terminal operation
+
+###### **1.4.3 Important Stream Characteristics**
+**Streams don't modify the original collection:**
+
+```java
+List<Integer> numbers = Arrays.asList(5, 9, 8, 8, 1);
+numbers.stream()
+    .filter(n -> n > 5)
+    .forEach(System.out::println);  // Prints: 9, 8, 8
+System.out.println(numbers);  // Still: [5, 9, 8, 8, 1]
+```
+
+The stream operations don't change `numbers`. To save the results, you must assign them to a variable using `collect()`:
+
+```java
+List<Integer> filtered = numbers.stream()
+    .filter(n -> n > 5)
+    .collect(Collectors.toList());
+```
+
+##### **1.5 Regular Expressions (Regex)**
+**Regular expressions** are patterns used to match character combinations in strings. They are extremely useful for filtering and validating string data, especially when combined with Stream API.
+
+###### **1.5.1 Common Regex Syntax**
+*   `.` - Any single character
+*   `[abc]` - Any of these characters (a, b, or c)
+*   `[a-z]` - Any character in this range
+*   `[^abc]` - None of these characters
+*   `^` - Starts with
+*   `$` - Ends with
+*   `*` - Zero or more times (greedy)
+*   `+` - One or more times (greedy)
+*   `?` - Zero or one time (greedy)
+*   `{n}` - Exactly n times
+*   `{n,m}` - Between n and m times
+*   `{n,}` - At least n times
+*   `\d` - Any digit character [0-9]
+*   `\D` - Any non-digit character
+*   `\w` - Any word character [a-zA-Z0-9_]
+*   `\W` - Any non-word character
+*   `\s` - Any whitespace character
+*   `\S` - Any non-whitespace character
+*   `|` - Or (alternative)
+*   `()` - Group
+*   `\` - Escape special character
+
+###### **1.5.2 Using Regex in Java**
+In Java, strings have methods for regex operations:
+
+*   `matches(regex)`: Tests if the entire string matches the pattern
+*   `replaceAll(regex, replacement)`: Replaces all matches
+*   `split(regex)`: Splits the string at matches
+
+For removing numbers from strings:
+
+```java
+String clean = str.replaceAll("\\d", "");  // Remove all digits
+```
+
+For filtering strings without numbers:
+
+```java
+list.stream()
+    .filter(s -> !s.matches(".*\\d.*"))  // Keep strings with no digits
+```
+
+##### **1.6 Concurrency and Multithreading**
+**Concurrency** is the ability to run multiple parts of a program simultaneously. Modern computers have multiple CPU cores, and **multithreading** allows programs to leverage this parallelism for improved performance.
+
+###### **1.6.1 Processes vs Threads**
+A **process** is an independent program running in its own memory space. Processes are isolated from each other and cannot directly access each other's data.
+
+A **thread** is a lightweight process that runs within a process. Multiple threads in the same process share the same memory space and can access shared data. Each thread has:
+
+*   Its own call stack
+*   Its own local variables
+*   Its own memory cache
+
+However, threads share:
+
+*   The process's heap memory
+*   Static variables
+*   Object instances
+
+###### **1.6.2 Creating Threads in Java**
+There are two main ways to create a thread in Java:
+
+**1. Implementing the Runnable interface:**
+
+```java
+public class HelloRunnable implements Runnable {
+    public void run() {
+        System.out.println("Hello from a thread!");
+    }
+    
+    public static void main(String[] args) {
+        (new Thread(new HelloRunnable())).start();
+    }
+}
+```
+
+**2. Extending the Thread class:**
+
+```java
+public class HelloThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Hello from a thread!");
+    }
+    
+    public static void main(String[] args) {
+        (new HelloThread()).start();
+    }
+}
+```
+
+The `Runnable` interface is a functional interface (it has a single abstract method `run()`), so you can also use lambda expressions:
+
+```java
+Thread thread = new Thread(() -> System.out.println("Hello from lambda thread!"));
+thread.start();
+```
+
+###### **1.6.3 start() vs run()**
+**Critical distinction:**
+
+*   `start()`: Creates a new thread and calls `run()` in that new thread
+*   `run()`: Simply calls the method in the current thread (no new thread created)
+
+Always use `start()` to begin thread execution. Calling `run()` directly defeats the purpose of multithreading.
+
+###### **1.6.4 Thread Synchronization Issues**
+When multiple threads access shared data simultaneously, **race conditions** can occur, leading to incorrect results.
+
+**Race condition example:**
+
+```java
+class Counter {
+    private int counter = 0;
+    
+    public void increment() {
+        counter++;  // NOT atomic! Actually three steps:
+                    // 1. Read current value
+                    // 2. Add 1
+                    // 3. Write back
+    }
+    
+    public int getValue() {
+        return counter;
+    }
+}
+```
+
+If two threads call `increment()` simultaneously, they might both read the same initial value, increment it, and write back, effectively losing one increment.
+
+**Solution: Use synchronized keyword**
+
+The `synchronized` keyword creates a mutual exclusion lock (mutex) that ensures only one thread can execute the synchronized code at a time:
+
+```java
+class Counter {
+    private int counter = 0;
+    
+    public synchronized void increment() {
+        counter++;
+    }
+    
+    public synchronized int getValue() {
+        return counter;
+    }
+}
+```
+
+Now the counter will be updated correctly even with multiple threads.
+
+###### **1.6.5 Deadlock**
+A **deadlock** occurs when two or more threads are blocked forever, each waiting for the other to release a resource. This typically happens when:
+
+*   Multiple threads need the same locks
+*   They acquire locks in different orders
+
+For example, if Thread A holds Lock 1 and waits for Lock 2, while Thread B holds Lock 2 and waits for Lock 1, both threads will wait forever.
+
+**Prevention**: Ensure all threads acquire locks in the same order.
+
+###### **1.6.6 Exception Handling in Threads**
+When an exception occurs in a thread, it only affects that particular thread - other threads continue running. The exception does not propagate to the thread that started it. To handle exceptions properly, wrap thread code in try-catch blocks within the `run()` method.
+
+#### **2. Definitions**
+*   **Functional Programming**: A programming paradigm that treats computation as the evaluation of mathematical functions, avoiding changing state and mutable data.
+*   **Imperative Programming**: A programming paradigm that uses statements to change a program's state, describing *how* a program operates through sequences of commands.
+*   **Pure Function**: A function with no side effects whose output depends only on its input parameters, always returning the same result for the same inputs.
+*   **Side Effect**: Any modification made by a function to state outside its scope, such as changing global variables, modifying objects, or performing I/O operations.
+*   **Referential Transparency**: The property where an expression can be replaced with its value without changing the program's behavior, characteristic of pure functions.
+*   **Lambda Expression**: An anonymous function (function without a name) that can be passed around as a value, written using the syntax `(parameters) -> expression`.
+*   **Anonymous Function**: A function defined without a name, typically used for short operations that don't need to be reused elsewhere.
+*   **First-Class Object**: A programming language entity that can be assigned to variables, passed as arguments, returned from functions, and created at runtime. In functional programming, functions are first-class objects.
+*   **Functional Interface**: A Java interface with exactly one abstract method, which can be implemented using lambda expressions. Annotated with `@FunctionalInterface`.
+*   **Method Reference**: A shorthand notation for a lambda expression that calls an existing method, using the syntax `ClassName::methodName` or `object::methodName`.
+*   **Closure**: A lambda expression that captures (references) variables from its surrounding scope. Captured variables must be effectively final.
+*   **Effectively Final**: A variable that is not explicitly declared `final` but whose value never changes after initialization, allowing it to be captured by lambda expressions.
+*   **Stream**: A sequence of elements that supports sequential and parallel aggregate operations, providing a functional approach to processing collections.
+*   **Intermediate Operation**: A stream operation that returns a new stream, allowing method chaining (e.g., `filter()`, `map()`, `sorted()`).
+*   **Terminal Operation**: A stream operation that produces a result or side effect and ends the stream pipeline (e.g., `forEach()`, `collect()`, `count()`).
+*   **Regular Expression (Regex)**: A sequence of characters that defines a search pattern, used for string matching and manipulation.
+*   **Concurrency**: The ability to run multiple programs or parts of a program in parallel, improving throughput and interactivity.
+*   **Process**: An independent program running in its own memory space, isolated from other processes.
+*   **Thread**: A lightweight process that runs within a process, sharing memory space with other threads in the same process but having its own call stack.
+*   **Race Condition**: A situation where multiple threads access shared data simultaneously and the final result depends on the timing of their execution, potentially leading to incorrect results.
+*   **Synchronization**: The coordination of threads to ensure safe access to shared resources, typically using locks or the `synchronized` keyword.
+*   **Mutex**: A mutual exclusion lock that ensures only one thread can access a protected resource at a time.
+*   **Deadlock**: A situation where two or more threads are blocked forever, each waiting for the other to release a resource.
+*   **Predicate**: A functional interface representing a boolean-valued function that takes one argument and returns true or false.
+*   **Consumer**: A functional interface representing an operation that takes a single argument and returns no result (void).
+*   **Supplier**: A functional interface representing a function that takes no arguments and returns a result.
+*   **Function**: A functional interface representing a function that takes one argument and produces a result, potentially of a different type.
+*   **UnaryOperator**: A functional interface representing a function that takes one argument and returns a result of the same type.
+*   **BinaryOperator**: A functional interface representing a function that takes two arguments of the same type and returns a result of that type.
+
+#### **3. Examples**
+##### **3.1. Describe Lambda Expression Attributes** (Lab 14, Warm-up 1)
+Describe the attributes of the following lambda expression:
+
+```java
+(o) -> o.toString();
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Analyze the structure of a lambda expression to understand its signature and behavior.
+
+**Attributes:**
+
+1.  **Parameters:** Single parameter `o` (type inferred from context)
+2.  **Parameter types:** Not explicitly specified, will be inferred by the compiler based on the functional interface being implemented
+3.  **Return type:** `String` (the return type of the `toString()` method)
+4.  **Body:** Single expression `o.toString()` that calls the `toString()` method on the parameter
+5.  **Functional interface:** This lambda can implement any functional interface with a single abstract method that:
+    *   Takes one parameter of any type
+    *   Returns a `String`
+    
+    For example, it could implement `Function<Object, String>` or similar interfaces.
+
+**Answer:** This lambda takes a single object parameter and returns its string representation by calling `toString()`. The parameter type is inferred from context, and the expression body consists of a single method call.
+
+</details>
+
+##### **3.2. Meaning of String::valueOf Expression** (Lab 14, Warm-up 2)
+What is the meaning of `String::valueOf` expression?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Method references provide a shorthand for lambdas that simply call an existing method.
+
+`String::valueOf` is a **method reference** that refers to the static `valueOf` method of the `String` class.
+
+**Equivalence:**
+
+```java
+// Method reference
+Function<Integer, String> converter1 = String::valueOf;
+
+// Equivalent lambda expression
+Function<Integer, String> converter2 = x -> String.valueOf(x);
+```
+
+**Usage:**
+
+The `valueOf` method converts various types (int, double, Object, etc.) to their String representation. The method reference can be used wherever a functional interface is expected that matches the signature of one of the `valueOf` overloads.
+
+**Example:**
+
+```java
+List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+List<String> strings = numbers.stream()
+    .map(String::valueOf)  // Convert each integer to String
+    .collect(Collectors.toList());
+```
+
+**Answer:** `String::valueOf` is a method reference to the static `valueOf` method of the `String` class, which converts values to their string representation. It's equivalent to the lambda `x -> String.valueOf(x)`.
+
+</details>
+
+##### **3.3. Stream Modifications Without Assignment** (Lab 14, Warm-up 3)
+Does the modification of a Set with Stream API and without assigning the value to this set do any updates in the original set?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Stream operations don't modify the source collection; they create a new stream with the results.
+
+**No**, stream operations do **not** modify the original collection unless you explicitly use methods designed to do so (like `forEach` with side effects, which is generally discouraged).
+
+**Example demonstrating this:**
+
+```java
+Set<Integer> numbers = new HashSet<>(Arrays.asList(5, 9, 8, 1));
+
+// This doesn't modify 'numbers'
+numbers.stream()
+    .filter(n -> n > 5)
+    .map(n -> n * 2);
+
+System.out.println(numbers);  // Still: [1, 5, 8, 9]
+
+// To save changes, you must collect the results
+Set<Integer> modified = numbers.stream()
+    .filter(n -> n > 5)
+    .map(n -> n * 2)
+    .collect(Collectors.toSet());
+
+System.out.println(modified);  // [16, 18]
+System.out.println(numbers);   // Still: [1, 5, 8, 9]
+```
+
+**Why?** Streams follow functional programming principles. They create new streams with transformed data rather than mutating existing collections. This makes code more predictable and thread-safe.
+
+**Answer:** No, stream operations without assignment do not modify the original set. Streams are immutable pipelines that produce new results without changing the source collection.
+
+</details>
+
+##### **3.4. Non-Abstract Methods in Functional Interfaces** (Lab 14, Warm-up 4)
+How many non-abstract (default) methods are allowed in functional interfaces?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Functional interfaces can have multiple default and static methods, but only one abstract method.
+
+**Answer:** **Unlimited** - there is no restriction on the number of default (non-abstract) methods or static methods in a functional interface.
+
+**Important rules:**
+
+*   A functional interface must have **exactly one** abstract method
+*   It can have **any number** of default methods
+*   It can have **any number** of static methods
+*   It inherits abstract methods from `Object` class (like `equals()`, `hashCode()`, `toString()`), but these don't count toward the "one abstract method" requirement
+
+**Example:**
+
+```java
+@FunctionalInterface
+interface MyInterface {
+    // One abstract method (required)
+    void doSomething(String s);
+    
+    // Multiple default methods (allowed)
+    default void method1() {
+        System.out.println("Default method 1");
+    }
+    
+    default void method2() {
+        System.out.println("Default method 2");
+    }
+    
+    default void method3() {
+        System.out.println("Default method 3");
+    }
+    
+    // Static methods (also allowed)
+    static void staticMethod() {
+        System.out.println("Static method");
+    }
+}
+```
+
+This is still a valid functional interface because it has exactly one abstract method, despite having multiple default and static methods.
+
+</details>
+
+##### **3.5. When to Use Runnable vs Thread** (Lab 14, Warm-up 5)
+When to use Runnable vs Thread in Java?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Prefer implementing `Runnable` over extending `Thread` in most cases for better design flexibility.
+
+**Use Runnable when:**
+
+*   You want to separate the task (what to run) from the execution mechanism (how to run)
+*   Your class already extends another class (Java doesn't support multiple inheritance)
+*   You want to implement multiple interfaces
+*   You follow better object-oriented design principles (composition over inheritance)
+*   You want to use thread pools or executor services
+*   The `Runnable` interface is functional, so you can use lambda expressions
+
+**Use Thread when:**
+
+*   You need to override other Thread methods besides `run()`
+*   You're creating a specialized thread class with additional thread-specific behavior
+*   (Rare cases - generally discouraged)
+
+**Comparison:**
+
+```java
+// Implementing Runnable (preferred)
+public class MyTask implements Runnable {
+    @Override
+    public void run() {
+        System.out.println("Task running");
+    }
+}
+// Usage
+Thread thread = new Thread(new MyTask());
+thread.start();
+
+// Or with lambda (since Runnable is functional)
+Thread thread = new Thread(() -> System.out.println("Task running"));
+thread.start();
+
+// Extending Thread (less flexible)
+public class MyThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Thread running");
+    }
+}
+// Usage
+MyThread thread = new MyThread();
+thread.start();
+```
+
+**Answer:** Prefer `Runnable` in most cases because it provides better separation of concerns, allows your class to extend other classes, and works with lambda expressions and modern concurrency utilities. Use `Thread` only when you need to override additional thread-specific methods.
+
+</details>
+
+##### **3.6. Difference Between start() and run()** (Lab 14, Warm-up 6)
+What is the difference between `start()` and `run()` method of Thread class?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `start()` creates a new thread; `run()` executes in the current thread.
+
+**Fundamental difference:**
+
+*   **`start()`**: Creates a **new thread** and executes the `run()` method in that new thread
+*   **`run()`**: Executes the `run()` method in the **current thread** (no new thread is created)
+
+**Detailed comparison:**
+
+| Aspect | start() | run() |
+|:-------|:--------|:------|
+| Creates new thread? | Yes | No |
+| Executes concurrently? | Yes (in separate thread) | No (in current thread) |
+| Can be called multiple times? | No (throws IllegalThreadStateException) | Yes (just a regular method call) |
+| Purpose | Begin thread execution | Define the thread's task |
+
+**Example:**
+
+```java
+class MyThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Running in thread: " + 
+            Thread.currentThread().getName());
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        MyThread t1 = new MyThread();
+        MyThread t2 = new MyThread();
+        
+        // Using start() - creates new threads
+        t1.start();  // Output: Running in thread: Thread-0
+        t2.start();  // Output: Running in thread: Thread-1
+        
+        // Using run() - no new thread
+        MyThread t3 = new MyThread();
+        t3.run();    // Output: Running in thread: main
+    }
+}
+```
+
+**Visual explanation:**
+
+```
+start() -> JVM creates new thread -> new thread calls run()
+run()   -> Current thread executes run() directly
+```
+
+**Answer:** `start()` creates a new thread and calls `run()` in that new thread, enabling concurrent execution. `run()` simply executes the method in the current thread like any regular method call, providing no concurrency benefit. Always use `start()` to begin thread execution.
+
+</details>
+
+##### **3.7. Exception in Java Thread** (Lab 14, Warm-up 7)
+What happens when an exception occurs in Java thread?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Exceptions in threads are isolated to that thread and don't propagate to other threads.
+
+**What happens:**
+
+1.  **The thread terminates**: The thread where the exception occurred stops execution
+2.  **Other threads continue**: The exception does not affect other running threads
+3.  **Exception doesn't propagate**: The exception does not propagate back to the thread that started it (e.g., the main thread)
+4.  **Stack trace is printed**: By default, the uncaught exception and its stack trace are printed to the console
+5.  **UncaughtExceptionHandler is called**: If set, the thread's `UncaughtExceptionHandler` is invoked
+
+**Example:**
+
+```java
+public class ThreadExceptionDemo {
+    public static void main(String[] args) {
+        Thread t1 = new Thread(() -> {
+            System.out.println("Thread 1 starting");
+            throw new RuntimeException("Exception in Thread 1");
+        });
+        
+        Thread t2 = new Thread(() -> {
+            try {
+                Thread.sleep(100);
+                System.out.println("Thread 2 still running!");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        
+        t1.start();
+        t2.start();
+        
+        System.out.println("Main thread continues");
+    }
+}
+```
+
+**Output:**
+```
+Thread 1 starting
+Main thread continues
+Exception in thread "Thread-0" java.lang.RuntimeException: Exception in Thread 1
+    at ThreadExceptionDemo.lambda$main$0(ThreadExceptionDemo.java:5)
+    at java.lang.Thread.run(Thread.java:748)
+Thread 2 still running!
+```
+
+**Handling exceptions in threads:**
+
+```java
+Thread thread = new Thread(() -> {
+    try {
+        // Thread code that might throw exception
+        int result = 10 / 0;
+    } catch (Exception e) {
+        System.out.println("Caught exception: " + e.getMessage());
+        // Handle appropriately
+    }
+});
+thread.start();
+```
+
+**Answer:** When an exception occurs in a thread, that thread terminates and prints the stack trace, but other threads (including the main thread) continue running unaffected. The exception doesn't propagate to the parent thread. To handle exceptions properly, wrap thread code in try-catch blocks within the `run()` method.
+
+</details>
+
+##### **3.8. Filter and Transform List Elements** (Lab 14, Exercise 1)
+Create a list of integer numbers and fill it with random positive and negative values. By using lambda expressions display all of them which are divisible by 3 and remove "-" sign if present.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use Stream API with `filter()` to select elements and `map()` to transform them, combined with lambda expressions.
+
+**Solution:**
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Exercise1 {
+    public static void main(String[] args) {
+        // Create list with random positive and negative values
+        List<Integer> numbers = new ArrayList<>();
+        Random random = new Random();
+        
+        // Fill with 20 random numbers between -50 and 50
+        for (int i = 0; i < 20; i++) {
+            numbers.add(random.nextInt(101) - 50);
+        }
+        
+        System.out.println("Original list: " + numbers);
+        
+        // Filter divisible by 3 and convert to absolute value
+        System.out.println("Numbers divisible by 3 (absolute):");
+        numbers.stream()
+            .filter(n -> n % 3 == 0)           // Keep only divisible by 3
+            .map(n -> Math.abs(n))             // Remove negative sign
+            .forEach(n -> System.out.print(n + " "));
+        
+        System.out.println();
+    }
+}
+```
+
+**Step-by-step explanation:**
+
+1.  **Create and populate list:** Use `ArrayList<Integer>` and fill with random values using `Random.nextInt()`
+2.  **Filter divisible by 3:** `filter(n -> n % 3 == 0)` keeps only numbers where remainder of division by 3 is zero
+3.  **Remove negative sign:** `map(n -> Math.abs(n))` transforms each number to its absolute value
+4.  **Display results:** `forEach(n -> System.out.print(n + " "))` prints each result
+
+**Alternative solution with method references:**
+
+```java
+numbers.stream()
+    .filter(n -> n % 3 == 0)
+    .map(Math::abs)                    // Method reference
+    .forEach(System.out::println);     // Method reference
+```
+
+**Example output:**
+```
+Original list: [-45, 12, -30, 7, 18, -9, 22, 0, 33, -27, 8, 15, -3, 41, 6, -18, 29, 21, -12, 36]
+Numbers divisible by 3 (absolute):
+45 12 30 18 9 0 33 27 15 3 6 18 21 12 36
+```
+
+**Answer:** See the solution above using `stream()`, `filter()`, `map()`, and `forEach()` with lambda expressions.
+
+</details>
+
+##### **3.9. Filter Strings with Regex** (Lab 14, Exercise 2)
+Create a list of strings and fill it with random strings of different length containing English letters and numbers. Duplicate all values and add them to the same list. By using lambda expressions display sorted list containing non-empty unique strings without numbers.
+
+**Hint:** use regular expression
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Combine Stream API operations with regex pattern matching to filter strings, then use `distinct()` and `sorted()` to get unique sorted results.
+
+**Solution:**
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Exercise2 {
+    public static void main(String[] args) {
+        // Create list with random strings
+        List<String> strings = new ArrayList<>();
+        Random random = new Random();
+        
+        // Generate 10 random strings with letters and numbers
+        for (int i = 0; i < 10; i++) {
+            StringBuilder sb = new StringBuilder();
+            int length = random.nextInt(8) + 1; // Length 1-8
+            
+            for (int j = 0; j < length; j++) {
+                // Random letter or digit
+                if (random.nextBoolean()) {
+                    // Add letter (a-z or A-Z)
+                    char letter = random.nextBoolean() ?
+                        (char)('a' + random.nextInt(26)) :
+                        (char)('A' + random.nextInt(26));
+                    sb.append(letter);
+                } else {
+                    // Add digit (0-9)
+                    sb.append(random.nextInt(10));
+                }
+            }
+            strings.add(sb.toString());
+        }
+        
+        // Add some strings with only letters for testing
+        strings.add("hello");
+        strings.add("world");
+        strings.add("");  // Empty string to test filtering
+        
+        // Duplicate all values
+        List<String> duplicated = new ArrayList<>(strings);
+        strings.addAll(duplicated);
+        
+        System.out.println("Original list with duplicates: " + strings);
+        
+        // Filter: non-empty, unique, no numbers, sorted
+        System.out.println("\nFiltered result:");
+        strings.stream()
+            .filter(s -> !s.isEmpty())              // Remove empty strings
+            .filter(s -> !s.matches(".*\\d.*"))     // Remove strings with digits
+            .distinct()                             // Remove duplicates
+            .sorted()                               // Sort alphabetically
+            .forEach(System.out::println);
+    }
+}
+```
+
+**Explanation of regex pattern:**
+
+*   `.*\\d.*` breaks down as:
+    *   `.*` - any characters (zero or more)
+    *   `\\d` - a digit (0-9)
+    *   `.*` - any characters (zero or more)
+*   This matches any string containing at least one digit
+*   `!s.matches(".*\\d.*")` returns `true` for strings **without** digits
+
+**Stream operations chain:**
+
+1.  **`filter(s -> !s.isEmpty())`** - Remove empty strings
+2.  **`filter(s -> !s.matches(".*\\d.*"))`** - Keep only strings without digits
+3.  **`distinct()`** - Remove duplicate strings
+4.  **`sorted()`** - Sort alphabetically
+5.  **`forEach(System.out::println)`** - Print each result
+
+**Example output:**
+```
+Original list with duplicates: [a3b, Xy2Z, hello, 9test, world, abc, X5Y, , abc7, letters, word9, a3b, Xy2Z, hello, 9test, world, abc, X5Y, , abc7, letters, word9, hello, world, ]
+
+Filtered result:
+abc
+hello
+letters
+world
+```
+
+**Alternative: Using collect() to create a new list:**
+
+```java
+List<String> filtered = strings.stream()
+    .filter(s -> !s.isEmpty())
+    .filter(s -> !s.matches(".*\\d.*"))
+    .distinct()
+    .sorted()
+    .collect(Collectors.toList());
+
+System.out.println(filtered);
+```
+
+**Answer:** See the solution above using `filter()` with regex pattern `.*\\d.*` to exclude strings containing digits, combined with `distinct()` and `sorted()` operations.
+
+</details>
+
+##### **3.10. Fix Race Condition with Synchronization** (Lab 14, Exercise 3)
+A Counter object is referenced from multiple threads (i.e. two threads, `thread1` and `thread2`). The `counter++` statement can be decomposed into 3 steps:
+
+1. Retrieve the current value of counter
+2. Increment the retrieved value by 1
+3. Store the incremented value back in counter
+
+```java
+class Counter {
+    private int counter = 0;
+    public void increment() {
+        counter++;
+    }
+    public int getValue() {
+        return counter;
+    }
+}
+```
+
+Fix the race condition, so that the counter object is referenced correctly. That is, the threads read/write the counter sequentially.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the `synchronized` keyword to create a mutex lock that ensures only one thread can execute the critical section at a time.
+
+**The Problem:**
+
+The `counter++` operation is **not atomic**. When multiple threads execute it simultaneously, they can interfere with each other:
+
+```
+Time | Thread 1              | Thread 2              | Counter Value
+-----|----------------------|----------------------|---------------
+0    |                      |                      | 0
+1    | Read counter (0)     |                      | 0
+2    | Increment to 1       | Read counter (0)     | 0
+3    | Write 1              | Increment to 1       | 1
+4    |                      | Write 1              | 1
+```
+
+Result: Both threads incremented, but counter is 1 instead of 2!
+
+**Solution 1: Synchronized Methods**
+
+```java
+class Counter {
+    private int counter = 0;
+    
+    public synchronized void increment() {
+        counter++;  // Now thread-safe
+    }
+    
+    public synchronized int getValue() {
+        return counter;  // Ensure visibility
+    }
+}
+```
+
+**Solution 2: Synchronized Block**
+
+```java
+class Counter {
+    private int counter = 0;
+    private final Object lock = new Object();
+    
+    public void increment() {
+        synchronized(lock) {
+            counter++;
+        }
+    }
+    
+    public int getValue() {
+        synchronized(lock) {
+            return counter;
+        }
+    }
+}
+```
+
+**Solution 3: AtomicInteger (Modern Approach)**
+
+```java
+import java.util.concurrent.atomic.AtomicInteger;
+
+class Counter {
+    private AtomicInteger counter = new AtomicInteger(0);
+    
+    public void increment() {
+        counter.incrementAndGet();  // Atomic operation
+    }
+    
+    public int getValue() {
+        return counter.get();
+    }
+}
+```
+
+**Testing the solution:**
+
+```java
+public class TestCounter {
+    public static void main(String[] args) throws InterruptedException {
+        Counter counter = new Counter();
+        
+        // Create two threads that increment 1000 times each
+        Thread t1 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                counter.increment();
+            }
+        });
+        
+        Thread t2 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                counter.increment();
+            }
+        });
+        
+        t1.start();
+        t2.start();
+        
+        // Wait for both threads to complete
+        t1.join();
+        t2.join();
+        
+        System.out.println("Final counter value: " + counter.getValue());
+        // Should be exactly 2000 with synchronization
+    }
+}
+```
+
+**Why synchronization works:**
+
+*   The `synchronized` keyword creates a **mutex** (mutual exclusion lock)
+*   Only one thread can hold the lock at a time
+*   Other threads must wait until the lock is released
+*   This ensures the three steps of `counter++` execute atomically from the perspective of other threads
+
+**Answer:** Add the `synchronized` keyword to both `increment()` and `getValue()` methods. This creates a mutex that ensures only one thread can access these methods at a time, preventing race conditions.
+
+</details>
+
+##### **3.11. Using Predicate Interface** (Tutorial 14, Example 1)
+Demonstrate the use of `Predicate<T>` functional interface to test if a number is positive.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `Predicate<T>` represents a boolean-valued function that takes one argument and returns true or false.
+
+**Predicate Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface Predicate<T> {
+    boolean test(T t);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.Predicate;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a predicate using lambda expression
+        Predicate<Integer> isPositive = x -> x > 0;
+        
+        // Test various numbers
+        System.out.println(isPositive.test(5));    // true
+        System.out.println(isPositive.test(-7));   // false
+        System.out.println(isPositive.test(0));    // false
+        
+        // Can also create other predicates
+        Predicate<Integer> isEven = x -> x % 2 == 0;
+        System.out.println(isEven.test(4));        // true
+        System.out.println(isEven.test(7));        // false
+        
+        // Combine predicates using and(), or(), negate()
+        Predicate<Integer> isPositiveAndEven = isPositive.and(isEven);
+        System.out.println(isPositiveAndEven.test(6));   // true
+        System.out.println(isPositiveAndEven.test(5));   // false
+        System.out.println(isPositiveAndEven.test(-4));  // false
+    }
+}
+```
+
+**Common use with Stream API:**
+
+```java
+List<Integer> numbers = Arrays.asList(-5, 3, -2, 8, 0, 12, -7);
+
+// Filter using predicate
+List<Integer> positiveNumbers = numbers.stream()
+    .filter(x -> x > 0)  // Predicate lambda
+    .collect(Collectors.toList());
+
+System.out.println(positiveNumbers);  // [3, 8, 12]
+```
+
+**Answer:** `Predicate<Integer> isPositive = x -> x > 0;` creates a predicate that returns true for positive numbers. Call `isPositive.test(5)` to test a value, which returns true.
+
+</details>
+
+##### **3.12. Using UnaryOperator Interface** (Tutorial 14, Example 2)
+Demonstrate the use of `UnaryOperator<T>` functional interface to square a number.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `UnaryOperator<T>` represents a function that takes one argument of type T and returns a result of the same type T.
+
+**UnaryOperator Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface UnaryOperator<T> {
+    T apply(T t);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.UnaryOperator;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a unary operator to square numbers
+        UnaryOperator<Integer> square = x -> x * x;
+        
+        System.out.println(square.apply(5));   // 25
+        System.out.println(square.apply(-3));  // 9
+        System.out.println(square.apply(0));   // 0
+        
+        // Other examples
+        UnaryOperator<String> toUpperCase = s -> s.toUpperCase();
+        System.out.println(toUpperCase.apply("hello"));  // HELLO
+        
+        UnaryOperator<Double> half = x -> x / 2.0;
+        System.out.println(half.apply(10.0));  // 5.0
+    }
+}
+```
+
+**Use with Stream API:**
+
+```java
+List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+
+// Square all numbers using map
+List<Integer> squared = numbers.stream()
+    .map(x -> x * x)  // UnaryOperator-like lambda
+    .collect(Collectors.toList());
+
+System.out.println(squared);  // [1, 4, 9, 16, 25]
+```
+
+**Chaining UnaryOperators:**
+
+```java
+UnaryOperator<Integer> square = x -> x * x;
+UnaryOperator<Integer> addOne = x -> x + 1;
+
+// Compose: addOne(square(x))
+UnaryOperator<Integer> squareThenAddOne = square.andThen(addOne);
+System.out.println(squareThenAddOne.apply(5));  // 26 (5² + 1)
+```
+
+**Answer:** `UnaryOperator<Integer> square = x -> x * x;` creates a unary operator that squares numbers. Call `square.apply(5)` to get 25.
+
+</details>
+
+##### **3.13. Using BinaryOperator Interface** (Tutorial 14, Example 3)
+Demonstrate the use of `BinaryOperator<T>` functional interface to multiply two numbers.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `BinaryOperator<T>` represents a function that takes two arguments of the same type T and returns a result of type T.
+
+**BinaryOperator Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface BinaryOperator<T> {
+    T apply(T t1, T t2);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.BinaryOperator;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a binary operator to multiply numbers
+        BinaryOperator<Integer> multiply = (x, y) -> x * y;
+        
+        System.out.println(multiply.apply(3, 5));    // 15
+        System.out.println(multiply.apply(10, -2));  // -20
+        System.out.println(multiply.apply(7, 0));    // 0
+        
+        // Other examples
+        BinaryOperator<Integer> add = (x, y) -> x + y;
+        System.out.println(add.apply(10, 20));  // 30
+        
+        BinaryOperator<String> concat = (s1, s2) -> s1 + s2;
+        System.out.println(concat.apply("Hello", "World"));  // HelloWorld
+        
+        BinaryOperator<Integer> max = (x, y) -> x > y ? x : y;
+        System.out.println(max.apply(5, 10));  // 10
+    }
+}
+```
+
+**Use with Stream API (reduce operation):**
+
+```java
+List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+
+// Multiply all numbers together using reduce
+int product = numbers.stream()
+    .reduce(1, (x, y) -> x * y);  // BinaryOperator lambda
+    
+System.out.println(product);  // 120 (1*2*3*4*5)
+
+// Sum all numbers
+int sum = numbers.stream()
+    .reduce(0, (x, y) -> x + y);
+    
+System.out.println(sum);  // 15
+```
+
+**Using built-in BinaryOperators:**
+
+```java
+import java.util.function.BinaryOperator;
+
+// Integer operations
+BinaryOperator<Integer> max = BinaryOperator.maxBy(Integer::compareTo);
+BinaryOperator<Integer> min = BinaryOperator.minBy(Integer::compareTo);
+
+System.out.println(max.apply(5, 10));  // 10
+System.out.println(min.apply(5, 10));  // 5
+```
+
+**Answer:** `BinaryOperator<Integer> multiply = (x, y) -> x * y;` creates a binary operator that multiplies two integers. Call `multiply.apply(3, 5)` to get 15.
+
+</details>
+
+##### **3.14. Using Function Interface** (Tutorial 14, Example 4)
+Demonstrate the use of `Function<T,R>` functional interface to convert an integer to a string with "dollars" suffix.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `Function<T,R>` represents a function that takes an argument of type T and returns a result of type R (which may be different from T).
+
+**Function Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface Function<T, R> {
+    R apply(T t);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.Function;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a function that converts Integer to String
+        Function<Integer, String> convert = 
+            x -> String.valueOf(x) + " dollars";
+        
+        System.out.println(convert.apply(5));    // 5 dollars
+        System.out.println(convert.apply(100));  // 100 dollars
+        System.out.println(convert.apply(0));    // 0 dollars
+        
+        // Other examples
+        Function<String, Integer> length = s -> s.length();
+        System.out.println(length.apply("Hello"));  // 5
+        
+        Function<Double, Integer> round = d -> (int) Math.round(d);
+        System.out.println(round.apply(3.7));  // 4
+    }
+}
+```
+
+**Use with Stream API (map operation):**
+
+```java
+List<Integer> prices = Arrays.asList(10, 25, 50, 100);
+
+// Convert integers to formatted strings
+List<String> formatted = prices.stream()
+    .map(x -> String.valueOf(x) + " dollars")  // Function lambda
+    .collect(Collectors.toList());
+
+System.out.println(formatted);  
+// [10 dollars, 25 dollars, 50 dollars, 100 dollars]
+```
+
+**Chaining Functions:**
+
+```java
+Function<Integer, Integer> multiplyBy2 = x -> x * 2;
+Function<Integer, String> toString = x -> "Result: " + x;
+
+// Compose: toString(multiplyBy2(x))
+Function<Integer, String> combined = multiplyBy2.andThen(toString);
+
+System.out.println(combined.apply(5));  // Result: 10
+```
+
+**Using method references:**
+
+```java
+// Instead of: x -> String.valueOf(x)
+Function<Integer, String> convert = String::valueOf;
+System.out.println(convert.apply(42));  // 42
+```
+
+**Answer:** `Function<Integer, String> convert = x -> String.valueOf(x) + " dollars";` creates a function that converts integers to dollar strings. Call `convert.apply(5)` to get "5 dollars".
+
+</details>
+
+##### **3.15. Using Consumer Interface** (Tutorial 14, Example 5)
+Demonstrate the use of `Consumer<T>` functional interface to print formatted output.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `Consumer<T>` represents an operation that takes a single argument and returns no result (void), typically used for side effects like printing.
+
+**Consumer Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface Consumer<T> {
+    void accept(T t);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.Consumer;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a consumer that prints formatted output
+        Consumer<Integer> printer = 
+            x -> System.out.printf("%d dollars \n", x);
+        
+        printer.accept(600);   // 600 dollars
+        printer.accept(1500);  // 1500 dollars
+        
+        // Other examples
+        Consumer<String> upperPrinter = s -> System.out.println(s.toUpperCase());
+        upperPrinter.accept("hello");  // HELLO
+        
+        Consumer<List<String>> listPrinter = 
+            list -> list.forEach(System.out::println);
+        listPrinter.accept(Arrays.asList("A", "B", "C"));
+    }
+}
+```
+
+**Use with Stream API (forEach operation):**
+
+```java
+List<Integer> numbers = Arrays.asList(5, 10, 15, 20);
+
+// Print each number with formatting
+numbers.forEach(x -> System.out.printf("%d dollars\n", x));
+
+// Or using method reference
+numbers.forEach(System.out::println);
+```
+
+**Chaining Consumers:**
+
+```java
+Consumer<String> print = s -> System.out.print(s);
+Consumer<String> newLine = s -> System.out.println();
+
+// Chain consumers
+Consumer<String> printWithNewLine = print.andThen(newLine);
+printWithNewLine.accept("Hello");
+```
+
+**Practical example with collection modification:**
+
+```java
+List<String> names = new ArrayList<>(Arrays.asList("alice", "bob", "charlie"));
+
+// Consumer that modifies the list
+Consumer<List<String>> capitalizeAll = list -> {
+    for (int i = 0; i < list.size(); i++) {
+        list.set(i, list.get(i).toUpperCase());
+    }
+};
+
+capitalizeAll.accept(names);
+System.out.println(names);  // [ALICE, BOB, CHARLIE]
+```
+
+**Answer:** `Consumer<Integer> printer = x -> System.out.printf("%d dollars \n", x);` creates a consumer that prints formatted dollar amounts. Call `printer.accept(600)` to print "600 dollars".
+
+</details>
+
+##### **3.16. Using Supplier Interface** (Tutorial 14, Example 6)
+Demonstrate the use of `Supplier<T>` functional interface to create a user factory.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `Supplier<T>` represents a function that takes no arguments and returns a result of type T, useful for factory patterns and lazy initialization.
+
+**Supplier Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface Supplier<T> {
+    T get();
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.Scanner;
+import java.util.function.Supplier;
+
+class User {
+    private String name;
+    
+    public User(String name) {
+        this.name = name;
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a supplier that creates User objects
+        Supplier<User> userFactory = () -> {
+            Scanner in = new Scanner(System.in);
+            System.out.println("Enter the name: ");
+            String name = in.nextLine();
+            return new User(name);
+        };
+        
+        // Create users using the factory
+        User user1 = userFactory.get();
+        User user2 = userFactory.get();
+        
+        System.out.println("user1 name: " + user1.getName());
+        System.out.println("user2 name: " + user2.getName());
+    }
+}
+```
+
+**Other Supplier Examples:**
+
+```java
+import java.util.function.Supplier;
+import java.time.LocalDateTime;
+
+public class SupplierExamples {
+    public static void main(String[] args) {
+        // Random number supplier
+        Supplier<Integer> randomInt = () -> (int)(Math.random() * 100);
+        System.out.println(randomInt.get());  // Random number
+        System.out.println(randomInt.get());  // Different random number
+        
+        // Current timestamp supplier
+        Supplier<LocalDateTime> timestamp = () -> LocalDateTime.now();
+        System.out.println(timestamp.get());
+        
+        // Default value supplier
+        Supplier<String> defaultName = () -> "Anonymous";
+        System.out.println(defaultName.get());  // Anonymous
+        
+        // Lazy computation
+        Supplier<Double> expensiveCalculation = () -> {
+            System.out.println("Performing expensive calculation...");
+            return Math.pow(2, 20);
+        };
+        // Calculation only happens when get() is called
+        System.out.println(expensiveCalculation.get());
+    }
+}
+```
+
+**Practical use case - Lazy evaluation:**
+
+```java
+public class LazyExample {
+    // Supplier allows lazy evaluation - value is computed only when needed
+    public static String getValue(boolean condition, Supplier<String> supplier) {
+        if (condition) {
+            return supplier.get();  // Only computed if condition is true
+        }
+        return "default";
+    }
+    
+    public static void main(String[] args) {
+        // This expensive operation won't execute if condition is false
+        String result = getValue(false, () -> {
+            System.out.println("Computing expensive value...");
+            return "expensive result";
+        });
+        System.out.println(result);  // "default", computation never happened
+    }
+}
+```
+
+**Answer:** `Supplier<User> userFactory = () -> { /* create and return User */ };` creates a factory that generates User objects on demand. Call `userFactory.get()` to create a new user instance.
+
+</details>
+
+##### **3.17. Stream API Operations** (Tutorial 14, Example 7)
+Demonstrate using Stream API to filter, remove duplicates, sort, and limit a list of integers.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Stream API allows chaining multiple operations to process collections in a functional style.
+
+**Complete Example:**
+
+```java
+import java.util.*;
+
+public class StreamApp {
+    public static void main(String[] args) {
+        List<Integer> numbers = new ArrayList<>();
+        numbers.add(5);
+        numbers.add(9);
+        numbers.add(8);
+        numbers.add(8);
+        numbers.add(1);
+        
+        // Print original list
+        numbers.forEach((n) -> System.out.print(n));
+        System.out.println();  // Output: 59881
+        
+        // Apply stream operations
+        numbers.stream()
+            .filter(n -> n > 5)        // Keep only numbers > 5: [9, 8, 8]
+            .distinct()                // Remove duplicates: [9, 8]
+            .sorted()                  // Sort: [8, 9]
+            .limit(1)                  // Take first element: [8]
+            .forEach(System.out::print);
+        
+        System.out.println("\n" + numbers);
+    }
+}
+```
+
+**Output:**
+```
+59881
+8
+[5, 9, 8, 8, 1]
+```
+
+**Step-by-step breakdown:**
+
+1.  **Original list:** `[5, 9, 8, 8, 1]`
+2.  **After `filter(n -> n > 5)`:** `[9, 8, 8]` (only elements greater than 5)
+3.  **After `distinct()`:** `[9, 8]` (duplicates removed)
+4.  **After `sorted()`:** `[8, 9]` (sorted in ascending order)
+5.  **After `limit(1)`:** `[8]` (only first element)
+6.  **`forEach(System.out::print)`:** Prints `8`
+
+**Important Note:** The original list `numbers` remains unchanged `[5, 9, 8, 8, 1]` because stream operations don't modify the source.
+
+**Extended Example with collect():**
+
+```java
+List<Integer> numbers = Arrays.asList(5, 9, 8, 8, 1);
+
+// Collect results into a new list
+List<Integer> processed = numbers.stream()
+    .filter(n -> n > 5)
+    .distinct()
+    .sorted()
+    .collect(Collectors.toList());
+
+System.out.println("Original: " + numbers);      // [5, 9, 8, 8, 1]
+System.out.println("Processed: " + processed);   // [8, 9]
+```
+
+**More Stream Examples:**
+
+```java
+// Count elements
+long count = numbers.stream()
+    .filter(n -> n > 5)
+    .count();
+System.out.println("Count: " + count);  // 3
+
+// Find first
+Optional<Integer> first = numbers.stream()
+    .filter(n -> n > 5)
+    .findFirst();
+System.out.println("First: " + first.get());  // 9
+
+// Map transformation
+List<Integer> doubled = numbers.stream()
+    .map(n -> n * 2)
+    .collect(Collectors.toList());
+System.out.println("Doubled: " + doubled);  // [10, 18, 16, 16, 2]
+
+// Reduce (sum)
+int sum = numbers.stream()
+    .reduce(0, (a, b) -> a + b);
+System.out.println("Sum: " + sum);  // 31
+```
+
+**Answer:** The stream pipeline filters numbers greater than 5, removes duplicates, sorts them, takes the first element, and prints it. The original list remains unchanged. Output: `8`.
+
+</details>
+
+##### **3.18. Creating and Starting Threads with Runnable** (Tutorial 14, Example 8)
+Demonstrate creating and starting a thread using the Runnable interface.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The Runnable interface defines the task to execute in a thread, separated from the thread mechanism itself.
+
+**Method 1: Implementing Runnable Interface**
+
+```java
+public class HelloRunnable implements Runnable {
+    public void run() {
+        System.out.println("Hello from a thread!");
+    }
+    
+    public static void main(String[] args) {
+        (new Thread(new HelloRunnable())).start();
+    }
+}
+```
+
+**Method 2: Extending Thread Class**
+
+```java
+public class HelloThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Hello from a thread!");
+    }
+    
+    public static void main(String[] args) {
+        (new HelloThread()).start();
+    }
+}
+```
+
+**Method 3: Anonymous Class**
+
+```java
+public class ThreadDemo {
+    public static void main(String[] args) {
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("Hello from anonymous thread!");
+            }
+        });
+        thread.start();
+    }
+}
+```
+
+**Method 4: Lambda Expression** (Best for simple tasks)
+
+```java
+public class LambdaThread {
+    public static void main(String[] args) {
+        // Runnable is a functional interface
+        Thread thread = new Thread(() -> {
+            System.out.println("Hello from lambda thread!");
+        });
+        thread.start();
+        
+        // Even more concise for single statements
+        new Thread(() -> System.out.println("Quick thread!")).start();
+    }
+}
+```
+
+**Complete Example with Multiple Threads:**
+
+```java
+public class MultiThreadExample {
+    public static void main(String[] args) {
+        System.out.println("Main thread: " + Thread.currentThread().getName());
+        
+        // Create first thread
+        Thread thread1 = new Thread(() -> {
+            for (int i = 1; i <= 5; i++) {
+                System.out.println("Thread 1: " + i);
+                try {
+                    Thread.sleep(500);  // Sleep 500ms
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        
+        // Create second thread
+        Thread thread2 = new Thread(() -> {
+            for (int i = 1; i <= 5; i++) {
+                System.out.println("Thread 2: " + i);
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        
+        // Start both threads
+        thread1.start();
+        thread2.start();
+        
+        System.out.println("Main thread continues...");
+    }
+}
+```
+
+**Output** (order may vary due to concurrent execution):
+```
+Main thread: main
+Main thread continues...
+Thread 1: 1
+Thread 2: 1
+Thread 1: 2
+Thread 2: 2
+Thread 1: 3
+Thread 2: 3
+Thread 1: 4
+Thread 2: 4
+Thread 1: 5
+Thread 2: 5
+```
+
+**Waiting for Thread Completion:**
+
+```java
+public class ThreadJoinExample {
+    public static void main(String[] args) throws InterruptedException {
+        Thread thread = new Thread(() -> {
+            System.out.println("Thread working...");
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.println("Thread finished!");
+        });
+        
+        thread.start();
+        System.out.println("Main thread waiting...");
+        thread.join();  // Wait for thread to complete
+        System.out.println("Main thread continues after thread finished");
+    }
+}
+```
+
+**Answer:** Implement Runnable interface or extend Thread class, then call `start()` to begin execution in a new thread. Using lambda expressions with Runnable is the most concise approach: `new Thread(() -> System.out.println("Hello")).start();`
+
+</details>
+
+##### **3.19. Lambda with Custom Functional Interface** (Lecture 14, Example 1)
+Create a custom functional interface and implement it using a lambda expression.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Any interface with a single abstract method can be implemented using lambda expressions.
+
+**Custom Functional Interface:**
+
+```java
+@FunctionalInterface
+interface Func {
+    int action(int x, int y);
+}
+
+class SomeClass {
+    // Lambda implementing the functional interface
+    Func lambda = (int x, int y) -> { return x + y; };
+    
+    public void demonstrateLambda() {
+        // Use the lambda
+        int result = lambda.action(5, 3);
+        System.out.println("Result: " + result);  // 8
+    }
+    
+    public static void main(String[] args) {
+        SomeClass obj = new SomeClass();
+        obj.demonstrateLambda();
+    }
+}
+```
+
+**Simplified Version:**
+
+```java
+@FunctionalInterface
+interface Func {
+    int action(int x, int y);
+}
+
+public class LambdaDemo {
+    public static void main(String[] args) {
+        // Various lambda implementations
+        Func sum = (x, y) -> x + y;
+        Func multiply = (x, y) -> x * y;
+        Func max = (x, y) -> x > y ? x : y;
+        
+        System.out.println("Sum: " + sum.action(5, 3));        // 8
+        System.out.println("Multiply: " + multiply.action(5, 3)); // 15
+        System.out.println("Max: " + max.action(5, 3));        // 5
+    }
+}
+```
+
+**Passing Lambda as Parameter:**
+
+```java
+@FunctionalInterface
+interface Operation {
+    int execute(int a, int b);
+}
+
+public class Calculator {
+    // Method that accepts functional interface
+    public static int calculate(int x, int y, Operation op) {
+        return op.execute(x, y);
+    }
+    
+    public static void main(String[] args) {
+        // Pass different operations as lambdas
+        int sum = calculate(10, 5, (a, b) -> a + b);
+        int diff = calculate(10, 5, (a, b) -> a - b);
+        int product = calculate(10, 5, (a, b) -> a * b);
+        
+        System.out.println("Sum: " + sum);       // 15
+        System.out.println("Diff: " + diff);     // 5
+        System.out.println("Product: " + product); // 50
+    }
+}
+```
+
+**With Multiple Implementations:**
+
+```java
+@FunctionalInterface
+interface StringFunction {
+    String run(String str);
+}
+
+public class Main {
+    public static void main(String[] args) {
+        StringFunction exclaim = (s) -> s + "!";
+        StringFunction ask = (s) -> s + "?";
+        StringFunction shout = (s) -> s.toUpperCase() + "!!!";
+        
+        printFormatted("Hello", exclaim);  // Hello!
+        printFormatted("Hello", ask);      // Hello?
+        printFormatted("Hello", shout);    // HELLO!!!
+    }
+    
+    public static void printFormatted(String str, StringFunction format) {
+        String result = format.run(str);
+        System.out.println(result);
+    }
+}
+```
+
+**Answer:** Define a functional interface with `@FunctionalInterface` and a single abstract method, then implement it with a lambda matching that method's signature: `Func lambda = (x, y) -> x + y;`
+
+</details>
+
+##### **3.20. Static Method Reference** (Lecture 14, Example 2)
+Demonstrate using method references to refer to static methods.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Method references provide shorthand for lambdas that only call existing methods.
+
+**Static Method Reference Example:**
+
+```java
+@FunctionalInterface
+public interface Finder {
+    public int find(String s1, String s2);
+}
+
+public class MyClass {
+    // Static method
+    public static int doFind(String s1, String s2) {
+        return s1.lastIndexOf(s2);
+    }
+}
+
+public class MethodReferenceDemo {
+    public static void main(String[] args) {
+        // Using lambda
+        Finder finderLambda = (s1, s2) -> MyClass.doFind(s1, s2);
+        
+        // Using method reference (cleaner)
+        Finder finderRef = MyClass::doFind;
+        
+        // Both work the same way
+        System.out.println(finderLambda.find("Hello World", "o"));  // 7
+        System.out.println(finderRef.find("Hello World", "o"));     // 7
+    }
+}
+```
+
+**More Static Method Reference Examples:**
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class StaticMethodReferences {
+    public static void main(String[] args) {
+        List<String> numbers = Arrays.asList("1", "2", "3", "4", "5");
+        
+        // Method reference to Integer.parseInt
+        List<Integer> integers = numbers.stream()
+            .map(Integer::parseInt)  // Same as: s -> Integer.parseInt(s)
+            .collect(Collectors.toList());
+        System.out.println(integers);  // [1, 2, 3, 4, 5]
+        
+        // Method reference to Math.abs
+        List<Integer> nums = Arrays.asList(-5, 3, -2, 8, -1);
+        List<Integer> absolute = nums.stream()
+            .map(Math::abs)  // Same as: n -> Math.abs(n)
+            .collect(Collectors.toList());
+        System.out.println(absolute);  // [5, 3, 2, 8, 1]
+        
+        // Method reference to String.valueOf
+        List<Integer> values = Arrays.asList(10, 20, 30);
+        List<String> strings = values.stream()
+            .map(String::valueOf)  // Same as: n -> String.valueOf(n)
+            .collect(Collectors.toList());
+        System.out.println(strings);  // [10, 20, 30]
+    }
+}
+```
+
+**Static Method Reference for Comparisons:**
+
+```java
+import java.util.*;
+
+class Person {
+    String name;
+    int age;
+    
+    Person(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+    
+    static int compareByAge(Person p1, Person p2) {
+        return Integer.compare(p1.age, p2.age);
+    }
+    
+    @Override
+    public String toString() {
+        return name + " (" + age + ")";
+    }
+}
+
+public class ComparisonExample {
+    public static void main(String[] args) {
+        List<Person> people = Arrays.asList(
+            new Person("Alice", 30),
+            new Person("Bob", 25),
+            new Person("Charlie", 35)
+        );
+        
+        // Sort using static method reference
+        people.sort(Person::compareByAge);
+        
+        System.out.println(people);
+        // [Bob (25), Alice (30), Charlie (35)]
+    }
+}
+```
+
+**Answer:** Use `ClassName::staticMethodName` syntax for static method references. Example: `Finder finder = MyClass::doFind;` is equivalent to `Finder finder = (s1, s2) -> MyClass.doFind(s1, s2);`
+
+</details>
+
+##### **3.21. Instance Method Reference** (Lecture 14, Example 3)
+Demonstrate using method references to refer to instance methods.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Instance method references refer to methods of a specific object instance.
+
+**Instance Method Reference Example:**
+
+```java
+@FunctionalInterface
+public interface Deserializer {
+    public int deserialize(String v1);
+}
+
+public class StringConverter {
+    public int convertToInt(String v1) {
+        return Integer.valueOf(v1);
+    }
+}
+
+public class InstanceMethodDemo {
+    public static void main(String[] args) {
+        StringConverter stringConverter = new StringConverter();
+        
+        // Using lambda
+        Deserializer desLambda = (v1) -> stringConverter.convertToInt(v1);
+        
+        // Using instance method reference (cleaner)
+        Deserializer desRef = stringConverter::convertToInt;
+        
+        // Both work the same way
+        System.out.println(desLambda.deserialize("42"));   // 42
+        System.out.println(desRef.deserialize("100"));     // 100
+    }
+}
+```
+
+**Common Instance Method References:**
+
+```java
+import java.util.*;
+
+public class InstanceReferences {
+    public static void main(String[] args) {
+        // Reference to println method of System.out object
+        List<String> words = Arrays.asList("Hello", "World", "Java");
+        words.forEach(System.out::println);
+        
+        // Reference to instance method
+        String prefix = "Item: ";
+        Function<String, String> addPrefix = prefix::concat;
+        System.out.println(addPrefix.apply("Apple"));  // Item: Apple
+        
+        // Multiple instance method references
+        List<String> names = Arrays.asList("alice", "bob", "charlie");
+        names.stream()
+            .map(String::toUpperCase)  // Instance method of String class
+            .forEach(System.out::println);
+        // ALICE
+        // BOB
+        // CHARLIE
+    }
+}
+```
+
+**Instance Method Reference with Objects:**
+
+```java
+class Printer {
+    private String prefix;
+    
+    public Printer(String prefix) {
+        this.prefix = prefix;
+    }
+    
+    public void print(String message) {
+        System.out.println(prefix + message);
+    }
+}
+
+public class PrinterDemo {
+    public static void main(String[] args) {
+        Printer errorPrinter = new Printer("[ERROR] ");
+        Printer infoPrinter = new Printer("[INFO] ");
+        
+        // Instance method references
+        Consumer<String> logError = errorPrinter::print;
+        Consumer<String> logInfo = infoPrinter::print;
+        
+        logError.accept("Something went wrong");  // [ERROR] Something went wrong
+        logInfo.accept("Application started");    // [INFO] Application started
+        
+        // Use with streams
+        List<String> messages = Arrays.asList("Starting", "Processing", "Complete");
+        messages.forEach(infoPrinter::print);
+        // [INFO] Starting
+        // [INFO] Processing
+        // [INFO] Complete
+    }
+}
+```
+
+**Answer:** Use `object::instanceMethodName` syntax for instance method references. Create an object first, then reference its method: `StringConverter converter = new StringConverter(); Deserializer des = converter::convertToInt;`
+
+</details>
+
+##### **3.22. Constructor Reference** (Lecture 14, Example 4)
+Demonstrate using method references to refer to constructors.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Constructor references use `ClassName::new` syntax to refer to constructors as functional interfaces.
+
+**Constructor Reference Example:**
+
+```java
+@FunctionalInterface
+public interface Factory {
+    public String create(char[] val);
+}
+
+public class ConstructorReferenceDemo {
+    public static void main(String[] args) {
+        // Using lambda
+        Factory factory1 = chars -> new String(chars);
+        
+        // Using constructor reference (cleaner)
+        Factory factory2 = String::new;
+        
+        // Both work the same way
+        char[] chars = {'H', 'e', 'l', 'l', 'o'};
+        System.out.println(factory1.create(chars));  // Hello
+        System.out.println(factory2.create(chars));  // Hello
+    }
+}
+```
+
+**Constructor References with Different Types:**
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+class Person {
+    private String name;
+    private int age;
+    
+    // Constructor with String parameter
+    public Person(String name) {
+        this.name = name;
+        this.age = 0;
+    }
+    
+    // Constructor with String and int parameters
+    public Person(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+    
+    @Override
+    public String toString() {
+        return name + " (" + age + ")";
+    }
+}
+
+public class ConstructorReferences {
+    public static void main(String[] args) {
+        // Reference to single-parameter constructor
+        Function<String, Person> personFactory1 = Person::new;
+        Person p1 = personFactory1.apply("Alice");
+        System.out.println(p1);  // Alice (0)
+        
+        // Reference to two-parameter constructor
+        BiFunction<String, Integer, Person> personFactory2 = Person::new;
+        Person p2 = personFactory2.apply("Bob", 25);
+        System.out.println(p2);  // Bob (25)
+        
+        // Using with streams
+        List<String> names = Arrays.asList("Charlie", "David", "Eve");
+        List<Person> people = names.stream()
+            .map(Person::new)  // Creates Person for each name
+            .collect(Collectors.toList());
+        people.forEach(System.out::println);
+        // Charlie (0)
+        // David (0)
+        // Eve (0)
+    }
+}
+```
+
+**Collection Constructor References:**
+
+```java
+import java.util.*;
+import java.util.function.*;
+import java.util.stream.*;
+
+public class CollectionConstructors {
+    public static void main(String[] args) {
+        List<String> list = Arrays.asList("A", "B", "C", "D", "E");
+        
+        // Constructor reference for ArrayList
+        Supplier<List<String>> listFactory = ArrayList::new;
+        List<String> newList = listFactory.get();
+        newList.addAll(list);
+        System.out.println(newList);  // [A, B, C, D, E]
+        
+        // Constructor reference for HashSet
+        Supplier<Set<String>> setFactory = HashSet::new;
+        Set<String> newSet = setFactory.get();
+        newSet.addAll(list);
+        System.out.println(newSet);  // [A, B, C, D, E]
+        
+        // Convert list to set using constructor reference
+        Set<String> set = list.stream()
+            .collect(Collectors.toCollection(HashSet::new));
+        System.out.println(set);  // [A, B, C, D, E]
+    }
+}
+```
+
+**Array Constructor Reference:**
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class ArrayConstructorReference {
+    public static void main(String[] args) {
+        // Array constructor reference
+        IntFunction<String[]> arrayFactory = String[]::new;
+        
+        String[] array = arrayFactory.apply(5);  // Creates array of size 5
+        System.out.println("Array length: " + array.length);  // 5
+        
+        // Using with streams
+        List<String> list = Arrays.asList("One", "Two", "Three");
+        String[] array2 = list.stream()
+            .toArray(String[]::new);  // Convert to array
+        System.out.println(Arrays.toString(array2));  // [One, Two, Three]
+    }
+}
+```
+
+**Answer:** Use `ClassName::new` syntax for constructor references. Example: `Factory factory = String::new;` is equivalent to `Factory factory = chars -> new String(chars);`. The compiler determines which constructor to use based on the functional interface signature.
+
+</details>
+
+##### **3.23. Lambda Capturing Variables (Closures)** (Lecture 14, Example 5)
+Demonstrate how lambdas can capture variables from their surrounding scope.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Lambdas can access variables from their enclosing scope (closures), but those variables must be effectively final.
+
+**Basic Closure Example:**
+
+```java
+@FunctionalInterface
+public interface Factory {
+    public String create(char[] val);
+}
+
+public class SomeClass {
+    String myString = "Test";
+    
+    // Lambda captures myString variable
+    Factory myFactory = (chars) -> myString + ":" + new String(chars);
+    
+    public void demonstrate() {
+        char[] data = {'H', 'i'};
+        System.out.println(myFactory.create(data));  // Test:Hi
+    }
+    
+    public static void main(String[] args) {
+        SomeClass obj = new SomeClass();
+        obj.demonstrate();
+    }
+}
+```
+
+**Effectively Final Requirement:**
+
+```java
+public class ClosureDemo {
+    public static void main(String[] args) {
+        String prefix = "Hello";  // Effectively final
+        int number = 42;          // Effectively final
+        
+        // Lambda captures both variables
+        Runnable task = () -> {
+            System.out.println(prefix + " " + number);
+        };
+        
+        task.run();  // Hello 42
+        
+        // This would cause a compiler error:
+        // prefix = "Goodbye";  // Can't modify captured variable
+        // number = 100;        // Can't modify captured variable
+    }
+}
+```
+
+**Practical Closure Examples:**
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class ClosureExamples {
+    public static void main(String[] args) {
+        // Example 1: Capturing for filtering
+        int threshold = 50;
+        List<Integer> numbers = Arrays.asList(25, 60, 30, 80, 45, 90);
+        
+        List<Integer> filtered = numbers.stream()
+            .filter(n -> n > threshold)  // Captures threshold
+            .collect(Collectors.toList());
+        System.out.println(filtered);  // [60, 80, 90]
+        
+        // Example 2: Capturing for transformation
+        String suffix = " dollars";
+        List<Integer> prices = Arrays.asList(10, 20, 30);
+        
+        List<String> formatted = prices.stream()
+            .map(p -> p + suffix)  // Captures suffix
+            .collect(Collectors.toList());
+        System.out.println(formatted);  // [10 dollars, 20 dollars, 30 dollars]
+        
+        // Example 3: Multiple captured variables
+        String greeting = "Hello";
+        String punctuation = "!";
+        
+        Function<String, String> greet = name -> 
+            greeting + ", " + name + punctuation;
+        
+        System.out.println(greet.apply("World"));  // Hello, World!
+        System.out.println(greet.apply("Java"));   // Hello, Java!
+    }
+}
+```
+
+**Counter Example - Why Effectively Final Matters:**
+
+```java
+public class CounterClosure {
+    public static void main(String[] args) {
+        // This won't work - variable must be effectively final
+        /*
+        int counter = 0;
+        Runnable increment = () -> {
+            counter++;  // ERROR: Cannot modify captured variable
+        };
+        */
+        
+        // Solution 1: Use an array (mutable container)
+        int[] counter = {0};
+        Runnable increment1 = () -> {
+            counter[0]++;  // OK - modifying array contents, not array reference
+        };
+        
+        // Solution 2: Use AtomicInteger
+        java.util.concurrent.atomic.AtomicInteger atomicCounter = 
+            new java.util.concurrent.atomic.AtomicInteger(0);
+        Runnable increment2 = () -> {
+            atomicCounter.incrementAndGet();  // OK - calling method on object
+        };
+        
+        // Solution 3: Use a wrapper class
+        class Counter {
+            int value = 0;
+        }
+        Counter counterObj = new Counter();
+        Runnable increment3 = () -> {
+            counterObj.value++;  // OK - modifying field, not object reference
+        };
+    }
+}
+```
+
+**Static Variables Exception:**
+
+```java
+public class StaticCapture {
+    static int staticCounter = 0;
+    
+    public static void main(String[] args) {
+        // Static variables can be modified in lambdas
+        Runnable task = () -> {
+            staticCounter++;  // OK - static variables are not captured
+            System.out.println("Counter: " + staticCounter);
+        };
+        
+        task.run();  // Counter: 1
+        task.run();  // Counter: 2
+        task.run();  // Counter: 3
+    }
+}
+```
+
+**Answer:** Lambdas can capture variables from their enclosing scope, creating closures. Captured variables must be effectively final (not modified after initialization). Example: `String prefix = "Test"; Factory f = (chars) -> prefix + ":" + new String(chars);` The lambda captures `prefix` and can use it in its body.
+
+</details>
+
+##### **3.24. Imperative vs Functional: GCD Algorithm** (Lecture 14, Example 6)
+Compare imperative and functional approaches by implementing Euclid's algorithm for finding the greatest common divisor (GCD).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The same algorithm can be implemented in both imperative (iterative with mutable state) and functional (recursive with immutable state) styles.
+
+**Imperative Approach (Iterative):**
+
+```java
+public class ImperativeGCD {
+    int gcd(int x, int y) {
+        int a = x, b = y;
+        while (a != 0) {
+            int temp = a;
+            a = b % a;
+            b = temp;
+        }
+        return b;
+    }
+    
+    public static void main(String[] args) {
+        ImperativeGCD calculator = new ImperativeGCD();
+        System.out.println("GCD(48, 18) = " + calculator.gcd(48, 18));  // 6
+        System.out.println("GCD(100, 35) = " + calculator.gcd(100, 35)); // 5
+        System.out.println("GCD(17, 19) = " + calculator.gcd(17, 19));   // 1
+    }
+}
+```
+
+**Characteristics of Imperative Approach:**
+
+*   Uses a loop (`while`)
+*   Has three local variables (`a`, `b`, `temp`)
+*   Variables change their values on each iteration
+*   Organized as a series of steps
+*   More verbose
+
+**Functional Approach (Recursive):**
+
+```java
+public class FunctionalGCD {
+    int gcd(int x, int y) {
+        return (y == 0) ? x : gcd(y, x % y);
+    }
+    
+    public static void main(String[] args) {
+        FunctionalGCD calculator = new FunctionalGCD();
+        System.out.println("GCD(48, 18) = " + calculator.gcd(48, 18));  // 6
+        System.out.println("GCD(100, 35) = " + calculator.gcd(100, 35)); // 5
+        System.out.println("GCD(17, 19) = " + calculator.gcd(17, 19));   // 1
+    }
+}
+```
+
+**Characteristics of Functional Approach:**
+
+*   Uses recursion instead of loops
+*   No local variables
+*   Parameters never change their values
+*   Much more concise and readable
+*   Closer to the mathematical definition
+
+**How the Functional Version Works:**
+
+```
+gcd(48, 18):
+  → gcd(18, 48 % 18)
+  → gcd(18, 12)
+  → gcd(12, 18 % 12)
+  → gcd(12, 6)
+  → gcd(6, 12 % 6)
+  → gcd(6, 0)
+  → 6
+```
+
+**Comparison Table:**
+
+| Aspect | Imperative | Functional |
+|:-------|:-----------|:-----------|
+| Variables | 3 local variables | No local variables |
+| Mutation | Variables change values | Variables immutable |
+| Control flow | While loop | Recursion |
+| Code length | Longer | Shorter |
+| Readability | More steps to follow | Concise, declarative |
+
+**Both Implementations:**
+
+```java
+public class GCDComparison {
+    // Imperative version
+    static int gcdIterative(int x, int y) {
+        int a = x, b = y;
+        while (a != 0) {
+            int temp = a;
+            a = b % a;
+            b = temp;
+        }
+        return b;
+    }
+    
+    // Functional version
+    static int gcdRecursive(int x, int y) {
+        return (y == 0) ? x : gcdRecursive(y, x % y);
+    }
+    
+    public static void main(String[] args) {
+        int x = 48, y = 18;
+        
+        System.out.println("Iterative GCD(" + x + ", " + y + ") = " + 
+            gcdIterative(x, y));  // 6
+        System.out.println("Recursive GCD(" + x + ", " + y + ") = " + 
+            gcdRecursive(x, y));  // 6
+    }
+}
+```
+
+**Note:** Many "conventional" languages can be used to program in functional style! Java supports both paradigms, allowing you to choose the most appropriate approach for your problem.
+
+**Answer:** Imperative approach uses loops and mutable variables: `while (a != 0) { ... }`. Functional approach uses recursion with no local variables: `return (y == 0) ? x : gcd(y, x % y);`. Both produce the same result, but the functional version is more concise.
+
+</details>
+
+##### **3.25. Pure vs Impure Functions** (Lecture 14, Example 7)
+Compare pure functions (functional style) with impure functions (imperative style) that have side effects.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Pure functions depend only on their parameters and have no side effects, while impure functions can modify state and produce different results with the same inputs.
+
+**Impure Function (Has Side Effects):**
+
+```java
+public class Example1 {
+    private int value;
+    
+    public int add(int next) {
+        this.value += next;  // Side effect: modifies object state
+        return this.value;
+    }
+}
+
+public class ImpureDemo {
+    public static void main(String[] args) {
+        Example1 obj = new Example1();
+        
+        System.out.println(obj.add(5));   // 5
+        System.out.println(obj.add(5));   // 10  (different result!)
+        System.out.println(obj.add(5));   // 15  (different result!)
+        
+        // Same input (5), different outputs each time
+        // Result depends on current state
+    }
+}
+```
+
+**Problems with Impure Functions:**
+
+*   Result depends on hidden state
+*   Same input produces different outputs
+*   Cannot be used in parallel safely
+*   Harder to test and debug
+*   Cannot be cached/memoized
+
+**Pure Function (No Side Effects):**
+
+```java
+public class Example2 {
+    public int sum(int x, int y) {
+        return x + y;  // No side effects, only depends on parameters
+    }
+}
+
+public class PureDemo {
+    public static void main(String[] args) {
+        Example2 obj = new Example2();
+        
+        System.out.println(obj.sum(5, 3));  // 8
+        System.out.println(obj.sum(5, 3));  // 8  (same result)
+        System.out.println(obj.sum(5, 3));  // 8  (same result)
+        
+        // Same inputs always produce same output
+        // No dependency on state
+    }
+}
+```
+
+**Advantages of Pure Functions:**
+
+1.  **Referential transparency**: Can replace function call with its result
+2.  **Cacheable**: Results can be cached for same inputs
+3.  **Parallelizable**: Can be executed in any order or in parallel
+4.  **Testable**: Easy to test without setup
+5.  **Removable**: If result is unused, function call can be removed
+
+**More Examples:**
+
+```java
+public class FunctionComparison {
+    // IMPURE: Depends on current time (external state)
+    static int getCurrentHour() {
+        return java.time.LocalTime.now().getHour();
+    }
+    
+    // PURE: Only depends on parameter
+    static int addHours(int currentHour, int hoursToAdd) {
+        return (currentHour + hoursToAdd) % 24;
+    }
+    
+    // IMPURE: Modifies external state (prints to console)
+    static int calculateAndPrint(int x, int y) {
+        int result = x + y;
+        System.out.println("Result: " + result);  // Side effect!
+        return result;
+    }
+    
+    // PURE: Just returns the calculation
+    static int calculate(int x, int y) {
+        return x + y;
+    }
+    
+    // IMPURE: Modifies the list
+    static void addToList(List<Integer> list, int value) {
+        list.add(value);  // Side effect!
+    }
+    
+    // PURE: Returns new list without modifying original
+    static List<Integer> withAddedValue(List<Integer> list, int value) {
+        List<Integer> newList = new ArrayList<>(list);
+        newList.add(value);
+        return newList;
+    }
+    
+    public static void main(String[] args) {
+        // Testing pure vs impure list operations
+        List<Integer> original = new ArrayList<>(Arrays.asList(1, 2, 3));
+        
+        // Impure: modifies original
+        addToList(original, 4);
+        System.out.println(original);  // [1, 2, 3, 4] - modified!
+        
+        // Pure: creates new list
+        List<Integer> original2 = new ArrayList<>(Arrays.asList(1, 2, 3));
+        List<Integer> modified = withAddedValue(original2, 4);
+        System.out.println(original2);  // [1, 2, 3] - unchanged
+        System.out.println(modified);   // [1, 2, 3, 4] - new list
+    }
+}
+```
+
+**Real-World Example:**
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+class BankAccount {
+    private double balance;
+    
+    // IMPURE: Modifies state
+    public void depositImpure(double amount) {
+        this.balance += amount;  // Side effect
+    }
+    
+    // PURE: Returns new account state
+    public BankAccount depositPure(double amount) {
+        BankAccount newAccount = new BankAccount();
+        newAccount.balance = this.balance + amount;
+        return newAccount;  // New object, original unchanged
+    }
+    
+    public double getBalance() {
+        return balance;
+    }
+}
+
+public class BankingExample {
+    public static void main(String[] args) {
+        // Impure approach
+        BankAccount account1 = new BankAccount();
+        account1.depositImpure(100);
+        account1.depositImpure(50);
+        System.out.println("Balance: " + account1.getBalance());  // 150
+        
+        // Pure approach (functional style)
+        BankAccount account2 = new BankAccount();
+        BankAccount after1 = account2.depositPure(100);
+        BankAccount after2 = after1.depositPure(50);
+        System.out.println("Original: " + account2.getBalance());  // 0
+        System.out.println("After deposits: " + after2.getBalance());  // 150
+    }
+}
+```
+
+**Stream API Uses Pure Functions:**
+
+```java
+List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+
+// All these stream operations use pure functions
+List<Integer> result = numbers.stream()
+    .filter(n -> n > 2)           // Pure predicate
+    .map(n -> n * 2)              // Pure transformation
+    .collect(Collectors.toList());
+
+System.out.println(numbers);  // [1, 2, 3, 4, 5] - unchanged!
+System.out.println(result);   // [6, 8, 10]
+```
+
+**Answer:** Impure functions have side effects and depend on state: `public int add(int next) { this.value += next; return this.value; }` - result depends on current state. Pure functions depend only on parameters: `public int sum(int x, int y) { return x + y; }` - same inputs always produce same output with no side effects.
+
+</details>
+
+##### **3.26. Complete Lambda and Stream Example** (Combined Tutorial/Lab Example)
+Create a comprehensive program demonstrating lambda expressions, functional interfaces, and Stream API operations.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Combine multiple functional programming concepts to process data in a clean, declarative style.
+
+**Complete Program:**
+
+```java
+import java.util.*;
+import java.util.function.*;
+import java.util.stream.*;
+
+public class CompleteFunctionalExample {
+    public static void main(String[] args) {
+        // Create a list of Person objects
+        List<Person> people = Arrays.asList(
+            new Person("Alice", 30, 50000),
+            new Person("Bob", 25, 45000),
+            new Person("Charlie", 35, 60000),
+            new Person("David", 28, 48000),
+            new Person("Eve", 32, 55000),
+            new Person("Frank", 27, 42000),
+            new Person("Grace", 29, 52000)
+        );
+        
+        System.out.println("=== Original List ===");
+        people.forEach(System.out::println);
+        
+        // Example 1: Filter using Predicate
+        System.out.println("\n=== People over 30 ===");
+        Predicate<Person> isOver30 = p -> p.getAge() > 30;
+        people.stream()
+            .filter(isOver30)
+            .forEach(System.out::println);
+        
+        // Example 2: Transform using Function
+        System.out.println("\n=== Names in Uppercase ===");
+        Function<Person, String> getUpperName = p -> p.getName().toUpperCase();
+        people.stream()
+            .map(getUpperName)
+            .forEach(System.out::println);
+        
+        // Example 3: Calculate using BinaryOperator
+        System.out.println("\n=== Total Salary ===");
+        BinaryOperator<Double> sum = (a, b) -> a + b;
+        double totalSalary = people.stream()
+            .map(Person::getSalary)
+            .reduce(0.0, sum);
+        System.out.println("Total: $" + totalSalary);
+        
+        // Example 4: Consumer for custom formatting
+        System.out.println("\n=== Formatted Output ===");
+        Consumer<Person> formatter = p -> 
+            System.out.printf("%-10s | Age: %2d | Salary: $%,.2f%n", 
+                p.getName(), p.getAge(), p.getSalary());
+        people.forEach(formatter);
+        
+        // Example 5: Complex stream pipeline
+        System.out.println("\n=== High Earners (Sorted by Name) ===");
+        List<String> highEarners = people.stream()
+            .filter(p -> p.getSalary() > 50000)     // Filter high earners
+            .sorted(Comparator.comparing(Person::getName))  // Sort by name
+            .map(p -> p.getName() + ": $" + p.getSalary())  // Format
+            .collect(Collectors.toList());          // Collect to list
+        highEarners.forEach(System.out::println);
+        
+        // Example 6: Grouping and statistics
+        System.out.println("\n=== Salary Statistics ===");
+        DoubleSummaryStatistics stats = people.stream()
+            .mapToDouble(Person::getSalary)
+            .summaryStatistics();
+        System.out.println("Average: $" + stats.getAverage());
+        System.out.println("Min: $" + stats.getMin());
+        System.out.println("Max: $" + stats.getMax());
+        
+        // Example 7: Partitioning
+        System.out.println("\n=== Partition by Age ===");
+        Map<Boolean, List<Person>> partitioned = people.stream()
+            .collect(Collectors.partitioningBy(p -> p.getAge() >= 30));
+        System.out.println("30 or older: " + partitioned.get(true).size());
+        System.out.println("Under 30: " + partitioned.get(false).size());
+        
+        // Example 8: Custom Supplier
+        System.out.println("\n=== Random Person Generator ===");
+        List<String> names = Arrays.asList("John", "Jane", "Jack", "Jill");
+        Random random = new Random();
+        Supplier<Person> randomPerson = () -> {
+            String name = names.get(random.nextInt(names.size()));
+            int age = 20 + random.nextInt(30);
+            double salary = 40000 + random.nextInt(30000);
+            return new Person(name, age, salary);
+        };
+        
+        // Generate 3 random people
+        Stream.generate(randomPerson)
+            .limit(3)
+            .forEach(System.out::println);
+    }
+}
+
+class Person {
+    private String name;
+    private int age;
+    private double salary;
+    
+    public Person(String name, int age, double salary) {
+        this.name = name;
+        this.age = age;
+        this.salary = salary;
+    }
+    
+    public String getName() { return name; }
+    public int getAge() { return age; }
+    public double getSalary() { return salary; }
+    
+    @Override
+    public String toString() {
+        return String.format("%s (age %d, salary $%.2f)", name, age, salary);
+    }
+}
+```
+
+**Output:**
+```
+=== Original List ===
+Alice (age 30, salary $50000.00)
+Bob (age 25, salary $45000.00)
+Charlie (age 35, salary $60000.00)
+...
+
+=== People over 30 ===
+Charlie (age 35, salary $60000.00)
+Eve (age 32, salary $55000.00)
+
+=== Names in Uppercase ===
+ALICE
+BOB
+CHARLIE
+...
+
+=== Total Salary ===
+Total: $352000.0
+
+=== Formatted Output ===
+Alice      | Age: 30 | Salary: $50,000.00
+Bob        | Age: 25 | Salary: $45,000.00
+...
+
+=== High Earners (Sorted by Name) ===
+Charlie: $60000.0
+Eve: $55000.0
+Grace: $52000.0
+
+=== Salary Statistics ===
+Average: $50285.714285714286
+Min: $42000.0
+Max: $60000.0
+
+=== Partition by Age ===
+30 or older: 4
+Under 30: 3
+
+=== Random Person Generator ===
+Jane (age 35, salary $62000.00)
+Jack (age 28, salary $51000.00)
+John (age 42, salary $68000.00)
+```
+
+**Key Techniques Demonstrated:**
+
+1.  **Predicate**: Filtering with conditions
+2.  **Function**: Transforming data
+3.  **BinaryOperator**: Combining values
+4.  **Consumer**: Custom output formatting
+5.  **Supplier**: Generating data
+6.  **Stream Pipeline**: Chaining operations
+7.  **Method References**: Concise syntax
+8.  **Collectors**: Gathering results
+9.  **Statistics**: Analyzing data
+10. **Partitioning**: Grouping by condition
+
+**Answer:** This comprehensive example demonstrates all major functional programming concepts in Java: lambda expressions for all built-in functional interfaces, stream operations (filter, map, reduce, collect), method references, and complex data processing pipelines.
+
+</details>
+
