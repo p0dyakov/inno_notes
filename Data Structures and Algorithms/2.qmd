@@ -1,0 +1,912 @@
+---
+title: "W2. Elementary Data Structures, Recursion and Backtracking"
+author: "Zakhar Podyakov"
+date: "January 29, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+##### **1.1 Abstract Data Types and Data Structures**
+###### **1.1.1 Abstract Data Types**
+An **Abstract Data Type (ADT)** is a mathematical model that describes a data type purely in terms of its behavior, without specifying how it is implemented. Think of an ADT as a contract or an "interface" — it tells you *what* operations are available and *what* rules they follow, but says nothing about *how* they work internally.
+
+An ADT determines three things:
+
+- **Operations and constructors** available for values of the type
+- **Type signatures** of those operations — what inputs they accept and what outputs they produce
+- **Properties (laws)** that the operations must satisfy
+
+For example, "Number" can be seen as an ADT: its operations include constructing zero, addition ($+$), etc.; the signature of $+$ says it takes two numbers and returns a number; and a property states that $x + y = y + x$ for any numbers $x, y$. Similarly, "Set" is an ADT with operations like constructing an empty set, union ($\cup$), etc., and properties like $x \cup y = y \cup x$.
+
+###### **1.1.2 Data Structures**
+A **Data Structure** is a *concrete* implementation of an ADT. While the ADT specifies *what* a type does, the data structure specifies *how* it does it — the actual data representation in memory and the algorithms for each operation.
+
+For instance, Java's `java.math.BigDecimal` is a data structure implementing arbitrary-precision decimals (it stores digits in a list and performs arithmetic on that list). Java's `java.util.HashSet` is a data structure implementing the Set ADT using a hash table with separate chaining.
+
+###### **1.1.3 Data Structure Building Blocks**
+Most data structures are built from two fundamental mechanisms for representing data in memory:
+
+- **Contiguous blocks of data (arrays):** Elements are stored in adjacent memory cells, enabling fast index-based access.
+- **Linked structures (pointers/references):** Elements are stored in separate nodes that reference each other, enabling flexible insertion and deletion.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.2 Lists**
+###### **1.2.1 List ADT**
+A **List** is an ADT representing an ordered sequence of elements. The key feature distinguishing a List from other sequence ADTs (like Stack or Queue) is that you can access, insert, or remove elements *at any given index*.
+
+The List ADT supports the following operations:
+
+- Create an empty list
+- `size()` — get the number of elements
+- `isEmpty()` — check if the list is empty
+- `get(i)` — retrieve the element at index $i$
+- `set(i, e)` — replace the element at index $i$ with $e$
+- `add(i, e)` — insert element $e$ at index $i$, shifting subsequent elements right
+- `remove(i)` — remove the element at index $i$, shifting subsequent elements left
+
+For example, starting from an empty list `[]`: add $A$ at index 0 gives `[A]`; add $B$ at index 0 gives `[B, A]`; add $C$ at index 2 gives `[B, A, C]`; get element at index 1 returns $A$; remove at index 1 gives `[B, C]`.
+
+###### **1.2.2 ArrayList**
+An **ArrayList** (array-based list) stores all elements in a single contiguous array. This gives excellent random access performance but makes insertions and deletions in the middle expensive because elements must be shifted.
+
+**How `get` and `set` work:** Since elements are stored in an array, accessing any element by index is a single array lookup — $O(1)$.
+
+**How `add` works:** To insert at index $i$, all elements from index $i$ to the end must be shifted one position to the right to make room. This takes $O(n - i)$ time. Adding at the *end* requires no shifting and is $O(1)$.
+
+**How `remove` works:** To remove at index $i$, all elements after index $i$ must be shifted one position to the left. This takes $O(n - i)$ time. Removing the *last* element requires no shifting and is $O(1)$.
+
+**Dynamic resizing:** What happens when the underlying array is full? The standard approach is to **double** the array capacity. You allocate a new array of twice the size, copy all existing elements, and then insert the new element. While a single resize costs $O(n)$, it happens infrequently enough that the **amortized** cost of adding at the end is still $O(1)$.
+
+**ArrayList time complexity:**
+
+| Method | Time Complexity |
+| :--- | :--- |
+| `size()` | $O(1)$ |
+| `isEmpty()` | $O(1)$ |
+| `get(i)` | $O(1)$ |
+| `set(i, x)` | $O(1)$ |
+| `add(i, x)` | $O(n - i)$ amortized |
+| `addFirst(x)` | $O(n)$ |
+| `addLast(x)` | $O(1)$ amortized |
+| `remove(i)` | $O(n - i)$ |
+| `removeFirst()` | $O(n)$ |
+| `removeLast()` | $O(1)$ |
+
+###### **1.2.3 Singly Linked List**
+A **Singly Linked List** stores elements in separate **nodes**. Each node contains:
+
+- The element (or a reference to it)
+- A reference (pointer) to the *next* node in the list
+
+The first node is called the **head** and the last node is called the **tail**. The tail's next pointer is `null` (or $\emptyset$).
+
+<!-- DIAGRAM HERE -->
+
+**How `get` and `set` work:** To access element at index $i$, you must start at the head and follow $i$ next-pointers — $O(i)$. There is no way to jump directly to an index.
+
+**How `add` works:** To insert at index $i$, traverse to node $i - 1$, create a new node pointing to node $i$, and update node $i - 1$ to point to the new node — $O(i)$. Special case: **adding at the head** ($i = 0$) only requires creating a new node pointing to the current head and updating the head pointer — $O(1)$. **Adding at the tail** requires traversal to find the tail — $O(n)$, unless you maintain an explicit tail pointer, in which case it is $O(1)$.
+
+**How `remove` works:** To remove at index $i$, traverse to node $i - 1$ and update its next pointer to skip over node $i$ — $O(i)$. **Removing the head** is $O(1)$. **Removing the tail** is always $O(n)$ because even with a tail pointer, you need to find the *second-to-last* node (and a singly linked list can only traverse forward).
+
+**Singly Linked List time complexity:**
+
+| Method | Time Complexity |
+| :--- | :--- |
+| `size()` | $O(1)$ |
+| `isEmpty()` | $O(1)$ |
+| `get(i)` | $O(i)$ |
+| `set(i, x)` | $O(i)$ |
+| `add(i, x)` | $O(i)$ |
+| `addFirst(x)` | $O(1)$ |
+| `addLast(x)` | $O(n)$ or $O(1)$ with tail pointer |
+| `remove(i)` | $O(i)$ |
+| `removeFirst()` | $O(1)$ |
+| `removeLast()` | $O(n)$ |
+
+###### **1.2.4 Doubly Linked List**
+A **Doubly Linked List** is similar to a singly linked list, but each node has references to *both* the next node and the *previous* node. This allows traversal in both directions.
+
+<!-- DIAGRAM HERE -->
+
+The backward pointer has several important consequences:
+
+- **`get` and `set`:** You can traverse from *either* end, so the complexity becomes $O(\min(i, n - i))$ — you start from whichever end is closer.
+- **`add` and `remove` at arbitrary index:** Also $O(\min(i, n - i))$ for the same reason.
+- **Operations at both ends:** Adding or removing at *either* end (head or tail) is $O(1)$, since both ends are directly accessible. This is a significant advantage over singly linked lists, where removing the tail is $O(n)$.
+
+**Doubly Linked List time complexity:**
+
+| Method | Time Complexity |
+| :--- | :--- |
+| `size()` | $O(1)$ |
+| `isEmpty()` | $O(1)$ |
+| `get(i)` | $O(\min(i, n - i))$ |
+| `set(i, x)` | $O(\min(i, n - i))$ |
+| `add(i, x)` | $O(\min(i, n - i))$ |
+| `addFirst(x)` | $O(1)$ |
+| `addLast(x)` | $O(1)$ |
+| `remove(i)` | $O(\min(i, n - i))$ |
+| `removeFirst()` | $O(1)$ |
+| `removeLast()` | $O(1)$ |
+
+##### **1.3 Stacks**
+###### **1.3.1 Stack ADT**
+A **Stack** is a restricted version of a List where you can only access, add, or remove elements at one end — the **top**. This makes it a **Last-In-First-Out (LIFO)** data structure: the last element added is the first one removed.
+
+The Stack ADT supports the following operations:
+
+- `size()` — get the number of elements
+- `isEmpty()` — check if the stack is empty
+- `push(x)` — add element $x$ at the top
+- `pop()` — remove and return the top element
+- `peek()` — return the top element without removing it
+
+Stacks are used in many important contexts:
+
+- **Recursive function calls** — the call stack stores activation frames
+- **Visiting history** — browser back buttons, undo functionality
+- **Nested typing contexts** in compilers
+
+###### **1.3.2 Array Stack**
+An **ArrayStack** uses an array and a `top` counter to track the index of the topmost element.
+
+- **Push:** Increment the `top` counter, store the new element at `data[top]`.
+- **Pop:** Return `data[top]`, then decrement `top`. For references (non-primitive data), you should also set `data[top + 1]` to `null` to enable garbage collection.
+- **When the array is full:** Double the array size (same dynamic resizing strategy as ArrayList).
+
+All operations are $O(1)$ (push is $O(1)$ amortized due to occasional resizing).
+
+###### **1.3.3 Linked Stack**
+A **LinkedStack** uses a singly linked list. The top of the stack corresponds to the head of the list.
+
+- **Push:** Same as `addFirst` on a linked list — $O(1)$.
+- **Pop:** Same as `removeFirst` on a linked list — $O(1)$.
+
+Since all operations happen at one end, a singly linked list is sufficient (no need for a doubly linked list or tail pointer).
+
+**Stack time complexity comparison:**
+
+| Method | ArrayStack | LinkedStack |
+| :--- | :--- | :--- |
+| `size()` | $O(1)$ | $O(1)$ |
+| `isEmpty()` | $O(1)$ | $O(1)$ |
+| `push(x)` | $O(1)$ amortized | $O(1)$ |
+| `pop()` | $O(1)$ | $O(1)$ |
+| `peek()` | $O(1)$ | $O(1)$ |
+
+In practice, **ArrayStack is often preferred** because arrays have better *cache locality* — elements are stored contiguously in memory, making access faster on modern hardware. Linked structures scatter nodes across memory, leading to more cache misses.
+
+##### **1.4 Queues**
+###### **1.4.1 Queue ADT**
+A **Queue** is a restricted version of a List where elements are added at one end (the **rear**) and removed from the other end (the **front**). This makes it a **First-In-First-Out (FIFO)** data structure: the first element added is the first one removed.
+
+The Queue ADT supports the following operations:
+
+- `size()` — get the number of elements
+- `isEmpty()` — check if the queue is empty
+- `offer(x)` — add element $x$ at the rear
+- `poll()` — remove and return the element at the front
+- `peek()` — return the front element without removing it
+
+Queues are used for:
+
+- Keeping track of jobs or tasks to perform
+- Processing messages in systems and communication channels
+- Handling incoming requests in web servers
+
+###### **1.4.2 Array Queue and the Circular Array**
+A naive **ArrayQueue** uses a `front` and `rear` counter. `offer` increments `rear` and places the element; `poll` increments `front` and returns the old front element. The problem is that after several offers and polls, the active content *crawls* to the right, wasting space at the beginning of the array.
+
+The solution is a **circular array**: when the rear reaches the end of the array, it wraps around to the beginning (if there is space). Counter increments are done **modulo** the array capacity:
+
+$$\text{rear} = (\text{rear} + 1) \mod \text{capacity}$$
+
+If the queue fills up entirely, the array is resized (doubled), just like with ArrayList.
+
+All operations are $O(1)$ (offer is $O(1)$ amortized due to occasional resizing).
+
+###### **1.4.3 Linked Queue**
+A **LinkedQueue** uses a singly linked list *with a tail pointer*.
+
+- **Offer:** Same as `addLast` — $O(1)$ with a tail pointer.
+- **Poll:** Same as `removeFirst` — $O(1)$.
+
+Since offer happens at the tail and poll happens at the head, a singly linked list with a tail pointer is sufficient.
+
+**Queue time complexity comparison:**
+
+| Method | ArrayQueue | LinkedQueue |
+| :--- | :--- | :--- |
+| `size()` | $O(1)$ | $O(1)$ |
+| `isEmpty()` | $O(1)$ | $O(1)$ |
+| `offer(x)` | $O(1)$ amortized | $O(1)$ |
+| `poll()` | $O(1)$ | $O(1)$ |
+| `peek()` | $O(1)$ | $O(1)$ |
+
+As with stacks, **ArrayQueue is often preferred** in practice due to better cache locality.
+
+##### **1.5 Recursion**
+###### **1.5.1 What is Recursion?**
+**Recursion** is a technique where an algorithm solves a problem by breaking it down into smaller instances of the *same* problem. A recursive algorithm has two types of cases:
+
+- **Base case:** The problem is small enough to solve directly (e.g., factorial of 0 is 1).
+- **Recursive case:** The problem is reduced to one or more *smaller* subproblems, which are solved by calling the same algorithm.
+
+###### **1.5.2 Recursion Examples**
+**Factorial:**
+
+```python
+def factorial(n):
+    if n == 0:
+        return 1
+    else:
+        return n * factorial(n - 1)
+```
+
+This has one base case ($n = 0$) and one recursive case with a single recursive call. Time complexity: $O(n)$. Space complexity: $O(n)$ (due to the call stack).
+
+**Fibonacci:**
+
+```python
+def fibonacci(n):
+    if n == 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+        return fibonacci(n - 1) + fibonacci(n - 2)
+```
+
+This has two base cases and one recursive case with *two* recursive calls. The running time follows the recurrence:
+
+$$T(n) = \begin{cases} 1, & \text{if } n \leq 1 \\ T(n-1) + T(n-2), & \text{otherwise} \end{cases}$$
+
+Upper bound: $T(n) \leq 2T(n-1) \leq 2^n$, so time complexity is $O(2^n)$. More precisely, $T(n) = O(\varphi^n)$ where $\varphi = \frac{1 + \sqrt{5}}{2} \approx 1.618$ is the golden ratio. Space complexity: $O(n)$ (maximum depth of the call stack).
+
+**Binary Search:**
+
+```python
+def binsearch(A, l, r, x):
+    if l > r:
+        return NOT_FOUND
+    else:
+        mid = (l + r) // 2
+        if A[mid] == x:
+            return mid
+        elif A[mid] > x:
+            return binsearch(A, l, mid - 1, x)
+        else:
+            return binsearch(A, mid + 1, r, x)
+```
+
+This has one base case and one recursive case (with two branches, but only *one* recursive call in each). Time complexity: $O(\log n)$ since the search interval halves each time. Space complexity: $O(\log n)$ due to the call stack.
+
+###### **1.5.3 The Call Stack**
+Recursive functions rely on the **call stack** — a stack maintained by the runtime system. Every function call places an **activation frame** on the call stack, containing:
+
+- Saved local variable values
+- Return address (where to continue after the call returns)
+- Argument values
+
+When a function returns, its frame is popped and execution resumes with the previous frame. Important implications:
+
+- The call stack uses *memory*, so deep recursion consumes significant space.
+- Excessively deep recursion causes a **stack overflow** — the call stack exceeds its allocated memory.
+
+##### **1.6 Recursion vs Explicit Stack**
+###### **1.6.1 The Idea**
+Any recursive algorithm can be converted to an iterative one by managing the call stack explicitly using a Stack data structure. The general approach:
+
+- Store the current function's state (arguments, local variables, and a marker for *where* in the function you are) on the stack.
+- Instead of making a recursive call, *push* a new frame onto the stack.
+- Instead of returning from a function, *pop* the top frame.
+- Stop when the stack is empty.
+
+###### **1.6.2 Tail Recursion**
+A function is **tail-recursive** if the recursive call is the *last* operation — the function directly returns the result of the recursive call without doing anything else with it. Tail-recursive functions are the easiest to convert to iterative form because the stack never grows beyond one frame.
+
+**Factorial (tail-recursive):**
+
+```python
+# Recursive
+def factorial(n):
+    return helper(n, 1)
+
+def helper(n, r):
+    if n == 0:
+        return r
+    else:
+        return helper(n - 1, n * r)
+```
+
+```python
+# Iterative with explicit stack
+def factorial(n):
+    s = []  # empty stack
+    s.append([n, 1])
+    result = None
+    while len(s) > 0:
+        [n, r] = s.pop()
+        if n == 0:
+            result = r
+        else:
+            s.append([n - 1, n * r])
+    return result
+```
+
+The stack never grows beyond one element — this is hidden tail call optimization.
+
+**Binary search** is also tail-recursive, so its explicit stack conversion follows the same simple pattern.
+
+###### **1.6.3 Non-Tail Recursion**
+When the recursive call is *not* the last operation (i.e., work remains after the call returns), the conversion is more involved. The function body is split into stages (BEFORE, AFTER, etc.), and a `result` register passes return values between frames.
+
+**Factorial (non-tail-recursive, explicit stack):**
+
+```python
+def factorial(n):
+    BEFORE, AFTER = 0, 1
+    s = []
+    s.append([n, BEFORE])
+    result = None
+    while len(s) > 0:
+        frame = s[-1]  # peek
+        if frame[1] == BEFORE:
+            frame[1] = AFTER
+            if frame[0] == 0:
+                result = 1
+                s.pop()
+            else:
+                s.append([frame[0] - 1, BEFORE])
+        else:
+            n_val = frame[0]
+            result = n_val * result
+            s.pop()
+    return result
+```
+
+**Fibonacci (two recursive calls, explicit stack):**
+
+With two recursive calls, the function is split into three stages: BEFORE, BETWEEN (after first call, before second), and AFTER. Local variables (like the result of the first call) must be saved on the stack.
+
+```python
+def fibonacci(n):
+    BEFORE, BETWEEN, AFTER = 0, 1, 2
+    s = []
+    s.append([n, BEFORE, None])  # [n, state, x]
+    result = None
+    while len(s) > 0:
+        frame = s[-1]  # peek
+        if frame[1] == BEFORE:
+            if frame[0] <= 1:
+                result = frame[0]
+                s.pop()
+            else:
+                frame[1] = BETWEEN
+                s.append([frame[0] - 1, BEFORE, None])
+        elif frame[1] == BETWEEN:
+            frame[2] = result  # save x
+            frame[1] = AFTER
+            s.append([frame[0] - 2, BEFORE, None])
+        else:
+            result = frame[2] + result
+            s.pop()
+    return result
+```
+
+##### **1.7 Brute Force and Backtracking**
+###### **1.7.1 Iterating over Sequences**
+A fundamental brute-force technique is to enumerate all possible sequences. Given a sequence length $n$ and maximum digit $k$, the task is to generate all distinct sequences of $n$ digits (each from 0 to $k$). The idea is to count from 0 in base-$(k+1)$, stopping when all digits are $k$.
+
+```python
+def all_sequences(n, k):
+    A = [0] * n
+    finished = False
+    while not finished:
+        i = n - 1
+        while A[i] == k:
+            A[i] = 0
+            i = i - 1
+        if i < 0:
+            finished = True
+        else:
+            A[i] = A[i] + 1
+            print(A)
+```
+
+This generates all $(k+1)^n$ sequences.
+
+###### **1.7.2 Iterating over Subsets**
+Every subset of a set with $n$ elements corresponds to a binary number of length $n$: the $i$-th bit is 1 if the $i$-th element is in the subset, and 0 otherwise. By iterating over all binary numbers from $0$ to $2^n - 1$, you enumerate all $2^n$ subsets.
+
+###### **1.7.3 Conditional Subsets**
+Given an array $A$ of $n$ integers and a target $k$, count the number of subsets of $A$ whose elements sum to $k$.
+
+**Iterative approach:** Iterate over all $2^n$ binary strings. Maintain a running sum that is updated incrementally whenever a digit changes ($0 \to 1$: add the element; $1 \to 0$: subtract it). Check if the current sum equals $k$.
+
+```python
+def subsets(A, n, k):
+    S = [0] * n
+    finished = False
+    total = 0
+    count = 0
+    while not finished:
+        i = n - 1
+        while S[i] == 1:
+            S[i] = 0
+            total = total - A[i]
+            i = i - 1
+        if i < 0:
+            finished = True
+        else:
+            S[i] = 1
+            total = total + A[i]
+        if total == k:
+            count = count + 1
+    return count
+```
+
+Time complexity: $O(2^n)$. Space complexity: $O(n)$.
+
+**Recursive approach:** Let $F(A, k)$ be the number of subsets of $A$ with sum $k$. For the empty set:
+
+$$F(\emptyset, k) = \begin{cases} 1, & \text{if } k = 0 \\ 0, & \text{otherwise} \end{cases}$$
+
+For a non-empty set $A = \{x\} \cup B$:
+
+$$F(\{x\} \cup B, k) = F(B, k) + F(B, k - x)$$
+
+This says: either $x$ is *not* in the subset (count subsets of $B$ summing to $k$) or $x$ *is* in the subset (count subsets of $B$ summing to $k - x$).
+
+```python
+def subsets(A, n, k):
+    if n == 0:
+        if k == 0:
+            return 1
+        else:
+            return 0
+    else:
+        x = A[n - 1]
+        without_x = subsets(A, n - 1, k)
+        with_x = subsets(A, n - 1, k - x)
+        return without_x + with_x
+```
+
+Time complexity: $O(2^n)$ (binary tree of recursive calls). Space complexity: $O(n)$ (depth of recursion).
+
+###### **1.7.4 Backtracking**
+**Backtracking** is an optimization of brute-force search. Instead of generating *all* possible solutions and then checking each one, backtracking builds solutions *incrementally* and **prunes** — abandons a partial solution as soon as it detects that it cannot possibly lead to a valid complete solution.
+
+**The N Queens Problem:**
+
+The classic example of backtracking is the **N Queens Problem**: place $n$ queens on an $n \times n$ chessboard so that no two queens attack each other (no two queens share a row, column, or diagonal).
+
+Key observations:
+
+- Each queen must be in a separate row, so we assign one queen per row.
+- For each row $i$, we need to find a valid column $j$ such that no previously placed queen attacks position $(i, j)$.
+- If no valid column exists for row $i$, we **backtrack** — go back to row $i - 1$ and try the next available column there.
+
+The search space forms a tree. Each level of the tree corresponds to a row, and each branch corresponds to a column choice. Backtracking prunes entire subtrees when a conflict is detected, which is far more efficient than checking all $n^n$ possible placements.
+
+```python
+def queens(n):
+    columns = [0] * n
+    i = 0
+    while i < n:
+        j = columns[i]
+        while j < n and not safe(columns, i, j):
+            j = j + 1
+        if j < n:
+            columns[i] = j
+            i = i + 1
+        else:
+            columns[i] = 0
+            i = i - 1
+    return columns
+```
+
+The `safe(columns, i, j)` function checks whether placing a queen at row $i$, column $j$ conflicts with any queen in rows $0$ through $i - 1$. For $n = 2$ and $n = 3$, there is no valid solution. For $n = 4$ and larger, solutions exist.
+
+#### **2. Definitions**
+
+*   **Abstract Data Type (ADT)**: A mathematical model of a data type that specifies the available operations, their type signatures, and the properties (laws) these operations must satisfy, without prescribing an implementation.
+*   **Data Structure**: A concrete implementation of an ADT, specifying the data representation in memory and the algorithms for each operation.
+*   **List**: An ADT representing an ordered sequence of elements with access, insertion, and removal at any given index.
+*   **ArrayList**: An array-based implementation of the List ADT that stores elements in a contiguous block of memory, providing $O(1)$ random access but $O(n)$ worst-case insertion/deletion.
+*   **Singly Linked List**: A node-based implementation of the List ADT where each node stores an element and a reference to the next node, enabling $O(1)$ insertion at the head but $O(n)$ access by index.
+*   **Doubly Linked List**: A node-based list implementation where each node has references to both the next and previous nodes, enabling $O(1)$ operations at both ends.
+*   **Head**: The first node in a linked list.
+*   **Tail**: The last node in a linked list.
+*   **Stack**: A LIFO (Last-In-First-Out) ADT that restricts access to only the top element, supporting push, pop, and peek operations.
+*   **Queue**: A FIFO (First-In-First-Out) ADT where elements are added at the rear and removed from the front, supporting offer, poll, and peek operations.
+*   **Circular Array**: An array where index arithmetic is performed modulo the array capacity, allowing the used region to wrap around from the end to the beginning.
+*   **Recursion**: An algorithmic technique where a function solves a problem by calling itself on smaller subproblems, with base cases providing direct solutions.
+*   **Base Case**: The condition in a recursive algorithm where the problem is solved directly without further recursive calls.
+*   **Recursive Case**: The condition where the problem is reduced to smaller subproblems solved by recursive calls to the same function.
+*   **Call Stack**: A stack maintained by the runtime system that stores activation frames for each active function call, containing local variables, return addresses, and arguments.
+*   **Stack Overflow**: An error that occurs when the call stack exceeds its allocated memory, typically due to excessively deep recursion.
+*   **Tail Recursion**: A form of recursion where the recursive call is the last operation in the function, allowing the call to be optimized into a loop without growing the stack.
+*   **Amortized Complexity**: The average time per operation over a worst-case sequence of operations, accounting for occasional expensive operations (like array resizing) spread across many cheap ones.
+*   **Brute Force**: An algorithmic strategy that systematically enumerates all possible candidates and checks each one.
+*   **Backtracking**: An optimization of brute force that incrementally builds candidate solutions and abandons (prunes) a candidate as soon as it determines the candidate cannot lead to a valid solution.
+*   **Pruning**: The act of skipping entire branches of a search tree when it is determined that no valid solution can be found in that branch.
+
+#### **3. Formulas**
+
+*   **ArrayList `add`/`remove` complexity**: $O(n - i)$ where $i$ is the index of the operation
+*   **Singly Linked List `get`/`set`/`add`/`remove` complexity**: $O(i)$ where $i$ is the target index
+*   **Doubly Linked List `get`/`set`/`add`/`remove` complexity**: $O(\min(i, n - i))$ where $i$ is the target index
+*   **Circular array index**: $\text{index} = (\text{current} + 1) \mod \text{capacity}$
+*   **Fibonacci recurrence (time)**: $T(n) = T(n-1) + T(n-2)$, giving $T(n) = O(2^n)$; more precisely $O(\varphi^n)$ where $\varphi = \frac{1+\sqrt{5}}{2}$
+*   **Binary search recurrence**: $T(n) = T(n/2) + O(1) = O(\log n)$
+*   **Number of sequences of length $n$ with digits $0$ to $k$**: $(k+1)^n$
+*   **Number of subsets of a set of size $n$**: $2^n$
+*   **Conditional subsets recurrence**: $F(\{x\} \cup B, k) = F(B, k) + F(B, k - x)$, with $F(\emptyset, k) = [k = 0]$
+
+#### **4. Examples**
+##### **4.1. Reverse a Doubly Linked List in $O(n)$** (Problem Set 2, Problem 2.1.1)
+
+Consider a `DoublyLinkedList` $A$. Write pseudocode for an efficient `reverse` method performing in $O(n)$, using only List ADT methods.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use two pointers — one from the front and one from the back — and swap elements, meeting in the middle.
+
+1.  **Initialize two indices:** Let `left = 0` and `right = size() - 1`.
+2.  **Swap elements from both ends inward:**
+    ```
+    while left < right:
+        temp = get(left)
+        set(left, get(right))
+        set(right, temp)
+        left = left + 1
+        right = right - 1
+    ```
+3.  **Complexity analysis:** Each `get` and `set` on a DoublyLinkedList at index $i$ costs $O(\min(i, n - i))$. The `left` index accesses near the head and `right` near the tail, so each access is $O(1)$ or close to it. We perform $n/2$ swaps, so total time is $O(n)$.
+
+**Answer:** Swap elements at positions `left` and `right` moving inward. Total complexity: $O(n)$.
+
+</details>
+
+##### **4.2. Reverse an ArrayList** (Problem Set 2, Problem 2.1.2)
+
+Determine the time complexity of reversing an `ArrayList` using only List ADT methods. Justify briefly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the same two-pointer swap approach as in Problem 2.1.1.
+
+1.  **Approach:** Use `get` and `set` with two pointers (front and back), swapping inward.
+2.  **Complexity:** `get(i)` and `set(i, x)` are both $O(1)$ for ArrayList. We perform $n/2$ swaps.
+
+**Answer:** $O(n)$. Each `get`/`set` is $O(1)$ and we perform $n/2$ swaps.
+
+</details>
+
+##### **4.3. Reverse a Singly Linked List without Tail Pointer** (Problem Set 2, Problem 2.1.3)
+
+Determine the time complexity of reversing a `LinkedList` without a tail pointer using only List ADT methods. Justify briefly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Using `get(i)` and `set(i, x)` on a singly linked list costs $O(i)$ each. The two-pointer swap approach requires accessing both ends.
+
+1.  **Approach:** Swap `get(left)` and `get(right)` for indices moving inward.
+2.  **Cost per swap:** Accessing index `right` (near end) costs $O(n)$ each time.
+3.  **Total cost:** $n/2$ swaps, each costing up to $O(n)$, gives $O(n^2)$.
+
+Alternatively, one can use `remove` and `add` operations, but removing/adding at the end also costs $O(n)$ without a tail pointer.
+
+**Answer:** $O(n^2)$. Each access near the tail costs $O(n)$, and we need $O(n)$ such accesses.
+
+</details>
+
+##### **4.4. Reverse a Singly Linked List with Tail Pointer** (Problem Set 2, Problem 2.1.4)
+
+Determine the time complexity of reversing a `LinkedList` with a tail pointer using only List ADT methods. Justify briefly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A tail pointer helps with `addLast` and accessing the last element, but it does *not* help with `get(i)` for arbitrary $i$ — that still requires traversal from the head.
+
+1.  **Approach:** Same as without tail pointer — the List ADT methods `get(i)` and `set(i, x)` still cost $O(i)$.
+2.  **The tail pointer does not help** because we need to access elements at positions near the end via `get`, which always traverses from the head.
+
+**Answer:** $O(n^2)$. The tail pointer does not improve `get(i)` or `set(i, x)` for arbitrary indices.
+
+</details>
+
+##### **4.5. Reverse an ArrayStack** (Problem Set 2, Problem 2.1.5)
+
+Determine the time complexity of reversing an `ArrayStack` using only Stack ADT methods. Justify briefly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** With only stack methods (`push`, `pop`, `peek`), the only way to access elements is to pop them all.
+
+1.  **Approach:** Pop all elements into a temporary structure (e.g., another stack or array), then push them back in the desired order.
+    - Pop all $n$ elements into an auxiliary stack $B$: $O(n)$.
+    - But this reverses the order. Popping from $B$ back into $A$ would restore original order. So we need a *second* auxiliary stack $C$: pop from $B$ into $C$, then pop from $C$ into $A$.
+    - Alternative: pop all $n$ elements into an auxiliary array, then push them back in the same order (from first popped to last popped — which is already reverse order of the original).
+
+2.  **Using only stack ADT methods and one auxiliary stack:**
+    - Pop all elements from $A$ into auxiliary stack $B$: the order in $B$ is reversed.
+    - Now $B$ contains the reversed version. Copy $B$ back into $A$: pop all from $B$ into another temp, then push into $A$.
+    - Total: $O(n)$.
+
+**Answer:** $O(n)$. Pop all elements and push them back in reversed order using auxiliary storage.
+
+</details>
+
+##### **4.6. Reverse a LinkedStack** (Problem Set 2, Problem 2.1.6)
+
+Determine the time complexity of reversing a `LinkedStack` using only Stack ADT methods. Justify briefly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Same approach as ArrayStack — the available operations are identical (Stack ADT).
+
+1.  **Approach:** Pop all elements into an auxiliary stack, then transfer appropriately.
+2.  **All operations** (`push`, `pop`) are $O(1)$ for LinkedStack.
+
+**Answer:** $O(n)$. Same approach as ArrayStack; all stack operations are $O(1)$.
+
+</details>
+
+##### **4.7. Reverse an ArrayQueue** (Problem Set 2, Problem 2.1.7)
+
+Determine the time complexity of reversing an `ArrayQueue` using only Queue ADT methods. Justify briefly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Queue ADT methods only allow adding at the rear (`offer`) and removing from the front (`poll`). With only a queue, reversing is not straightforward because the FIFO order is always preserved.
+
+1.  **Approach:** Using only queue operations on a single queue, you can cycle elements ($n - 1$ times poll and re-offer to move the last element to the front), but this gives $O(n^2)$.
+2.  **With an auxiliary stack:** Poll all $n$ elements from the queue into a stack, then pop all elements from the stack and offer them back into the queue. The stack reverses the order. This is $O(n)$, but requires a stack (not just queue methods).
+3.  **Using only Queue ADT methods (no auxiliary data structures other than queues):** Reversing a queue using only queue operations requires $O(n^2)$ time.
+
+**Answer:** $O(n^2)$ using only Queue ADT methods. Each element must be cycled through the queue, requiring $O(n)$ work per element.
+
+</details>
+
+##### **4.8. Reverse a LinkedQueue** (Problem Set 2, Problem 2.1.8)
+
+Determine the time complexity of reversing a `LinkedQueue` using only Queue ADT methods. Justify briefly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Same situation as ArrayQueue — the available operations are identical (Queue ADT).
+
+1.  **Approach:** Same as ArrayQueue. Queue ADT only provides `offer` and `poll`, which maintain FIFO order.
+2.  **All operations** are $O(1)$ for LinkedQueue, but the algorithmic constraint is the same.
+
+**Answer:** $O(n^2)$ using only Queue ADT methods, for the same reason as ArrayQueue.
+
+</details>
+
+##### **4.9. Queue Using Two Stacks** (Problem Set 2, Problem 2.2)
+
+Suggest an implementation of a queue using two stacks. Write pseudocode for `offer(x)` and `poll()`, justify correctness, and analyze worst-case time complexity.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use two stacks — an "inbox" stack for incoming elements and an "outbox" stack for outgoing elements. When the outbox is empty and we need to dequeue, transfer all elements from the inbox to the outbox, which reverses their order and gives us FIFO access.
+
+1.  **Main idea:** Maintain two stacks, `inbox` and `outbox`.
+    - `offer(x)` always pushes to `inbox`.
+    - `poll()` pops from `outbox`. If `outbox` is empty, first transfer all elements from `inbox` to `outbox` (by popping from `inbox` and pushing to `outbox`).
+
+2.  **Pseudocode:**
+
+    ```python
+    class QueueFromStacks:
+        inbox = new empty stack
+        outbox = new empty stack
+
+        def offer(x):
+            inbox.push(x)
+
+        def poll():
+            if outbox.is_empty():
+                while not inbox.is_empty():
+                    outbox.push(inbox.pop())
+            return outbox.pop()
+    ```
+
+3.  **Correctness:**
+    - `offer(x)`: Simply pushes onto `inbox`. Elements in `inbox` are in reverse order of arrival (last arrived is on top).
+    - `poll()`: When we transfer from `inbox` to `outbox`, the order is reversed again, so `outbox` has elements in FIFO order (first arrived is on top). Subsequent `poll` calls pop from `outbox` in correct FIFO order until it is empty.
+
+4.  **Worst-case time complexity:**
+    - `offer(x)`: $O(1)$ — single push.
+    - `poll()`: $O(n)$ worst case — when `outbox` is empty, all $n$ elements from `inbox` are transferred.
+
+5.  **Amortized analysis:** Each element is pushed and popped at most twice (once into/from `inbox`, once into/from `outbox`), so the amortized cost per operation is $O(1)$.
+
+**Answer:** Use two stacks (inbox/outbox). `offer` is $O(1)$, `poll` is $O(n)$ worst case but $O(1)$ amortized.
+
+</details>
+
+##### **4.10. Counting Subsets with a Given Sum (Brute Force)** (Problem Set 2, Problem 2.3)
+
+Let $A$ be an array of $n$ integers. Show how to compute the number of ways to select $k$ elements of $A$ such that their sum equals $m$ using a brute force approach.
+
+1. Describe the main idea.
+2. Write pseudocode.
+3. Compute the asymptotic time complexity and briefly justify it.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Enumerate all subsets of size $k$ and check if their sum equals $m$. This can be done recursively by deciding, for each element, whether to include it or not, while tracking the current subset size and sum.
+
+1.  **Main idea:** Use recursion (or iteration) to enumerate all subsets $I \subseteq \{1, \dots, n\}$ of size $k$. For each such subset, compute $\sum_{i \in I} A[i]$ and check if it equals $m$. Count the number of subsets that satisfy the condition.
+
+2.  **Pseudocode (recursive):**
+
+    ```python
+    def count_subsets(A, n, k, m):
+        return helper(A, n, 0, k, m)
+
+    def helper(A, n, i, remaining, target):
+        if remaining == 0:
+            if target == 0:
+                return 1
+            else:
+                return 0
+        if i == n:
+            return 0
+        # Don't include A[i]
+        without = helper(A, n, i + 1, remaining, target)
+        # Include A[i]
+        with_i = helper(A, n, i + 1, remaining - 1, target - A[i])
+        return without + with_i
+    ```
+
+3.  **Time complexity:** The recursion explores a binary tree of depth $n$ (at each of $n$ elements, we choose to include or exclude). However, we prune branches where `remaining` reaches 0 early. In the worst case, the number of subsets of size $k$ from $n$ elements is $\binom{n}{k}$, and checking each takes $O(1)$ (since we track the sum incrementally). The total number of recursive calls is at most $O(2^n)$, but more precisely bounded by $O(\binom{n}{k} \cdot 1) = O\left(\binom{n}{k}\right)$ for the leaves, with internal nodes adding at most a constant factor. Overall: $O\left(\binom{n}{k}\right)$ in terms of subsets checked, or $O(2^n)$ as a loose upper bound.
+
+**Answer:** Recursively enumerate all $\binom{n}{k}$ subsets of size $k$, checking if each sums to $m$. Time complexity: $O\left(\binom{n}{k}\right)$ (or $O(2^n)$ as an upper bound).
+
+</details>
+
+##### **4.11. Factorial (Recursive)** (Lecture 2, Example 1)
+
+Write a recursive function to compute $n!$ and analyze its time and space complexity.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```python
+def factorial(n):
+    if n == 0:
+        return 1
+    else:
+        return n * factorial(n - 1)
+```
+
+1.  **Base case:** $n = 0$ returns 1.
+2.  **Recursive case:** Returns $n \times \text{factorial}(n - 1)$.
+3.  **Time complexity:** $O(n)$ — one recursive call per decrement of $n$.
+4.  **Space complexity:** $O(n)$ — the call stack grows to depth $n$.
+
+**Answer:** Time: $O(n)$, Space: $O(n)$.
+
+</details>
+
+##### **4.12. Fibonacci (Recursive)** (Lecture 2, Example 2)
+
+Write a recursive function to compute the $n$-th Fibonacci number and analyze its time complexity.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```python
+def fibonacci(n):
+    if n == 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+        return fibonacci(n - 1) + fibonacci(n - 2)
+```
+
+1.  **Two base cases:** $n = 0$ returns 0, $n = 1$ returns 1.
+2.  **Recursive case:** Two recursive calls.
+3.  **Time complexity recurrence:**
+    $$T(n) = T(n-1) + T(n-2) + O(1)$$
+    Upper bound: $T(n) \leq 2T(n-1) \leq 2^n$, so $T(n) = O(2^n)$.
+    More precisely, $T(n) = O(\varphi^n)$ where $\varphi = \frac{1+\sqrt{5}}{2} \approx 1.618$.
+4.  **Space complexity:** $O(n)$ — maximum depth of recursion.
+
+**Answer:** Time: $O(2^n)$ (more precisely $O(\varphi^n)$). Space: $O(n)$.
+
+</details>
+
+##### **4.13. Binary Search (Recursive)** (Lecture 2, Example 3)
+
+Write a recursive binary search and analyze its time and space complexity.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```python
+def binsearch(A, l, r, x):
+    if l > r:
+        return NOT_FOUND
+    else:
+        mid = (l + r) // 2
+        if A[mid] == x:
+            return mid
+        elif A[mid] > x:
+            return binsearch(A, l, mid - 1, x)
+        else:
+            return binsearch(A, mid + 1, r, x)
+```
+
+1.  **Base case:** $l > r$ means the element is not found.
+2.  **Recursive case:** Compare target $x$ with middle element. Recurse on the left or right half.
+3.  **Correctness:** The search interval halves each time. If $x$ exists in the sorted array, it will eventually be found at `mid`. If not, the interval shrinks to empty.
+4.  **Time complexity:** $T(n) = T(n/2) + O(1) = O(\log n)$.
+5.  **Space complexity:** $O(\log n)$ due to the call stack. (Can be reduced to $O(1)$ with an iterative version since this is tail-recursive.)
+
+**Answer:** Time: $O(\log n)$. Space: $O(\log n)$ (recursive), $O(1)$ (iterative).
+
+</details>
+
+##### **4.14. N Queens Problem (Backtracking)** (Lecture 2, Example 4)
+
+Solve the N Queens problem: place $n$ queens on an $n \times n$ board so that no two queens share a row, column, or diagonal.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Place queens row by row. For each row, try each column. If placing a queen is safe (no conflicts with previously placed queens), move to the next row. If no column works, backtrack to the previous row and try the next column.
+
+```python
+def queens(n):
+    columns = [0] * n
+    i = 0
+    while i >= 0 and i < n:
+        j = columns[i]
+        while j < n and not safe(columns, i, j):
+            j = j + 1
+        if j < n:
+            columns[i] = j
+            i = i + 1           # move to next row
+        else:
+            columns[i] = 0      # reset this row
+            i = i - 1           # backtrack
+            if i >= 0:
+                columns[i] = columns[i] + 1  # try next column
+    return columns
+
+def safe(columns, row, col):
+    for r in range(row):
+        c = columns[r]
+        if c == col:                        # same column
+            return False
+        if abs(c - col) == abs(r - row):    # same diagonal
+            return False
+    return True
+```
+
+1.  **`safe` function:** Checks that the new queen at `(row, col)` doesn't share a column or diagonal with any previously placed queen.
+2.  **Backtracking:** When no valid column is found for row $i$, reset and go back to row $i - 1$.
+3.  **Pruning:** Invalid placements are detected early, pruning entire subtrees of the search space.
+4.  **Examples:** No solution exists for $n = 2$ or $n = 3$. Solutions exist for $n = 1$ and $n \geq 4$.
+
+**Answer:** Use row-by-row placement with backtracking. The `safe` check prunes invalid branches efficiently.
+
+</details>

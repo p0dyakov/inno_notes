@@ -1,0 +1,808 @@
+---
+title: "W2. Elementary Matrices, LU Decomposition, Pivoting, LDU and Cholesky Decomposition"
+author: "Zakhar Podyakov"
+date: "January 29, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+##### **1.1 Elementary Matrices**
+An **elementary matrix** is a matrix obtained by performing a single elementary row operation on an identity matrix $I$. Elementary matrices are the building blocks of Gaussian elimination: every step of row reduction can be expressed as multiplication by an elementary matrix.
+
+There are three types of elementary matrices:
+
+- **Row Swap** $P_{ij}$: swaps rows $i$ and $j$ of the identity matrix. Multiplying $P_{ij}A$ swaps rows $i$ and $j$ of $A$.
+- **Row Scaling** $D_i(\alpha)$: multiplies row $i$ of the identity by a nonzero scalar $\alpha$. Multiplying $D_i(\alpha)A$ scales row $i$ of $A$ by $\alpha$.
+- **Row Addition** $E_{ij}(\alpha)$: adds $\alpha$ times row $j$ to row $i$ in the identity. Multiplying $E_{ij}(\alpha)A$ adds $\alpha$ times row $j$ to row $i$ of $A$.
+
+###### **1.1.1 Inverses of Elementary Matrices**
+Each elementary matrix is invertible, and its inverse is another elementary matrix that "undoes" the operation:
+
+- $P_{ij}^{-1} = P_{ij}$ (swapping twice returns to original)
+- $D_i(\alpha)^{-1} = D_i(1/\alpha)$ (scale by $1/\alpha$ to undo)
+- $E_{ij}(\alpha)^{-1} = E_{ij}(-\alpha)$ (subtract what was added)
+
+###### **1.1.2 Determinants of Elementary Matrices**
+
+- $\det(P_{ij}) = -1$ (row swap flips sign)
+- $\det(D_i(\alpha)) = \alpha$
+- $\det(E_{ij}(\alpha)) = 1$ (adding a multiple of one row to another does not change the determinant)
+
+###### **1.1.3 Fundamental Theorem**
+Every invertible matrix can be expressed as a product of elementary matrices:
+$$A = E_1 E_2 \cdots E_k$$
+The inverse is then:
+$$A^{-1} = E_k^{-1} \cdots E_2^{-1} E_1^{-1}$$
+
+This is the theoretical basis of Gauss-Jordan elimination: reducing $[A \mid I]$ to $[I \mid A^{-1}]$ amounts to left-multiplying by a sequence of elementary matrices.
+
+##### **1.2 Right Multiplication by Elementary Matrices**
+A crucial distinction: when an elementary matrix multiplies $A$ from the **left** ($EA$), it performs a **row** operation. When it multiplies from the **right** ($AE$), it performs the corresponding **column** operation.
+
+| Operation | Left Multiply $EA$ | Right Multiply $AE$ |
+| :--- | :--- | :--- |
+| **Row swap $P_{ij}$** | Swaps rows $i$ and $j$ | Swaps columns $i$ and $j$ |
+| **Row scale $D_i(\alpha)$** | Scales row $i$ by $\alpha$ | Scales column $i$ by $\alpha$ |
+| **Row add $E_{ij}(\alpha)$** | Adds $\alpha \times$ row $j$ to row $i$ | Adds $\alpha \times$ col $i$ to col $j$ |
+| **Effect on** | Row space | Column space |
+| **Preserves** | Column relations | Row relations |
+| **Use case** | Solving $Ax = b$ | Solving $xA = b$ |
+
+For example, if $A = \begin{pmatrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{pmatrix}$ and $P_{23} = \begin{pmatrix} 1 & 0 & 0 \\ 0 & 0 & 1 \\ 0 & 1 & 0 \end{pmatrix}$, then $P_{23}A$ swaps rows 2 and 3, while $AP_{23}$ swaps columns 2 and 3.
+
+###### **1.2.1 Properties of Permutation Matrices**
+A permutation matrix $P_{ij}$ is both **symmetric** and **orthogonal**:
+$$P_{ij}^T = P_{ij}^{-1} = P_{ij}$$
+This means $P_{ij}$ is its own inverse and its own transpose.
+
+For **symmetric matrices**, we often use **symmetric permutations** of the form $PAP^T$, which simultaneously permute both rows and columns. This preserves symmetry and eigenvalue structure because $(PAP^T)^T = (P^T)^T A^T P^T = PAP^T$.
+
+##### **1.3 Triangular Systems**
+Triangular systems are particularly easy to solve, which motivates decomposing matrices into triangular factors.
+
+###### **1.3.1 Forward Substitution (Lower Triangular)**
+For a lower triangular system $Lx = b$, solve from top to bottom:
+$$x_1 = b_1 / l_{11}, \quad x_2 = (b_2 - l_{21}x_1) / l_{22}, \quad \ldots$$
+
+In general:
+$$x_i = \frac{1}{l_{ii}} \left( b_i - \sum_{j=1}^{i-1} l_{ij} x_j \right)$$
+
+###### **1.3.2 Back Substitution (Upper Triangular)**
+For an upper triangular system $Ux = b$, solve from bottom to top:
+$$x_n = b_n / u_{nn}, \quad x_{n-1} = (b_{n-1} - u_{n-1,n}x_n) / u_{n-1,n-1}, \quad \ldots$$
+
+In general:
+$$x_i = \frac{1}{u_{ii}} \left( b_i - \sum_{j=i+1}^{n} u_{ij} x_j \right)$$
+
+##### **1.4 LU Decomposition**
+**LU decomposition** factors a matrix $A$ into the product of a **lower triangular** matrix $L$ and an **upper triangular** matrix $U$:
+$$A = LU$$
+
+The matrix $U$ is exactly the result of Gaussian elimination on $A$, and $L$ stores the multipliers used during elimination. To ensure uniqueness, we require $L$ to be **unit lower triangular** (1's on the diagonal).
+
+###### **1.4.1 Deriving LU from Gaussian Elimination**
+During Gaussian elimination, each row operation corresponds to an elementary matrix. If we reduce $A$ to $U$ using operations $E_k \cdots E_2 E_1$, then:
+$$E_k \cdots E_2 E_1 A = U$$
+$$A = E_1^{-1} E_2^{-1} \cdots E_k^{-1} U = LU$$
+
+The product $L = E_1^{-1} E_2^{-1} \cdots E_k^{-1}$ is lower triangular. A key convenience: the entries below the diagonal of $L$ are simply the **negatives** of the multipliers used in elimination. For instance, if the operation "subtract 4 times row 1 from row 2" is performed, then $l_{21} = 4$ (the positive multiplier).
+
+###### **1.4.2 Existence and Uniqueness**
+An invertible matrix $A$ has an LU decomposition (without pivoting) if and only if all its **leading principal minors** are nonzero. The $k$-th leading principal minor $M_k$ is the determinant of the top-left $k \times k$ submatrix of $A$.
+
+If $A$ is invertible and all leading principal minors are nonzero, then the unit lower triangular LU decomposition is **unique**.
+
+*Example of failure:* The matrix $\begin{bmatrix} 0 & 1 \\ 1 & 0 \end{bmatrix}$ is invertible but $M_1 = 0$, so standard LU decomposition does not exist — pivoting is required.
+
+###### **1.4.3 Why LU is Efficient**
+If we need to solve $Ax = b$ for many different right-hand sides $b_1, b_2, \ldots, b_k$, naive Gaussian elimination costs $k \cdot \frac{2}{3}n^3$ flops. With LU decomposition, we factor once ($\frac{2}{3}n^3$) and then solve each system with forward and back substitution ($2n^2$ each), giving a total cost of $\frac{2}{3}n^3 + k \cdot 2n^2$. For large $k$, the savings are enormous.
+
+*Example:* For $n = 1000$ and $k = 1000$ right-hand sides, LU requires about 2.67 billion flops vs. 667 billion for repeated Gaussian elimination.
+
+##### **1.5 Pivoting**
+When a zero (or very small) pivot is encountered during Gaussian elimination, we must **swap rows** (and possibly columns) to place a suitable pivot element in the diagonal position. This process is called **pivoting**.
+
+###### **1.5.1 Partial Pivoting**
+**Partial pivoting** searches the current column below the diagonal for the largest element in absolute value, then swaps it into the pivot position.
+
+**Algorithm** at step $k$:
+
+1. Find $p$ such that $|a_{pk}| = \max_{i \ge k} |a_{ik}|$
+2. Swap rows $k$ and $p$
+3. Continue elimination
+
+The result is the factorization:
+$$PA = LU$$
+where $P$ is a permutation matrix recording all row swaps, $L$ is unit lower triangular with $|l_{ij}| \le 1$, and $U$ is upper triangular.
+
+Partial pivoting always exists for any invertible matrix $A$. Once $P$ is fixed, $L$ and $U$ are unique.
+
+###### **1.5.2 Complete Pivoting**
+**Complete pivoting** searches the entire remaining submatrix (not just one column) for the largest element:
+
+**Algorithm** at step $k$:
+
+1. Find $(p, q)$ such that $|a_{pq}| = \max_{i,j \ge k} |a_{ij}|$
+2. Swap rows $k$ and $p$ (using $P$)
+3. Swap columns $k$ and $q$ (using $Q$)
+4. Continue elimination
+
+The result is:
+$$PAQ = LU$$
+where $P$ permutes rows, $Q$ permutes columns, $L$ is unit lower triangular, and $U$ is upper triangular. This factorization exists for **any** matrix $A$, even singular ones.
+
+###### **1.5.3 Numerical Stability**
+The **growth factor** measures how much entries grow during elimination:
+$$\rho = \frac{\max_{i,j} |a_{ij}^{(k)}|}{\max_{i,j} |a_{ij}|}$$
+
+- **No pivoting:** $\rho$ can reach $2^{n-1}$ (catastrophic)
+- **Partial pivoting:** $\rho \le 2^{n-1}$ (worst case), but in practice $\rho$ is small
+- **Complete pivoting:** $\rho \le n^{1/2}(2 \cdot 3^{1/2} \cdots n^{1/(n-1)}) \sim O(n^{\frac{1}{2}\log n})$
+
+| | Partial | Complete |
+| :--- | :--- | :--- |
+| **Operation** | Row swaps | Row + column swaps |
+| **Search cost** | $O(n)$ per step | $O(n^2)$ per step |
+| **Total extra cost** | $O(n^2)$ | $O(n^3)$ |
+| **Stability** | Usually sufficient | Best possible |
+| **Growth bound** | $\le 2^{n-1}$ | $\sim O(n^{\log n})$ |
+| **Form** | $PA = LU$ | $PAQ = LU$ |
+| **Usage** | Default in practice | Ill-conditioned/rank-deficient |
+
+###### **1.5.4 Rook Pivoting**
+**Rook pivoting** is a compromise between partial and complete pivoting: it searches both the current row and column but stops at the first element that is largest in both its row and column. It is almost as stable as complete pivoting with expected cost $O(n^2)$.
+
+###### **1.5.5 Solving Systems with Complete Pivoting**
+To solve $AX = B$ when complete pivoting is needed:
+
+1. Compute $PAQ = LU$
+2. Rewrite: $PAQ(Q^TX) = PB$
+3. Let $Y = Q^TX$, then solve $LZ = PB$ (forward substitution), then $UY = Z$ (back substitution)
+4. Recover $X = QY$ (reverse column permutation)
+
+###### **1.5.6 Determinant with Pivoting**
+For a permutation matrix $P_{ij}$:
+
+- $\det(P_{ij}A) = -\det(A)$ (row swap)
+- $\det(AP_{ij}) = -\det(A)$ (column swap)
+- $\det(P_{ij}AP_{ij}) = \det(A)$ (simultaneous row and column swap)
+
+In the decomposition $PAQ = LU$:
+$$\det(A) = \det(P^{-1}) \det(L) \det(U) \det(Q^{-1}) = \pm \prod_{i} u_{ii}$$
+
+###### **1.5.7 When to Use Which**
+**Partial pivoting suffices for:**
+
+- Most well-conditioned problems
+- Diagonally dominant matrices
+- Symmetric positive definite matrices (no pivoting needed at all)
+
+**Complete pivoting is needed for:**
+
+- Ill-conditioned matrices ($\kappa(A) \gg 1$)
+- Rank-deficient matrices (determining rank)
+- Computing null space
+- When backward stability is critical
+
+##### **1.6 LDU Decomposition**
+From the LU decomposition $A = LU$, we can factor out the diagonal of $U$ to get:
+$$A = LDU_0$$
+where $D = \text{diag}(u_{11}, u_{22}, \ldots, u_{nn})$ is the diagonal matrix of pivots and $U_0 = D^{-1}U$ is unit upper triangular (1's on the diagonal).
+
+###### **1.6.1 Symmetric Case: $LDL^T$**
+If $A$ is **symmetric** ($A = A^T$), then in the LDU decomposition, $U_0 = L^T$. This gives:
+$$A = LDL^T$$
+This is more storage-efficient (only $L$ and $D$ are needed) and preserves the symmetry of the matrix.
+
+##### **1.7 Symmetric Positive Definite Matrices and Cholesky Decomposition**
+A symmetric matrix $A$ is **symmetric positive definite (SPD)** if $x^TAx > 0$ for every nonzero vector $x$.
+
+###### **1.7.1 Sylvester's Criterion**
+A symmetric matrix $A$ is positive definite if and only if **all its leading principal minors are positive**: $M_1 > 0$, $M_2 > 0$, $\ldots$, $M_n > 0$.
+
+###### **1.7.2 Cholesky Decomposition**
+For SPD matrices, the $LDL^T$ decomposition can be taken further. Since all diagonal entries of $D$ are positive (because all pivots of an SPD matrix are positive), we can write $D = D^{1/2} D^{1/2}$ and absorb the square roots into $L$:
+$$A = LL^T$$
+where $L$ is lower triangular with **positive diagonal entries**. This is the **Cholesky decomposition**.
+
+**Advantages of Cholesky:**
+
+- Costs only $\frac{1}{3}n^3$ flops (half of LU)
+- Numerically stable without pivoting
+- Requires only storing one triangular factor
+
+##### **1.8 Matrix Inversion**
+###### **1.8.1 The 2x2 Inverse Formula**
+For a $2 \times 2$ matrix $A = \begin{bmatrix} a & b \\ c & d \end{bmatrix}$ with $\det(A) = ad - bc \neq 0$:
+$$A^{-1} = \frac{1}{ad - bc} \begin{bmatrix} d & -b \\ -c & a \end{bmatrix}$$
+
+###### **1.8.2 Gauss-Jordan Method**
+To find $A^{-1}$, augment $A$ with the identity $[A \mid I]$ and apply row operations until the left side becomes $I$. The right side then equals $A^{-1}$.
+
+###### **1.8.3 Properties Preserved by Inversion**
+If $A$ is invertible, then $A^{-1}$:
+
+- **Is triangular** if $A$ is triangular (upper stays upper, lower stays lower) — provable by induction
+- **Is symmetric** if $A$ is symmetric — because $(A^{-1})^T = (A^T)^{-1} = A^{-1}$
+- **Is NOT necessarily tridiagonal** even if $A$ is tridiagonal — the inverse is generally a full/dense matrix
+- **Does NOT necessarily have integer entries** even if $A$ does — the inverse involves division by the determinant
+
+##### **1.9 Matrix Multiplication and Row/Column Interpretation**
+Each row of the product $AB$ is a linear combination of the rows of $B$, with coefficients from the corresponding row of $A$. Similarly, each column of $AB$ is a linear combination of the columns of $A$, with coefficients from the corresponding column of $B$.
+
+For example, if $A = \begin{bmatrix} 2 & 1 & 4 \\ 0 & -1 & 1 \end{bmatrix}$ and $B = \begin{bmatrix} 1 & 1 \\ 0 & 1 \\ 1 & 0 \end{bmatrix}$, then the first row of $AB$ is $2 \cdot [1,1] + 1 \cdot [0,1] + 4 \cdot [1,0] = [6,3]$.
+
+#### **2. Definitions**
+*   **Elementary Matrix**: A matrix obtained by performing a single elementary row operation on the identity matrix.
+*   **Row Swap Matrix ($P_{ij}$)**: An elementary matrix that swaps rows $i$ and $j$; also called a permutation matrix.
+*   **Row Scaling Matrix ($D_i(\alpha)$)**: An elementary matrix that multiplies row $i$ by a nonzero scalar $\alpha$.
+*   **Row Addition Matrix ($E_{ij}(\alpha)$)**: An elementary matrix that adds $\alpha$ times row $j$ to row $i$.
+*   **LU Decomposition**: A factorization $A = LU$ where $L$ is unit lower triangular and $U$ is upper triangular.
+*   **Leading Principal Minor ($M_k$)**: The determinant of the top-left $k \times k$ submatrix of a matrix.
+*   **Partial Pivoting**: A pivoting strategy that swaps rows to place the largest element (in absolute value) in the current column into the pivot position, yielding $PA = LU$.
+*   **Complete Pivoting**: A pivoting strategy that swaps both rows and columns to place the largest element in the remaining submatrix into the pivot position, yielding $PAQ = LU$.
+*   **Rook Pivoting**: A compromise pivoting strategy that searches both the current row and column for the first element that is largest in both.
+*   **Growth Factor ($\rho$)**: The ratio of the largest entry appearing during elimination to the largest entry of the original matrix; measures numerical stability.
+*   **LDU Decomposition**: A factorization $A = LDU_0$ where $L$ is unit lower triangular, $D$ is diagonal (containing the pivots), and $U_0$ is unit upper triangular.
+*   **Symmetric Positive Definite (SPD) Matrix**: A symmetric matrix $A$ such that $x^TAx > 0$ for every nonzero vector $x$.
+*   **Sylvester's Criterion**: A symmetric matrix is positive definite if and only if all its leading principal minors are positive.
+*   **Cholesky Decomposition**: For SPD matrices, $A = LL^T$ where $L$ is lower triangular with positive diagonal entries.
+*   **Matrix Equivalence**: Two matrices $A$ and $B$ are equivalent if there exist invertible matrices $P$ and $Q$ such that $B = PAQ$.
+*   **Gauss-Jordan Elimination**: A method to compute $A^{-1}$ by row-reducing the augmented matrix $[A \mid I]$ to $[I \mid A^{-1}]$.
+
+#### **3. Formulas**
+*   **Inverse of Row Swap**: $P_{ij}^{-1} = P_{ij}$
+*   **Inverse of Row Scaling**: $D_i(\alpha)^{-1} = D_i(1/\alpha)$
+*   **Inverse of Row Addition**: $E_{ij}(\alpha)^{-1} = E_{ij}(-\alpha)$
+*   **Determinant of Row Swap**: $\det(P_{ij}) = -1$
+*   **Determinant of Row Scaling**: $\det(D_i(\alpha)) = \alpha$
+*   **Determinant of Row Addition**: $\det(E_{ij}(\alpha)) = 1$
+*   **LU Decomposition**: $A = LU$ (exists when all leading principal minors $M_k \neq 0$)
+*   **LU with Partial Pivoting**: $PA = LU$ (exists for any invertible $A$)
+*   **LU with Complete Pivoting**: $PAQ = LU$ (exists for any matrix $A$, including singular)
+*   **LDU Decomposition**: $A = LDU_0$ where $D = \text{diag}(u_{11}, \ldots, u_{nn})$ and $U_0 = D^{-1}U$
+*   **Symmetric LDU**: $A = LDL^T$ (when $A$ is symmetric)
+*   **Cholesky Decomposition**: $A = LL^T$ (when $A$ is symmetric positive definite)
+*   **Cholesky Cost**: $\frac{1}{3}n^3$ flops
+*   **LU Cost**: $\frac{2}{3}n^3$ flops for factorization, $2n^2$ flops per solve
+*   **Forward Substitution**: $x_i = \frac{1}{l_{ii}}\left(b_i - \sum_{j=1}^{i-1} l_{ij}x_j\right)$
+*   **Back Substitution**: $x_i = \frac{1}{u_{ii}}\left(b_i - \sum_{j=i+1}^{n} u_{ij}x_j\right)$
+*   **Determinant from PAQ = LU**: $\det(A) = \pm \prod_{i} u_{ii}$
+*   **2x2 Inverse**: $\begin{bmatrix} a & b \\ c & d \end{bmatrix}^{-1} = \frac{1}{ad-bc}\begin{bmatrix} d & -b \\ -c & a \end{bmatrix}$
+*   **Transpose of Inverse**: $(A^{-1})^T = (A^T)^{-1}$
+*   **Invertible Matrix as Product of Elementary Matrices**: $A = E_1 E_2 \cdots E_k$
+
+#### **4. Examples**
+##### **4.1. Compute $B - 2A$, $AC$, and $CD$** (Textbook, Section 2.1, Task 1)
+Given $A = \begin{bmatrix} 2 & 0 & -1 \\ 4 & -5 & 2 \end{bmatrix}$, $B = \begin{bmatrix} 7 & -5 & 1 \\ 1 & -4 & -3 \end{bmatrix}$, $C = \begin{bmatrix} 1 & 2 \\ -2 & 1 \end{bmatrix}$, $D = \begin{bmatrix} 3 & 5 \\ -1 & 4 \end{bmatrix}$.
+
+Compute: (a) $B - 2A$, (b) $AC$, (c) $CD$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) $B - 2A$:**
+
+1.  **Compute $-2A$:**
+    $$-2A = (-2)\begin{bmatrix} 2 & 0 & -1 \\ 4 & -5 & 2 \end{bmatrix} = \begin{bmatrix} -4 & 0 & 2 \\ -8 & 10 & -4 \end{bmatrix}$$
+2.  **Add to $B$:**
+    $$B - 2A = \begin{bmatrix} 7 & -5 & 1 \\ 1 & -4 & -3 \end{bmatrix} + \begin{bmatrix} -4 & 0 & 2 \\ -8 & 10 & -4 \end{bmatrix} = \begin{bmatrix} 3 & -5 & 3 \\ -7 & 6 & -7 \end{bmatrix}$$
+
+**(b) $AC$:**
+
+$A$ is $2 \times 3$ and $C$ is $2 \times 2$. The number of columns of $A$ (3) does not match the number of rows of $C$ (2), so $AC$ is **not defined**.
+
+**(c) $CD$:**
+
+1.  **Multiply:**
+    $$CD = \begin{bmatrix} 1 & 2 \\ -2 & 1 \end{bmatrix}\begin{bmatrix} 3 & 5 \\ -1 & 4 \end{bmatrix} = \begin{bmatrix} 1(3)+2(-1) & 1(5)+2(4) \\ -2(3)+1(-1) & -2(5)+1(4) \end{bmatrix} = \begin{bmatrix} 1 & 13 \\ -7 & -6 \end{bmatrix}$$
+
+**Answer:** (a) $\begin{bmatrix} 3 & -5 & 3 \\ -7 & 6 & -7 \end{bmatrix}$, (b) not defined, (c) $\begin{bmatrix} 1 & 13 \\ -7 & -6 \end{bmatrix}$
+
+</details>
+
+##### **4.2. Compute $A + 3B$, $2C - 3E$, $DB$, and $EC$** (Textbook, Section 2.1, Task 2)
+Using the same $A$, $B$, $C$, $D$ from Task 1, and $E$ (a column vector), compute: (a) $A + 3B$, (b) $2C - 3E$, (c) $DB$, (d) $EC$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) $A + 3B$:**
+
+$$A + 3B = \begin{bmatrix} 2 & 0 & -1 \\ 4 & -5 & 2 \end{bmatrix} + 3\begin{bmatrix} 7 & -5 & 1 \\ 1 & -4 & -3 \end{bmatrix} = \begin{bmatrix} 2+21 & 0-15 & -1+3 \\ 4+3 & -5-12 & 2-9 \end{bmatrix} = \begin{bmatrix} 23 & -15 & 2 \\ 7 & -17 & -7 \end{bmatrix}$$
+
+**(b) $2C - 3E$:**
+
+$2C$ is $2 \times 2$ (2 columns) and $-3E$ has only 1 column, so $2C - 3E$ is **not defined** (dimension mismatch).
+
+**(c) $DB$:**
+
+$$DB = \begin{bmatrix} 3 & 5 \\ -1 & 4 \end{bmatrix}\begin{bmatrix} 7 & -5 & 1 \\ 1 & -4 & -3 \end{bmatrix} = \begin{bmatrix} 3(7)+5(1) & 3(-5)+5(-4) & 3(1)+5(-3) \\ -1(7)+4(1) & -1(-5)+4(-4) & -1(1)+4(-3) \end{bmatrix} = \begin{bmatrix} 26 & -35 & -12 \\ -3 & -11 & -13 \end{bmatrix}$$
+
+**(d) $EC$:**
+
+$E$ has 1 column, and $C$ has 2 rows. The number of columns of $E$ does not match the number of rows of $C$, so $EC$ is **not defined**.
+
+**Answer:** (a) $\begin{bmatrix} 23 & -15 & 2 \\ 7 & -17 & -7 \end{bmatrix}$, (b) not defined, (c) $\begin{bmatrix} 26 & -35 & -12 \\ -3 & -11 & -13 \end{bmatrix}$, (d) not defined
+
+</details>
+
+##### **4.3. Determine the Size of $B$** (Textbook, Section 2.1, Task 7)
+If $A$ is a $2 \times 3$ matrix and $AB$ has 7 columns, what is the size of $B$?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For the product $AB$ to be defined, the number of columns of $A$ must equal the number of rows of $B$. The result has the same number of rows as $A$ and the same number of columns as $B$.
+
+1.  **$A$ has 3 columns**, so $B$ must have **3 rows**.
+2.  **$AB$ has 7 columns**, so $B$ must have **7 columns**.
+
+**Answer:** $B$ is $3 \times 7$.
+
+</details>
+
+##### **4.4. Determine the Number of Rows of $B$** (Textbook, Section 2.1, Task 8)
+If $B$ has the same number of rows as $BC$, how many rows does $B$ have if $BC$ has 5 rows?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The product $BC$ has the same number of rows as $B$.
+
+Since $BC$ has 5 rows, $B$ must have **5 rows**.
+
+**Answer:** $B$ has 5 rows.
+
+</details>
+
+##### **4.5. Find $k$ Such That $AB = BA$** (Textbook, Section 2.1, Task 9)
+Given $A = \begin{bmatrix} 2 & 3 \\ -1 & 1 \end{bmatrix}$ and $B = \begin{bmatrix} 1 & 9 \\ -3 & k \end{bmatrix}$, find $k$ such that $AB = BA$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+1.  **Compute $AB$:**
+    $$AB = \begin{bmatrix} 2 & 3 \\ -1 & 1 \end{bmatrix}\begin{bmatrix} 1 & 9 \\ -3 & k \end{bmatrix} = \begin{bmatrix} 2-9 & 18+3k \\ -1-3 & -9+k \end{bmatrix} = \begin{bmatrix} -7 & 18+3k \\ -4 & -9+k \end{bmatrix}$$
+
+2.  **Compute $BA$:**
+    $$BA = \begin{bmatrix} 1 & 9 \\ -3 & k \end{bmatrix}\begin{bmatrix} 2 & 3 \\ -1 & 1 \end{bmatrix} = \begin{bmatrix} 2-9 & 3+9 \\ -6-k & -9+k \end{bmatrix} = \begin{bmatrix} -7 & 12 \\ -6-k & -9+k \end{bmatrix}$$
+
+3.  **Set $AB = BA$ and solve:**
+    *   From position $(1,2)$: $18 + 3k = 12 \implies k = -2$
+    *   From position $(2,1)$: $-4 = -6 - k \implies k = -2$ ✓
+
+**Answer:** $k = -2$
+
+</details>
+
+##### **4.6. Show That $AB = AC$ Does Not Imply $B = C$** (Textbook, Section 2.1, Task 10)
+Given $A = \begin{bmatrix} 3 & -6 \\ -1 & 2 \end{bmatrix}$, $B = \begin{bmatrix} -1 & 1 \\ 3 & 4 \end{bmatrix}$, $C = \begin{bmatrix} -3 & -5 \\ 2 & 1 \end{bmatrix}$. Show that $AB = AC$ even though $B \neq C$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+1.  **Compute $AB$:**
+    $$AB = \begin{bmatrix} 3 & -6 \\ -1 & 2 \end{bmatrix}\begin{bmatrix} -1 & 1 \\ 3 & 4 \end{bmatrix} = \begin{bmatrix} -3-18 & 3-24 \\ 1+6 & -1+8 \end{bmatrix} = \begin{bmatrix} -21 & -21 \\ 7 & 7 \end{bmatrix}$$
+
+2.  **Compute $AC$:**
+    $$AC = \begin{bmatrix} 3 & -6 \\ -1 & 2 \end{bmatrix}\begin{bmatrix} -3 & -5 \\ 2 & 1 \end{bmatrix} = \begin{bmatrix} -9-12 & -15-6 \\ 3+4 & 5+2 \end{bmatrix} = \begin{bmatrix} -21 & -21 \\ 7 & 7 \end{bmatrix}$$
+
+3.  **Conclusion:** $AB = AC$ but $B \neq C$. This is possible because $A$ is **singular** ($\det(A) = 6 - 6 = 0$), so the cancellation law does not hold.
+
+**Answer:** $AB = AC = \begin{bmatrix} -21 & -21 \\ 7 & 7 \end{bmatrix}$, but $B \neq C$. Cancellation fails for singular matrices.
+
+</details>
+
+##### **4.7. Solve $Ax = b$ Using LU Decomposition** (Textbook, Section 2.5, Task 1)
+Given $L = \begin{bmatrix} 1 & 0 & 0 \\ -1 & 1 & 0 \\ 2 & -5 & 1 \end{bmatrix}$, $U = \begin{bmatrix} 3 & -7 & -2 \\ 0 & -2 & -1 \\ 0 & 0 & -1 \end{bmatrix}$, $\mathbf{b} = \begin{bmatrix} -7 \\ 5 \\ 2 \end{bmatrix}$.
+
+Solve $Ax = b$ where $A = LU$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Solve in two steps: first $L\mathbf{y} = \mathbf{b}$ (forward substitution), then $U\mathbf{x} = \mathbf{y}$ (back substitution).
+
+1.  **Solve $L\mathbf{y} = \mathbf{b}$ (forward substitution):**
+    *   $y_1 = -7$
+    *   $-y_1 + y_2 = 5 \implies y_2 = 5 - 7 = -2$
+    *   $2y_1 - 5y_2 + y_3 = 2 \implies y_3 = 2 - (-14) - 10 = 6$
+    *   $\mathbf{y} = \begin{bmatrix} -7 \\ -2 \\ 6 \end{bmatrix}$
+
+2.  **Solve $U\mathbf{x} = \mathbf{y}$ (back substitution):**
+    *   $-x_3 = 6 \implies x_3 = -6$
+    *   $-2x_2 - x_3 = -2 \implies -2x_2 + 6 = -2 \implies x_2 = 4$
+    *   $3x_1 - 7x_2 - 2x_3 = -7 \implies 3x_1 = -7 + 28 - 12 = 9 \implies x_1 = 3$
+
+**Answer:** $\mathbf{x} = \begin{bmatrix} 3 \\ 4 \\ -6 \end{bmatrix}$
+
+</details>
+
+##### **4.8. Solve $Ax = b$ Using LU Decomposition** (Textbook, Section 2.5, Task 2)
+Given $L = \begin{bmatrix} 1 & 0 & 0 \\ -2 & 1 & 0 \\ 0 & 1 & 1 \end{bmatrix}$, $U = \begin{bmatrix} 2 & -6 & 4 \\ 0 & -4 & 8 \\ 0 & 0 & -2 \end{bmatrix}$, $\mathbf{b} = \begin{bmatrix} 2 \\ -4 \\ 6 \end{bmatrix}$.
+
+Solve $Ax = b$ where $A = LU$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+1.  **Solve $L\mathbf{y} = \mathbf{b}$ (forward substitution):**
+    *   $y_1 = 2$
+    *   $-2y_1 + y_2 = -4 \implies y_2 = -4 + 4 = 0$
+    *   $y_2 + y_3 = 6 \implies y_3 = 6$
+    *   $\mathbf{y} = \begin{bmatrix} 2 \\ 0 \\ 6 \end{bmatrix}$
+
+2.  **Solve $U\mathbf{x} = \mathbf{y}$ (back substitution):**
+    *   $-2x_3 = 6 \implies x_3 = -3$
+    *   $-4x_2 + 8x_3 = 0 \implies -4x_2 = 24 \implies x_2 = -6$
+    *   $2x_1 - 6x_2 + 4x_3 = 2 \implies 2x_1 = 2 + 36 - 12 = -10 \implies 2x_1 = 2 - 36 + (-12) = -22 \implies x_1 = -11$
+
+**Answer:** $\mathbf{x} = \begin{bmatrix} -11 \\ -6 \\ -3 \end{bmatrix}$
+
+</details>
+
+##### **4.9. Solve $Ax = b$ Using LU Decomposition** (Textbook, Section 2.5, Task 3)
+Given $L = \begin{bmatrix} 1 & 0 & 0 \\ -2 & 1 & 0 \\ 3 & -1 & 1 \end{bmatrix}$, $U = \begin{bmatrix} 2 & -4 & 2 \\ 0 & -3 & 6 \\ 0 & 0 & 1 \end{bmatrix}$, $\mathbf{b} = \begin{bmatrix} 6 \\ 0 \\ 6 \end{bmatrix}$.
+
+Solve $Ax = b$ where $A = LU$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+1.  **Solve $L\mathbf{y} = \mathbf{b}$:**
+    *   $y_1 = 6$
+    *   $-2(6) + y_2 = 0 \implies y_2 = 12$
+    *   $3(6) - 12 + y_3 = 6 \implies y_3 = 0$
+    *   $\mathbf{y} = \begin{bmatrix} 6 \\ 12 \\ 0 \end{bmatrix}$
+
+2.  **Solve $U\mathbf{x} = \mathbf{y}$:**
+    *   $x_3 = 0$
+    *   $-3x_2 + 6(0) = 12 \implies x_2 = -4$
+    *   $2x_1 - 4(-4) + 2(0) = 6 \implies 2x_1 = 6 - 16 = -10 \implies x_1 = -5$
+
+**Answer:** $\mathbf{x} = \begin{bmatrix} -5 \\ -4 \\ 0 \end{bmatrix}$
+
+</details>
+
+##### **4.10. Solve $Ax = b$ Using LU Decomposition** (Textbook, Section 2.5, Task 4)
+Given $L = \begin{bmatrix} 1 & 0 & 0 \\ 1 & 1 & 0 \\ 3 & -5 & 1 \end{bmatrix}$, $U = \begin{bmatrix} 1 & -1 & 2 \\ 0 & -2 & -1 \\ 0 & 0 & -6 \end{bmatrix}$, $\mathbf{b} = \begin{bmatrix} 0 \\ -5 \\ 7 \end{bmatrix}$.
+
+Solve $Ax = b$ where $A = LU$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+1.  **Solve $L\mathbf{y} = \mathbf{b}$:**
+    *   $y_1 = 0$
+    *   $0 + y_2 = -5 \implies y_2 = -5$
+    *   $3(0) - 5(-5) + y_3 = 7 \implies y_3 = 7 - 25 = -18$
+    *   $\mathbf{y} = \begin{bmatrix} 0 \\ -5 \\ -18 \end{bmatrix}$
+
+2.  **Solve $U\mathbf{x} = \mathbf{y}$:**
+    *   $-6x_3 = -18 \implies x_3 = 3$
+    *   $-2x_2 - 3 = -5 \implies x_2 = 1$
+    *   $x_1 - 1 + 6 = 0 \implies x_1 = -5$
+
+**Answer:** $\mathbf{x} = \begin{bmatrix} -5 \\ 1 \\ 3 \end{bmatrix}$
+
+</details>
+
+##### **4.11. Solve $Ax = b$ Using LU Decomposition (4x4)** (Textbook, Section 2.5, Task 5)
+Given $L = \begin{bmatrix} 1 & 0 & 0 & 0 \\ 3 & 1 & 0 & 0 \\ -1 & 0 & 1 & 0 \\ -3 & 4 & -2 & 1 \end{bmatrix}$, $U = \begin{bmatrix} 1 & -2 & -2 & -3 \\ 0 & -3 & 6 & 0 \\ 0 & 0 & 2 & 4 \\ 0 & 0 & 0 & 1 \end{bmatrix}$, $\mathbf{b} = \begin{bmatrix} 1 \\ 6 \\ 0 \\ 3 \end{bmatrix}$.
+
+Solve $Ax = b$ where $A = LU$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+1.  **Solve $L\mathbf{y} = \mathbf{b}$:**
+    *   $y_1 = 1$
+    *   $3(1) + y_2 = 6 \implies y_2 = 3$
+    *   $-(1) + y_3 = 0 \implies y_3 = 1$
+    *   $-3(1) + 4(3) - 2(1) + y_4 = 3 \implies y_4 = 3 - 9 + 2 = -4 \implies y_4 = 3 + 3 - 12 + 2 = -4$
+    *   $\mathbf{y} = \begin{bmatrix} 1 \\ 3 \\ 1 \\ -4 \end{bmatrix}$
+
+2.  **Solve $U\mathbf{x} = \mathbf{y}$:**
+    *   $x_4 = -4$
+    *   $2x_3 + 4(-4) = 1 \implies 2x_3 = 17 \implies x_3 = 17/2$
+    *   $-3x_2 + 6(17/2) + 0 = 3 \implies -3x_2 = 3 - 51 = -48 \implies x_2 = 16$
+    *   $x_1 - 2(16) - 2(17/2) - 3(-4) = 1 \implies x_1 = 1 + 32 + 17 - 12 = 38$
+
+**Answer:** $\mathbf{x} = \begin{bmatrix} 38 \\ 16 \\ 17/2 \\ -4 \end{bmatrix}$
+
+</details>
+
+##### **4.12. First Row of $AB$ as Linear Combination** (Lecture, Problem 1)
+The first row of $AB$ is a linear combination of all the rows of $B$. What are the coefficients, and what is the first row?
+
+$A = \begin{bmatrix} 2 & 1 & 4 \\ 0 & -1 & 1 \end{bmatrix}$, $B = \begin{bmatrix} 1 & 1 \\ 0 & 1 \\ 1 & 0 \end{bmatrix}$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Row $i$ of $AB$ equals $a_{i1}(\text{row 1 of } B) + a_{i2}(\text{row 2 of } B) + \cdots + a_{in}(\text{row } n \text{ of } B)$.
+
+1.  **Identify coefficients from row 1 of $A$:** The coefficients are $\alpha_1 = 2$, $\alpha_2 = 1$, $\alpha_3 = 4$.
+
+2.  **Compute the linear combination:**
+    $$2[1,1] + 1[0,1] + 4[1,0] = [2,2] + [0,1] + [4,0] = [6,3]$$
+
+3.  **Verify by computing full product:**
+    $$AB = \begin{bmatrix} 2(1)+1(0)+4(1) & 2(1)+1(1)+4(0) \\ 0(1)+(-1)(0)+1(1) & 0(1)+(-1)(1)+1(0) \end{bmatrix} = \begin{bmatrix} 6 & 3 \\ 1 & -1 \end{bmatrix}$$
+
+**Answer:** The coefficients are $2, 1, 4$ (the entries of the first row of $A$). The first row of $AB$ is $[6, 3]$.
+
+</details>
+
+##### **4.13. Rows of $EA$ and Columns of $AE$** (Lecture, Problem 2)
+Describe the rows of $EA$ and the columns of $AE$ if $E = \begin{bmatrix} 1 & 7 \\ 0 & 1 \end{bmatrix}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Left multiplication ($EA$) creates rows as linear combinations of rows of $A$; right multiplication ($AE$) creates columns as linear combinations of columns of $A$.
+
+**Rows of $EA$:**
+
+- 1st row of $EA$ = $1 \cdot (\text{row 1 of } A) + 7 \cdot (\text{row 2 of } A)$
+- 2nd row of $EA$ = $0 \cdot (\text{row 1 of } A) + 1 \cdot (\text{row 2 of } A) = \text{row 2 of } A$
+
+**Columns of $AE$:**
+
+- 1st column of $AE$ = $1 \cdot (\text{col 1 of } A) + 0 \cdot (\text{col 2 of } A) = \text{col 1 of } A$
+- 2nd column of $AE$ = $7 \cdot (\text{col 1 of } A) + 1 \cdot (\text{col 2 of } A)$
+
+**Answer:** $EA$ replaces row 1 with (row 1 + 7 · row 2) and keeps row 2. $AE$ keeps column 1 and replaces column 2 with (7 · col 1 + col 2).
+
+</details>
+
+##### **4.14. Construct Elementary Matrices and Compare Order** (Lecture, Problem 3)
+(a) Write $E_{21}$ that subtracts 5 times row 1 from row 2.
+(b) Write $E_{32}$ that adds 7 times row 2 to row 3.
+(c) Compute $E_{32}E_{21}b$ and $E_{21}E_{32}b$ for $b = (1,0,0)^T$. Compare the results.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a)** $E_{21}$ subtracts 5 times row 1 from row 2:
+$$E_{21} = \begin{bmatrix} 1 & 0 & 0 \\ -5 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix}$$
+
+**(b)** $E_{32}$ adds 7 times row 2 to row 3:
+$$E_{32} = \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 7 & 1 \end{bmatrix}$$
+
+**(c)** First compute $E_{32}E_{21}b$:
+
+- $E_{21}b = \begin{bmatrix} 1 \\ -5 \\ 0 \end{bmatrix}$, then $E_{32}\begin{bmatrix} 1 \\ -5 \\ 0 \end{bmatrix} = \begin{bmatrix} 1 \\ -5 \\ -35 \end{bmatrix}$
+
+Now compute $E_{21}E_{32}b$:
+
+- $E_{32}b = \begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix}$, then $E_{21}\begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix} = \begin{bmatrix} 1 \\ -5 \\ 0 \end{bmatrix}$
+
+**Observation:** When $E_{32}$ comes after $E_{21}$ (i.e., $E_{32}E_{21}$), the row 3 operation "sees" the already-modified row 2 and produces $-35$ in position 3. When $E_{32}$ comes first, row 3 adds 7 times the original row 2 (which is 0), so row 3 is unaffected.
+
+**Answer:** $E_{32}E_{21}b = (1, -5, -35)^T$ and $E_{21}E_{32}b = (1, -5, 0)^T$. The order of multiplication matters.
+
+</details>
+
+##### **4.15. LU Decomposition by Elimination** (Lecture, Problem 4)
+Find the LU decomposition of:
+
+(a) $A = \begin{bmatrix} 2 & 1 \\ 8 & 7 \end{bmatrix}$
+
+(b) $A = \begin{bmatrix} 1 & 1 & 1 \\ 1 & 4 & 4 \\ 1 & 4 & 8 \end{bmatrix}$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a)** $A = \begin{bmatrix} 2 & 1 \\ 8 & 7 \end{bmatrix}$
+
+1.  **Eliminate:** $R_2 \leftarrow R_2 - 4R_1$:
+    $$U = \begin{bmatrix} 2 & 1 \\ 0 & 3 \end{bmatrix}$$
+2.  **Build $L$:** The multiplier was 4, so:
+    $$L = \begin{bmatrix} 1 & 0 \\ 4 & 1 \end{bmatrix}$$
+3.  **Verify:** $LU = \begin{bmatrix} 1 & 0 \\ 4 & 1 \end{bmatrix}\begin{bmatrix} 2 & 1 \\ 0 & 3 \end{bmatrix} = \begin{bmatrix} 2 & 1 \\ 8 & 7 \end{bmatrix} = A$ ✓
+
+**(b)** $A = \begin{bmatrix} 1 & 1 & 1 \\ 1 & 4 & 4 \\ 1 & 4 & 8 \end{bmatrix}$
+
+1.  **Step 1:** $R_2 \leftarrow R_2 - R_1$, $R_3 \leftarrow R_3 - R_1$:
+    $$\begin{bmatrix} 1 & 1 & 1 \\ 0 & 3 & 3 \\ 0 & 3 & 7 \end{bmatrix}$$
+2.  **Step 2:** $R_3 \leftarrow R_3 - R_2$:
+    $$U = \begin{bmatrix} 1 & 1 & 1 \\ 0 & 3 & 3 \\ 0 & 0 & 4 \end{bmatrix}$$
+3.  **Build $L$:** Multipliers are $l_{21}=1$, $l_{31}=1$, $l_{32}=1$:
+    $$L = \begin{bmatrix} 1 & 0 & 0 \\ 1 & 1 & 0 \\ 1 & 1 & 1 \end{bmatrix}$$
+
+**Answer:** (a) $L = \begin{bmatrix} 1 & 0 \\ 4 & 1 \end{bmatrix}$, $U = \begin{bmatrix} 2 & 1 \\ 0 & 3 \end{bmatrix}$. (b) $L = \begin{bmatrix} 1 & 0 & 0 \\ 1 & 1 & 0 \\ 1 & 1 & 1 \end{bmatrix}$, $U = \begin{bmatrix} 1 & 1 & 1 \\ 0 & 3 & 3 \\ 0 & 0 & 4 \end{bmatrix}$.
+
+</details>
+
+##### **4.16. LDU Factorization and Nonsingularity** (Lecture, Problem 5)
+Given $A = LDU$ where:
+$$L = \begin{bmatrix} 1 & 0 & 0 \\ -1 & 1 & 0 \\ 0 & -1 & 1 \end{bmatrix}, \quad D = \begin{bmatrix} d_1 & 0 & 0 \\ 0 & d_2 & 0 \\ 0 & 0 & d_3 \end{bmatrix}, \quad U = \begin{bmatrix} 1 & -1 & 0 \\ 0 & 1 & -1 \\ 0 & 0 & 1 \end{bmatrix}$$
+
+(a) When is $A$ nonsingular?
+(b) Solve $Ax = b$ where $b = (0,0,1)^T$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a)** $A$ is nonsingular when $\det(A) \neq 0$. Since $\det(A) = \det(L)\det(D)\det(U) = 1 \cdot d_1 d_2 d_3 \cdot 1 = d_1 d_2 d_3$, the matrix is nonsingular if and only if $d_1, d_2, d_3 \neq 0$.
+
+**(b)** Solve $Lc = b$ first (forward substitution):
+
+- $c_1 = 0$
+- $-c_1 + c_2 = 0 \implies c_2 = 0$
+- $-c_2 + c_3 = 1 \implies c_3 = 1$
+
+So $c = (0, 0, 1)^T$. Now solve $DUx = c$:
+
+- $d_3 x_3 = 1 \implies x_3 = 1/d_3$
+- $d_2(x_2 - x_3) = 0 \implies x_2 = x_3 = 1/d_3$
+- $d_1(x_1 - x_2) = 0 \implies x_1 = x_2 = 1/d_3$
+
+**Answer:** (a) $A$ is nonsingular iff $d_1, d_2, d_3 \neq 0$. (b) $x = \frac{1}{d_3}(1, 1, 1)^T$.
+
+</details>
+
+##### **4.17. LDU of an Upper Triangular Matrix** (Lecture, Problem 6)
+Find $L$, $D$, and $U_0$ in $A = LDU_0$ for:
+$$A = \begin{bmatrix} 2 & 4 & 8 \\ 0 & 3 & 9 \\ 0 & 0 & 7 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Since $A$ is already upper triangular, no elimination is needed.
+
+1.  **$L = I$** (no row operations required):
+    $$L = \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix}$$
+
+2.  **$D$** is the diagonal of pivots:
+    $$D = \begin{bmatrix} 2 & 0 & 0 \\ 0 & 3 & 0 \\ 0 & 0 & 7 \end{bmatrix}$$
+
+3.  **$U_0 = D^{-1}A$** (divide each row by its pivot):
+    $$U_0 = \begin{bmatrix} 1 & 2 & 4 \\ 0 & 1 & 3 \\ 0 & 0 & 1 \end{bmatrix}$$
+
+**Answer:** $L = I$, $D = \text{diag}(2, 3, 7)$, $U_0 = \begin{bmatrix} 1 & 2 & 4 \\ 0 & 1 & 3 \\ 0 & 0 & 1 \end{bmatrix}$.
+
+</details>
+
+##### **4.18. Show That $AB$ Is the Inverse of $A$** (Lecture, Problem 7)
+Given that $B = (A^2)^{-1}$, show that $AB$ is the inverse of $A$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+1.  **Start from $B = (A^2)^{-1}$**, meaning $A^2 B = I$.
+2.  **Rewrite $A^2$ as $A \cdot A$:**
+    $$(AA)B = I$$
+    $$A(AB) = I$$
+3.  **By definition**, if $A(AB) = I$, then $AB$ is the right inverse of $A$. For square matrices, a right inverse is also the left inverse.
+
+**Answer:** Since $A(AB) = I$, we conclude $A^{-1} = AB$.
+
+</details>
+
+##### **4.19. Properties of Matrix Inverses** (Lecture, Problem 8)
+If $A$ is invertible, which properties are preserved by $A^{-1}$?
+(a) Triangular (b) Symmetric (c) Tridiagonal (d) Integer entries (e) Entries that are fractions
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Triangular: Yes.** The inverse of an upper (lower) triangular matrix is upper (lower) triangular. This can be proved by induction using block partitioning.
+
+**(b) Symmetric: Yes.** If $A = A^T$, then $(A^{-1})^T = (A^T)^{-1} = A^{-1}$.
+
+**(c) Tridiagonal: No.** The inverse of a tridiagonal matrix is generally a full (dense) matrix.
+
+**(d) Integer entries: No.** The inverse involves division by the determinant, which generally produces non-integer entries.
+
+**(e) Fractions: Yes.** If entries are rational numbers, then all operations (addition, multiplication, division by nonzero determinant) produce rational numbers.
+
+**Answer:** (a) Yes, (b) Yes, (c) No, (d) No, (e) Yes.
+
+</details>
+
+##### **4.20. Conditions for Invertibility** (Lecture, Problem 9)
+Determine conditions for invertibility of:
+
+(a) A block diagonal matrix with diagonal entries $a$, $e$, $i$.
+(b) A matrix $B$ with specific block structure.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a)** A block diagonal matrix is invertible if and only if each diagonal block is invertible. For scalar diagonal entries, this means $a \neq 0$, $e \neq 0$, $i \neq 0$.
+
+**(b)** For matrix $B$ with the given block structure, invertibility requires $e \neq 0$ and $c \neq 0$ (based on the block structure's determinant).
+
+**Answer:** (a) $a, e, i \neq 0$. (b) $e \neq 0$ and $c \neq 0$.
+
+</details>
+
+##### **4.21. Find Inverses of 2x2 Matrices** (Lecture, Problem 10)
+Find the inverses using the formula $\begin{bmatrix} a & b \\ c & d \end{bmatrix}^{-1} = \frac{1}{ad-bc}\begin{bmatrix} d & -b \\ -c & a \end{bmatrix}$.
+
+(a) $A = \begin{bmatrix} 0 & 3 \\ 4 & 6 \end{bmatrix}$
+(b) $B = \begin{bmatrix} a & b \\ b & 0 \end{bmatrix}$
+(c) $C = \begin{bmatrix} 3 & 4 \\ 5 & 7 \end{bmatrix}$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a)** $\det(A) = 0(6) - 3(4) = -12$.
+$$A^{-1} = \frac{1}{-12}\begin{bmatrix} 6 & -3 \\ -4 & 0 \end{bmatrix} = \begin{bmatrix} -1/2 & 1/4 \\ 1/3 & 0 \end{bmatrix}$$
+
+**(b)** $\det(B) = a(0) - b(b) = -b^2$. Requires $b \neq 0$.
+$$B^{-1} = \frac{1}{-b^2}\begin{bmatrix} 0 & -b \\ -b & a \end{bmatrix} = \begin{bmatrix} 0 & 1/b \\ 1/b & -a/b^2 \end{bmatrix}$$
+
+**(c)** $\det(C) = 3(7) - 4(5) = 21 - 20 = 1$.
+$$C^{-1} = \frac{1}{1}\begin{bmatrix} 7 & -4 \\ -5 & 3 \end{bmatrix} = \begin{bmatrix} 7 & -4 \\ -5 & 3 \end{bmatrix}$$
+
+**Answer:** (a) $\frac{1}{-12}\begin{bmatrix} 6 & -3 \\ -4 & 0 \end{bmatrix}$, (b) $\frac{1}{-b^2}\begin{bmatrix} 0 & -b \\ -b & a \end{bmatrix}$, (c) $\begin{bmatrix} 7 & -4 \\ -5 & 3 \end{bmatrix}$.
+
+</details>
+
+##### **4.22. Gauss-Jordan Inversion** (Lecture, Problem 11)
+Find $A^{-1}$ using Gauss-Jordan elimination for:
+$$A = \begin{bmatrix} 1 & 0 & 0 \\ 2 & 1 & 3 \\ 0 & 0 & 1 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+1.  **Form augmented matrix $[A \mid I]$:**
+    $$\begin{bmatrix} 1 & 0 & 0 & | & 1 & 0 & 0 \\ 2 & 1 & 3 & | & 0 & 1 & 0 \\ 0 & 0 & 1 & | & 0 & 0 & 1 \end{bmatrix}$$
+
+2.  **$R_2 \leftarrow R_2 - 2R_1$:**
+    $$\begin{bmatrix} 1 & 0 & 0 & | & 1 & 0 & 0 \\ 0 & 1 & 3 & | & -2 & 1 & 0 \\ 0 & 0 & 1 & | & 0 & 0 & 1 \end{bmatrix}$$
+
+3.  **$R_2 \leftarrow R_2 - 3R_3$:**
+    $$\begin{bmatrix} 1 & 0 & 0 & | & 1 & 0 & 0 \\ 0 & 1 & 0 & | & -2 & 1 & -3 \\ 0 & 0 & 1 & | & 0 & 0 & 1 \end{bmatrix}$$
+
+**Answer:** $A^{-1} = \begin{bmatrix} 1 & 0 & 0 \\ -2 & 1 & -3 \\ 0 & 0 & 1 \end{bmatrix}$
+
+</details>
+
+##### **4.23. Powers of Matrices** (Lecture, Problem 12)
+Find patterns for powers of:
+
+(a) $A = \begin{bmatrix} 2 & 3 \\ 0 & 0 \end{bmatrix}$
+(b) $B = \begin{bmatrix} 2 & 3 \\ 0 & 1 \end{bmatrix}$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a)** $A = \begin{bmatrix} 2 & 3 \\ 0 & 0 \end{bmatrix}$:
+
+- $A^2 = \begin{bmatrix} 4 & 6 \\ 0 & 0 \end{bmatrix}$
+- $A^3 = \begin{bmatrix} 8 & 12 \\ 0 & 0 \end{bmatrix}$
+- Pattern: $A^n = \begin{bmatrix} 2^n & 3 \cdot 2^{n-1} \\ 0 & 0 \end{bmatrix}$
+
+**(b)** $B = \begin{bmatrix} 2 & 3 \\ 0 & 1 \end{bmatrix}$:
+
+- $B^2 = \begin{bmatrix} 4 & 9 \\ 0 & 1 \end{bmatrix}$
+- $B^3 = \begin{bmatrix} 8 & 21 \\ 0 & 1 \end{bmatrix}$
+- Pattern: $B^n = \begin{bmatrix} 2^n & 3(2^n - 1) \\ 0 & 1 \end{bmatrix}$
+
+**Answer:** (a) $A^n = \begin{bmatrix} 2^n & 3 \cdot 2^{n-1} \\ 0 & 0 \end{bmatrix}$, (b) $B^n = \begin{bmatrix} 2^n & 3(2^n-1) \\ 0 & 1 \end{bmatrix}$.
+
+</details>
+
+##### **4.24. Inverses of Lower Triangular Matrices** (Lecture, Problem 13)
+Compute the inverse of lower triangular matrices with entries $l$ and $m$ below the diagonal using Gauss-Jordan elimination.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The inverse of a unit lower triangular matrix is obtained by negating the off-diagonal entries (for $2 \times 2$) or applying row operations that undo each elimination step.
+
+For a general $3 \times 3$ unit lower triangular matrix:
+$$L = \begin{bmatrix} 1 & 0 & 0 \\ l & 1 & 0 \\ m & n & 1 \end{bmatrix}$$
+
+Apply $R_2 \leftarrow R_2 - lR_1$, then $R_3 \leftarrow R_3 - mR_1$, then $R_3 \leftarrow R_3 - nR_2$:
+$$L^{-1} = \begin{bmatrix} 1 & 0 & 0 \\ -l & 1 & 0 \\ -m+ln & -n & 1 \end{bmatrix}$$
+
+**Answer:** The inverse involves negating the multipliers and accounting for their interactions in the lower-triangular entries.
+
+</details>
