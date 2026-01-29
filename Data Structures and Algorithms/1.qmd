@@ -47,13 +47,29 @@ There are three main approaches to establishing that an algorithm is correct:
 3. **Formal verification** — a computer-checked proof of correctness using proof assistants (e.g., Coq, Isabelle). This is the most rigorous approach but also the most labor-intensive.
 
 ###### **1.2.2 Loop Invariants**
-Most algorithms rely on loops (for-loops, while-loops). To prove a loop correct, we use a **loop invariant** — a property (usually expressed in terms of the loop's variables) that holds true on every iteration of the loop. To prove a loop invariant $P$, we must show three things:
+Most algorithms rely on loops (for-loops, while-loops). To prove a loop correct, we use a **loop invariant** — a property (usually expressed in terms of the loop's variables) that holds true on every iteration of the loop. 
+
+**Think of a loop invariant as a promise the loop makes to itself:** "No matter how many times I've executed, this property is still true." This property remains true throughout the loop's execution, even as the variables change.
+
+To prove a loop invariant $P$, we must show three things:
 
 1. **Initialization:** $P$ holds before the first iteration of the loop.
-2. **Maintenance:** If $P$ holds before an iteration, then it still holds after that iteration.
-3. **Termination:** The loop terminates, and when it does, $P$ gives us a useful property that helps show the algorithm is correct.
+   - This establishes that our invariant is true when we start.
+   - Like proving the base case in mathematical induction.
 
-This is analogous to **mathematical induction**: initialization is the base case, and maintenance is the inductive step. The termination part connects the invariant to the algorithm's overall correctness.
+2. **Maintenance:** If $P$ holds before an iteration, then it still holds after that iteration.
+   - This shows that one execution of the loop body preserves the invariant.
+   - Like proving the inductive step: if true for iteration $i$, then true for iteration $i+1$.
+   - We must show this works for *any* iteration, not just specific ones.
+
+3. **Termination:** The loop terminates, and when it does, $P$ gives us a useful property that helps show the algorithm is correct.
+   - We must prove the loop doesn't run forever.
+   - When the loop stops, the invariant (plus the termination condition) should give us what we need to prove correctness.
+
+**Connection to mathematical induction:** Loop invariants are directly analogous to mathematical induction:
+- **Base case** (n=0 or n=1) → **Initialization** (before first iteration)
+- **Inductive step** (if true for n, then true for n+1) → **Maintenance** (if true before iteration, then true after)
+- The difference is that loops have a **termination** condition, whereas induction proves the statement for all natural numbers.
 
 ###### **1.2.3 Loop Invariant Example: Exponentiation**
 Consider the following algorithm that computes $a^n$:
@@ -118,10 +134,18 @@ This approach is practical but has limitations: results depend on hardware, prog
 
 **Theoretical (analytical) approach:**
 
-1. Describe the algorithm as pseudocode.
+1. Describe the algorithm as **pseudocode** (a high-level description that abstracts away implementation details).
 2. Characterize its running time as a function $T(n)$ of the input size $n$.
 
 This approach gives hardware-independent results and can reveal the true asymptotic growth rate.
+
+**What is pseudocode?** Pseudocode is a simplified programming language that represents the essential logic of an algorithm without worrying about syntax details. It's designed to be readable by humans and easy to analyze mathematically. In this course, we follow the CLRS (Cormen et al.) pseudocode conventions, which include:
+
+- **Variables**: Assigned with `:=` (e.g., `x := 5`)
+- **Arrays**: 1-indexed by default (e.g., `A[1]` is the first element)
+- **Loops**: `for i = 1 to n` (inclusive), `while condition`
+- **Indentation**: Shows block structure (like Python)
+- **Comments**: Typically written as `// comment` or in special blocks
 
 ###### **1.3.3 Input Size and Running Time**
 The running time $T(n)$ is typically expressed as a function of a single input-size parameter $n$, though sometimes multiple parameters are needed (e.g., $T(n, k)$).
@@ -159,21 +183,90 @@ For theoretical analysis, we use the **RAM (Random-Access Machine)** model:
 Under this model, we analyze **worst-case time complexity**.
 
 ###### **1.3.7 Insertion Sort Analysis**
-As an example, the analysis of **Insertion Sort** yields a running time of:
-$$T(n) = \left(\frac{c_5}{2} + \frac{c_6}{2} + \frac{c_7}{2}\right)n^2 + \left(c_1 + c_2 + c_4 + \frac{c_5}{2} - \frac{c_6}{2} - \frac{c_7}{2} + c_8\right)n - (c_2 + c_4 + c_5 + c_8)$$
-where $c_1, \dots, c_8$ are the per-line costs. This simplifies to $an^2 + bn + c$, which is $\Theta(n^2)$ in the worst case. The key insight is that the inner loop can run up to $i-1$ times for each value of $i$, and summing $\sum_{i=2}^{n}(i-1) = \frac{n(n-1)}{2}$ gives the quadratic term.
+**Insertion Sort** is a simple sorting algorithm that works like how you might sort playing cards in your hand. You start with an empty left hand and cards face down on the table. Then you remove one card at a time from the table and insert it into the correct position in your left hand. To find the correct position, you compare the new card with each card already in your hand, from right to left.
+
+Here's the pseudocode:
+
+```text
+INSERTION-SORT(A, n)
+1   for i = 2 to n
+2       key = A[i]
+3       j = i - 1
+4       while j > 0 and A[j] > key
+5           A[j + 1] = A[j]
+6           j = j - 1
+7       A[j + 1] = key
+```
+
+**How it works:**
+- The algorithm maintains a sorted subarray A[1...i-1]
+- In each iteration, it takes A[i] and inserts it into its correct position in the sorted part
+- It does this by shifting larger elements one position to the right
+
+**Example:** Sorting [5, 2, 4, 6, 1, 3]
+- Start: [**5** | 2, 4, 6, 1, 3] (sorted | unsorted)
+- i=2: [**2, 5** | 4, 6, 1, 3] (insert 2)
+- i=3: [**2, 4, 5** | 6, 1, 3] (insert 4)
+- i=4: [**2, 4, 5, 6** | 1, 3] (insert 6, no shift needed)
+- i=5: [**1, 2, 4, 5, 6** | 3] (insert 1, shift all)
+- i=6: [**1, 2, 3, 4, 5, 6** | ] (insert 3)
+
+**Time complexity analysis:**
+
+For worst-case analysis (array sorted in reverse order), we compute the cost of each line multiplied by how many times it executes:
+
+| Line | Cost | Times | Contribution |
+|:---|:---|:---|:---|
+| 1 | $c_1$ | $n$ | $c_1 n$ |
+| 2 | $c_2$ | $n-1$ | $c_2(n-1)$ |
+| 3 | $c_3$ | $n-1$ | $c_3(n-1)$ |
+| 4 | $c_4$ | $\sum_{i=2}^{n} t_i$ | $c_4 \sum_{i=2}^{n} t_i$ |
+| 5 | $c_5$ | $\sum_{i=2}^{n} (t_i - 1)$ | $c_5 \sum_{i=2}^{n} (t_i - 1)$ |
+| 6 | $c_6$ | $\sum_{i=2}^{n} (t_i - 1)$ | $c_6 \sum_{i=2}^{n} (t_i - 1)$ |
+| 7 | $c_7$ | $n-1$ | $c_7(n-1)$ |
+
+where $t_i$ is the number of times the while-loop test executes for each value of $i$.
+
+In the worst case (reverse sorted array), $t_i = i$ for each $i$. Therefore:
+$$\sum_{i=2}^{n} t_i = \sum_{i=2}^{n} i = \frac{n(n+1)}{2} - 1$$
+
+Summing all contributions gives:
+$$T(n) = \left(\frac{c_4}{2} + \frac{c_5}{2} + \frac{c_6}{2}\right)n^2 + \left(c_1 + c_2 + c_3 + c_4 + \frac{c_5}{2} + \frac{c_6}{2} + c_7\right)n + \text{(lower order terms)}$$
+
+This simplifies to $an^2 + bn + c$ for some constants $a, b, c$, which is $\Theta(n^2)$ in the worst case.
+
+**Key insight:** The inner while-loop can run up to $i-1$ times for each value of $i$, and summing $\sum_{i=2}^{n}(i-1) = \frac{n(n-1)}{2} = \Theta(n^2)$ gives the quadratic term.
 
 ##### **1.4 Asymptotic Notation**
-Working with exact expressions for $T(n)$ is cumbersome and obscures the essential behavior. What matters is the **order of growth** — how $T(n)$ scales as $n$ grows large. **Asymptotic notation** provides a way to describe this growth rate by:
+Working with exact expressions for $T(n)$ is cumbersome and obscures the essential behavior. What matters is the **order of growth** — how $T(n)$ scales as $n$ grows large.
 
-- Ignoring lower-order terms (e.g., $n^2 + 5000n \to O(n^2)$)
-- Ignoring constant factors (e.g., $6n \to O(n)$)
+**Why do we need this?** Consider two algorithms:
+- Algorithm A takes time $T_A(n) = 1000n$ 
+- Algorithm B takes time $T_B(n) = n^2$
+
+For small inputs (say, $n = 10$), Algorithm A takes 10,000 units while Algorithm B takes only 100 units. But for large inputs (say, $n = 10,000$), Algorithm A takes 10,000,000 units while Algorithm B takes 100,000,000 units — 10 times slower! The constant factor (1000) becomes irrelevant as $n$ grows. What matters is whether the algorithm is linear ($n$) or quadratic ($n^2$).
+
+**Asymptotic notation** provides a way to describe this growth rate by:
+
+- **Ignoring lower-order terms** (e.g., $n^2 + 5000n \to O(n^2)$)
+  - For large $n$, the $n^2$ term dominates. When $n = 1,000,000$, we have $n^2 = 1,000,000,000,000$ but $5000n = 5,000,000,000$ — the $n^2$ term is 200,000 times larger!
+  
+- **Ignoring constant factors** (e.g., $6n \to O(n)$)
+  - Constants like 6 depend on implementation details (programming language, compiler optimization, hardware). We care about the fundamental shape of growth, not these details.
 
 ###### **1.4.1 $O$-notation (Big-O) — Upper Bound**
 $O(g(n))$ is the set of functions that grow *no faster* than $g(n)$, up to a constant factor:
 $$O(g(n)) = \{f(n) \mid \exists\, c > 0,\, n_0 > 0 \text{ such that } \forall\, n \ge n_0: 0 \le f(n) \le c \cdot g(n)\}$$
 
-Intuitively, $f(n) = O(g(n))$ means "$f$ grows at most as fast as $g$."
+**What does this mean in plain English?**
+
+Intuitively, $f(n) = O(g(n))$ means "$f$ grows at most as fast as $g$." More precisely:
+- There exists some constant $c$ such that $f(n) \le c \cdot g(n)$
+- This inequality doesn't have to hold for *all* $n$, just for all $n$ beyond some threshold $n_0$
+- For small values of $n$ (before $n_0$), $f(n)$ can be larger than $c \cdot g(n)$ — we don't care about small inputs
+- The constants $c$ and $n_0$ can be **any** positive numbers — we just need to find **some** that work
+
+**Visual intuition:** Imagine plotting $f(n)$ and $c \cdot g(n)$ on a graph. Big-O says: "After some point $n_0$, the function $f(n)$ stays below the scaled version $c \cdot g(n)$." The function $g(n)$ (scaled by $c$) acts as an **upper bound** or **ceiling** for $f(n)$.
 
 **To prove $f(n) = O(g(n))$:**
 
@@ -197,7 +290,16 @@ We need: for any $c, n_0 > 0$, find $n \ge n_0$ with $n^3 - 100n^2 > cn^2$. Divi
 $\Omega(g(n))$ is the set of functions that grow *at least as fast* as $g(n)$:
 $$\Omega(g(n)) = \{f(n) \mid \exists\, c > 0,\, n_0 > 0 \text{ such that } \forall\, n \ge n_0: 0 \le c \cdot g(n) \le f(n)\}$$
 
-Intuitively, $f(n) = \Omega(g(n))$ means "$f$ grows at least as fast as $g$."
+**What does this mean in plain English?**
+
+Intuitively, $f(n) = \Omega(g(n))$ means "$f$ grows at least as fast as $g$." More precisely:
+- There exists some constant $c$ such that $f(n) \ge c \cdot g(n)$
+- This inequality holds for all $n$ beyond some threshold $n_0$
+- The function $g(n)$ (scaled by $c$) acts as a **lower bound** or **floor** for $f(n)$
+
+**Key difference from Big-O:** Big-O is an upper bound (ceiling), while Big-Omega is a lower bound (floor). Together, they "sandwich" a function:
+- $f(n) = O(g(n))$ says: "$f$ doesn't grow faster than $g$"
+- $f(n) = \Omega(g(n))$ says: "$f$ doesn't grow slower than $g$"
 
 **Example:** Prove $4n^2 + 100n + 500 = \Omega(n^2)$.
 
@@ -211,27 +313,76 @@ Divide by $n^2$: $c \le \frac{1}{100} - \frac{100}{n} - \frac{500}{n^2}$. For la
 $\Theta(g(n))$ is the set of functions that grow *at the same rate* as $g(n)$:
 $$\Theta(g(n)) = \{f(n) \mid \exists\, c_1, c_2, n_0 > 0 \text{ such that } \forall\, n \ge n_0: 0 \le c_1 g(n) \le f(n) \le c_2 g(n)\}$$
 
-The function $f$ is "sandwiched" between $c_1 g(n)$ and $c_2 g(n)$.
+**What does this mean in plain English?**
+
+The function $f$ is "sandwiched" between $c_1 g(n)$ and $c_2 g(n)$. In other words:
+- $f(n)$ grows neither faster nor slower than $g(n)$ — they grow at the **same rate**
+- Both the upper bound ($c_2 g(n)$) and lower bound ($c_1 g(n)$) use the same function $g(n)$
+- This is the **most precise** asymptotic bound — it pins down the growth rate exactly
+
+**Visual intuition:** Imagine $f(n)$ trapped between two scaled versions of $g(n)$. No matter how you zoom in or out on the graph, $f(n)$ stays within this "channel" defined by $c_1 g(n)$ and $c_2 g(n)$.
 
 **Theorem 3.1:** $f(n) = \Theta(g(n))$ if and only if $f(n) = O(g(n))$ **and** $f(n) = \Omega(g(n))$.
 
-This theorem is very useful: to prove a $\Theta$ bound, prove the $O$ and $\Omega$ bounds separately.
+**Why is this useful?** To prove a tight bound $\Theta$, we can:
+1. First prove the upper bound: $f(n) = O(g(n))$
+2. Then prove the lower bound: $f(n) = \Omega(g(n))$
+3. Conclude: $f(n) = \Theta(g(n))$
+
+This is often easier than directly finding constants $c_1$ and $c_2$ for the $\Theta$ definition.
 
 ###### **1.4.4 $o$-notation (Little-o) — Strict Upper Bound**
 $o(g(n))$ is the set of functions that grow *strictly slower* than $g(n)$:
 $$o(g(n)) = \{f(n) \mid \forall\, c > 0,\, \exists\, n_0 > 0 \text{ such that } \forall\, n \ge n_0: 0 \le f(n) < c \cdot g(n)\}$$
 
-Note the key difference from $O$: the condition must hold for *all* positive $c$, not just some. Equivalently:
-$$\lim_{n \to \infty} \frac{f(n)}{g(n)} = 0$$
+**What does this mean in plain English?**
 
-For example, $n = o(n^2)$ but $n^2 \ne o(n^2)$.
+Little-o is like Big-O, but **strict** — $f(n)$ grows **strictly slower** than $g(n)$. The key differences:
+
+- **Big-O** ($O$): The condition must hold for **some** constant $c$ (we get to choose $c$)
+- **Little-o** ($o$): The condition must hold for **all** constants $c$ (even arbitrarily small ones)
+
+This is analogous to the difference between $\le$ (less than or equal) and $<$ (strictly less than):
+- $f(n) = O(g(n))$ is like "$f \le g$" (can be equal)
+- $f(n) = o(g(n))$ is like "$f < g$" (must be strictly less)
+
+**Limit characterization:** An equivalent and often easier way to think about little-o:
+$$f(n) = o(g(n)) \iff \lim_{n \to \infty} \frac{f(n)}{g(n)} = 0$$
+
+This says: "$f$ becomes negligible compared to $g$ as $n$ grows."
+
+**Examples:**
+- $n = o(n^2)$ ✓ (linear grows strictly slower than quadratic)
+- $n^2 \ne o(n^2)$ ✗ (a function doesn't grow strictly slower than itself)
+- $100n = o(n^2)$ ✓ (constants don't matter; linear still grows strictly slower than quadratic)
 
 ###### **1.4.5 $\omega$-notation (Little-omega) — Strict Lower Bound**
 $\omega(g(n))$ is the set of functions that grow *strictly faster* than $g(n)$:
 $$\omega(g(n)) = \{f(n) \mid \forall\, c > 0,\, \exists\, n_0 > 0 \text{ such that } \forall\, n \ge n_0: 0 \le c \cdot g(n) < f(n)\}$$
 
-Equivalently:
-$$\lim_{n \to \infty} \frac{f(n)}{g(n)} = \infty$$
+**What does this mean in plain English?**
+
+Little-omega is like Big-Omega, but **strict** — $f(n)$ grows **strictly faster** than $g(n)$. 
+
+**Limit characterization:**
+$$f(n) = \omega(g(n)) \iff \lim_{n \to \infty} \frac{f(n)}{g(n)} = \infty$$
+
+This says: "$f$ grows so much faster than $g$ that their ratio goes to infinity."
+
+**Relationship between little-o and little-omega:**
+$$f(n) = o(g(n)) \iff g(n) = \omega(f(n))$$
+
+Just like how Big-O and Big-Omega are symmetric, little-o and little-omega are also symmetric.
+
+**Summary of all five notations:**
+
+| Notation | Meaning | Analogy | Limit Test |
+|:---|:---|:---|:---|
+| $f = O(g)$ | $f$ grows at most as fast as $g$ | $\le$ | $\limsup \frac{f}{g} < \infty$ |
+| $f = \Omega(g)$ | $f$ grows at least as fast as $g$ | $\ge$ | $\liminf \frac{f}{g} > 0$ |
+| $f = \Theta(g)$ | $f$ grows at the same rate as $g$ | $=$ | $0 < \lim \frac{f}{g} < \infty$ |
+| $f = o(g)$ | $f$ grows strictly slower than $g$ | $<$ | $\lim \frac{f}{g} = 0$ |
+| $f = \omega(g)$ | $f$ grows strictly faster than $g$ | $>$ | $\lim \frac{f}{g} = \infty$ |
 
 ###### **1.4.6 Proper Usage of Asymptotic Notation**
 When stating complexity results, precision matters:
@@ -251,62 +402,129 @@ Asymptotic notation can appear inside formulas as a placeholder for an anonymous
 In chains of equations, each equality is interpreted independently.
 
 ##### **1.5 Properties of Asymptotic Notation**
-The asymptotic notations satisfy several useful algebraic properties:
+The asymptotic notations satisfy several useful algebraic properties that make them easy to work with:
 
 - **Reflexivity:** $f(n) = \Theta(f(n))$, $f(n) = O(f(n))$, $f(n) = \Omega(f(n))$.
-- **Transitivity:** If $f(n) = \Theta(g(n))$ and $g(n) = \Theta(h(n))$, then $f(n) = \Theta(h(n))$. This holds for all five notations ($O, \Omega, \Theta, o, \omega$).
+  - Every function is an upper bound, lower bound, and tight bound for itself.
+  - Intuitively: $f$ grows exactly as fast as itself!
+
+- **Transitivity:** If $f(n) = \Theta(g(n))$ and $g(n) = \Theta(h(n))$, then $f(n) = \Theta(h(n))$. 
+  - This holds for all five notations ($O, \Omega, \Theta, o, \omega$).
+  - This lets us "chain" relationships: if $f$ grows like $g$ and $g$ grows like $h$, then $f$ grows like $h$.
+
 - **Symmetry:** $f(n) = \Theta(g(n))$ if and only if $g(n) = \Theta(f(n))$.
-- **Transpose symmetry:** $f(n) = O(g(n))$ if and only if $g(n) = \Omega(f(n))$. Similarly, $f(n) = o(g(n))$ if and only if $g(n) = \omega(f(n))$.
-- **No trichotomy:** Unlike real numbers (where exactly one of $a < b$, $a = b$, $a > b$ holds), for functions it is possible that *none* of $f = o(g)$, $f = \Theta(g)$, $f = \omega(g)$ hold. This can happen with oscillating functions.
+  - Theta ($\Theta$) is symmetric — it's a true "equivalence" relation.
+  - If $f$ and $g$ grow at the same rate, then saying "$f = \Theta(g)$" or "$g = \Theta(f)$" is equivalent.
+
+- **Transpose symmetry:** $f(n) = O(g(n))$ if and only if $g(n) = \Omega(f(n))$.
+  - Similarly, $f(n) = o(g(n))$ if and only if $g(n) = \omega(f(n))$.
+  - Upper bounds and lower bounds are "dual" to each other.
+  - If $f$ is bounded above by $g$, then $g$ is bounded below by $f$.
+
+- **No trichotomy:** Unlike real numbers (where exactly one of $a < b$, $a = b$, $a > b$ holds), for functions it is possible that *none* of $f = o(g)$, $f = \Theta(g)$, $f = \omega(g)$ hold. 
+  - **Why?** Some functions oscillate or behave erratically.
+  - **Example:** Let $f(n) = n^{1 + \sin n}$. This function oscillates between growing like $n^0 = 1$ (when $\sin n = -1$) and growing like $n^2$ (when $\sin n = 1$). It doesn't have a consistent relationship with, say, $g(n) = n$.
+  - **Practical note:** Most functions we encounter in algorithm analysis (polynomials, logarithms, exponentials) *do* satisfy trichotomy.
 
 ##### **1.6 Common Functions and Asymptotic Growth**
-Understanding how common function families compare asymptotically is essential for algorithm analysis.
+Understanding how common function families compare asymptotically is essential for algorithm analysis. This section provides a "hierarchy" of growth rates you'll encounter frequently.
 
 ###### **1.6.1 Polynomials**
 A polynomial of degree $d$: $p(n) = a_d n^d + a_{d-1} n^{d-1} + \dots + a_1 n + a_0$ (with $a_d > 0$) satisfies:
 $$p(n) = \Theta(n^d)$$
 
+**Key insight:** Only the highest-degree term matters! A polynomial of degree $d$ always grows like $n^d$, regardless of the lower-degree terms or constant coefficients.
+
+**Examples:**
+- $3n^2 + 100n + 5 = \Theta(n^2)$
+- $n^3 - 1000n^2 = \Theta(n^3)$
+- $7n = \Theta(n)$
+
+**Comparison:** Higher-degree polynomials always grow faster:
+$$n \prec n^2 \prec n^3 \prec n^4 \prec \dots$$
+where $\prec$ means "grows strictly slower than."
+
 ###### **1.6.2 Exponentials**
-Exponential functions grow faster than any polynomial:
+Exponential functions grow faster than **any** polynomial, no matter how large the polynomial degree:
 $$n^b = o(a^n) \quad \text{for any constant } a > 1 \text{ and any constant } b$$
 
+**Why is this important?** Algorithms with exponential running time (like $2^n$ or $3^n$) become impractical very quickly, even for moderate input sizes. For example:
+- $n = 30$: $n^{10} \approx 5.9 \times 10^{14}$, but $2^n \approx 1.1 \times 10^9$ (polynomial is actually larger here)
+- $n = 100$: $n^{10} \approx 10^{20}$, but $2^n \approx 1.3 \times 10^{30}$ (exponential dominates)
+- $n = 1000$: $n^{10} \approx 10^{30}$, but $2^n \approx 10^{301}$ (exponential is astronomically larger)
+
+**Practical note:** Even $2^{100}$ is computationally infeasible (more than the number of atoms in the universe!).
+
 ###### **1.6.3 Logarithms**
-Polylogarithmic functions grow slower than any polynomial:
+Polylogarithmic functions (powers of logarithms) grow slower than **any** polynomial with a positive exponent:
 $$\log^b n = o(n^a) \quad \text{for any constants } a > 0 \text{ and } b$$
 
-Note: the base of the logarithm does not matter asymptotically, since $\log_a n = \frac{\log_b n}{\log_b a}$, and $\frac{1}{\log_b a}$ is a constant.
+**What is $\log^b n$?** This means $(\log n)^b$, not $\log(\log(\dots\log n))$.
+
+**Examples:**
+- $\log n = o(n)$ (logarithm grows slower than linear)
+- $(\log n)^2 = o(n^{0.1})$ (even squared logarithm grows slower than any polynomial)
+- $n \log n = o(n^{1.01})$ (algorithm with $n \log n$ time is nearly linear)
+
+**Why logarithms appear:** Many efficient algorithms (like binary search, merge sort, heap operations) have logarithmic or $n \log n$ running times because they repeatedly divide the problem size.
+
+**Logarithm base doesn't matter:** $\log_a n = \frac{\log_b n}{\log_b a}$, and $\frac{1}{\log_b a}$ is just a constant. So:
+$$\log_2 n = \Theta(\log_{10} n) = \Theta(\ln n)$$
+For asymptotic analysis, we usually just write $\log n$ without specifying the base.
 
 ###### **1.6.4 Factorials**
-Key facts about $n!$:
+The factorial function $n! = n \times (n-1) \times \cdots \times 2 \times 1$ appears in algorithms that generate permutations or subsets.
 
-- $n! \le n^n$
+**Key facts about $n!$:**
+
+- **Upper bound:** $n! \le n^n$ (multiply $n$ copies of $n$)
+- **Lower bound:** $n! \ge (n/2)^{n/2}$ (at least half the factors are $\ge n/2$)
 - **Stirling's approximation:** $n! = \sqrt{2\pi n}\left(\frac{n}{e}\right)^n\left(1 + \Theta\left(\frac{1}{n}\right)\right)$
+  - This gives an extremely accurate estimate for large $n$
+  - Useful for: $\log(n!) = \Theta(n \log n)$
+
+**Growth comparisons:**
 - $n! = o(n^n)$ — factorials grow slower than $n^n$
 - $n! = \omega(2^n)$ — factorials grow faster than $2^n$
-- $\log(n!) = \Theta(n \log n)$
+- In fact: $n! = \Theta\left(\sqrt{n}\left(\frac{n}{e}\right)^n\right)$ (from Stirling)
 
-The overall asymptotic hierarchy (from slowest to fastest growth):
-$$1 \prec \log n \prec n^a \ (0 < a < 1) \prec n \prec n \log n \prec n^2 \prec n^3 \prec \dots \prec 2^n \prec n! \prec n^n$$
+**The complete hierarchy** (from slowest to fastest growth):
+$$1 \prec \log \log n \prec \log n \prec (\log n)^2 \prec \sqrt{n} \prec n \prec n \log n \prec n^2 \prec n^3 \prec 2^n \prec n! \prec n^n$$
+
+**Practical interpretation:**
+- **Constant** ($1$): Best possible — no dependence on input size
+- **Logarithmic** ($\log n$): Excellent — typically from divide-and-conquer
+- **Linear** ($n$): Good — must at least look at every input element
+- **Linearithmic** ($n \log n$): Good — optimal for comparison-based sorting
+- **Quadratic** ($n^2$): Acceptable for small inputs, problematic for large
+- **Cubic** ($n^3$) and higher: Problematic unless $n$ is small
+- **Exponential** ($2^n$, $n!$, $n^n$): Intractable for even moderate $n$ (typically $n > 30$)
 
 #### **2. Definitions**
 
-*   **Algorithm**: A well-defined computational procedure that takes input and produces output in a finite amount of time.
-*   **Computational problem**: A specification of the desired input/output relationship, defining what constitutes valid inputs and correct outputs.
+*   **Algorithm**: A well-defined computational procedure that takes input and produces output in a finite amount of time. It is a sequence of computational steps that transform the input into the output.
+*   **Computational problem**: A specification of the desired input/output relationship, defining what constitutes valid inputs and correct outputs for all problem instances.
 *   **Correct algorithm**: An algorithm that, for every valid input, terminates in finite time and produces a correct output as defined by the computational problem.
-*   **Loop invariant**: A property of a loop's variables that holds true before and after every iteration, used to prove the correctness of loop-based algorithms.
-*   **Algorithm analysis**: The study of how an algorithm's resource requirements (time, memory) scale with input size.
-*   **Input size**: A measure of the amount of data fed to an algorithm (e.g., number of elements, string length, number of bits).
-*   **Worst-case analysis**: Analyzing an algorithm's performance on the input that causes it to run the slowest, providing a guaranteed upper bound.
-*   **RAM model (Random-Access Machine)**: A theoretical computation model where each basic operation and memory access takes 1 unit of time, and instructions execute sequentially.
-*   **Execution cost**: The time (in abstract units) required to execute a single instance of an instruction.
-*   **Frequency count**: The number of times a particular instruction is executed during the algorithm's run.
+*   **Loop invariant**: A property (expressed in terms of the loop's variables) that holds true before and after every iteration of a loop, used to prove the correctness of loop-based algorithms through initialization, maintenance, and termination.
+*   **Algorithm analysis**: The study of how an algorithm's resource requirements (time, memory) scale with input size, typically focusing on worst-case behavior.
+*   **Time complexity**: A measure of how the running time of an algorithm grows as a function of input size, usually expressed in asymptotic notation.
+*   **Space complexity**: A measure of how much additional memory an algorithm requires as a function of input size.
+*   **Input size**: A measure of the amount of data fed to an algorithm (e.g., number of elements, string length, number of bits, matrix dimensions).
+*   **Running time $T(n)$**: The total number of primitive operations executed by an algorithm as a function of input size $n$.
+*   **Best-case analysis**: Analyzing an algorithm's performance on the input that causes it to run the fastest.
+*   **Average-case analysis**: Analyzing an algorithm's expected performance over all possible inputs (or a distribution of inputs).
+*   **Worst-case analysis**: Analyzing an algorithm's performance on the input that causes it to run the slowest, providing a guaranteed upper bound on running time.
+*   **RAM model (Random-Access Machine)**: A theoretical computation model where each basic operation ($+, -, \times, \div, :=$, comparisons) and memory access takes 1 unit of time, and instructions execute sequentially.
+*   **Execution cost**: The time (in abstract units) required to execute a single instance of an instruction in the RAM model.
+*   **Frequency count**: The number of times a particular instruction is executed during the algorithm's run for a given input.
 *   **Asymptotic notation**: Mathematical notation ($O, \Omega, \Theta, o, \omega$) for describing the growth rate of functions as input size approaches infinity, ignoring constant factors and lower-order terms.
-*   **$O$-notation (Big-O)**: Denotes an asymptotic upper bound; $f(n) = O(g(n))$ means $f$ grows no faster than $g$ up to a constant factor.
-*   **$\Omega$-notation (Big-Omega)**: Denotes an asymptotic lower bound; $f(n) = \Omega(g(n))$ means $f$ grows at least as fast as $g$ up to a constant factor.
-*   **$\Theta$-notation (Theta)**: Denotes a tight asymptotic bound; $f(n) = \Theta(g(n))$ means $f$ grows at the same rate as $g$.
-*   **$o$-notation (Little-o)**: Denotes a strict upper bound; $f(n) = o(g(n))$ means $f$ grows strictly slower than $g$.
-*   **$\omega$-notation (Little-omega)**: Denotes a strict lower bound; $f(n) = \omega(g(n))$ means $f$ grows strictly faster than $g$.
-*   **Pseudocode**: A high-level, semi-formal description of an algorithm that abstracts away implementation details to facilitate analysis.
+*   **Order of growth**: The rate at which a function increases as its input grows, typically characterized using the dominant term (highest-order term).
+*   **$O$-notation (Big-O)**: Denotes an asymptotic upper bound; $f(n) = O(g(n))$ means there exist constants $c > 0$ and $n_0 > 0$ such that $f(n) \le c \cdot g(n)$ for all $n \ge n_0$.
+*   **$\Omega$-notation (Big-Omega)**: Denotes an asymptotic lower bound; $f(n) = \Omega(g(n))$ means there exist constants $c > 0$ and $n_0 > 0$ such that $f(n) \ge c \cdot g(n)$ for all $n \ge n_0$.
+*   **$\Theta$-notation (Theta)**: Denotes a tight asymptotic bound; $f(n) = \Theta(g(n))$ means $f(n) = O(g(n))$ and $f(n) = \Omega(g(n))$, i.e., $f$ and $g$ grow at the same rate.
+*   **$o$-notation (Little-o)**: Denotes a strict upper bound; $f(n) = o(g(n))$ means for all $c > 0$, there exists $n_0$ such that $f(n) < c \cdot g(n)$ for all $n \ge n_0$. Equivalently, $\lim_{n \to \infty} \frac{f(n)}{g(n)} = 0$.
+*   **$\omega$-notation (Little-omega)**: Denotes a strict lower bound; $f(n) = \omega(g(n))$ means for all $c > 0$, there exists $n_0$ such that $f(n) > c \cdot g(n)$ for all $n \ge n_0$. Equivalently, $\lim_{n \to \infty} \frac{f(n)}{g(n)} = \infty$.
+*   **Pseudocode**: A high-level, semi-formal description of an algorithm that abstracts away implementation details to facilitate mathematical analysis and improve readability.
 
 #### **3. Formulas**
 
