@@ -8,9 +8,19 @@ engine: knitr
 
 #### **1. Summary**
 ##### **1.1 Elementary Matrices**
-An **elementary matrix** is a matrix obtained by performing a single elementary row operation on an identity matrix $I$. Elementary matrices are the building blocks of Gaussian elimination: every step of row reduction can be expressed as multiplication by an elementary matrix.
+Before diving into elementary matrices, recall that an **identity matrix** $I$ is a square matrix with 1's on the main diagonal and 0's elsewhere (e.g., $I_3 = \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix}$). When we multiply any matrix $A$ by the identity, we get $A$ back: $IA = AI = A$.
 
-There are three types of elementary matrices:
+An **elementary matrix** is a matrix obtained by performing a single **elementary row operation** on an identity matrix $I$. But what are elementary row operations? These are the three basic operations we can perform on the rows of a matrix:
+
+1. **Swap two rows** (interchange)
+2. **Multiply a row by a nonzero scalar** (scaling)
+3. **Add a multiple of one row to another row** (row addition)
+
+These operations are fundamental to **Gaussian elimination**, the systematic method for solving systems of linear equations by transforming a matrix to row echelon form (upper triangular form). Elementary matrices are powerful because they allow us to express these row operations as matrix multiplications: every step of row reduction can be expressed as multiplication by an elementary matrix.
+
+**Why does this matter?** By representing row operations as matrices, we can track all the steps of Gaussian elimination algebraically. This leads directly to matrix factorizations like LU decomposition, which we'll study later.
+
+There are three types of elementary matrices, corresponding to the three row operations:
 
 - **Row Swap** $P_{ij}$: swaps rows $i$ and $j$ of the identity matrix. Multiplying $P_{ij}A$ swaps rows $i$ and $j$ of $A$.
 - **Row Scaling** $D_i(\alpha)$: multiplies row $i$ of the identity by a nonzero scalar $\alpha$. Multiplying $D_i(\alpha)A$ scales row $i$ of $A$ by $\alpha$.
@@ -59,27 +69,51 @@ This means $P_{ij}$ is its own inverse and its own transpose.
 For **symmetric matrices**, we often use **symmetric permutations** of the form $PAP^T$, which simultaneously permute both rows and columns. This preserves symmetry and eigenvalue structure because $(PAP^T)^T = (P^T)^T A^T P^T = PAP^T$.
 
 ##### **1.3 Triangular Systems**
-Triangular systems are particularly easy to solve, which motivates decomposing matrices into triangular factors.
+Before discussing why we decompose matrices, we need to understand what makes **triangular systems** special. A matrix is **upper triangular** if all entries below the main diagonal are zero (e.g., $\begin{bmatrix} 2 & 3 & 4 \\ 0 & 5 & 6 \\ 0 & 0 & 7 \end{bmatrix}$). A matrix is **lower triangular** if all entries above the main diagonal are zero (e.g., $\begin{bmatrix} 2 & 0 & 0 \\ 3 & 5 & 0 \\ 4 & 6 & 7 \end{bmatrix}$).
+
+**Why are triangular systems important?** When solving a system of equations $Ax = b$, if $A$ is triangular, we can solve it extremely efficiently using simple substitution. This is much faster than general methods. The efficiency of triangular systems motivates us to decompose arbitrary matrices into triangular factors — if we can write $A = LU$ where $L$ is lower triangular and $U$ is upper triangular, then solving $Ax = b$ becomes solving two easy triangular systems instead of one hard general system.
 
 ###### **1.3.1 Forward Substitution (Lower Triangular)**
-For a lower triangular system $Lx = b$, solve from top to bottom:
+For a lower triangular system $Lx = b$, we solve from **top to bottom** because the first equation involves only $x_1$, the second equation involves only $x_1$ and $x_2$, and so on. This is called **forward substitution**.
+
+**Example:** For $\begin{bmatrix} 2 & 0 & 0 \\ 3 & 5 & 0 \\ 4 & 6 & 7 \end{bmatrix}\begin{bmatrix} x_1 \\ x_2 \\ x_3 \end{bmatrix} = \begin{bmatrix} 10 \\ 22 \\ 45 \end{bmatrix}$:
+- First: $2x_1 = 10 \implies x_1 = 5$
+- Second: $3x_1 + 5x_2 = 22 \implies 15 + 5x_2 = 22 \implies x_2 = 1.4$
+- Third: $4x_1 + 6x_2 + 7x_3 = 45 \implies 20 + 8.4 + 7x_3 = 45 \implies x_3 = 2.37...$
+
+The general formula is:
 $$x_1 = b_1 / l_{11}, \quad x_2 = (b_2 - l_{21}x_1) / l_{22}, \quad \ldots$$
 
-In general:
+Or more compactly:
 $$x_i = \frac{1}{l_{ii}} \left( b_i - \sum_{j=1}^{i-1} l_{ij} x_j \right)$$
 
 ###### **1.3.2 Back Substitution (Upper Triangular)**
-For an upper triangular system $Ux = b$, solve from bottom to top:
+For an upper triangular system $Ux = b$, we solve from **bottom to top** because the last equation involves only $x_n$, the second-to-last involves only $x_{n-1}$ and $x_n$, and so on. This is called **back substitution**.
+
+**Example:** For $\begin{bmatrix} 2 & 3 & 4 \\ 0 & 5 & 6 \\ 0 & 0 & 7 \end{bmatrix}\begin{bmatrix} x_1 \\ x_2 \\ x_3 \end{bmatrix} = \begin{bmatrix} 20 \\ 23 \\ 14 \end{bmatrix}$:
+- Last: $7x_3 = 14 \implies x_3 = 2$
+- Second: $5x_2 + 6x_3 = 23 \implies 5x_2 + 12 = 23 \implies x_2 = 2.2$
+- First: $2x_1 + 3x_2 + 4x_3 = 20 \implies 2x_1 + 6.6 + 8 = 20 \implies x_1 = 2.7$
+
+The general formula is:
 $$x_n = b_n / u_{nn}, \quad x_{n-1} = (b_{n-1} - u_{n-1,n}x_n) / u_{n-1,n-1}, \quad \ldots$$
 
-In general:
+Or more compactly:
 $$x_i = \frac{1}{u_{ii}} \left( b_i - \sum_{j=i+1}^{n} u_{ij} x_j \right)$$
 
 ##### **1.4 LU Decomposition**
-**LU decomposition** factors a matrix $A$ into the product of a **lower triangular** matrix $L$ and an **upper triangular** matrix $U$:
+**LU decomposition** (also called LU factorization) is one of the most important matrix factorizations in linear algebra. It expresses a matrix $A$ as the product of a **lower triangular** matrix $L$ and an **upper triangular** matrix $U$:
 $$A = LU$$
 
-The matrix $U$ is exactly the result of Gaussian elimination on $A$, and $L$ stores the multipliers used during elimination. To ensure uniqueness, we require $L$ to be **unit lower triangular** (1's on the diagonal).
+**The big idea:** Instead of solving $Ax = b$ directly using Gaussian elimination (which requires $O(n^3)$ operations), we can factor $A = LU$ once, and then solve any system $Ax = b$ by solving two triangular systems:
+1. First solve $Ly = b$ (forward substitution, fast)
+2. Then solve $Ux = y$ (back substitution, fast)
+
+Since $A = LU$, we have $LUx = b$, and setting $y = Ux$ gives us the two-step process above.
+
+**Connection to Gaussian elimination:** The matrix $U$ is exactly what you get when you perform Gaussian elimination on $A$ (the row echelon form). The matrix $L$ stores the **multipliers** used during elimination. A **multiplier** is the number you use when performing row operations. For example, if you compute "Row 2 - 4×Row 1", then 4 is the multiplier, and we store it as $l_{21} = 4$ in $L$.
+
+To ensure uniqueness, we require $L$ to be **unit lower triangular**, meaning $L$ has 1's on its diagonal.
 
 ###### **1.4.1 Deriving LU from Gaussian Elimination**
 During Gaussian elimination, each row operation corresponds to an elementary matrix. If we reduce $A$ to $U$ using operations $E_k \cdots E_2 E_1$, then:
@@ -89,9 +123,16 @@ $$A = E_1^{-1} E_2^{-1} \cdots E_k^{-1} U = LU$$
 The product $L = E_1^{-1} E_2^{-1} \cdots E_k^{-1}$ is lower triangular. A key convenience: the entries below the diagonal of $L$ are simply the **negatives** of the multipliers used in elimination. For instance, if the operation "subtract 4 times row 1 from row 2" is performed, then $l_{21} = 4$ (the positive multiplier).
 
 ###### **1.4.2 Existence and Uniqueness**
-An invertible matrix $A$ has an LU decomposition (without pivoting) if and only if all its **leading principal minors** are nonzero. The $k$-th leading principal minor $M_k$ is the determinant of the top-left $k \times k$ submatrix of $A$.
+An invertible matrix $A$ has an LU decomposition (without pivoting) if and only if all its **leading principal minors** are nonzero. 
 
-If $A$ is invertible and all leading principal minors are nonzero, then the unit lower triangular LU decomposition is **unique**.
+**What's a leading principal minor?** The $k$-th leading principal minor $M_k$ is the determinant of the top-left $k \times k$ submatrix of $A$. For a $3 \times 3$ matrix:
+- $M_1 = a_{11}$ (just the top-left entry)
+- $M_2 = \det\begin{bmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \end{bmatrix}$ (top-left $2 \times 2$ block)
+- $M_3 = \det(A)$ (the full matrix)
+
+**Why does this matter?** Each leading principal minor corresponds to a pivot during Gaussian elimination. If $M_k = 0$, the pivot at position $k$ will be zero, and standard LU decomposition fails. In this case, we need pivoting (row swaps).
+
+If $A$ is invertible and all leading principal minors are nonzero, then the unit lower triangular LU decomposition is **unique**. This means there's exactly one way to write $A = LU$ with $L$ having 1's on its diagonal.
 
 *Example of failure:* The matrix $\begin{bmatrix} 0 & 1 \\ 1 & 0 \end{bmatrix}$ is invertible but $M_1 = 0$, so standard LU decomposition does not exist — pivoting is required.
 
@@ -101,7 +142,11 @@ If we need to solve $Ax = b$ for many different right-hand sides $b_1, b_2, \ldo
 *Example:* For $n = 1000$ and $k = 1000$ right-hand sides, LU requires about 2.67 billion flops vs. 667 billion for repeated Gaussian elimination.
 
 ##### **1.5 Pivoting**
-When a zero (or very small) pivot is encountered during Gaussian elimination, we must **swap rows** (and possibly columns) to place a suitable pivot element in the diagonal position. This process is called **pivoting**.
+When performing Gaussian elimination, we work our way down the diagonal, using each diagonal element (called a **pivot**) to eliminate entries below it. But what happens if a pivot is zero? We can't divide by zero! Even if a pivot is very small (close to zero), dividing by it can cause huge numerical errors due to round-off in computer arithmetic.
+
+**The solution: pivoting.** We **swap rows** (and possibly columns) to place a better (larger in absolute value) element in the pivot position. This process is called **pivoting**, and it's essential for both theoretical correctness and numerical stability.
+
+**What is numerical stability?** In theory, we can work with exact arithmetic. In practice, computers use floating-point numbers with limited precision. Small errors can accumulate and grow. A **numerically stable** algorithm is one that doesn't let these errors blow up. Pivoting helps ensure stability by avoiding division by small numbers.
 
 ###### **1.5.1 Partial Pivoting**
 **Partial pivoting** searches the current column below the diagonal for the largest element in absolute value, then swaps it into the pivot position.
@@ -180,15 +225,19 @@ $$\det(A) = \det(P^{-1}) \det(L) \det(U) \det(Q^{-1}) = \pm \prod_{i} u_{ii}$$
 
 **Complete pivoting is needed for:**
 
-- Ill-conditioned matrices ($\kappa(A) \gg 1$)
-- Rank-deficient matrices (determining rank)
-- Computing null space
-- When backward stability is critical
+- **Ill-conditioned matrices** ($\kappa(A) \gg 1$): A matrix is **ill-conditioned** if small changes in the input can cause large changes in the output. The **condition number** $\kappa(A)$ measures this sensitivity. Large $\kappa(A)$ means the problem is difficult numerically.
+- **Rank-deficient matrices**: Matrices where some rows/columns are linearly dependent (not full rank), used when determining the rank
+- **Computing the null space**: Finding all vectors $x$ such that $Ax = 0$
+- **When backward stability is critical**: Applications requiring maximum possible accuracy
 
 ##### **1.6 LDU Decomposition**
-From the LU decomposition $A = LU$, we can factor out the diagonal of $U$ to get:
+The LU decomposition can be refined further. From $A = LU$, we can **factor out the diagonal** of $U$ to get:
 $$A = LDU_0$$
-where $D = \text{diag}(u_{11}, u_{22}, \ldots, u_{nn})$ is the diagonal matrix of pivots and $U_0 = D^{-1}U$ is unit upper triangular (1's on the diagonal).
+where:
+- $D = \text{diag}(u_{11}, u_{22}, \ldots, u_{nn})$ is a **diagonal matrix** containing the pivots from $U$
+- $U_0 = D^{-1}U$ is **unit upper triangular** (upper triangular with 1's on the diagonal)
+
+**Why do this?** Separating the diagonal pivots into $D$ makes the structure clearer. It also reveals special patterns for symmetric matrices (see next section).
 
 ###### **1.6.1 Symmetric Case: $LDL^T$**
 If $A$ is **symmetric** ($A = A^T$), then in the LDU decomposition, $U_0 = L^T$. This gives:
@@ -196,15 +245,27 @@ $$A = LDL^T$$
 This is more storage-efficient (only $L$ and $D$ are needed) and preserves the symmetry of the matrix.
 
 ##### **1.7 Symmetric Positive Definite Matrices and Cholesky Decomposition**
-A symmetric matrix $A$ is **symmetric positive definite (SPD)** if $x^TAx > 0$ for every nonzero vector $x$.
+A matrix $A$ is **symmetric** if $A = A^T$ (it equals its transpose, meaning $a_{ij} = a_{ji}$). Symmetric matrices have special properties and arise frequently in applications (physics, optimization, statistics).
+
+A symmetric matrix $A$ is **symmetric positive definite (SPD)** if $x^TAx > 0$ for every nonzero vector $x$. 
+
+**What does this mean intuitively?** The expression $x^TAx$ is called a **quadratic form**. For SPD matrices, this quadratic form always gives positive values (except at $x = 0$). Geometrically, this means the matrix defines a "bowl-shaped" surface with no saddle points. SPD matrices are like "well-behaved" matrices — they're always invertible, have positive eigenvalues, and numerical methods work reliably on them.
 
 ###### **1.7.1 Sylvester's Criterion**
-A symmetric matrix $A$ is positive definite if and only if **all its leading principal minors are positive**: $M_1 > 0$, $M_2 > 0$, $\ldots$, $M_n > 0$.
+**Sylvester's Criterion** provides a practical test for positive definiteness: a symmetric matrix $A$ is positive definite if and only if **all its leading principal minors are positive**: $M_1 > 0$, $M_2 > 0$, $\ldots$, $M_n > 0$.
+
+This is incredibly useful because checking the definition ($x^TAx > 0$ for all nonzero $x$) would require testing infinitely many vectors! Sylvester's criterion reduces this to computing $n$ determinants.
 
 ###### **1.7.2 Cholesky Decomposition**
-For SPD matrices, the $LDL^T$ decomposition can be taken further. Since all diagonal entries of $D$ are positive (because all pivots of an SPD matrix are positive), we can write $D = D^{1/2} D^{1/2}$ and absorb the square roots into $L$:
-$$A = LL^T$$
-where $L$ is lower triangular with **positive diagonal entries**. This is the **Cholesky decomposition**.
+For SPD matrices, the $LDL^T$ decomposition can be taken one step further. Since all diagonal entries of $D$ are positive (because all pivots of an SPD matrix are positive), we can write each diagonal entry as a square: $d_i = (\sqrt{d_i})^2$. This means $D = D^{1/2} D^{1/2}$ where $D^{1/2}$ is the diagonal matrix with $\sqrt{d_i}$ on the diagonal.
+
+We can then absorb these square roots into $L$ and $L^T$:
+$$A = L D L^T = L D^{1/2} D^{1/2} L^T = (LD^{1/2})(LD^{1/2})^T$$
+
+If we define $\tilde{L} = LD^{1/2}$, we get:
+$$A = \tilde{L}\tilde{L}^T$$
+
+We typically just write this as $A = LL^T$ (dropping the tilde), where $L$ is lower triangular with **positive diagonal entries**. This is the **Cholesky decomposition** (or Cholesky factorization).
 
 **Advantages of Cholesky:**
 
@@ -213,12 +274,26 @@ where $L$ is lower triangular with **positive diagonal entries**. This is the **
 - Requires only storing one triangular factor
 
 ##### **1.8 Matrix Inversion**
+The **inverse** of a matrix $A$ (denoted $A^{-1}$) is the matrix that "undoes" $A$: $AA^{-1} = A^{-1}A = I$. Not all matrices have inverses — only **invertible** (or **nonsingular**) matrices do. A matrix is invertible if and only if its determinant is nonzero.
+
+**Why do we care about inverses?** If $A$ is invertible, we can solve $Ax = b$ by computing $x = A^{-1}b$. However, in practice, we rarely compute $A^{-1}$ explicitly because it's expensive and numerically unstable. Instead, we use LU decomposition or other factorizations.
+
 ###### **1.8.1 The 2x2 Inverse Formula**
 For a $2 \times 2$ matrix $A = \begin{bmatrix} a & b \\ c & d \end{bmatrix}$ with $\det(A) = ad - bc \neq 0$:
 $$A^{-1} = \frac{1}{ad - bc} \begin{bmatrix} d & -b \\ -c & a \end{bmatrix}$$
 
+**Memory trick:** Swap the diagonal entries ($a \leftrightarrow d$), negate the off-diagonal entries, and divide by the determinant.
+
 ###### **1.8.2 Gauss-Jordan Method**
-To find $A^{-1}$, augment $A$ with the identity $[A \mid I]$ and apply row operations until the left side becomes $I$. The right side then equals $A^{-1}$.
+To find $A^{-1}$ for larger matrices, we use **Gauss-Jordan elimination**: augment $A$ with the identity matrix to form $[A \mid I]$, then apply row operations until the left side becomes $I$. The right side then equals $A^{-1}$.
+
+**Why does this work?** The row operations correspond to multiplying by elementary matrices. If we reduce $A$ to $I$ using operations $E_k \cdots E_2 E_1$, then:
+$$E_k \cdots E_2 E_1 A = I$$
+
+This means $E_k \cdots E_2 E_1 = A^{-1}$. Applying the same operations to $I$ gives:
+$$E_k \cdots E_2 E_1 I = A^{-1}$$
+
+So $[A \mid I] \to [I \mid A^{-1}]$ computes the inverse by tracking what operations we apply.
 
 ###### **1.8.3 Properties Preserved by Inversion**
 If $A$ is invertible, then $A^{-1}$:
@@ -229,9 +304,20 @@ If $A$ is invertible, then $A^{-1}$:
 - **Does NOT necessarily have integer entries** even if $A$ does — the inverse involves division by the determinant
 
 ##### **1.9 Matrix Multiplication and Row/Column Interpretation**
-Each row of the product $AB$ is a linear combination of the rows of $B$, with coefficients from the corresponding row of $A$. Similarly, each column of $AB$ is a linear combination of the columns of $A$, with coefficients from the corresponding column of $B$.
+Matrix multiplication can be understood in several ways. Beyond the standard "dot product of row $i$ and column $j$" definition, there's a powerful interpretation using linear combinations.
 
-For example, if $A = \begin{bmatrix} 2 & 1 & 4 \\ 0 & -1 & 1 \end{bmatrix}$ and $B = \begin{bmatrix} 1 & 1 \\ 0 & 1 \\ 1 & 0 \end{bmatrix}$, then the first row of $AB$ is $2 \cdot [1,1] + 1 \cdot [0,1] + 4 \cdot [1,0] = [6,3]$.
+**Row perspective:** Each row of the product $AB$ is a **linear combination** of the rows of $B$, with coefficients from the corresponding row of $A$. 
+
+**Why?** When you compute $(AB)_{i,j}$, you're taking the $i$-th row of $A$ and the $j$-th column of $B$. But if you look at the entire $i$-th row of $AB$, it's:
+$$\text{row}_i(AB) = a_{i1} \cdot \text{row}_1(B) + a_{i2} \cdot \text{row}_2(B) + \cdots + a_{in} \cdot \text{row}_n(B)$$
+
+**Column perspective:** Each column of $AB$ is a linear combination of the columns of $A$, with coefficients from the corresponding column of $B$:
+$$\text{col}_j(AB) = b_{1j} \cdot \text{col}_1(A) + b_{2j} \cdot \text{col}_2(A) + \cdots + b_{nj} \cdot \text{col}_n(A)$$
+
+**Example:** If $A = \begin{bmatrix} 2 & 1 & 4 \\ 0 & -1 & 1 \end{bmatrix}$ and $B = \begin{bmatrix} 1 & 1 \\ 0 & 1 \\ 1 & 0 \end{bmatrix}$, then the first row of $AB$ is:
+$$2 \cdot [1,1] + 1 \cdot [0,1] + 4 \cdot [1,0] = [2,2] + [0,1] + [4,0] = [6,3]$$
+
+This perspective is crucial for understanding how elementary matrices work: left multiplication affects rows, right multiplication affects columns.
 
 #### **2. Definitions**
 *   **Elementary Matrix**: A matrix obtained by performing a single elementary row operation on the identity matrix.

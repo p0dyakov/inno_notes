@@ -7,6 +7,22 @@ engine: knitr
 ---
 
 #### **1. Summary**
+##### **1.0 Introduction and Prerequisites**
+###### **1.0.1 Understanding Time Complexity (Big-O Notation)**
+Before diving into data structures, it's essential to understand how we measure their efficiency. **Time complexity** tells us how the running time of an operation grows as the input size increases.
+
+- **$O(1)$ — Constant time:** The operation takes the same amount of time regardless of input size. Example: accessing an array element by index `arr[5]` always takes one step.
+- **$O(n)$ — Linear time:** Time grows proportionally with input size $n$. Example: searching through an unsorted list of $n$ elements requires checking each one.
+- **$O(\log n)$ — Logarithmic time:** Time grows slowly as input size increases. Example: binary search on a sorted array of 1000 elements takes only about 10 steps (since $2^{10} = 1024$).
+- **$O(n^2)$ — Quadratic time:** Time grows with the square of input size. Example: comparing every pair of elements in a list.
+
+**Amortized complexity** is the average time per operation over a sequence of operations, accounting for occasional expensive operations. For example, if you add 100 elements to an ArrayList and only resize once (copying all elements), most additions are cheap, giving $O(1)$ amortized time.
+
+###### **1.0.2 Pointers and References**
+A **pointer** (or **reference** in languages like Java and Python) is a variable that stores the memory address of another object. Instead of storing the actual data, it "points to" where the data lives in memory.
+
+Think of it like a note with someone's address: the note itself isn't the house, but it tells you where to find the house. In linked structures, each node contains a reference to the next node, creating a chain.
+
 ##### **1.1 Abstract Data Types and Data Structures**
 ###### **1.1.1 Abstract Data Types**
 An **Abstract Data Type (ADT)** is a mathematical model that describes a data type purely in terms of its behavior, without specifying how it is implemented. Think of an ADT as a contract or an "interface" — it tells you *what* operations are available and *what* rules they follow, but says nothing about *how* they work internally.
@@ -48,12 +64,34 @@ The List ADT supports the following operations:
 
 For example, starting from an empty list `[]`: add $A$ at index 0 gives `[A]`; add $B$ at index 0 gives `[B, A]`; add $C$ at index 2 gives `[B, A, C]`; get element at index 1 returns $A$; remove at index 1 gives `[B, C]`.
 
+In Java, a List interface might look like this:
+
+```java
+public interface List<E> {
+    int size();
+    boolean isEmpty();
+    E get(int i) throws IndexOutOfBoundsException;
+    E set(int i, E e) throws IndexOutOfBoundsException;
+    void add(int i, E e) throws IndexOutOfBoundsException;
+    E remove(int i) throws IndexOutOfBoundsException;
+}
+```
+
+This interface specifies the operations that any List implementation must provide, without dictating how they are implemented.
+
 ###### **1.2.2 ArrayList**
 An **ArrayList** (array-based list) stores all elements in a single contiguous array. This gives excellent random access performance but makes insertions and deletions in the middle expensive because elements must be shifted.
 
-**How `get` and `set` work:** Since elements are stored in an array, accessing any element by index is a single array lookup — $O(1)$.
+**How `get` and `set` work:** Since elements are stored in an array, accessing any element by index is a single array lookup — $O(1)$. The computer can calculate exactly where in memory the element is stored using the formula: `memory_address = base_address + (index × element_size)`. This is instantaneous, regardless of the array size.
 
-**How `add` works:** To insert at index $i$, all elements from index $i$ to the end must be shifted one position to the right to make room. This takes $O(n - i)$ time. Adding at the *end* requires no shifting and is $O(1)$.
+**How `add` works:** To insert at index $i$, all elements from index $i$ to the end must be shifted one position to the right to make room. *Why?* Arrays store elements in adjacent memory locations — there's no "gap" to insert into. We must physically move elements to create space.
+
+For example, inserting X at index 2 in `[A, B, C, D]`:
+1. Shift D to position 4: `[A, B, C, _, D]`
+2. Shift C to position 3: `[A, B, _, C, D]`
+3. Insert X at position 2: `[A, B, X, C, D]`
+
+This takes $O(n - i)$ time because we must shift $(n - i)$ elements. Adding at the *end* requires no shifting and is $O(1)$.
 
 **How `remove` works:** To remove at index $i$, all elements after index $i$ must be shifted one position to the left. This takes $O(n - i)$ time. Removing the *last* element requires no shifting and is $O(1)$.
 
@@ -73,6 +111,15 @@ An **ArrayList** (array-based list) stores all elements in a single contiguous a
 | `remove(i)` | $O(n - i)$ |
 | `removeFirst()` | $O(n)$ |
 | `removeLast()` | $O(1)$ |
+
+**When to use ArrayList:**
+- When you need fast random access by index (e.g., frequently using `get(i)`)
+- When most operations are at the end of the list
+- When you know approximately how many elements you'll store (to avoid many resizes)
+
+**ArrayList weaknesses:**
+- Adding/removing at the beginning requires shifting all elements — $O(n)$
+- Inserting in the middle is expensive — $O(n)$
 
 ###### **1.2.3 Singly Linked List**
 A **Singly Linked List** stores elements in separate **nodes**. Each node contains:
@@ -105,6 +152,16 @@ The first node is called the **head** and the last node is called the **tail**. 
 | `removeFirst()` | $O(1)$ |
 | `removeLast()` | $O(n)$ |
 
+**When to use Singly Linked List:**
+- When you frequently add/remove at the beginning of the list
+- When you rarely need to access elements by index
+- When memory overhead of ArrayList (unused array space) is a concern
+
+**Singly Linked List weaknesses:**
+- No fast random access — getting element at index $i$ requires $O(i)$ traversal
+- Removing from the tail is $O(n)$ even with a tail pointer
+- Each node requires extra memory for the `next` pointer
+
 ###### **1.2.4 Doubly Linked List**
 A **Doubly Linked List** is similar to a singly linked list, but each node has references to *both* the next node and the *previous* node. This allows traversal in both directions.
 
@@ -131,9 +188,31 @@ The backward pointer has several important consequences:
 | `removeFirst()` | $O(1)$ |
 | `removeLast()` | $O(1)$ |
 
+**When to use Doubly Linked List:**
+- When you need efficient operations at *both* ends (queue-like behavior)
+- When you need to traverse in both directions
+- When implementing data structures like deques (double-ended queues)
+
+**Doubly Linked List trade-offs:**
+- More memory overhead — each node stores *two* pointers (next and previous)
+- Slightly more complex to implement and maintain
+- Better performance than singly linked list for many operations, but still slower than ArrayList for random access
+
+**Comparison Summary:**
+- **ArrayList:** Best for random access and operations at the end. Use when you read more than you write.
+- **Singly Linked List:** Best for frequent insertions/deletions at the head. Use when operations are sequential.
+- **Doubly Linked List:** Best for operations at both ends. Use when you need flexibility in both directions.
+
 ##### **1.3 Stacks**
 ###### **1.3.1 Stack ADT**
 A **Stack** is a restricted version of a List where you can only access, add, or remove elements at one end — the **top**. This makes it a **Last-In-First-Out (LIFO)** data structure: the last element added is the first one removed.
+
+**Real-world analogy:** Think of a stack of plates. You can only add a new plate to the top or remove the top plate. You cannot access plates in the middle without first removing all the plates above them. This LIFO behavior is exactly how a Stack works.
+
+**Why restrict access?** While you *could* implement these operations using a regular List, having a specialized Stack interface:
+1. Makes your code clearer — when you see a Stack, you know elements are processed in LIFO order
+2. Prevents bugs — you can't accidentally access elements in the middle
+3. May enable more efficient implementations
 
 The Stack ADT supports the following operations:
 
@@ -153,7 +232,7 @@ Stacks are used in many important contexts:
 An **ArrayStack** uses an array and a `top` counter to track the index of the topmost element.
 
 - **Push:** Increment the `top` counter, store the new element at `data[top]`.
-- **Pop:** Return `data[top]`, then decrement `top`. For references (non-primitive data), you should also set `data[top + 1]` to `null` to enable garbage collection.
+- **Pop:** Return `data[top]`, then decrement `top`. For references (non-primitive data), you should also set `data[top + 1]` to `null` to enable **garbage collection**. *Why?* Garbage collection is the automatic memory management process that frees memory when objects are no longer referenced. If we don't set the popped element to `null`, the array still "holds onto" the object, preventing it from being freed even though we've logically removed it from the stack.
 - **When the array is full:** Double the array size (same dynamic resizing strategy as ArrayList).
 
 All operations are $O(1)$ (push is $O(1)$ amortized due to occasional resizing).
@@ -182,6 +261,10 @@ In practice, **ArrayStack is often preferred** because arrays have better *cache
 ###### **1.4.1 Queue ADT**
 A **Queue** is a restricted version of a List where elements are added at one end (the **rear**) and removed from the other end (the **front**). This makes it a **First-In-First-Out (FIFO)** data structure: the first element added is the first one removed.
 
+**Real-world analogy:** Think of a line of people waiting at a checkout counter. New people join at the back of the line, and people are served from the front. The person who arrived first is served first — exactly FIFO behavior.
+
+**Contrast with Stack:** While a Stack is like a stack of plates (last in, first out), a Queue is like a waiting line (first in, first out). Choosing the right data structure depends on the order you need to process elements.
+
 The Queue ADT supports the following operations:
 
 - `size()` — get the number of elements
@@ -199,9 +282,19 @@ Queues are used for:
 ###### **1.4.2 Array Queue and the Circular Array**
 A naive **ArrayQueue** uses a `front` and `rear` counter. `offer` increments `rear` and places the element; `poll` increments `front` and returns the old front element. The problem is that after several offers and polls, the active content *crawls* to the right, wasting space at the beginning of the array.
 
-The solution is a **circular array**: when the rear reaches the end of the array, it wraps around to the beginning (if there is space). Counter increments are done **modulo** the array capacity:
+**Example of the problem:**
+- Start: `[A, B, C, _, _]` (front=0, rear=2)
+- After `poll()`: `[_, B, C, _, _]` (front=1, rear=2)
+- After `poll()`: `[_, _, C, _, _]` (front=2, rear=2)
+- After `offer(D)`: `[_, _, C, D, _]` (front=2, rear=3)
+- After `offer(E)`: `[_, _, C, D, E]` (front=2, rear=4)
+- Now we're at the end, but positions 0 and 1 are unused!
+
+The solution is a **circular array**: when the rear reaches the end of the array, it wraps around to the beginning (if there is space). Think of the array as a circle where the last position connects back to the first. Counter increments are done **modulo** the array capacity:
 
 $$\text{rear} = (\text{rear} + 1) \mod \text{capacity}$$
+
+For example, if capacity is 5 and rear is at position 4, then $(4 + 1) \mod 5 = 0$, wrapping back to the start.
 
 If the queue fills up entirely, the array is resized (doubled), just like with ArrayList.
 
@@ -234,6 +327,17 @@ As with stacks, **ArrayQueue is often preferred** in practice due to better cach
 - **Base case:** The problem is small enough to solve directly (e.g., factorial of 0 is 1).
 - **Recursive case:** The problem is reduced to one or more *smaller* subproblems, which are solved by calling the same algorithm.
 
+**Intuitive Example:** Imagine you need to count the number of people in a line, but you can only see the person directly in front of you. You could recursively solve this:
+- *Base case:* If you're at the front of the line, return 1 (just yourself).
+- *Recursive case:* Otherwise, ask the person in front "how many people are ahead of you?" and add 1 to their answer.
+
+Each person solves the same problem ("count the people ahead"), but for a smaller line. Eventually, the question reaches the front person who knows the answer directly.
+
+The key insight: to solve a problem recursively, you must:
+1. Identify a way to break the problem into a *smaller* version of itself
+2. Have a simple case where you can answer directly (base case)
+3. Ensure that each recursive call moves closer to the base case
+
 ###### **1.5.2 Recursion Examples**
 **Factorial:**
 
@@ -245,7 +349,18 @@ def factorial(n):
         return n * factorial(n - 1)
 ```
 
-This has one base case ($n = 0$) and one recursive case with a single recursive call. Time complexity: $O(n)$. Space complexity: $O(n)$ (due to the call stack).
+**Understanding the execution:** Let's trace `factorial(3)`:
+1. `factorial(3)` calls `factorial(2)` and will multiply the result by 3
+2. `factorial(2)` calls `factorial(1)` and will multiply the result by 2
+3. `factorial(1)` calls `factorial(0)` and will multiply the result by 1
+4. `factorial(0)` returns 1 immediately (base case!)
+5. `factorial(1)` receives 1 and returns $1 \times 1 = 1$
+6. `factorial(2)` receives 1 and returns $2 \times 1 = 2$
+7. `factorial(3)` receives 2 and returns $3 \times 2 = 6$
+
+Notice how the recursion "goes down" until it hits the base case, then "comes back up" computing results.
+
+This has one base case ($n = 0$) and one recursive case with a single recursive call. Time complexity: $O(n)$ — we make $n$ recursive calls. Space complexity: $O(n)$ — the call stack grows to depth $n$ (all function calls are "waiting" until we hit the base case).
 
 **Fibonacci:**
 
@@ -397,8 +512,14 @@ def fibonacci(n):
 ```
 
 ##### **1.7 Brute Force and Backtracking**
+**Brute force** is the simplest problem-solving approach: try *every* possible solution until you find one that works (or determine none exists). While often inefficient, it guarantees finding the answer if one exists, and it's a good starting point for understanding a problem.
+
+**Example:** To find a specific book in an unsorted shelf, you could check every book one by one. This is brute force — guaranteed to work, but slow.
+
 ###### **1.7.1 Iterating over Sequences**
 A fundamental brute-force technique is to enumerate all possible sequences. Given a sequence length $n$ and maximum digit $k$, the task is to generate all distinct sequences of $n$ digits (each from 0 to $k$). The idea is to count from 0 in base-$(k+1)$, stopping when all digits are $k$.
+
+**Why this works:** Think of generating all 3-digit binary numbers (000, 001, 010, ..., 111). You're essentially counting from 0 to 7 in binary. Similarly, for sequences of length $n$ with digits 0 to $k$, you're counting in base $(k+1)$.
 
 ```python
 def all_sequences(n, k):
@@ -454,11 +575,21 @@ Time complexity: $O(2^n)$. Space complexity: $O(n)$.
 
 $$F(\emptyset, k) = \begin{cases} 1, & \text{if } k = 0 \\ 0, & \text{otherwise} \end{cases}$$
 
+*Explanation:* The empty set $\emptyset$ has sum 0, so if we're looking for sum 0, there's one valid subset (the empty set itself). If we're looking for any other sum, there are zero valid subsets.
+
 For a non-empty set $A = \{x\} \cup B$:
 
 $$F(\{x\} \cup B, k) = F(B, k) + F(B, k - x)$$
 
-This says: either $x$ is *not* in the subset (count subsets of $B$ summing to $k$) or $x$ *is* in the subset (count subsets of $B$ summing to $k - x$).
+*Explanation:* For each element $x$, we have a choice: include it or don't include it.
+- **Don't include $x$:** The remaining elements $B$ must sum to $k$. This gives $F(B, k)$ valid subsets.
+- **Include $x$:** The remaining elements $B$ must sum to $k - x$ (since $x$ contributes its value). This gives $F(B, k - x)$ valid subsets.
+- Total: Add these two counts together.
+
+**Example:** For $A = \{2, 3, 5\}$ and $k = 5$, we can either:
+- Not use 2: find subsets of $\{3, 5\}$ that sum to 5 → one subset: $\{5\}$
+- Use 2: find subsets of $\{3, 5\}$ that sum to $5 - 2 = 3$ → one subset: $\{3\}$
+- Total: 2 subsets ($\{5\}$ and $\{2, 3\}$)
 
 ```python
 def subsets(A, n, k):
@@ -479,9 +610,15 @@ Time complexity: $O(2^n)$ (binary tree of recursive calls). Space complexity: $O
 ###### **1.7.4 Backtracking**
 **Backtracking** is an optimization of brute-force search. Instead of generating *all* possible solutions and then checking each one, backtracking builds solutions *incrementally* and **prunes** — abandons a partial solution as soon as it detects that it cannot possibly lead to a valid complete solution.
 
+**Analogy:** Imagine solving a maze. Brute force would map out *every* possible path, then check which reaches the exit. Backtracking instead walks the maze: when you hit a dead end, you *backtrack* to the last intersection and try a different path. You never waste time exploring paths you know lead nowhere.
+
+**Key advantage:** Backtracking can dramatically reduce the search space. Instead of checking all $n^n$ possible queen placements, we might only explore a few thousand valid partial placements.
+
 **The N Queens Problem:**
 
 The classic example of backtracking is the **N Queens Problem**: place $n$ queens on an $n \times n$ chessboard so that no two queens attack each other (no two queens share a row, column, or diagonal).
+
+**Why this problem is hard:** For an $8 \times 8$ board, there are $\binom{64}{8} \approx 4.4$ billion ways to place 8 queens. Checking all of them is infeasible. Backtracking makes it tractable by pruning invalid placements early.
 
 Key observations:
 
@@ -490,6 +627,17 @@ Key observations:
 - If no valid column exists for row $i$, we **backtrack** — go back to row $i - 1$ and try the next available column there.
 
 The search space forms a tree. Each level of the tree corresponds to a row, and each branch corresponds to a column choice. Backtracking prunes entire subtrees when a conflict is detected, which is far more efficient than checking all $n^n$ possible placements.
+
+**Step-by-step walkthrough for $n = 4$:**
+1. Place queen in row 0, column 0
+2. Try row 1: columns 0, 1 are attacked (same column and diagonal). Try column 2: safe! Place it.
+3. Try row 2: columns 0, 1, 2, 3 all attacked. No valid position!
+4. **Backtrack** to row 1. Remove queen from column 2, try column 3: safe! Place it.
+5. Try row 2: column 1 is safe! Place it.
+6. Try row 3: columns 0, 1, 2 attacked. Column 3 is safe, but row 1 already has a queen there. No solution from here.
+7. **Backtrack** to row 2. Try other columns... (process continues)
+
+Eventually, we find that placing queens at columns [1, 3, 0, 2] (for rows 0-3) is a valid solution.
 
 ```python
 def queens(n):
@@ -501,14 +649,20 @@ def queens(n):
             j = j + 1
         if j < n:
             columns[i] = j
-            i = i + 1
+            i = i + 1  # Move to next row
         else:
-            columns[i] = 0
-            i = i - 1
+            columns[i] = 0  # Reset this row
+            i = i - 1  # Backtrack to previous row
+            if i >= 0:
+                columns[i] = columns[i] + 1  # Try next column in previous row
     return columns
 ```
 
-The `safe(columns, i, j)` function checks whether placing a queen at row $i$, column $j$ conflicts with any queen in rows $0$ through $i - 1$. For $n = 2$ and $n = 3$, there is no valid solution. For $n = 4$ and larger, solutions exist.
+The `safe(columns, i, j)` function checks whether placing a queen at row $i$, column $j$ conflicts with any queen in rows $0$ through $i - 1$:
+- **Column conflict:** Is any previous queen in column $j$?
+- **Diagonal conflict:** Are any previous queens on the same diagonal? Two queens at positions $(r_1, c_1)$ and $(r_2, c_2)$ are on the same diagonal if $|r_1 - r_2| = |c_1 - c_2|$.
+
+For $n = 2$ and $n = 3$, there is no valid solution. For $n = 1$ and $n \geq 4$, solutions exist.
 
 #### **2. Definitions**
 
