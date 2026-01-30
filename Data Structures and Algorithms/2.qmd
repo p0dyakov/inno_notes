@@ -1064,3 +1064,206 @@ def safe(columns, row, col):
 **Answer:** Use row-by-row placement with backtracking. The `safe` check prunes invalid branches efficiently.
 
 </details>
+
+##### **4.15. Tovarisch Function with Queue and Stack** (Homework, Coding Exercise A)
+
+**Tovarisch Function** is defined as follows: Given a list of linear functions and an integer $x$, apply the functions sequentially from left to right such that:
+
+$$F([f_1, f_2, \dots, f_r], x) = f_r(f_{r-1}(\dots(f_1(x))\dots))$$
+
+Initially you have an empty list $A$ of linear functions. Each function has the form: $f(x) = a \cdot x + b$.
+
+You have to process $Q$ queries of the following types:
+
+- **add** $a$ $b$ — add the function $f(x) = a \cdot x + b$ to the **end** of the list $A$.
+- **remove** — remove the **first** function from the list $A$.
+- **compute** $x$ — compute the Tovarisch Function by passing the current list $A$ and given value $x$.
+
+**Hint:** Use a queue and a stack such that the queue maintains the order of functions, while the stack is used as a temporary buffer during `(compute x)` to traverse the queue without losing its content or order.
+
+**Input:** The first line contains an integer $Q$ ($1 \le Q \le 1000$) — the number of queries. Each of the next $Q$ lines contains one of the following queries:
+- **add** $a$ $b$ — $a, b$ are integers and ($0 \le a \le 1$), ($0 \le b \le 10^9$).
+- **remove**
+- **compute** $x$ — $x$ is integer and ($0 \le x \le 1$).
+
+**Output:** For each `(compute x)` query, print the result on a separate line. If a `(compute x)` query is given while the list $A$ is empty, print $x$. If a `(remove)` query is given while the list $A$ is empty, print "Empty" (without quotes).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Maintain functions in a queue (adding at rear, removing from front). Use a stack for computing in the correct order.
+
+1.  **Data Structures:**
+    - `queue`: Stores the functions as $(a, b)$ pairs. New functions are added at the rear; old ones removed from the front.
+    - `stack`: Temporary storage to reverse the queue order during computation.
+
+2.  **Implementation (pseudocode):**
+    ```python
+    class TovarischFunction:
+        queue = empty queue
+        stack = empty stack
+
+        def add(a, b):
+            queue.offer((a, b))
+
+        def remove():
+            if queue.is_empty():
+                print("Empty")
+            else:
+                queue.poll()
+
+        def compute(x):
+            if queue.is_empty():
+                print(x)
+            else:
+                # Transfer queue to stack (reversing order)
+                temp = []
+                while not queue.is_empty():
+                    temp.append(queue.poll())
+
+                # Push back to stack (now in reverse of reverse = original order)
+                for item in temp:
+                    stack.push(item)
+
+                # Apply functions in reverse order (rightmost first)
+                result = x
+                while not stack.is_empty():
+                    (a, b) = stack.pop()
+                    result = a * result + b
+
+                # Restore queue
+                while not stack.is_empty():
+                    queue.offer(stack.pop())
+
+                print(result)
+    ```
+
+3.  **Why it works:**
+    - The queue maintains the left-to-right order: $f_1, f_2, \dots, f_r$.
+    - To compute $f_r(\cdots(f_1(x))\cdots)$, we must apply $f_1$ first to $x$, then $f_2$, etc.
+    - But to implement this recursively or iteratively from right to left, it's easier to apply from $f_r$ down to $f_1$.
+    - By popping from a stack in reverse order, we apply $f_r$ first.
+
+4.  **Complexity:**
+    - `add`: $O(1)$
+    - `remove`: $O(1)$
+    - `compute`: $O(n)$ where $n$ is the number of functions (to transfer and restore the queue)
+
+**Answer:** Use queue (add at rear, remove from front) + stack for temporary reversal during compute. Complexity: add/remove $O(1)$, compute $O(n)$.
+
+</details>
+
+##### **4.16. Perfect Paths in a Maze** (Homework, Coding Exercise B)
+
+Cheburashka found an $N \times M$ maze. Each cell of the maze is **exactly** one of the following:
+
+- "." — a free cell
+- "#" — a trap cell
+- "G" — a cell containing an orange
+
+The rows are numbered from $1$ to $N$ (down to top), and the columns are numbered from $1$ to $M$ (left to right).
+
+If standing at the cell $(i, j)$, it's possible to move either to the right (to the cell $(i, j+1)$), or up (to the cell $(i+1, j)$).
+
+Cheburashka starts at the cell $(1, 1)$ and wonders how many perfect paths exist to reach the cell $(N, M)$ such that:
+
+- he never steps on a trap cell
+- he collects **all** the oranges on his path
+- he never leaves the maze
+
+Help him to find the answer.
+
+**Input:** The first line has two integers $N$ and $M$ ($1 \le N, M \le 30$) — the number of rows and the number of columns of the maze, respectively. Each of the following $N$ lines contains $M$ characters describing the maze, such that each character is ".", "#" or "G".
+
+**Additional constraint:** $N \times M \le 250$. It's guaranteed that the maze has **at least** one orange.
+
+**Output:** Print the number of perfect paths.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use dynamic programming with a bitmask to track which oranges have been collected. For each cell and orange-collection state, count the number of ways to reach that state.
+
+1.  **State Definition:**
+    - Let $\text{dp}[i][j][mask]$ = number of ways to reach cell $(i, j)$ while having collected exactly the oranges indicated by bitmask `mask`.
+    - Each orange is assigned a unique bit position (0 to $k-1$ where $k$ is the total number of oranges).
+    - `mask` is an integer where bit $b$ is 1 iff orange $b$ has been collected.
+
+2.  **Transitions:**
+    - We can reach $(i, j)$ from $(i-1, j)$ (moving up) or $(i, j-1)$ (moving right).
+    - If cell $(i, j)$ is a trap ("#"), skip it (no paths through it).
+    - If cell $(i, j)$ is an orange ("G"), update the mask by setting the corresponding bit.
+
+3.  **Base Case:**
+    - If cell $(1, 1)$ is an orange, $\text{dp}[1][1][\text{initial mask}] = 1$.
+    - If cell $(1, 1)$ is free, $\text{dp}[1][1][0] = 1$ (no oranges collected yet).
+
+4.  **Answer:**
+    - The answer is $\text{dp}[N][M][\text{all oranges mask}]$, where "all oranges mask" has all $k$ bits set to 1 (i.e., $2^k - 1$).
+
+5.  **Pseudocode:**
+    ```python
+    def count_perfect_paths(N, M, maze):
+        # Find all oranges and assign bit indices
+        oranges = []  # list of (row, col) positions
+        for i = 1 to N:
+            for j = 1 to M:
+                if maze[i][j] == 'G':
+                    oranges.append((i, j))
+
+        k = len(oranges)  # number of oranges
+        orange_mask = {}  # map (i, j) to bit index
+        for idx, (i, j) in enumerate(oranges):
+            orange_mask[(i, j)] = idx
+
+        all_mask = (1 << k) - 1  # binary: 111...1 (k ones)
+
+        # DP table
+        dp = [[[0 for _ in range(1 << k)] for _ in range(M + 1)] for _ in range(N + 1)]
+
+        # Base case
+        start_mask = 0
+        if maze[1][1] == 'G':
+            start_mask = 1 << orange_mask[(1, 1)]
+        dp[1][1][start_mask] = 1
+
+        # Fill DP table
+        for i = 1 to N:
+            for j = 1 to M:
+                if maze[i][j] == '#':
+                    continue  # skip traps
+
+                for mask = 0 to (1 << k) - 1:
+                    if dp[i][j][mask] == 0:
+                        continue  # no ways to reach this state
+
+                    current_mask = mask
+                    if maze[i][j] == 'G':
+                        current_mask = mask | (1 << orange_mask[(i, j)])
+
+                    # Transition to (i+1, j) [moving up in grid, but down in row index]
+                    if i + 1 <= N and maze[i + 1][j] != '#':
+                        new_mask = current_mask
+                        if maze[i + 1][j] == 'G':
+                            new_mask = current_mask | (1 << orange_mask[(i + 1, j)])
+                        dp[i + 1][j][new_mask] += dp[i][j][mask]
+
+                    # Transition to (i, j+1) [moving right]
+                    if j + 1 <= M and maze[i][j + 1] != '#':
+                        new_mask = current_mask
+                        if maze[i][j + 1] == 'G':
+                            new_mask = current_mask | (1 << orange_mask[(i, j + 1)])
+                        dp[i][j + 1][new_mask] += dp[i][j][mask]
+
+        return dp[N][M][all_mask]
+    ```
+
+6.  **Complexity:**
+    - State space: $O(N \times M \times 2^k)$ where $k$ is the number of oranges.
+    - Since $N \times M \le 250$ and we count oranges only, typically $k$ is small (say, $k \le 20$).
+    - Time: $O(N \times M \times 2^k)$
+    - Space: $O(N \times M \times 2^k)$
+
+**Answer:** Use DP with bitmask to track orange collection. Time/Space: $O(N \times M \times 2^k)$ where $k$ = number of oranges.
+
+</details>
