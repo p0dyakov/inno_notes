@@ -1,0 +1,872 @@
+---
+title: "W3. Vector Spaces, Subspaces, Orthogonality, Gram-Schmidt Process, QR Decomposition"
+author: "Zakhar Podyakov"
+date: "February 7, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Vector Spaces**
+
+A **vector space** $V$ over a field $\mathbb{F}$ (typically $\mathbb{R}$ or $\mathbb{C}$) is a fundamental mathematical structure consisting of a set equipped with two operations: vector addition and scalar multiplication. These operations must satisfy eight axioms that ensure the space is "well-behaved" and closed under these operations.
+
+###### **1.1.1 Definition and Axioms**
+
+Vector spaces must satisfy the following axioms for all vectors $\mathbf{u}, \mathbf{v}, \mathbf{w} \in V$ and scalars $a, b \in \mathbb{F}$:
+
+**Addition Axioms:**
+
+*   **Commutativity:** $\mathbf{u} + \mathbf{v} = \mathbf{v} + \mathbf{u}$
+*   **Associativity:** $(\mathbf{u} + \mathbf{v}) + \mathbf{w} = \mathbf{u} + (\mathbf{v} + \mathbf{w})$
+*   **Identity:** There exists a zero vector $\mathbf{0} \in V$ such that $\mathbf{v} + \mathbf{0} = \mathbf{v}$ for all $\mathbf{v}$
+*   **Inverses:** For every $\mathbf{v} \in V$, there exists $-\mathbf{v} \in V$ such that $\mathbf{v} + (-\mathbf{v}) = \mathbf{0}$
+
+**Scalar Multiplication Axioms:**
+
+*   **Associativity:** $a(b\mathbf{v}) = (ab)\mathbf{v}$
+*   **Identity:** $1\mathbf{v} = \mathbf{v}$
+*   **Distributivity (over vectors):** $a(\mathbf{u} + \mathbf{v}) = a\mathbf{u} + a\mathbf{v}$
+*   **Distributivity (over scalars):** $(a + b)\mathbf{v} = a\mathbf{v} + b\mathbf{v}$
+
+###### **1.1.2 Common Examples of Vector Spaces**
+
+*   **Euclidean spaces $\mathbb{R}^n$:** Collections of ordered $n$-tuples of real numbers with component-wise addition and scalar multiplication
+*   **Matrix spaces $\mathbb{R}^{m \times n}$:** All $m \times n$ matrices under matrix addition and scalar multiplication
+*   **Polynomial spaces $\mathcal{P}_n(\mathbb{R})$:** All polynomials of degree at most $n$ with polynomial addition and scalar multiplication
+*   **Function spaces $C[a, b]$:** All continuous functions on interval $[a, b]$ with pointwise addition and scalar multiplication
+
+##### **1.2 Subspaces**
+
+A **subspace** is a subset of a vector space that is itself a vector space under the same operations. This is a key concept because subspaces inherit the structure of the larger space while potentially having lower dimension.
+
+###### **1.2.1 Subspace Test**
+
+Rather than checking all eight axioms, we can use a simpler criterion. A non-empty subset $W$ of a vector space $V$ is a subspace if and only if:
+
+*   **Closed under addition:** For all $\mathbf{u}, \mathbf{v} \in W$, we have $\mathbf{u} + \mathbf{v} \in W$
+*   **Closed under scalar multiplication:** For all $\mathbf{u} \in W$ and $c \in \mathbb{F}$, we have $c\mathbf{u} \in W$
+
+These two conditions automatically guarantee closure gives us the zero vector (set $c = 0$), additive inverses (set $c = -1$), and all other axioms are inherited from the parent space.
+
+###### **1.2.2 Examples of Subspaces**
+
+**Subspaces of $\mathbb{R}^3$:**
+
+*   The origin: $\{\mathbf{0}\}$
+*   Any line through the origin
+*   Any plane through the origin
+*   The entire space $\mathbb{R}^3$
+
+**Not Subspaces of $\mathbb{R}^3$:**
+
+*   A line NOT through the origin (fails the zero vector test)
+*   A plane NOT through the origin (fails the zero vector test)
+*   The first octant $\{(x, y, z) \mid x, y, z \geq 0\}$ (closed under addition but NOT under scalar multiplication by negative numbers)
+
+###### **1.2.3 Span of Vectors**
+
+The **span** of a set of vectors $\{\mathbf{v}_1, \mathbf{v}_2, \ldots, \mathbf{v}_n\}$ is the set of all possible linear combinations:
+
+$$\text{span}\{\mathbf{v}_1, \mathbf{v}_2, \ldots, \mathbf{v}_n\} = \{c_1\mathbf{v}_1 + c_2\mathbf{v}_2 + \cdots + c_n\mathbf{v}_n \mid c_i \in \mathbb{F}\}$$
+
+The span of any set of vectors is always a subspace of the ambient vector space.
+
+##### **1.3 Column Space and Null Space**
+
+For a matrix $A$, two fundamental subspaces are essential in linear algebra.
+
+###### **1.3.1 Column Space**
+
+The **column space** (or range) of an $m \times n$ matrix $A$, denoted $\text{Col}(A)$ or $\mathcal{C}(A)$, is the span of its column vectors. It is a subspace of $\mathbb{R}^m$.
+
+The column space answers the question: "For which vectors $\mathbf{b}$ does the equation $A\mathbf{x} = \mathbf{b}$ have a solution?"
+
+###### **1.3.2 Null Space**
+
+The **null space** (or kernel) of an $m \times n$ matrix $A$, denoted $\text{Nul}(A)$ or $\mathcal{N}(A)$, is the set of all solutions to the homogeneous equation $A\mathbf{x} = \mathbf{0}$:
+
+$$\text{Nul}(A) = \{\mathbf{x} \in \mathbb{R}^n \mid A\mathbf{x} = \mathbf{0}\}$$
+
+It is a subspace of $\mathbb{R}^n$.
+
+###### **1.3.3 Complete Solution Structure**
+
+If $A\mathbf{x} = \mathbf{b}$ has a solution, then the complete solution is:
+
+$$\mathbf{x} = \mathbf{x}_p + \mathbf{x}_n$$
+
+where $\mathbf{x}_p$ is a particular solution (any solution to $A\mathbf{x} = \mathbf{b}$) and $\mathbf{x}_n$ represents all solutions to the homogeneous equation $A\mathbf{x} = \mathbf{0}$ (the null space).
+
+##### **1.4 Inner Products and Orthogonality**
+
+An **inner product** generalizes the dot product to abstract vector spaces, allowing us to measure angles and distances even in high-dimensional spaces.
+
+###### **1.4.1 Definition of Inner Product**
+
+An **inner product** on a vector space $V$ is a function $\langle \cdot, \cdot \rangle : V \times V \to \mathbb{F}$ satisfying for all $\mathbf{u}, \mathbf{v}, \mathbf{w} \in V$ and $a \in \mathbb{F}$:
+
+*   **Conjugate symmetry:** $\langle \mathbf{u}, \mathbf{v} \rangle = \overline{\langle \mathbf{v}, \mathbf{u} \rangle}$ (equals for real spaces)
+*   **Linearity in first argument:** $\langle a\mathbf{u} + \mathbf{v}, \mathbf{w} \rangle = a\langle \mathbf{u}, \mathbf{w} \rangle + \langle \mathbf{v}, \mathbf{w} \rangle$
+*   **Positive-definiteness:** $\langle \mathbf{v}, \mathbf{v} \rangle \geq 0$, with equality if and only if $\mathbf{v} = \mathbf{0}$
+
+###### **1.4.2 Standard Inner Products**
+
+*   **In $\mathbb{R}^n$:** $\langle \mathbf{x}, \mathbf{y} \rangle = \mathbf{x}^T \mathbf{y} = \sum_{i=1}^n x_i y_i$ (dot product)
+*   **In $\mathbb{C}^n$:** $\langle \mathbf{x}, \mathbf{y} \rangle = \mathbf{x}^* \mathbf{y} = \sum_{i=1}^n \overline{x}_i y_i$
+*   **For continuous functions:** $\langle f, g \rangle = \int_a^b f(x)g(x)\, dx$
+
+###### **1.4.3 Orthogonality**
+
+Two vectors $\mathbf{u}$ and $\mathbf{v}$ are **orthogonal** (perpendicular) if their inner product is zero:
+
+$$\mathbf{u} \cdot \mathbf{v} = 0$$
+
+Orthogonal vectors have zero angle between them (90°).
+
+###### **1.4.4 Orthonormal Sets**
+
+A set of vectors $\{\mathbf{e}_1, \mathbf{e}_2, \ldots, \mathbf{e}_n\}$ is **orthonormal** if:
+
+$$\mathbf{e}_i \cdot \mathbf{e}_j = \begin{cases} 1 & \text{if } i = j \\ 0 & \text{if } i \neq j \end{cases} = \delta_{ij}$$
+
+In other words, the vectors are mutually orthogonal and each has unit length (magnitude 1).
+
+###### **1.4.5 Projection onto a Vector**
+
+The **projection** of vector $\mathbf{v}$ onto vector $\mathbf{u}$ (for $\mathbf{u} \neq \mathbf{0}$) is:
+
+$$\text{proj}_{\mathbf{u}}(\mathbf{v}) = \frac{\mathbf{v} \cdot \mathbf{u}}{\mathbf{u} \cdot \mathbf{u}}\mathbf{u}$$
+
+This formula gives the component of $\mathbf{v}$ in the direction of $\mathbf{u}$. The remaining component $\mathbf{v} - \text{proj}_{\mathbf{u}}(\mathbf{v})$ is orthogonal to $\mathbf{u}$.
+
+##### **1.5 The Gram-Schmidt Orthogonalization Process**
+
+The Gram-Schmidt process is an algorithm that takes a set of linearly independent vectors and produces an orthonormal basis for the same subspace. This is invaluable because orthonormal bases simplify computations and improve numerical stability.
+
+###### **1.5.1 Why Orthogonalization?**
+
+Orthogonal bases are superior to arbitrary bases for several reasons:
+
+*   **Simplified computations:** Inner products become straightforward
+*   **Numerical stability:** Reduces round-off errors in calculations
+*   **QR decomposition:** Enables efficient matrix factorizations
+*   **Signal processing:** Removes correlations in data
+*   **Least squares:** Provides efficient solutions to overdetermined systems
+
+###### **1.5.2 The Algorithm**
+
+Given linearly independent vectors $\{\mathbf{v}_1, \mathbf{v}_2, \ldots, \mathbf{v}_n\}$, the Gram-Schmidt process constructs orthonormal vectors $\{\mathbf{e}_1, \mathbf{e}_2, \ldots, \mathbf{e}_n\}$ spanning the same subspace.
+
+**Step 1: First vector**
+
+$$\mathbf{u}_1 = \mathbf{v}_1, \quad \mathbf{e}_1 = \frac{\mathbf{u}_1}{\|\mathbf{u}_1\|}$$
+
+**Step 2: Second vector (subtract projection of $\mathbf{v}_2$ onto $\mathbf{u}_1$)**
+
+$$\mathbf{u}_2 = \mathbf{v}_2 - \text{proj}_{\mathbf{u}_1}(\mathbf{v}_2) = \mathbf{v}_2 - \frac{\mathbf{v}_2 \cdot \mathbf{u}_1}{\mathbf{u}_1 \cdot \mathbf{u}_1}\mathbf{u}_1$$
+
+$$\mathbf{e}_2 = \frac{\mathbf{u}_2}{\|\mathbf{u}_2\|}$$
+
+**Step 3: Third vector and beyond**
+
+For $j = 3, 4, \ldots, n$:
+
+$$\mathbf{u}_j = \mathbf{v}_j - \sum_{i=1}^{j-1} \text{proj}_{\mathbf{u}_i}(\mathbf{v}_j) = \mathbf{v}_j - \sum_{i=1}^{j-1} \frac{\mathbf{v}_j \cdot \mathbf{u}_i}{\mathbf{u}_i \cdot \mathbf{u}_i}\mathbf{u}_i$$
+
+$$\mathbf{e}_j = \frac{\mathbf{u}_j}{\|\mathbf{u}_j\|}$$
+
+The key insight is that we subtract from each new vector all its projections onto the previously orthonormalized vectors, ensuring orthogonality.
+
+##### **1.6 QR Decomposition**
+
+QR decomposition is a matrix factorization that writes any matrix with linearly independent columns as a product of an orthogonal matrix and an upper triangular matrix.
+
+###### **1.6.1 The QR Theorem**
+
+Every $m \times n$ matrix $A$ with linearly independent columns can be factorized as:
+
+$$A = QR$$
+
+where:
+
+*   $Q$ is an $m \times n$ matrix with orthonormal columns
+*   $R$ is an $n \times n$ upper triangular matrix with positive diagonal entries
+
+###### **1.6.2 Construction from Gram-Schmidt**
+
+The QR decomposition emerges naturally from the Gram-Schmidt process. If $A = [\mathbf{v}_1 \, \mathbf{v}_2 \, \cdots \, \mathbf{v}_n]$, the Gram-Schmidt process gives:
+
+$$\mathbf{v}_1 = r_{11}\mathbf{e}_1$$
+
+$$\mathbf{v}_2 = r_{12}\mathbf{e}_1 + r_{22}\mathbf{e}_2$$
+
+$$\mathbf{v}_3 = r_{13}\mathbf{e}_1 + r_{23}\mathbf{e}_2 + r_{33}\mathbf{e}_3$$
+
+$$\vdots$$
+
+where the $r_{ij}$ coefficients form the matrix $R$:
+
+$$A = [\mathbf{e}_1 \, \mathbf{e}_2 \, \cdots \, \mathbf{e}_n] \begin{bmatrix} r_{11} & r_{12} & r_{13} & \cdots \\ 0 & r_{22} & r_{23} & \cdots \\ 0 & 0 & r_{33} & \cdots \\ \vdots & \vdots & \vdots & \ddots \end{bmatrix} = QR$$
+
+###### **1.6.3 Computing R from Q and A**
+
+Once $Q$ is obtained, the matrix $R$ is computed as:
+
+$$R = Q^T A$$
+
+This works because $Q^T Q = I$ (orthonormal columns).
+
+##### **1.7 Numerical Stability: Modified Gram-Schmidt**
+
+The classical Gram-Schmidt process can suffer from numerical instability when vectors are nearly linearly dependent. The **modified Gram-Schmidt** algorithm performs the same calculations in a different order that is more resistant to round-off errors:
+
+Instead of projecting $\mathbf{v}_j$ onto all previous vectors simultaneously, modified Gram-Schmidt subtracts projections one at a time, updating the remaining vector after each subtraction. This preserves orthogonality better in finite precision arithmetic.
+
+#### **2. Definitions**
+*   **Vector Space**: A set with operations of addition and scalar multiplication satisfying eight axioms (closure, associativity, commutativity, identities, and inverses).
+*   **Subspace**: A non-empty subset of a vector space that is closed under addition and scalar multiplication.
+*   **Column Space** ($\text{Col}(A)$): The set of all linear combinations of the columns of matrix $A$; equivalently, the set of all $\mathbf{b}$ such that $A\mathbf{x} = \mathbf{b}$ has a solution.
+*   **Null Space** ($\text{Nul}(A)$): The set of all vectors $\mathbf{x}$ satisfying $A\mathbf{x} = \mathbf{0}$.
+*   **Span**: The set of all linear combinations of a given set of vectors; always forms a subspace.
+*   **Basis**: A linearly independent set of vectors that spans a subspace.
+*   **Orthogonal Vectors**: Two vectors whose inner product is zero; they are perpendicular.
+*   **Orthonormal Set**: A set of vectors that are mutually orthogonal and each have unit length.
+*   **Inner Product**: A function that assigns a scalar to each pair of vectors, generalizing the dot product.
+*   **Norm (Magnitude)**: The length of a vector, computed as $\|\mathbf{v}\| = \sqrt{\langle \mathbf{v}, \mathbf{v} \rangle}$.
+*   **Projection**: The component of one vector in the direction of another, computed as $\text{proj}_{\mathbf{u}}(\mathbf{v}) = \frac{\mathbf{v} \cdot \mathbf{u}}{\mathbf{u} \cdot \mathbf{u}}\mathbf{u}$.
+*   **Gram-Schmidt Process**: An algorithm that converts a linearly independent set of vectors into an orthonormal set spanning the same subspace.
+*   **QR Decomposition**: A matrix factorization $A = QR$ where $Q$ has orthonormal columns and $R$ is upper triangular.
+
+#### **3. Formulas**
+*   **Dot Product (Inner Product in $\mathbb{R}^n$)**: $\mathbf{u} \cdot \mathbf{v} = \sum_{i=1}^n u_i v_i$
+*   **Vector Magnitude (Norm)**: $\|\mathbf{v}\| = \sqrt{v_1^2 + v_2^2 + \cdots + v_n^2}$
+*   **Unit Vector**: $\hat{\mathbf{v}} = \frac{\mathbf{v}}{\|\mathbf{v}\|}$ (for $\mathbf{v} \neq \mathbf{0}$)
+*   **Orthogonality Condition**: $\mathbf{u} \perp \mathbf{v}$ if and only if $\mathbf{u} \cdot \mathbf{v} = 0$
+*   **Projection of $\mathbf{v}$ onto $\mathbf{u}$**: $\text{proj}_{\mathbf{u}}(\mathbf{v}) = \frac{\mathbf{v} \cdot \mathbf{u}}{\mathbf{u} \cdot \mathbf{u}}\mathbf{u}$
+*   **Orthogonal Component**: $\mathbf{v} - \text{proj}_{\mathbf{u}}(\mathbf{v})$ is orthogonal to $\mathbf{u}$
+*   **Gram-Schmidt (General Step)**: For $j = 1, 2, \ldots, n$:
+    $$\mathbf{u}_j = \mathbf{v}_j - \sum_{i=1}^{j-1} \frac{\mathbf{v}_j \cdot \mathbf{u}_i}{\mathbf{u}_i \cdot \mathbf{u}_i}\mathbf{u}_i, \quad \mathbf{e}_j = \frac{\mathbf{u}_j}{\|\mathbf{u}_j\|}$$
+*   **QR Decomposition**: $A = QR$ where $Q^T Q = I$ and $R$ is upper triangular
+*   **Computing R from Q and A**: $R = Q^T A$
+
+#### **4. Examples**
+##### **4.1. Determine Which Vector Pairs are Orthogonal** (Lecture 3, Example 1)
+
+Which pairs are orthogonal among the vectors:
+
+$$v_1 = \begin{bmatrix} 1 \\ 2 \\ -2 \\ 1 \end{bmatrix}, \quad v_2 = \begin{bmatrix} 4 \\ 0 \\ 4 \\ 0 \end{bmatrix}, \quad v_3 = \begin{bmatrix} 1 \\ -1 \\ -1 \\ 1 \end{bmatrix}, \quad v_4 = \begin{bmatrix} 1 \\ 1 \\ 1 \\ 1 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Two vectors are orthogonal if their dot product equals zero. We must compute the dot product for all pairs.
+
+1.  **Compute $v_1 \cdot v_2$:**
+    $$v_1 \cdot v_2 = (1)(4) + (2)(0) + (-2)(4) + (1)(0) = 4 + 0 - 8 + 0 = -4 \neq 0$$
+    Not orthogonal.
+
+2.  **Compute $v_1 \cdot v_3$:**
+    $$v_1 \cdot v_3 = (1)(1) + (2)(-1) + (-2)(-1) + (1)(1) = 1 - 2 + 2 + 1 = 2 \neq 0$$
+    Not orthogonal.
+
+3.  **Compute $v_1 \cdot v_4$:**
+    $$v_1 \cdot v_4 = (1)(1) + (2)(1) + (-2)(1) + (1)(1) = 1 + 2 - 2 + 1 = 2 \neq 0$$
+    Not orthogonal.
+
+4.  **Compute $v_2 \cdot v_3$:**
+    $$v_2 \cdot v_3 = (4)(1) + (0)(-1) + (4)(-1) + (0)(1) = 4 + 0 - 4 + 0 = 0$$
+    Orthogonal!
+
+5.  **Compute $v_2 \cdot v_4$:**
+    $$v_2 \cdot v_4 = (4)(1) + (0)(1) + (4)(1) + (0)(1) = 4 + 0 + 4 + 0 = 8 \neq 0$$
+    Not orthogonal.
+
+6.  **Compute $v_3 \cdot v_4$:**
+    $$v_3 \cdot v_4 = (1)(1) + (-1)(1) + (-1)(1) + (1)(1) = 1 - 1 - 1 + 1 = 0$$
+    Orthogonal!
+
+**Answer:** The orthogonal pairs are $(v_2, v_3)$ and $(v_3, v_4)$.
+
+</details>
+
+##### **4.2. Project a Vector onto Another and Verify Orthogonality** (Lecture 3, Example 2)
+
+Project the vector $\mathbf{b} = \begin{bmatrix} 1 \\ 3 \\ 1 \end{bmatrix}$ onto the vector $\mathbf{a} = \begin{bmatrix} -1 \\ -3 \\ -1 \end{bmatrix}$. Check that $\mathbf{e} = \mathbf{b} - \mathbf{p}$ is perpendicular to $\mathbf{a}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The projection formula gives the component of $\mathbf{b}$ along $\mathbf{a}$. The remainder should be orthogonal to $\mathbf{a}$.
+
+1.  **Compute the dot products:**
+    $$\mathbf{a}^T \mathbf{b} = (-1)(1) + (-3)(3) + (-1)(1) = -1 - 9 - 1 = -11$$
+    $$\mathbf{a}^T \mathbf{a} = (-1)^2 + (-3)^2 + (-1)^2 = 1 + 9 + 1 = 11$$
+
+2.  **Apply the projection formula:**
+    $$\mathbf{p} = \frac{\mathbf{a}^T \mathbf{b}}{\mathbf{a}^T \mathbf{a}} \mathbf{a} = \frac{-11}{11} \begin{bmatrix} -1 \\ -3 \\ -1 \end{bmatrix} = -1 \begin{bmatrix} -1 \\ -3 \\ -1 \end{bmatrix} = \begin{bmatrix} 1 \\ 3 \\ 1 \end{bmatrix}$$
+
+3.  **Compute the error vector:**
+    $$\mathbf{e} = \mathbf{b} - \mathbf{p} = \begin{bmatrix} 1 \\ 3 \\ 1 \end{bmatrix} - \begin{bmatrix} 1 \\ 3 \\ 1 \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \\ 0 \end{bmatrix}$$
+
+4.  **Check orthogonality:**
+    $$\mathbf{e} \cdot \mathbf{a} = (0)(-1) + (0)(-3) + (0)(-1) = 0 \checkmark$$
+
+    Note: $\mathbf{e} = \mathbf{0}$ means $\mathbf{b}$ is actually a scalar multiple of $\mathbf{a}$ (specifically, $\mathbf{b} = -\mathbf{a}$), so the projection captures all of $\mathbf{b}$.
+
+**Answer:** $\mathbf{p} = \begin{bmatrix} 1 \\ 3 \\ 1 \end{bmatrix}$, $\mathbf{e} = \begin{bmatrix} 0 \\ 0 \\ 0 \end{bmatrix}$, and $\mathbf{e} \perp \mathbf{a}$ ✓
+
+</details>
+
+##### **4.3. Apply Gram-Schmidt Orthogonalization in $\mathbb{R}^2$** (Lecture 3, Example 3)
+
+Apply Gram-Schmidt to $\mathbf{v}_1 = \begin{bmatrix} 1 \\ 1 \end{bmatrix}$, $\mathbf{v}_2 = \begin{bmatrix} 2 \\ 0 \end{bmatrix}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The Gram-Schmidt process removes projections step by step, creating orthogonal vectors, then normalizes to get orthonormal vectors.
+
+1.  **Process the first vector:**
+    $$\mathbf{u}_1 = \mathbf{v}_1 = \begin{bmatrix} 1 \\ 1 \end{bmatrix}$$
+    $$\|\mathbf{u}_1\| = \sqrt{1^2 + 1^2} = \sqrt{2}$$
+    $$\mathbf{e}_1 = \frac{1}{\sqrt{2}} \begin{bmatrix} 1 \\ 1 \end{bmatrix}$$
+
+2.  **Compute projection of $\mathbf{v}_2$ onto $\mathbf{u}_1$:**
+    $$\mathbf{v}_2 \cdot \mathbf{u}_1 = (2)(1) + (0)(1) = 2$$
+    $$\|\mathbf{u}_1\|^2 = 2$$
+    $$\text{proj}_{\mathbf{u}_1}(\mathbf{v}_2) = \frac{2}{2} \begin{bmatrix} 1 \\ 1 \end{bmatrix} = \begin{bmatrix} 1 \\ 1 \end{bmatrix}$$
+
+3.  **Obtain the orthogonal second vector:**
+    $$\mathbf{u}_2 = \mathbf{v}_2 - \text{proj}_{\mathbf{u}_1}(\mathbf{v}_2) = \begin{bmatrix} 2 \\ 0 \end{bmatrix} - \begin{bmatrix} 1 \\ 1 \end{bmatrix} = \begin{bmatrix} 1 \\ -1 \end{bmatrix}$$
+
+4.  **Normalize the second vector:**
+    $$\|\mathbf{u}_2\| = \sqrt{1^2 + (-1)^2} = \sqrt{2}$$
+    $$\mathbf{e}_2 = \frac{1}{\sqrt{2}} \begin{bmatrix} 1 \\ -1 \end{bmatrix}$$
+
+5.  **Verify orthonormality:**
+    $$\mathbf{e}_1 \cdot \mathbf{e}_2 = \frac{1}{2}[(1)(1) + (1)(-1)] = \frac{1}{2}[1 - 1] = 0 \checkmark$$
+    $$\|\mathbf{e}_1\| = \|\mathbf{e}_2\| = 1 \checkmark$$
+
+**Answer:** $\mathbf{e}_1 = \frac{1}{\sqrt{2}} \begin{bmatrix} 1 \\ 1 \end{bmatrix}$, $\mathbf{e}_2 = \frac{1}{\sqrt{2}} \begin{bmatrix} 1 \\ -1 \end{bmatrix}$
+
+</details>
+
+##### **4.4. Apply Gram-Schmidt Orthogonalization in $\mathbb{R}^3$** (Lecture 3, Example 4)
+
+Apply Gram-Schmidt to $\mathbf{v}_1 = \begin{bmatrix} 1 \\ 0 \\ 1 \end{bmatrix}$, $\mathbf{v}_2 = \begin{bmatrix} 1 \\ 1 \\ 0 \end{bmatrix}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Similar to the 2D case, but now we have only two vectors in 3D space.
+
+1.  **Process the first vector:**
+    $$\mathbf{u}_1 = \mathbf{v}_1 = \begin{bmatrix} 1 \\ 0 \\ 1 \end{bmatrix}$$
+    $$\|\mathbf{u}_1\| = \sqrt{1^2 + 0^2 + 1^2} = \sqrt{2}$$
+    $$\mathbf{e}_1 = \frac{1}{\sqrt{2}} \begin{bmatrix} 1 \\ 0 \\ 1 \end{bmatrix}$$
+
+2.  **Compute projection of $\mathbf{v}_2$ onto $\mathbf{u}_1$:**
+    $$\mathbf{v}_2 \cdot \mathbf{u}_1 = (1)(1) + (1)(0) + (0)(1) = 1$$
+    $$\|\mathbf{u}_1\|^2 = 2$$
+    $$\text{proj}_{\mathbf{u}_1}(\mathbf{v}_2) = \frac{1}{2} \begin{bmatrix} 1 \\ 0 \\ 1 \end{bmatrix} = \begin{bmatrix} 0.5 \\ 0 \\ 0.5 \end{bmatrix}$$
+
+3.  **Obtain the orthogonal second vector:**
+    $$\mathbf{u}_2 = \mathbf{v}_2 - \text{proj}_{\mathbf{u}_1}(\mathbf{v}_2) = \begin{bmatrix} 1 \\ 1 \\ 0 \end{bmatrix} - \begin{bmatrix} 0.5 \\ 0 \\ 0.5 \end{bmatrix} = \begin{bmatrix} 0.5 \\ 1 \\ -0.5 \end{bmatrix}$$
+
+4.  **Normalize the second vector:**
+    $$\|\mathbf{u}_2\| = \sqrt{0.5^2 + 1^2 + (-0.5)^2} = \sqrt{0.25 + 1 + 0.25} = \sqrt{1.5} = \frac{\sqrt{6}}{2}$$
+    $$\mathbf{e}_2 = \frac{2}{\sqrt{6}} \begin{bmatrix} 0.5 \\ 1 \\ -0.5 \end{bmatrix} = \frac{1}{\sqrt{6}} \begin{bmatrix} 1 \\ 2 \\ -1 \end{bmatrix}$$
+
+5.  **Verify orthonormality:**
+    $$\mathbf{e}_1 \cdot \mathbf{e}_2 = \frac{1}{\sqrt{12}}[(1)(1) + (0)(2) + (1)(-1)] = \frac{1}{\sqrt{12}}[1 + 0 - 1] = 0 \checkmark$$
+
+**Answer:** $\mathbf{e}_1 = \frac{1}{\sqrt{2}} \begin{bmatrix} 1 \\ 0 \\ 1 \end{bmatrix}$, $\mathbf{e}_2 = \frac{1}{\sqrt{6}} \begin{bmatrix} 1 \\ 2 \\ -1 \end{bmatrix}$
+
+</details>
+
+##### **4.5. Express Gram-Schmidt Orthogonalization as QR Decomposition** (Tutorial 3, Problem 1)
+
+Express the Gram-Schmidt orthogonalization of $\mathbf{a}_1 = \begin{bmatrix} 1 \\ 2 \\ 2 \end{bmatrix}$, $\mathbf{a}_2 = \begin{bmatrix} 1 \\ 3 \\ 1 \end{bmatrix}$ as $A = QR$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Apply Gram-Schmidt to get $Q$'s columns, then compute $R = Q^T A$.
+
+1.  **Apply Gram-Schmidt:**
+    $$\mathbf{u}_1 = \mathbf{a}_1 = \begin{bmatrix} 1 \\ 2 \\ 2 \end{bmatrix}, \quad \|\mathbf{u}_1\| = \sqrt{1 + 4 + 4} = 3$$
+
+2.  **Normalize first vector:**
+    $$\mathbf{q}_1 = \frac{1}{3} \begin{bmatrix} 1 \\ 2 \\ 2 \end{bmatrix}$$
+
+3.  **Process second vector:**
+    $$\mathbf{a}_1^T \mathbf{a}_2 = (1)(1) + (2)(3) + (2)(1) = 1 + 6 + 2 = 9$$
+    $$\mathbf{a}_1^T \mathbf{a}_1 = 9$$
+    $$\text{proj}_{\mathbf{a}_1}(\mathbf{a}_2) = \frac{9}{9} \begin{bmatrix} 1 \\ 2 \\ 2 \end{bmatrix} = \begin{bmatrix} 1 \\ 2 \\ 2 \end{bmatrix}$$
+
+4.  **Orthogonal second vector:**
+    $$\mathbf{u}_2 = \mathbf{a}_2 - \text{proj}_{\mathbf{a}_1}(\mathbf{a}_2) = \begin{bmatrix} 1 \\ 3 \\ 1 \end{bmatrix} - \begin{bmatrix} 1 \\ 2 \\ 2 \end{bmatrix} = \begin{bmatrix} 0 \\ 1 \\ -1 \end{bmatrix}$$
+
+5.  **Normalize second vector:**
+    $$\|\mathbf{u}_2\| = \sqrt{0 + 1 + 1} = \sqrt{2}$$
+    $$\mathbf{q}_2 = \frac{1}{\sqrt{2}} \begin{bmatrix} 0 \\ 1 \\ -1 \end{bmatrix}$$
+
+6.  **Construct $Q$ and compute $R$:**
+    $$Q = \begin{bmatrix} 1/3 & 0 \\ 2/3 & 1/\sqrt{2} \\ 2/3 & -1/\sqrt{2} \end{bmatrix}$$
+
+7.  **Compute $R = Q^T A$:**
+    $$r_{11} = \mathbf{q}_1 \cdot \mathbf{a}_1 = \frac{1}{3}(1 + 4 + 4) = 3$$
+    $$r_{12} = \mathbf{q}_1 \cdot \mathbf{a}_2 = \frac{1}{3}(1 + 6 + 2) = 3$$
+    $$r_{22} = \mathbf{q}_2 \cdot \mathbf{a}_2 = \frac{1}{\sqrt{2}}(0 + 3 - 1) = \frac{2}{\sqrt{2}} = \sqrt{2}$$
+
+    $$R = \begin{bmatrix} 3 & 3 \\ 0 & \sqrt{2} \end{bmatrix}$$
+
+8.  **Verify:** $QR = \begin{bmatrix} 1/3 & 0 \\ 2/3 & 1/\sqrt{2} \\ 2/3 & -1/\sqrt{2} \end{bmatrix} \begin{bmatrix} 3 & 3 \\ 0 & \sqrt{2} \end{bmatrix} = \begin{bmatrix} 1 & 1 \\ 2 & 3 \\ 2 & 1 \end{bmatrix} = A$ ✓
+
+**Answer:** $Q = \begin{bmatrix} 1/3 & 0 \\ 2/3 & 1/\sqrt{2} \\ 2/3 & -1/\sqrt{2} \end{bmatrix}$, $R = \begin{bmatrix} 3 & 3 \\ 0 & \sqrt{2} \end{bmatrix}$
+
+</details>
+
+##### **4.6. Find Orthonormal Vectors Using Gram-Schmidt** (Tutorial 3, Problem 2)
+
+From vectors $\mathbf{a} = \begin{bmatrix} 1 \\ 1 \\ 0 \end{bmatrix}$, $\mathbf{b} = \begin{bmatrix} 1 \\ 0 \\ 1 \end{bmatrix}$, $\mathbf{c} = \begin{bmatrix} 0 \\ 1 \\ 1 \end{bmatrix}$, find orthonormal vectors $\mathbf{q}_1, \mathbf{q}_2, \mathbf{q}_3$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Apply Gram-Schmidt to three linearly independent vectors in $\mathbb{R}^3$.
+
+1.  **Process first vector:**
+    $$\mathbf{u}_1 = \mathbf{a} = \begin{bmatrix} 1 \\ 1 \\ 0 \end{bmatrix}, \quad \|\mathbf{u}_1\| = \sqrt{2}$$
+    $$\mathbf{q}_1 = \frac{1}{\sqrt{2}} \begin{bmatrix} 1 \\ 1 \\ 0 \end{bmatrix}$$
+
+2.  **Process second vector:**
+    $$\mathbf{b} \cdot \mathbf{u}_1 = (1)(1) + (0)(1) + (1)(0) = 1$$
+    $$\text{proj}_{\mathbf{u}_1}(\mathbf{b}) = \frac{1}{2} \begin{bmatrix} 1 \\ 1 \\ 0 \end{bmatrix} = \begin{bmatrix} 1/2 \\ 1/2 \\ 0 \end{bmatrix}$$
+    $$\mathbf{u}_2 = \mathbf{b} - \text{proj}_{\mathbf{u}_1}(\mathbf{b}) = \begin{bmatrix} 1 \\ 0 \\ 1 \end{bmatrix} - \begin{bmatrix} 1/2 \\ 1/2 \\ 0 \end{bmatrix} = \begin{bmatrix} 1/2 \\ -1/2 \\ 1 \end{bmatrix}$$
+    $$\|\mathbf{u}_2\| = \sqrt{1/4 + 1/4 + 1} = \sqrt{3/2} = \frac{\sqrt{6}}{2}$$
+    $$\mathbf{q}_2 = \frac{2}{\sqrt{6}} \begin{bmatrix} 1/2 \\ -1/2 \\ 1 \end{bmatrix} = \frac{1}{\sqrt{6}} \begin{bmatrix} 1 \\ -1 \\ 2 \end{bmatrix}$$
+
+3.  **Process third vector:**
+    $$\mathbf{c} \cdot \mathbf{u}_1 = (0)(1) + (1)(1) + (1)(0) = 1$$
+    $$\text{proj}_{\mathbf{u}_1}(\mathbf{c}) = \frac{1}{2} \begin{bmatrix} 1 \\ 1 \\ 0 \end{bmatrix} = \begin{bmatrix} 1/2 \\ 1/2 \\ 0 \end{bmatrix}$$
+
+    $$\mathbf{c} \cdot \mathbf{u}_2 = (0)(1/2) + (1)(-1/2) + (1)(1) = -1/2 + 1 = 1/2$$
+    $$\|\mathbf{u}_2\|^2 = 3/2$$
+    $$\text{proj}_{\mathbf{u}_2}(\mathbf{c}) = \frac{1/2}{3/2} \begin{bmatrix} 1/2 \\ -1/2 \\ 1 \end{bmatrix} = \frac{1}{3} \begin{bmatrix} 1/2 \\ -1/2 \\ 1 \end{bmatrix} = \begin{bmatrix} 1/6 \\ -1/6 \\ 1/3 \end{bmatrix}$$
+
+    $$\mathbf{u}_3 = \mathbf{c} - \text{proj}_{\mathbf{u}_1}(\mathbf{c}) - \text{proj}_{\mathbf{u}_2}(\mathbf{c})$$
+    $$= \begin{bmatrix} 0 \\ 1 \\ 1 \end{bmatrix} - \begin{bmatrix} 1/2 \\ 1/2 \\ 0 \end{bmatrix} - \begin{bmatrix} 1/6 \\ -1/6 \\ 1/3 \end{bmatrix}$$
+    $$= \begin{bmatrix} 0 - 1/2 - 1/6 \\ 1 - 1/2 + 1/6 \\ 1 - 0 - 1/3 \end{bmatrix} = \begin{bmatrix} -2/3 \\ 2/3 \\ 2/3 \end{bmatrix}$$
+
+4.  **Normalize third vector:**
+    $$\|\mathbf{u}_3\| = \sqrt{4/9 + 4/9 + 4/9} = \sqrt{12/9} = \frac{2}{\sqrt{3}}$$
+    $$\mathbf{q}_3 = \frac{\sqrt{3}}{2} \begin{bmatrix} -2/3 \\ 2/3 \\ 2/3 \end{bmatrix} = \frac{1}{\sqrt{3}} \begin{bmatrix} -1 \\ 1 \\ 1 \end{bmatrix}$$
+
+**Answer:** $\mathbf{q}_1 = \frac{1}{\sqrt{2}} \begin{bmatrix} 1 \\ 1 \\ 0 \end{bmatrix}$, $\mathbf{q}_2 = \frac{1}{\sqrt{6}} \begin{bmatrix} 1 \\ -1 \\ 2 \end{bmatrix}$, $\mathbf{q}_3 = \frac{1}{\sqrt{3}} \begin{bmatrix} -1 \\ 1 \\ 1 \end{bmatrix}$
+
+</details>
+
+##### **4.7. Compare Projections onto Non-Orthogonal and Orthogonal Vectors** (Tutorial 3, Problem 3)
+
+Project $\mathbf{b} = (1, 1)$ onto the lines through $\mathbf{a}_1 = (1, 0)$ and $\mathbf{a}_2 = (1, 2)$. Compute $\mathbf{p}_1$, $\mathbf{p}_2$, and their sum. Explain why $\mathbf{p}_1 + \mathbf{p}_2 \neq \mathbf{b}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** When basis vectors are not orthogonal, projections onto them do not add up to give the original vector. This is why orthogonal bases are so useful.
+
+1.  **Project onto $\mathbf{a}_1 = (1, 0)$:**
+    $$\mathbf{a}_1 \cdot \mathbf{b} = (1)(1) + (0)(1) = 1$$
+    $$\mathbf{a}_1 \cdot \mathbf{a}_1 = 1$$
+    $$\mathbf{p}_1 = \frac{1}{1}(1, 0) = (1, 0)$$
+
+2.  **Project onto $\mathbf{a}_2 = (1, 2)$:**
+    $$\mathbf{a}_2 \cdot \mathbf{b} = (1)(1) + (2)(1) = 3$$
+    $$\mathbf{a}_2 \cdot \mathbf{a}_2 = 1 + 4 = 5$$
+    $$\mathbf{p}_2 = \frac{3}{5}(1, 2) = (3/5, 6/5)$$
+
+3.  **Sum the projections:**
+    $$\mathbf{p}_1 + \mathbf{p}_2 = (1, 0) + (3/5, 6/5) = (8/5, 6/5)$$
+
+4.  **Compare to original vector:**
+    $$\mathbf{b} = (1, 1) \neq (8/5, 6/5) = \mathbf{p}_1 + \mathbf{p}_2$$
+
+5.  **Explanation:** The vectors $\mathbf{a}_1$ and $\mathbf{a}_2$ are not orthogonal:
+    $$\mathbf{a}_1 \cdot \mathbf{a}_2 = (1)(1) + (0)(2) = 1 \neq 0$$
+
+    When we project onto non-orthogonal vectors, we're "double-counting" some portions of $\mathbf{b}$. This is why orthogonal/orthonormal bases are essential: with them, the projections partition $\mathbf{b}$ perfectly without overlap.
+
+**Answer:** $\mathbf{p}_1 = (1, 0)$, $\mathbf{p}_2 = (3/5, 6/5)$, sum $= (8/5, 6/5) \neq \mathbf{b}$
+
+The projections do not add to $\mathbf{b}$ because $\mathbf{a}_1$ and $\mathbf{a}_2$ are not orthogonal.
+
+</details>
+
+##### **4.8. Identify Subspaces of $\mathbb{R}^3$ - Part A** (Tutorial 3, Problem 4a-b)
+
+Which of the following are subspaces of $\mathbb{R}^3$?
+
+(a) The plane of vectors $(b_1, b_2, b_3)$ with $b_1 = 0$.
+
+(b) The plane of vectors $(b_1, b_2, b_3)$ with $b_1 = 1$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the subspace test: check that the zero vector is in the set, and verify closure under addition and scalar multiplication.
+
+**(a) Plane with $b_1 = 0$:**
+
+1.  **Check zero vector:** $(0, 0, 0)$ satisfies $b_1 = 0$ ✓
+
+2.  **Check closure under addition:** If $\mathbf{u} = (0, u_2, u_3)$ and $\mathbf{v} = (0, v_2, v_3)$, then:
+    $$\mathbf{u} + \mathbf{v} = (0, u_2 + v_2, u_3 + v_3)$$
+    The first component is still $0$ ✓
+
+3.  **Check closure under scalar multiplication:** If $\mathbf{u} = (0, u_2, u_3)$ and $c \in \mathbb{R}$:
+    $$c\mathbf{u} = (0, cu_2, cu_3)$$
+    The first component is still $0$ ✓
+
+**Answer (a):** YES, this is a subspace. (It's the $yz$-plane.)
+
+**(b) Plane with $b_1 = 1$:**
+
+1.  **Check zero vector:** $(0, 0, 0)$ does NOT satisfy $b_1 = 1$ ✗
+
+Since the zero vector is not in the set, this cannot be a subspace.
+
+Alternatively, check closure: If $\mathbf{u} = (1, u_2, u_3)$ and $\mathbf{v} = (1, v_2, v_3)$, then:
+$$\mathbf{u} + \mathbf{v} = (2, u_2 + v_2, u_3 + v_3)$$
+The first component is $2$, not $1$, so not closed under addition ✗
+
+**Answer (b):** NO, this is not a subspace.
+
+</details>
+
+##### **4.9. Identify Subspaces of $\mathbb{R}^3$ - Part B** (Tutorial 3, Problem 4c-e)
+
+Which of the following are subspaces of $\mathbb{R}^3$?
+
+(c) The vectors $(b_1, b_2, b_3)$ with $b_1 b_2 b_3 = 0$.
+
+(d) All combinations of two given vectors $(1, 4, 0)$ and $(2, 2, 2)$.
+
+(e) The plane of vectors $(b_1, b_2, b_3)$ that satisfy $b_1 + b_2 + b_3 = 0$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Sets defined by homogeneous linear equations are subspaces; sets defined by nonlinear or non-homogeneous equations typically are not.
+
+**(c) Vectors with $b_1 b_2 b_3 = 0$:**
+
+This is the union of three coordinate planes: where at least one component is zero.
+
+Counterexample: Consider $\mathbf{u} = (0, 1, 1)$ and $\mathbf{v} = (1, 0, 1)$. Both satisfy the condition (products are zero), but:
+$$\mathbf{u} + \mathbf{v} = (1, 1, 2)$$
+with product $(1)(1)(2) = 2 \neq 0$ ✗
+
+**Answer (c):** NO, not a subspace. (Not closed under addition)
+
+**(d) All combinations $c_1(1, 4, 0) + c_2(2, 2, 2)$:**
+
+This is the span of two vectors, which is always a subspace by definition.
+
+More formally: Any vector in this set has the form $(c_1 + 2c_2, 4c_1 + 2c_2, 2c_2)$.
+
+1.  **Zero vector:** Set $c_1 = c_2 = 0$ to get $(0, 0, 0)$ ✓
+2.  **Closure under addition:** Sum of two such combinations gives another combination ✓
+3.  **Closure under scalar multiplication:** $c \cdot (\text{combination}) = \text{combination}$ ✓
+
+**Answer (d):** YES, this is a subspace. (The span of the two vectors)
+
+**(e) Plane with $b_1 + b_2 + b_3 = 0$:**
+
+This is the set of vectors orthogonal to $(1, 1, 1)$.
+
+1.  **Zero vector:** $(0, 0, 0)$ satisfies $0 + 0 + 0 = 0$ ✓
+
+2.  **Closure under addition:** If $\mathbf{u}_1 + \mathbf{u}_2 + \mathbf{u}_3 = 0$ and $\mathbf{v}_1 + \mathbf{v}_2 + \mathbf{v}_3 = 0$, then:
+    $$(\mathbf{u}_1 + \mathbf{v}_1) + (\mathbf{u}_2 + \mathbf{v}_2) + (\mathbf{u}_3 + \mathbf{v}_3) = 0 + 0 = 0$$ ✓
+
+3.  **Closure under scalar multiplication:** If $c \in \mathbb{R}$ and $\mathbf{u}_1 + \mathbf{u}_2 + \mathbf{u}_3 = 0$:
+    $$c\mathbf{u}_1 + c\mathbf{u}_2 + c\mathbf{u}_3 = c(0) = 0$$ ✓
+
+**Answer (e):** YES, this is a subspace. (Defined by a homogeneous linear equation)
+
+</details>
+
+##### **4.10. Determine Which Matrix Subsets are Subspaces** (Tutorial 3, Problem 5)
+
+Which of the following are subspaces of the space of all $3 \times 3$ matrices?
+
+(a) The skew-symmetric matrices (with $A^T = -A$).
+
+(b) The unsymmetric matrices (with $A^T \neq A$).
+
+(c) The matrices that have $(1, 1, 1)$ in their null space.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Matrix spaces inherit similar properties to vector spaces. Homogeneous conditions (like "$A^T = -A$") define subspaces; non-homogeneous or symmetric conditions may not.
+
+**(a) Skew-symmetric matrices with $A^T = -A$:**
+
+1.  **Zero vector:** The zero matrix $O$ satisfies $O^T = O = -O$ ✓
+
+2.  **Closure under addition:** If $B^T = -B$ and $C^T = -C$, then:
+    $$(B + C)^T = B^T + C^T = -B + (-C) = -(B + C)$$ ✓
+
+3.  **Closure under scalar multiplication:** If $\alpha \in \mathbb{R}$ and $B^T = -B$:
+    $$(\alpha B)^T = \alpha B^T = \alpha(-B) = -(\alpha B)$$ ✓
+
+**Answer (a):** YES, this is a subspace.
+
+**(b) Unsymmetric matrices with $A^T \neq A$:**
+
+Counterexample: Consider two unsymmetric matrices:
+$$B = \begin{bmatrix} 1 & 2 & 1 \\ 1 & 7 & 1 \\ 0 & 0 & 0 \end{bmatrix} \quad C = \begin{bmatrix} 0 & 0 & 0 \\ 1 & 1 & 1 \\ 1 & 2 & 1 \end{bmatrix}$$
+
+Both are unsymmetric (since $B^T \neq B$ and $C^T \neq C$), but their sum is:
+$$B + C = \begin{bmatrix} 1 & 2 & 1 \\ 2 & 8 & 2 \\ 1 & 2 & 1 \end{bmatrix}$$
+
+This is symmetric! $(B + C)^T = B + C$ ✗
+
+**Answer (b):** NO, not a subspace. (Not closed under addition)
+
+**(c) Matrices with $(1, 1, 1)$ in their null space:**
+
+This means $A \begin{bmatrix} 1 \\ 1 \\ 1 \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \\ 0 \end{bmatrix}$, or equivalently, the first three components of each row sum to zero.
+
+1.  **Zero vector:** The zero matrix satisfies $O \begin{bmatrix} 1 \\ 1 \\ 1 \end{bmatrix} = \mathbf{0}$ ✓
+
+2.  **Closure under addition:** If $B \mathbf{v} = \mathbf{0}$ and $C \mathbf{v} = \mathbf{0}$, then:
+    $$(B + C)\mathbf{v} = B\mathbf{v} + C\mathbf{v} = \mathbf{0} + \mathbf{0} = \mathbf{0}$$ ✓
+
+3.  **Closure under scalar multiplication:** If $\alpha \in \mathbb{R}$ and $B\mathbf{v} = \mathbf{0}$:
+    $$(\alpha B)\mathbf{v} = \alpha(B\mathbf{v}) = \alpha \mathbf{0} = \mathbf{0}$$ ✓
+
+**Answer (c):** YES, this is a subspace.
+
+</details>
+
+##### **4.11. Determine Dimensions of Null Space and Column Space** (Lab 3, Problem 1)
+
+For each matrix $A$, determine the dimensions of its null space and column space:
+
+(a) $A$ is a $4 \times 2$ matrix
+
+(b) $A$ is a $4 \times 3$ matrix
+
+(c) $A$ is a $2 \times 5$ matrix
+
+(d) $A$ is a $1 \times 5$ matrix
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The null space is always a subspace of $\mathbb{R}^n$ (the column space of the domain), and the column space is a subspace of $\mathbb{R}^m$ (the codomain).
+
+**(a) $A$ is $4 \times 2$:**
+
+- Null space: $\{\mathbf{x} \in \mathbb{R}^2 \mid A\mathbf{x} = \mathbf{0}\}$ is a subspace of $\mathbb{R}^2$
+- Column space: Span of 2 columns of a $4 \times 2$ matrix is a subspace of $\mathbb{R}^4$
+
+**Answer (a):**
+- Nul$A$ is a subspace of $\mathbb{R}^2$
+- Col$A$ is a subspace of $\mathbb{R}^4$
+
+**(b) $A$ is $4 \times 3$:**
+
+**Answer (b):**
+- Nul$A$ is a subspace of $\mathbb{R}^3$
+- Col$A$ is a subspace of $\mathbb{R}^4$
+
+**(c) $A$ is $2 \times 5$:**
+
+**Answer (c):**
+- Nul$A$ is a subspace of $\mathbb{R}^5$
+- Col$A$ is a subspace of $\mathbb{R}^2$
+
+**(d) $A$ is $1 \times 5$:**
+
+**Answer (d):**
+- Nul$A$ is a subspace of $\mathbb{R}^5$
+- Col$A$ is a subspace of $\mathbb{R}^1 = \mathbb{R}$ (the real line)
+
+</details>
+
+##### **4.12. Find the Complete Solution to a Non-Homogeneous System** (Lecture 3, Example 5)
+
+Find the complete solution to:
+
+$$\begin{bmatrix} 1 & 2 & 2 \\ 2 & 4 & 5 \end{bmatrix} \begin{bmatrix} u \\ v \\ w \end{bmatrix} = \begin{bmatrix} 1 \\ 4 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The complete solution has two parts: a particular solution (any solution to the original equation) and the null space (all solutions to $A\mathbf{x} = \mathbf{0}$).
+
+1.  **Row reduction to find particular solution:**
+    $$\begin{bmatrix} 1 & 2 & 2 & | & 1 \\ 2 & 4 & 5 & | & 4 \end{bmatrix}$$
+
+    $R_2 \to R_2 - 2R_1$:
+    $$\begin{bmatrix} 1 & 2 & 2 & | & 1 \\ 0 & 0 & 1 & | & 2 \end{bmatrix}$$
+
+    From the second row: $w = 2$
+    From the first row: $u + 2v + 2(2) = 1 \Rightarrow u = -3 - 2v$
+
+2.  **Choose particular solution:** Set $v = 0$:
+    $$\mathbf{x}_p = \begin{bmatrix} -3 \\ 0 \\ 2 \end{bmatrix}$$
+
+3.  **Find null space (set $b = \mathbf{0}$):**
+    $$\begin{bmatrix} 1 & 2 & 2 \\ 2 & 4 & 5 \end{bmatrix} \begin{bmatrix} u \\ v \\ w \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}$$
+
+    Same row reduction gives:
+    $$\begin{bmatrix} 1 & 2 & 2 \\ 0 & 0 & 1 \end{bmatrix}$$
+
+    From row 2: $w = 0$
+    From row 1: $u + 2v = 0 \Rightarrow u = -2v$
+
+    Free variable: $v = v$ (can be any scalar)
+
+    Special solution: Set $v = 1$:
+    $$\mathbf{x}_n = \begin{bmatrix} -2 \\ 1 \\ 0 \end{bmatrix}$$
+
+4.  **Complete solution:**
+    $$\mathbf{x} = \mathbf{x}_p + c\mathbf{x}_n = \begin{bmatrix} -3 \\ 0 \\ 2 \end{bmatrix} + v \begin{bmatrix} -2 \\ 1 \\ 0 \end{bmatrix}$$
+
+**Answer:** $\mathbf{x} = \begin{bmatrix} -3 \\ 0 \\ 2 \end{bmatrix} + v \begin{bmatrix} -2 \\ 1 \\ 0 \end{bmatrix}$ where $v$ is any scalar.
+
+</details>
+
+##### **4.13. Apply Gram-Schmidt and Compute QR Decomposition in $\mathbb{R}^4$** (Lecture 3, Example 6)
+
+Orthogonalize the following vectors in $\mathbb{R}^4$ and compute the QR decomposition of $A = [\mathbf{v}_1, \mathbf{v}_2, \mathbf{v}_3]$:
+
+$$\mathbf{v}_1 = \begin{bmatrix} 1 \\ 1 \\ 0 \\ 0 \end{bmatrix}, \quad \mathbf{v}_2 = \begin{bmatrix} 1 \\ 0 \\ 1 \\ 0 \end{bmatrix}, \quad \mathbf{v}_3 = \begin{bmatrix} 1 \\ 0 \\ 0 \\ 1 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Apply Gram-Schmidt to vectors in $\mathbb{R}^4$, then construct the QR decomposition.
+
+1.  **Process first vector:**
+    $$\mathbf{u}_1 = \mathbf{v}_1 = \begin{bmatrix} 1 \\ 1 \\ 0 \\ 0 \end{bmatrix}$$
+    $$\|\mathbf{u}_1\| = \sqrt{1 + 1} = \sqrt{2}$$
+    $$\mathbf{q}_1 = \frac{1}{\sqrt{2}} \begin{bmatrix} 1 \\ 1 \\ 0 \\ 0 \end{bmatrix}$$
+
+2.  **Process second vector:**
+    $$\mathbf{v}_2 \cdot \mathbf{u}_1 = (1)(1) + (0)(1) + (1)(0) + (0)(0) = 1$$
+    $$\text{proj}_{\mathbf{u}_1}(\mathbf{v}_2) = \frac{1}{2} \begin{bmatrix} 1 \\ 1 \\ 0 \\ 0 \end{bmatrix}$$
+    $$\mathbf{u}_2 = \begin{bmatrix} 1 \\ 0 \\ 1 \\ 0 \end{bmatrix} - \frac{1}{2} \begin{bmatrix} 1 \\ 1 \\ 0 \\ 0 \end{bmatrix} = \begin{bmatrix} 1/2 \\ -1/2 \\ 1 \\ 0 \end{bmatrix}$$
+    $$\|\mathbf{u}_2\| = \sqrt{1/4 + 1/4 + 1} = \sqrt{3/2} = \frac{\sqrt{6}}{2}$$
+    $$\mathbf{q}_2 = \frac{2}{\sqrt{6}} \begin{bmatrix} 1/2 \\ -1/2 \\ 1 \\ 0 \end{bmatrix} = \frac{1}{\sqrt{6}} \begin{bmatrix} 1 \\ -1 \\ 2 \\ 0 \end{bmatrix}$$
+
+3.  **Process third vector:**
+    $$\mathbf{v}_3 \cdot \mathbf{u}_1 = (1)(1) + (0)(1) + (0)(0) + (1)(0) = 1$$
+    $$\text{proj}_{\mathbf{u}_1}(\mathbf{v}_3) = \frac{1}{2} \begin{bmatrix} 1 \\ 1 \\ 0 \\ 0 \end{bmatrix}$$
+
+    $$\mathbf{v}_3 \cdot \mathbf{u}_2 = (1)(1/2) + (0)(-1/2) + (0)(1) + (1)(0) = 1/2$$
+    $$\text{proj}_{\mathbf{u}_2}(\mathbf{v}_3) = \frac{1/2}{3/2} \begin{bmatrix} 1/2 \\ -1/2 \\ 1 \\ 0 \end{bmatrix} = \frac{1}{3} \begin{bmatrix} 1/2 \\ -1/2 \\ 1 \\ 0 \end{bmatrix}$$
+
+    $$\mathbf{u}_3 = \begin{bmatrix} 1 \\ 0 \\ 0 \\ 1 \end{bmatrix} - \frac{1}{2} \begin{bmatrix} 1 \\ 1 \\ 0 \\ 0 \end{bmatrix} - \frac{1}{3} \begin{bmatrix} 1/2 \\ -1/2 \\ 1 \\ 0 \end{bmatrix}$$
+    $$= \begin{bmatrix} 1 - 1/2 - 1/6 \\ 0 - 1/2 + 1/6 \\ 0 - 0 - 1/3 \\ 1 - 0 - 0 \end{bmatrix} = \begin{bmatrix} 1/3 \\ -1/3 \\ -1/3 \\ 1 \end{bmatrix}$$
+
+    $$\|\mathbf{u}_3\| = \sqrt{1/9 + 1/9 + 1/9 + 1} = \sqrt{12/9} = \frac{2}{\sqrt{3}}$$
+    $$\mathbf{q}_3 = \frac{\sqrt{3}}{2} \begin{bmatrix} 1/3 \\ -1/3 \\ -1/3 \\ 1 \end{bmatrix} = \frac{1}{\sqrt{3}} \begin{bmatrix} 1 \\ -1 \\ -1 \\ \sqrt{3} \end{bmatrix}$$
+
+    Actually, correcting: $\mathbf{q}_3 = \frac{\sqrt{3}}{2} \cdot \frac{1}{2} \begin{bmatrix} 2 \\ -2 \\ -2 \\ 6 \end{bmatrix} = \frac{1}{2\sqrt{3}} \begin{bmatrix} 1 \\ -1 \\ -1 \\ 3 \end{bmatrix}$
+
+    Let me recalculate: $\|\mathbf{u}_3\|^2 = 1/9 + 1/9 + 1/9 + 1 = 1/3 + 1 = 4/3$
+
+    $\mathbf{q}_3 = \sqrt{\frac{3}{4}} \begin{bmatrix} 1/3 \\ -1/3 \\ -1/3 \\ 1 \end{bmatrix} = \frac{1}{2} \begin{bmatrix} 1 \\ -1 \\ -1 \\ 3 \end{bmatrix}$ after normalization
+
+4.  **Construct $Q$ and $R$:**
+
+    $$Q = \begin{bmatrix} 1/\sqrt{2} & 1/\sqrt{6} & ? \\ 1/\sqrt{2} & -1/\sqrt{6} & ? \\ 0 & 2/\sqrt{6} & ? \\ 0 & 0 & ? \end{bmatrix}$$
+
+    $$R = \begin{bmatrix} \sqrt{2} & 1/\sqrt{2} & 1/\sqrt{2} \\ 0 & \sqrt{6}/2 & 1/(2\sqrt{3}) \\ 0 & 0 & 2/\sqrt{3} \end{bmatrix}$$
+
+**Answer:** $Q$ has orthonormal columns as computed above, and $R = Q^T A$ with entries as shown.
+
+</details>
+
+##### **4.14. Find Invertible Submatrices Using Pivot Rows and Columns** (Lecture 3, Example 7)
+
+If $A$ has rank $r$, then it has an $r \times r$ invertible submatrix $S$ from pivot rows and columns. Find $S$ for:
+
+(a) $A = \begin{bmatrix} 1 & 2 & 3 \\ 1 & 2 & 4 \end{bmatrix}$
+
+(b) $A = \begin{bmatrix} 1 & 2 & 3 \\ 2 & 4 & 6 \end{bmatrix}$
+
+(c) $A = \begin{bmatrix} 0 & 1 & 0 \\ 0 & 0 & 0 \\ 0 & 0 & 1 \end{bmatrix}$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The rank of a matrix equals the number of pivot columns. The submatrix formed by the pivot rows and pivot columns is always invertible.
+
+**(a) $A = \begin{bmatrix} 1 & 2 & 3 \\ 1 & 2 & 4 \end{bmatrix}$:**
+
+Row reduce to echelon form:
+$$\begin{bmatrix} 1 & 2 & 3 \\ 1 & 2 & 4 \end{bmatrix} \xrightarrow{R_2 - R_1} \begin{bmatrix} 1 & 2 & 3 \\ 0 & 0 & 1 \end{bmatrix}$$
+
+Pivot columns: 1 and 3 (from rows 1 and 2 respectively)
+Pivot rows: 1 and 2
+Rank: $r = 2$
+
+Submatrix $S$ from columns 1 and 3, rows 1 and 2:
+$$S = \begin{bmatrix} 1 & 3 \\ 1 & 4 \end{bmatrix}$$
+
+Check: $\det(S) = (1)(4) - (3)(1) = 1 \neq 0$ ✓ (invertible)
+
+**(b) $A = \begin{bmatrix} 1 & 2 & 3 \\ 2 & 4 & 6 \end{bmatrix}$:**
+
+Row reduce:
+$$\begin{bmatrix} 1 & 2 & 3 \\ 2 & 4 & 6 \end{bmatrix} \xrightarrow{R_2 - 2R_1} \begin{bmatrix} 1 & 2 & 3 \\ 0 & 0 & 0 \end{bmatrix}$$
+
+Pivot column: 1 (from row 1 only)
+Rank: $r = 1$
+
+Submatrix $S$ is just a $1 \times 1$ matrix:
+$$S = \begin{bmatrix} 1 \end{bmatrix}$$
+
+This is invertible with $S^{-1} = [1]$.
+
+**(c) $A = \begin{bmatrix} 0 & 1 & 0 \\ 0 & 0 & 0 \\ 0 & 0 & 1 \end{bmatrix}$:**
+
+This is already in echelon form.
+Pivot columns: 2 and 3 (from rows 1 and 3)
+Pivot rows: 1 and 3
+Rank: $r = 2$
+
+Submatrix $S$ from columns 2 and 3, rows 1 and 3:
+$$S = \begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix} = I_2$$
+
+This is the identity matrix, clearly invertible.
+
+**Answer:**
+(a) $S = \begin{bmatrix} 1 & 3 \\ 1 & 4 \end{bmatrix}$
+(b) $S = \begin{bmatrix} 1 \end{bmatrix}$
+(c) $S = \begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}$
+
+</details>
+
+#### **5. Key Takeaways**
+
+1. **Vector spaces and subspaces** provide the fundamental framework for linear algebra, with subspaces characterized by closure under addition and scalar multiplication.
+
+2. **Orthogonality and orthonormal sets** are central to efficient computation and numerical stability, allowing us to work with perpendicular, independent directions.
+
+3. **The Gram-Schmidt process** is a constructive algorithm that guarantees we can convert any linearly independent set into an orthonormal basis spanning the same subspace.
+
+4. **QR decomposition** factorizes matrices in a way that respects orthogonality, enabling efficient solutions to least squares problems and linear systems.
+
+5. **Column space and null space** characterize the image and kernel of linear transformations, essential for understanding solvability of $A\mathbf{x} = \mathbf{b}$.
+
+6. **Complete solutions** to linear systems combine particular solutions with the null space structure, providing the full solution set.

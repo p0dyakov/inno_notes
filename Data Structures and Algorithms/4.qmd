@@ -1,0 +1,1198 @@
+---
+title: "W4. Lower Bound for Sorting, Counting Sort, Radix Sort, Bucket Sort"
+author: "Zakhar Podyakov"
+date: "February 9, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Lower Bound for Comparison-Based Sorting**
+
+One of the fundamental results in computer science is that **comparison-based sorting algorithms cannot be faster than $\Omega(n \log n)$ in the worst case**. This is a mathematical barrier: no matter how clever your algorithm is, if it relies only on comparing elements, it must make at least $\Omega(n \log n)$ comparisons.
+
+###### **1.1.1 Key Ideas About Sorting**
+
+Before proving the lower bound, let's understand the landscape of sorting algorithms:
+
+1. **Quadratic sorts work fast on small arrays:** Algorithms like insertion sort and selection sort run in $O(n^2)$ time. While this seems slow, these algorithms have excellent **constant factors** due to efficient loops and processor cache usage. For very small arrays (typically $n < 20$), insertion sort often beats sophisticated $O(n \log n)$ algorithms. This is why production sorting algorithms often use insertion sort on small subarrays.
+2. **Comparison-based sorts have a lower bound:** In general, sorting cannot be faster than $\Omega(n \log n)$. This applies strictly to algorithms that **make decisions based only on comparing elements** (like "is $A[i] \le A[j]$?").
+3. **Special cases allow linear time:** When we have additional information about the data (like knowing the range of values), we can sometimes sort faster than $\Omega(n \log n)$. This is the topic of this lecture: **linear-time sorting algorithms**.
+
+###### **1.1.2 The Decision Tree Model**
+
+To understand why comparison-based sorting requires $\Omega(n \log n)$ comparisons, we use the **decision tree** formalism:
+
+A **decision tree** is a binary tree that represents the execution of a comparison-based sorting algorithm:
+
+- **Internal nodes** represent comparisons (e.g., "Is $A[i] \le A[j]$?"). Each internal node has two child branches: one for the "true" outcome (left) and one for the "false" outcome (right).
+- **Leaves** represent possible outcomes — different permutations of the input.
+- **Paths** from root to leaf represent possible execution traces. Each path corresponds to a sequence of comparisons leading to a final sorted order.
+
+**Example:** For sorting three elements $\langle a_1, a_2, a_3 \rangle$, the decision tree shows:
+
+- Root compares $a_1$ and $a_2$
+- Based on the outcome, further comparisons determine which of the $3! = 6$ permutations is correct
+- Leaves are the six possible sorted orderings
+
+The height of the decision tree corresponds to the **worst-case number of comparisons** — it is the longest path from root to any leaf.
+
+For any sorting algorithm with input size $n$:
+
+- There must be at least $n!$ different leaves (one for each possible input permutation that could result in a different sorted order)
+- A complete binary tree of height $h$ has at most $2^h$ leaves
+- Therefore: $2^h \ge n!$, which gives $h \ge \log_2(n!)$
+
+###### **1.1.3 Deriving the Lower Bound**
+
+We need to lower-bound $\log_2(n!)$:
+
+$$h \ge \log_2(n!) = \sum_{i=1}^{n} \log_2(i)$$
+
+To find a lower bound:
+
+$$\sum_{i=1}^{n} \log_2(i) \ge \sum_{i=n/2}^{n} \log_2(i) \ge \sum_{i=n/2}^{n} \log_2(n/2) = \frac{n}{2} \log_2(n/2)$$
+
+$$= \frac{n}{2} (\log_2 n - 1) = \frac{n}{2} \log_2 n - \frac{n}{2} = \Omega(n \log n)$$
+
+**Conclusion:** Any comparison-based sorting algorithm requires at least $\Omega(n \log n)$ comparisons in the worst case.
+
+##### **1.2 Counting Sort**
+
+**Counting Sort** is a linear-time sorting algorithm that works when elements come from a **small, known range** of values. Instead of comparing elements, it counts occurrences of each value and reconstructs the sorted array.
+
+###### **1.2.1 Assumption and Basic Idea**
+
+**Assumption:** Elements are integers in the range $[0, k-1]$ for some parameter $k$. If you have a large range of integers, you can sometimes normalize them to fit this assumption.
+
+**Main idea:**
+
+1. **Count frequencies:** Create an array $C$ where $C[i]$ initially stores how many elements equal $i$.
+2. **Compute cumulative counts:** Transform $C$ into a cumulative array where $C[i]$ now stores how many elements are $\le i$. This tells us the final position of each element.
+3. **Place elements:** Traverse the input array and place each element in its correct position based on the cumulative counts, decrementing counts to handle duplicates.
+
+The advantage of using cumulative counts is that it preserves **stability** — equal elements maintain their original relative order.
+
+###### **1.2.2 Naive Variant (Not Stable)**
+
+The simplest version just counts and writes elements back:
+
+1. Count occurrences: $C[i]$ = number of elements equal to $i$
+2. Iterate through values $0$ to $k-1$ in order
+3. Write $C[i]$ copies of value $i$ to the output
+
+This is $O(n + k)$ time and stable-preserving by nature, but doesn't use indices effectively.
+
+###### **1.2.3 Stable Variant with Cumulative Counts**
+
+For problems requiring stability or more sophisticated sorting:
+
+1. **Count frequencies:** Let $C[i]$ = count of elements equal to $i$.
+2. **Cumulative sums:** Let $C[i] = C[i] + C[i-1]$. Now $C[i]$ = index where the *last* element with value $i$ should go.
+3. **Backward traversal:** Traverse the input array from right to left. For each element with value $v$ at some position, place it at position $C[v]$ in the output, then decrement $C[v]$.
+
+**Why backward traversal?** Processing from right to left ensures that when we have multiple elements with the same value, they are placed in the output in their original relative order.
+
+**Example:** Input $[2, 5, 3, 0, 2, 3, 0, 3]$ with values in range $[0, 5]$.
+
+- Count: $C = [2, 0, 2, 3, 0, 1]$ (two 0s, zero 1s, two 2s, three 3s, etc.)
+- Cumulative: $C = [2, 2, 4, 7, 7, 8]$
+- Process from right to left:
+  - Element 3 at index 7 goes to position $C[3] = 7$; set $C[3] = 6$
+  - Element 0 at index 6 goes to position $C[0] = 2$; set $C[0] = 1$
+  - ... and so on
+- Output: $[0, 0, 2, 2, 3, 3, 3, 5]$
+
+###### **1.2.4 Time and Space Complexity**
+
+- **Time:** $\Theta(n + k)$
+  - Counting: $\Theta(n)$
+  - Cumulative sum: $\Theta(k)$
+  - Placement: $\Theta(n)$
+  - Total: $\Theta(n + k)$
+
+- **Space:** $\Theta(n + k)$ for the output array and count array
+
+**When is counting sort practical?** When $k$ is small relative to $n$. If $k \approx n$, it's competitive with $O(n \log n)$ algorithms. If $k \gg n$, it's worse than merge sort.
+
+##### **1.3 Radix Sort**
+
+**Radix Sort** extends the idea of counting sort to handle multi-digit numbers. It sorts numbers digit-by-digit, starting from the *least significant digit* (rightmost) and proceeding to the most significant digit (leftmost). The key insight is that **if you have already sorted by more significant digits, sorting by less significant digits won't disturb that order, as long as you use a stable sort**.
+
+###### **1.3.1 Problem Setup**
+
+**Input:** Numbers with $d$ digits, where each digit is in the range $[0, k-1]$.
+
+**Idea:** Sort the numbers $d$ times:
+
+1. Sort by digit $d$ (least significant)
+2. Sort by digit $d-1$ (stable)
+3. ...
+4. Sort by digit $1$ (most significant, stable)
+
+After these $d$ passes, the numbers are fully sorted.
+
+###### **1.3.2 Why It Works**
+
+**Claim:** After sorting by the last $i$ digits, numbers are sorted by those $i$ digits.
+
+**Proof sketch:**
+
+- Initially (after sorting by the last digit): numbers with the same digits $2$ through $d$ may appear in any order relative to each other, but all numbers with a smaller last digit come before those with a larger last digit.
+- After sorting by digits $2$ and $1$ (using a stable sort at each step): the most significant positions are correct, and the stable sort preserves the relative order of numbers equal on the current digit.
+
+**Example:** Sorting $[329, 457, 657, 839, 436, 720, 355]$ (3-digit numbers, each digit in $[0, 9]$).
+
+1. Sort by digit 1 (units): $[720, 355, 436, 457, 657, 329, 839]$ (by last digit: 0, 5, 6, 7, 7, 9, 9; note stability)
+2. Sort by digit 2 (tens, stable): $[720, 329, 436, 839, 355, 457, 657]$ (by middle digit: 2, 2, 3, 3, 5, 5, 5)
+3. Sort by digit 3 (hundreds, stable): $[329, 355, 436, 457, 657, 720, 839]$ (by first digit: 3, 3, 4, 4, 6, 7, 8)
+
+**Result:** Fully sorted!
+
+###### **1.3.3 Time Complexity**
+
+If we use **counting sort** to sort by each digit:
+
+- Each of the $d$ passes uses counting sort with $n$ elements and $k$ possible digit values.
+- Time per pass: $\Theta(n + k)$
+- Total time: $\Theta(d(n + k))$
+
+**Special case — sorting $b$-bit binary numbers:**
+- Each number has $b$ bits (digits in base 2, so $k = 2$).
+- Time: $\Theta(b(n + 2)) = \Theta(bn)$
+- For numbers in range $[0, 2^b - 1]$: $\Theta(b \cdot n)$
+
+We can optimize further by using larger "digits" (processing multiple bits at a time). If we process $r$-bit chunks, we have $d = b/r$ passes and $k = 2^r$ possible values per digit:
+$$T(n) = \Theta\left(\frac{b}{r}(n + 2^r)\right)$$
+
+The optimal choice is $r \approx \log n$, giving $\Theta(n)$ time for sorting $b$-bit numbers when $b \le O(\log n)$ or for reasonably-sized numbers.
+
+##### **1.4 Bucket Sort**
+
+**Bucket Sort** is another linear-time algorithm that works when elements are **uniformly distributed** in a known range (typically $[0, 1)$). It divides the range into buckets, distributes elements into buckets, sorts within buckets, and concatenates.
+
+###### **1.4.1 Assumption and Basic Idea**
+
+**Assumption:** Input consists of $n$ numbers uniformly distributed in the interval $[0, 1)$. We can generalize to any interval $[a, b)$ by rescaling.
+
+**Algorithm:**
+
+1. **Create $n$ buckets** — divide the range $[0, 1)$ into $n$ equal intervals: $[0, 1/n)$, $[1/n, 2/n)$, ..., $[(n-1)/n, 1)$.
+2. **Distribute elements** — for each element $x$, place it in bucket $\lfloor n \cdot x \rfloor$.
+3. **Sort within buckets** — sort each bucket using any algorithm (typically insertion sort, which is fast on small arrays).
+4. **Concatenate** — concatenate all sorted buckets to form the final result.
+
+**Why uniform distribution matters:** With uniformly distributed data, each bucket expects to contain $O(n/n) = O(1)$ elements on average. Thus, sorting each bucket is fast.
+
+###### **1.4.2 Complexity Analysis**
+
+**Setup:** Let $n_i$ = number of elements in bucket $i$.
+
+**Total time:**
+$$T(n) = \Theta(n) + \sum_{i=1}^{n} O(n_i^2)$$
+
+where $\Theta(n)$ is for initialization and distribution, and $O(n_i^2)$ is for sorting bucket $i$ with insertion sort.
+
+**Expected running time (with uniform distribution):**
+
+Each element independently falls into each bucket with probability $1/n$. Thus, $n_i$ follows a binomial distribution with parameters $n$ and $1/n$, giving:
+$$E[n_i] = 1, \quad E[n_i^2] = 2 - 1/n$$
+
+Therefore:
+$$E[T(n)] = \Theta(n) + \sum_{i=1}^{n} O(E[n_i^2]) = \Theta(n) + n \cdot O(2 - 1/n) = \Theta(n)$$
+
+**Why do we choose $n$ buckets?** If we choose too few buckets, they'll be crowded and sorting will be slow. If we choose too many, initializing empty buckets is wasteful. With $n$ buckets for $n$ elements, we achieve the sweet spot where expected bucket size is $O(1)$ and expected total time is $\Theta(n)$.
+
+###### **1.4.3 Worst Case**
+
+If all elements are in a single bucket, we resort to insertion sort on all $n$ elements:
+$$T_{\text{worst}}(n) = \Theta(n^2)$$
+
+This can happen if the data is not actually uniformly distributed or if there are pathological cases.
+
+##### **1.5 Comparison of Linear-Time Sorting Algorithms**
+
+All three linear-time algorithms have advantages and disadvantages:
+
+| Algorithm | Time | Space | Assumption | Stable | Notes |
+| --- | --- | --- | --- | --- | --- |
+| **Counting Sort** | $\Theta(n + k)$ | $\Theta(n + k)$ | Small integer range $[0, k-1]$ | Yes | Practical when $k = O(n)$ |
+| **Radix Sort** | $\Theta(d(n + k))$ | $\Theta(n + k)$ | Multi-digit numbers | Yes (with stable sub-sort) | Effective for large integers/strings |
+| **Bucket Sort** | $\Theta(n)$ average | $\Theta(n)$ | Uniformly distributed in range | Yes | Can be $\Theta(n^2)$ worst case |
+
+**Choosing the right algorithm:**
+
+- **Use Counting Sort** when elements are small integers in a known narrow range (e.g., sorting grades 0-100, or counting digit frequencies).
+- **Use Radix Sort** when elements are multi-digit numbers (especially for binary or fixed-width representations). It's practical for sorting strings with fixed alphabet size.
+- **Use Bucket Sort** when data is known to be uniformly distributed and you want simple, practical average-case linear time.
+- **Use comparison-based sorts** ($O(n \log n)$ like merge sort or quicksort) when you need worst-case guarantees or when the assumptions of linear-time algorithms don't hold.
+
+#### **2. Definitions**
+
+*   **Comparison-Based Sorting**: A sorting algorithm that makes all decisions based on comparing pairs of elements, such as comparing $A[i] \le A[j]$.
+*   **Decision Tree**: A binary tree model representing the execution of a comparison-based sorting algorithm, where internal nodes are comparisons and leaves are sorted permutations.
+*   **Lower Bound**: A proven minimum number of operations (e.g., $\Omega(n \log n)$ comparisons) that any algorithm of a certain class must perform.
+*   **Counting Sort**: A linear-time sorting algorithm for integers in a small range $[0, k-1]$ that counts occurrences of each value.
+*   **Stable Sort**: A sorting algorithm that preserves the relative order of elements with equal keys.
+*   **Cumulative Count Array**: In counting sort, the array that stores the number of elements less than or equal to each value, used to determine final positions.
+*   **Radix Sort**: A linear-time sorting algorithm that sorts multi-digit numbers by sorting each digit position independently, starting from the least significant digit.
+*   **Digit (Radix Sort)**: A single digit in a particular position of a multi-digit number, treated as the sorting key for a single pass.
+*   **Least Significant Digit (LSD)**: The rightmost digit in a number; sorting by LSD first is standard in radix sort.
+*   **Bucket Sort**: A linear-time sorting algorithm for uniformly distributed values that partitions the range into equal-sized buckets, sorts each bucket, and concatenates.
+*   **Bucket**: A subdivision of the value range in bucket sort, into which elements are distributed before individual sorting.
+*   **Uniform Distribution**: A probability distribution where each value in a range is equally likely; the assumption required for bucket sort's average-case analysis.
+*   **Amortized Analysis**: Analysis showing that over a sequence of operations, the average cost per operation is low, even if some operations are expensive.
+*   **In-Place Sorting**: A sorting algorithm that requires only $O(1)$ or $O(\log n)$ extra space, not counting the input and output.
+*   **Linear-Time Sorting**: An algorithm that runs in $O(n)$ or $O(n + k)$ time, achieving the theoretical limit when applicable.
+
+#### **3. Formulas**
+
+*   **Lower Bound (Decision Tree)**: $2^h \ge n! \implies h \ge \log_2(n!) = \Omega(n \log n)$
+*   **Lower Bound Derivation**: $\log_2(n!) \ge \sum_{i=n/2}^{n} \log_2(n/2) = \frac{n}{2} \log_2(n/2) = \Omega(n \log n)$
+*   **Counting Sort Time Complexity**: $\Theta(n + k)$ where $n$ is the number of elements and $k$ is the range of values
+*   **Counting Sort Space Complexity**: $\Theta(n + k)$ for output and count arrays
+*   **Radix Sort Time Complexity (General)**: $\Theta(d(n + k))$ where $d$ is the number of digits and $k$ is the base
+*   **Radix Sort Time Complexity (Binary)**: $\Theta(b \cdot n)$ where $b$ is the number of bits
+*   **Radix Sort with Optimized Radix**: $\Theta\left(\frac{b}{r}(n + 2^r)\right)$ where $r$ is the bits per digit; optimal at $r = \log n$
+*   **Bucket Index Formula**: $\text{bucket} = \lfloor n \cdot x \rfloor$ for element $x \in [0, 1)$
+*   **Bucket Sort Time Complexity (Average)**: $\Theta(n)$ with uniform distribution
+*   **Bucket Sort Time Complexity (Worst)**: $\Theta(n^2)$ when all elements fall in one bucket
+*   **Expected Bucket Size (Uniform Distribution)**: $E[n_i] = 1$ for $n$ elements in $n$ buckets
+*   **Expected Cost of Sorting Bucket (Insertion Sort)**: $E[n_i^2] = 2 - 1/n$ for bucket $i$
+
+#### **4. Examples**
+##### **4.1. Prove Lower Bound for Comparison-Based Sorting** (Lecture 4, Example)
+
+Prove that any comparison-based sorting algorithm requires at least $\Omega(n \log n)$ comparisons in the worst case.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the decision tree model. A decision tree has at least $n!$ leaves (one for each permutation), and the height of the tree is the worst-case number of comparisons.
+
+1. **Setup Decision Tree:**
+   - For any sorting algorithm on input of size $n$, we can model its execution as a binary decision tree.
+   - Each internal node represents a comparison operation.
+   - Each leaf represents a final sorted order (one of the $n!$ possible permutations).
+   - The path from root to leaf represents the sequence of comparisons for a particular input.
+
+2. **Count Leaves:**
+   - There must be at least $n!$ distinct leaves because there are $n!$ possible input permutations.
+   - Different input permutations might lead to the same sorted order, but we need at least one leaf per distinct permutation.
+
+3. **Relate Leaves to Height:**
+   - A complete binary tree of height $h$ has exactly $2^h$ leaves.
+   - Therefore: $2^h \ge n!$
+   - Taking logarithms: $h \ge \log_2(n!)$
+
+4. **Lower Bound on $\log_2(n!)$:**
+   $$\log_2(n!) = \sum_{i=1}^{n} \log_2(i) = 1 + \log_2(2) + \log_2(3) + \cdots + \log_2(n)$$
+
+   To find a lower bound, keep only terms from $i = n/2$ to $n$:
+   $$\sum_{i=1}^{n} \log_2(i) \ge \sum_{i=n/2}^{n} \log_2(i) \ge \sum_{i=n/2}^{n} \log_2(n/2) = \frac{n}{2} \log_2(n/2)$$
+
+   Simplify:
+   $$\frac{n}{2} \log_2(n/2) = \frac{n}{2}(\log_2 n - \log_2 2) = \frac{n}{2}(\log_2 n - 1) = \frac{n}{2} \log_2 n - \frac{n}{2}$$
+
+   This is $\Omega(n \log n)$ because the first term dominates.
+
+5. **Conclusion:**
+   $$T_{\text{worst}}(n) \ge h \ge \log_2(n!) = \Omega(n \log n)$$
+
+**Answer:** Any comparison-based sorting algorithm requires at least $\Omega(n \log n)$ comparisons in the worst case, proven via the decision tree lower bound.
+
+</details>
+
+##### **4.2. Apply Radix Sort to Decimal Numbers** (Lecture 4, Example)
+
+Sort the array $[329, 457, 657, 839, 436, 720, 355]$ using radix sort. Show the state after sorting by each digit.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Sort by each digit position from least to most significant, using a stable sort (like counting sort) at each step.
+
+**Input:** $[329, 457, 657, 839, 436, 720, 355]$ (3-digit numbers, each digit in $[0, 9]$)
+
+**Pass 1: Sort by Units Digit (Least Significant)**
+
+Elements grouped by units digit (using stable sort):
+- 0: 720
+- 5: 355
+- 6: 436
+- 7: 457, 657 (stable: 457 comes before 657 since it appeared first)
+- 9: 329, 839 (stable: 329 comes before 839)
+
+**Result after Pass 1:** $[720, 355, 436, 457, 657, 329, 839]$
+
+**Pass 2: Sort by Tens Digit (Stable)**
+
+Current array: $[720, 355, 436, 457, 657, 329, 839]$
+
+Elements grouped by tens digit:
+- 2: 720, 329 (stable order preserved from previous pass)
+- 3: 436, 839
+- 5: 355, 457, 657 (stable order preserved)
+
+**Result after Pass 2:** $[720, 329, 436, 839, 355, 457, 657]$
+
+**Pass 3: Sort by Hundreds Digit (Most Significant, Stable)**
+
+Current array: $[720, 329, 436, 839, 355, 457, 657]$
+
+Elements grouped by hundreds digit:
+- 3: 329, 355 (stable order preserved)
+- 4: 436, 457 (stable order preserved)
+- 6: 657
+- 7: 720
+- 8: 839
+
+**Result after Pass 3:** $[329, 355, 436, 457, 657, 720, 839]$
+
+**Final Sorted Array:** $[329, 355, 436, 457, 657, 720, 839]$ ✓
+
+**Complexity Analysis:**
+
+- $n = 7$ elements
+- $d = 3$ digits
+- $k = 10$ possible values per digit (0-9)
+- Time: $\Theta(d(n + k)) = \Theta(3(7 + 10)) = \Theta(51)$ ✓
+
+**Answer:** After sorting by units, tens, and hundreds digits respectively, the array becomes fully sorted: $[329, 355, 436, 457, 657, 720, 839]$.
+
+</details>
+
+##### **4.3. Analyze Bucket Sort Average Case** (Lecture 4, Example)
+
+Analyze the average-case time complexity of bucket sort for $n$ elements uniformly distributed in $[0, 1)$ using $n$ buckets and insertion sort within buckets.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** With uniform distribution and $n$ buckets, the expected size of each bucket is $O(1)$, making insertion sort fast on average.
+
+1. **Setup:**
+   - $n$ elements, uniformly distributed in $[0, 1)$
+   - $n$ buckets, each covering an interval of width $1/n$
+   - Bucket $i$ covers $[i/n, (i+1)/n)$
+   - Each element independently falls into bucket $i$ with probability $1/n$
+
+2. **Distribution of Bucket Sizes:**
+   - Let $X_i$ be the size of bucket $i$ (number of elements in it)
+   - Each element independently falls into bucket $i$ with probability $1/n$
+   - $X_i$ follows a binomial distribution: $X_i \sim \text{Binomial}(n, 1/n)$
+
+3. **Expected Bucket Size:**
+   $$E[X_i] = n \cdot (1/n) = 1$$
+
+4. **Expected Cost of Sorting Bucket $i$:**
+   - We use insertion sort, which takes $O(X_i^2)$ worst-case time
+   - But we care about expected time: $E[O(X_i^2)] = O(E[X_i^2])$
+   - For a binomial distribution: $E[X_i^2] = \text{Var}(X_i) + (E[X_i])^2$
+   - $\text{Var}(X_i) = np(1-p) = n \cdot (1/n) \cdot (1 - 1/n) = 1 - 1/n$
+   - $E[X_i^2] = (1 - 1/n) + 1^2 = 2 - 1/n$
+
+5. **Total Expected Time:**
+   $$E[T(n)] = \Theta(n) + \sum_{i=1}^{n} O(E[X_i^2]) = \Theta(n) + n \cdot O(2 - 1/n) = \Theta(n) + O(2n - 1) = \Theta(n)$$
+
+6. **Why $n$ buckets is optimal:**
+   - With $m$ buckets and $n$ elements: expected bucket size is $n/m$
+   - Insertion sort on each bucket costs $O((n/m)^2)$
+   - Total: $\Theta(n) + m \cdot O((n/m)^2) = \Theta(n) + \Theta(n^2/m)$
+   - This is minimized when $m \approx n$, giving $\Theta(n)$ total time
+
+**Answer:** Average-case time complexity is $\Theta(n)$ with $n$ buckets. The key insight is that each bucket is expected to have size $O(1)$ with uniform distribution, making insertion sort efficient.
+
+</details>
+
+##### **4.4. Decision Tree for Sorting Three Elements** (Lecture 4, Example)
+
+Construct a decision tree for insertion sort when sorting three elements $\langle a, b, c \rangle$. Identify all leaves (sorted permutations).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A decision tree shows all possible comparisons and outcomes. Each internal node represents a comparison; leaves represent final sorted orders.
+
+**Input:** Three elements $a$, $b$, $c$ (unlabeled — we don't know their values)
+
+**Insertion Sort Logic:**
+1. Compare $a$ and $b$
+2. Based on the outcome, determine where to insert $c$
+
+**Decision Tree:**
+
+```
+                    a ≤ b?
+                   /      \
+                YES        NO
+               /             \
+         (a,b,c) or order?   (b,a,c) or order?
+            b ≤ c?            a ≤ c?
+           /      \          /      \
+         YES      NO       YES      NO
+         /         \       /         \
+      a≤b≤c      a≤c<b   b≤a≤c    b≤c<a
+                           or c<a
+                           a ≤ c?
+                          /      \
+                        YES      NO
+                        /         \
+                     b≤a≤c      c<a≤b  (Not reachable, contradiction)
+```
+
+Actually, let me redraw this more carefully:
+
+**Root: Compare $a$ and $b$**
+
+- **Left branch ($a \le b$):** We know $a \le b$.
+  - Next: Compare $b$ and $c$
+    - **Left branch ($b \le c$):** We have $a \le b \le c$. **Leaf: $a \le b \le c$**
+    - **Right branch ($b > c$):** We have $a \le b$ and $b > c$. Now compare $a$ and $c$:
+      - **Left branch ($a \le c$):** We have $a \le c < b$. **Leaf: $a \le c < b$**
+      - **Right branch ($a > c$):** We have $c < a \le b$. **Leaf: $c < a \le b$**
+
+- **Right branch ($a > b$):** We know $b < a$.
+  - Next: Compare $a$ and $c$
+    - **Left branch ($a \le c$):** We have $b < a \le c$. **Leaf: $b < a \le c$**
+    - **Right branch ($a > c$):** We have $a > c$ and $b < a$. Now compare $b$ and $c$:
+      - **Left branch ($b \le c$):** We have $b \le c < a$. **Leaf: $b \le c < a$**
+      - **Right branch ($b > c$):** We have $c < b < a$. **Leaf: $c < b < a$**
+
+**Complete Decision Tree:**
+
+```
+                        a ≤ b?
+                       /      \
+                     YES       NO
+                     /          \
+                 b ≤ c?        a ≤ c?
+                 /    \         /    \
+               YES    NO       YES   NO
+              /        \       /      \
+          a≤b≤c    a≤c<b   b<a≤c   b≤c<a
+        (Leaf 1)  (Leaf 2) (Leaf 3) (Leaf 4)
+                              \      /
+                             b≤c?  b≤c?
+                            /   \  /   \
+                          YES   NO (not reachable)
+                          /      \
+                       b≤c<a   c<b<a
+                      (Leaf 5) (Leaf 6)
+```
+
+Wait, let me simplify. The six leaves correspond to the six permutations of three elements:
+
+1. $a \le b \le c$
+2. $a \le c < b$
+3. $c < a \le b$
+4. $b < a \le c$
+5. $b \le c < a$
+6. $c < b < a$
+
+**Complete list of leaves (sorted orders):**
+
+| Leaf | Permutation | Path |
+| --- | --- | --- |
+| 1 | $a \le b \le c$ | $(a \le b)$ YES, $(b \le c)$ YES |
+| 2 | $a \le c < b$ | $(a \le b)$ YES, $(b \le c)$ NO, $(a \le c)$ YES |
+| 3 | $c < a \le b$ | $(a \le b)$ YES, $(b \le c)$ NO, $(a \le c)$ NO |
+| 4 | $b < a \le c$ | $(a \le b)$ NO, $(a \le c)$ YES |
+| 5 | $b \le c < a$ | $(a \le b)$ NO, $(a \le c)$ NO, $(b \le c)$ YES |
+| 6 | $c < b < a$ | $(a \le b)$ NO, $(a \le c)$ NO, $(b \le c)$ NO |
+
+**Height of tree:** Longest path has 3 comparisons (e.g., path to Leaf 2). Since $\log_2(3!) = \log_2(6) \approx 2.58$, any decision tree for sorting 3 elements requires at least $\lceil 2.58 \rceil = 3$ comparisons in the worst case.
+
+**Answer:** The decision tree has 6 leaves (one per permutation of three elements), root represents $(a \le b)$, and the longest path from root to leaf requires 3 comparisons, corresponding to the worst-case lower bound.
+
+</details>
+
+##### **4.5. Stability of Radix Sort** (Lecture 4, Example)
+
+Explain why radix sort is stable when the sub-sorting algorithm (used for each digit) is stable. Provide an example.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Stability is preserved if the sub-sort is stable. We sort from least significant to most significant digit; stability at each step maintains the correct order from prior steps.
+
+**Claim:** If the sub-sorting algorithm is stable, then radix sort is stable.
+
+**Proof:**
+
+Suppose we are sorting records with multi-digit keys. After sorting by the last $i$ digits, records are in the correct order with respect to those $i$ digits. When we sort by digit $i+1$:
+
+- Records with the same digit $i+1$ value will be reordered by the stable sub-sort
+- Since the sub-sort is stable, records that are already in the correct relative order (from prior sorting by digits $i, i-1, \ldots, 1$) will remain in that order
+- Thus, records are now sorted correctly by digits $i+1, i, \ldots, 1$
+
+By induction, after processing all $d$ digits, the records are sorted.
+
+**Example:**
+
+Consider pairs (key, data) where keys are 2-digit numbers:
+
+**Input:** $(23, A), (12, B), (23, C), (15, D), (12, E)$
+
+**Pass 1: Sort by units digit (least significant)**
+
+Using stable counting sort on the units digit:
+
+| Units Digit | Records |
+| --- | --- |
+| 2 | $(12, B), (12, E)$ |
+| 3 | $(23, A), (23, C)$ |
+| 5 | $(15, D)$ |
+
+**After Pass 1 (sorted by units digit, stable within ties):**
+$(12, B), (12, E), (23, A), (23, C), (15, D)$
+
+Note: $(12, B)$ comes before $(12, E)$ because B appeared before E in the original array (stability).
+
+**Pass 2: Sort by tens digit (most significant)**
+
+Using stable counting sort on the tens digit:
+
+| Tens Digit | Records (in their current order from Pass 1) |
+| --- | --- |
+| 1 | $(12, B), (12, E), (15, D)$ |
+| 2 | $(23, A), (23, C)$ |
+
+**After Pass 2 (sorted by tens digit, then units digit):**
+$(12, B), (12, E), (15, D), (23, A), (23, C)$
+
+Note:
+- Within tens digit 1: $(12, B)$ and $(12, E)$ maintain their order from Pass 1 (same units digit 2, so they remain in relative order by stability). The sub-sort doesn't change their relative order because they have the same tens digit value.
+- Within tens digit 2: $(23, A)$ comes before $(23, C)$ because A appeared before C in the original array, and the sub-sort preserves this (stability).
+
+**Final sorted result:** $[(12, B), (12, E), (15, D), (23, A), (23, C)]$ ✓
+
+The keys are in order: 12, 12, 15, 23, 23. For equal keys (12, 12) and (23, 23), the original order is preserved (B before E, A before C).
+
+**Answer:** Radix sort is stable because stable sub-sorting at each digit preserves the relative order of elements that are equal in the current digit, which maintains the correct order from previous digits. The cumulative effect ensures that after all $d$ passes, the entire multi-digit keys are in correct sorted order with stability preserved.
+
+</details>
+
+##### **4.6. Compare Sorting Algorithms on Different Data** (Lecture 4, Exercise)
+
+For each scenario below, recommend the best sorting algorithm and justify your choice:
+
+1. Sorting 1 million English words of varying length
+2. Sorting 1 billion 32-bit unsigned integers
+3. Sorting 100 students by grade (0-100)
+4. Sorting a linked list of arbitrary integers
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Different algorithms excel in different scenarios. Consider the input size, range, data distribution, and memory constraints.
+
+**(1) Sorting 1 million English words of varying length:**
+
+**Recommendation:** **Merge sort** or **quicksort** (comparison-based)
+
+**Justification:**
+- Words are complex objects; no obvious numeric range
+- Variable length makes radix sort awkward (would need to pad all words to max length)
+- English words are not uniformly distributed (bucket sort would be inefficient)
+- $O(n \log n) \approx 1M \log(1M) \approx 20M$ comparisons is acceptable
+- Merge sort guarantees $O(n \log n)$ even in worst case
+- Quick sort is faster in practice with good pivot selection
+
+**(2) Sorting 1 billion 32-bit unsigned integers:**
+
+**Recommendation:** **Radix sort** (with 8-bit or 16-bit radix)
+
+**Justification:**
+- Integers have a fixed, small range: $[0, 2^{32}-1]$
+- Radix sort with 8-bit chunks: $d = 4$, $k = 256$
+- Time: $\Theta(4(10^9 + 256)) \approx \Theta(4 \times 10^9)$ — linear!
+- Counting sort (radix sort with 8-bit chunks) is $O(n + 2^8)$ per pass
+- Much faster than $\Theta(n \log n) \approx \Theta(30 \times 10^9)$ for merge/quick sort
+
+**(3) Sorting 100 students by grade (0-100):**
+
+**Recommendation:** **Counting sort**
+
+**Justification:**
+- Small range: grades are integers in $[0, 100]$
+- $n = 100$, $k = 101$
+- Time: $\Theta(n + k) = \Theta(100 + 101) \approx \Theta(200)$ — extremely fast
+- Far better than $\Theta(100 \log 100) \approx \Theta(660)$ for comparison-based sorts
+- Simple to implement
+- Can easily handle ties (use stable counting sort)
+
+**(4) Sorting a linked list of arbitrary integers:**
+
+**Recommendation:** **Merge sort**
+
+**Justification:**
+- Linked lists don't support fast random access
+- Radix/bucket sort need to iterate over array indices — inefficient on linked lists
+- Merge sort is naturally suited to linked lists: can merge two lists by only following pointers, no array indexing needed
+- Insertion sort on linked lists is $O(n^2)$ (slow traversal for each insertion)
+- Quicksort on linked lists is awkward (hard to partition without random access)
+- Merge sort: $O(n \log n)$, naturally fits linked list structure
+
+**Answer:**
+1. **English words:** Merge sort or quicksort
+2. **Integers (32-bit):** Radix sort
+3. **Grades (0-100):** Counting sort
+4. **Linked list:** Merge sort
+
+</details>
+
+##### **4.7. Estimate Complexity of Radix Sort with Arbitrary Radix** (Lecture 4, Exercise)
+
+Show that we can sort $n$ numbers in the range $[0, n^5 - 1]$ in $\Theta(n)$ time. What radix and number of digits should we use?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use radix sort with base $k = n$ and $d = 5$ digits.
+
+1. **Problem Setup:**
+   - Range: $[0, n^5 - 1]$
+   - We need to express numbers in a suitable base-$k$ representation
+
+2. **Choose Radix and Digits:**
+   - Let radix $k = n$ (each digit is in range $[0, n-1]$)
+   - To represent numbers up to $n^5 - 1$ in base $n$: we need $d$ digits where $n^d \ge n^5$
+   - Thus $d = 5$ digits
+
+   Example: If $n = 10$, numbers $[0, 10^5 - 1]$ are represented as 5-digit numbers in base 10: 00000 to 99999.
+
+3. **Radix Sort Complexity:**
+   - With $d = 5$ digits and radix $k = n$:
+   - Time per pass (using counting sort): $\Theta(n + k) = \Theta(n + n) = \Theta(n)$
+   - Total passes: $d = 5$
+   - Total time: $\Theta(d(n + k)) = \Theta(5(n + n)) = \Theta(10n) = \Theta(n)$ ✓
+
+4. **Verification:**
+   - For $n = 10$: Sort numbers in $[0, 99999]$ in $\Theta(10)$ time ✓
+   - For $n = 100$: Sort numbers in $[0, 10^{10} - 1]$ in $\Theta(100)$ time ✓
+
+**Answer:** Use radix sort with base $k = n$ and $d = 5$ digits. Each pass takes $\Theta(n + n) = \Theta(n)$, and we perform 5 passes, for a total of $\Theta(n)$.
+
+</details>
+
+##### **4.8. Time Complexity of Radix Sort with Variable-Radix** (Lecture 4, Exercise)
+
+Show that we can sort $n$ $d$-bit numbers in $\Theta\left(\frac{d}{r}(n + 2^r)\right)$ for any $1 \le r \le d$. What choice of $r$ minimizes the time complexity?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Instead of sorting by each bit individually (radix 2), we can process multiple bits at once (radix $2^r$).
+
+1. **Setup:**
+   - Numbers are represented in binary with $d$ bits total
+   - Instead of processing 1 bit at a time, process $r$ bits at once
+   - This creates a base-$2^r$ representation with $d/r$ digits (each digit is $r$ bits)
+2. **Number of Passes:**
+   - If we process $r$ bits per pass, we need $d/r$ passes
+3. **Time per Pass:**
+   - Each pass counts elements based on an $r$-bit value (range $[0, 2^r - 1]$)
+   - Using counting sort: $\Theta(n + 2^r)$ per pass
+4. **Total Time:**
+   $$T(n) = \Theta\left(\frac{d}{r} (n + 2^r)\right)$$
+5. **Optimization — Find Minimum:**
+   - We want to minimize $f(r) = \frac{d}{r}(n + 2^r)$
+   - Take derivative: $\frac{df}{dr} = -\frac{d(n + 2^r)}{r^2} + \frac{d \cdot 2^r \ln 2}{r}$
+   - Setting to zero and solving: the optimal $r$ satisfies $2^r \approx n$, so $r \approx \log_2 n$
+6. **Optimal Choice:**
+   - **$r = 1$:** Process 1 bit at a time. $T(n) = \Theta(d(n + 2)) = \Theta(dn)$
+   - **$r = \log_2 d$:** $T(n) = \Theta\left(\frac{d}{\log_2 d}(n + d)\right) = \Theta(dn / \log n)$ (if $d \sim \log n$)
+   - **$r = d$:** Process all $d$ bits at once. $T(n) = \Theta(n + 2^d)$ — only if $2^d$ is manageable
+   - **$r = \log_2 n$:** (if $r \le d$) $T(n) = \Theta\left(\frac{d}{\log_2 n}(n + n)\right) = \Theta(nd / \log n)$
+7. **Practical Recommendation:**
+   - If $d$ is very large, choose $r \approx \log_2 n$ to balance the two terms
+   - This achieves close-to-linear time when $d = O(\log n)$
+
+**Answer:** Radix sort with $r$-bit digits requires $\Theta\left(\frac{d}{r}(n + 2^r)\right)$ time. The optimal choice is $r \approx \log_2 n$ (if $r \le d$), which minimizes the expression by balancing the number of passes and the cost per pass.
+
+</details>
+
+##### **4.9. Range Queries Using Counting Sort** (Lecture 4, Exercise)
+
+Preprocess an array of $n$ numbers in range $[0, k]$ using counting sort so that queries "how many elements in range $[a, b]$?" can be answered in $\Theta(1)$ time.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** After counting sort, build a prefix sum array. Range queries become simple subtractions.
+
+1. **Preprocessing:**
+   - Perform counting sort to get the count array $C$ where $C[i]$ = count of elements equal to $i$
+   - Compute cumulative sum: $C[i] \leftarrow C[i] + C[i-1]$
+   - Now $C[i]$ = total count of elements $\le i$ (or $< i+1$)
+
+2. **Range Query [a, b]:**
+   - To count elements in range $[a, b]$ (inclusive):
+   $$\text{count} = C[b] - C[a-1]$$
+   - This is $O(1)$ time!
+
+3. **Explanation:**
+   - $C[b]$ = number of elements $\le b$
+   - $C[a-1]$ = number of elements $\le a-1$ = number of elements $< a$
+   - Difference = number of elements in $[a, b]$
+
+4. **Example:**
+
+   **Input array:** $[0, 3, 0, 1, 0, 0, 1, 3]$
+
+   **Step 1: Count frequencies**
+   - $C = [4, 2, 0, 2]$ (four 0s, two 1s, zero 2s, two 3s)
+
+   **Step 2: Cumulative sum**
+   - $C[0] = 4$ (four elements $\le 0$)
+   - $C[1] = 4 + 2 = 6$ (six elements $\le 1$)
+   - $C[2] = 6 + 0 = 6$ (six elements $\le 2$)
+   - $C[3] = 6 + 2 = 8$ (eight elements $\le 3$)
+   - Result: $C = [4, 6, 6, 8]$
+
+   **Query: How many elements in range [1, 3]?**
+   $$\text{count} = C[3] - C[0] = 8 - 4 = 4$$
+   Elements in $[1, 3]$: $[3, 1, 1, 3]$ — count is 4 ✓
+
+   **Query: How many elements in range [0, 1]?**
+   $$\text{count} = C[1] - C[-1]$$
+   But $C[-1]$ is out of bounds. Instead, if querying $[0, b]$:
+   $$\text{count} = C[b]$$
+   So: $C[1] = 6$ ✓ (Elements 0, 0, 0, 0, 1, 1)
+
+5. **Time complexity:**
+   - Preprocessing (counting sort): $\Theta(n + k)$
+   - Each query: $\Theta(1)$
+   - Total for $q$ queries: $\Theta(n + k + q)$
+
+**Answer:** Build a cumulative count array using counting sort. To answer "how many in range $[a, b]$?", return $C[b] - C[a-1]$ in $\Theta(1)$ time. Preprocessing takes $\Theta(n + k)$.
+
+</details>
+
+##### **4.10. Apply Counting Sort** (Problem Set 4, Problem 1)
+
+Apply counting sort to the array with keys and associated data:
+
+| Keys | 3 | 1 | 6 | 3 | 0 | 3 | 6 | 3 | 1 | 4 | 6 | 4 | 6 |
+| Data | A | O | S | R | Y | E | O | A | U | W | M | E | E |
+
+Show:
+1. The auxiliary array before filling the output
+2. The auxiliary array after the algorithm finishes
+3. The final output array with keys and data
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use counting sort with stability to preserve the relative order of equal keys.
+
+**Input:** Keys $[3, 1, 6, 3, 0, 3, 6, 3, 1, 4, 6, 4, 6]$, Data $[A, O, S, R, Y, E, O, A, U, W, M, E, E]$
+
+Range: $0$ to $6$ (so $k = 7$)
+
+**Step 1: Count Frequencies**
+
+| Value | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+| Count | 1 | 2 | 0 | 4 | 2 | 0 | 4 |
+
+This gives us $C$ array **before filling output**:
+$$C = [1, 2, 0, 4, 2, 0, 4]$$
+
+**Step 2: Cumulative Counts**
+
+| Value | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+| Cumulative | 1 | 3 | 3 | 7 | 9 | 9 | 13 |
+
+This $C$ array **after the algorithm finishes** (before element placement):
+$$C = [1, 3, 3, 7, 9, 9, 13]$$
+
+(This represents the ending position of each group in the output.)
+
+**Step 3: Backward Traversal to Place Elements**
+
+Traverse input from right to left. For each element at position $i$:
+- Get key $k = \text{keys}[i]$
+- Place at position $C[k]$ in output
+- Decrement $C[k]$
+
+| Step | $i$ | Key | Data | $C[\text{key}]$ | Output Position | Updated $C$ |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 12 | 6 | E | 13 | 13 | $[1, 3, 3, 7, 9, 9, 12]$ |
+| 2 | 11 | 4 | E | 9 | 9 | $[1, 3, 3, 7, 8, 9, 12]$ |
+| 3 | 10 | 6 | M | 12 | 12 | $[1, 3, 3, 7, 8, 9, 11]$ |
+| 4 | 9 | 4 | W | 8 | 8 | $[1, 3, 3, 7, 7, 9, 11]$ |
+| 5 | 8 | 1 | U | 3 | 3 | $[1, 2, 3, 7, 7, 9, 11]$ |
+| 6 | 7 | 3 | A | 7 | 7 | $[1, 2, 3, 6, 7, 9, 11]$ |
+| 7 | 6 | 6 | O | 11 | 11 | $[1, 2, 3, 6, 7, 9, 10]$ |
+| 8 | 5 | 3 | E | 6 | 6 | $[1, 2, 3, 5, 7, 9, 10]$ |
+| 9 | 4 | 0 | Y | 1 | 1 | $[0, 2, 3, 5, 7, 9, 10]$ |
+| 10 | 3 | 3 | R | 5 | 5 | $[0, 2, 3, 4, 7, 9, 10]$ |
+| 11 | 2 | 6 | S | 10 | 10 | $[0, 2, 3, 4, 7, 9, 9]$ |
+| 12 | 1 | 1 | O | 2 | 2 | $[0, 1, 3, 4, 7, 9, 9]$ |
+| 13 | 0 | 3 | A | 4 | 4 | $[0, 1, 2, 4, 7, 9, 9]$ |
+
+**Final Output Array with Keys and Data (sorted by key):**
+
+| Position | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 |
+| Key | 0 | 1 | 1 | 3 | 3 | 3 | 3 | 4 | 4 | 6 | 6 | 6 | 6 |
+| Data | Y | O | U | A | R | E | A | W | E | S | O | M | E |
+
+**Answer:**
+1. **Auxiliary array before filling:** $C = [1, 2, 0, 4, 2, 0, 4]$ (frequency counts)
+2. **Auxiliary array after algorithm finishes:** $C = [1, 3, 3, 7, 9, 9, 13]$ (cumulative counts after decrementing)
+3. **Output array:** Keys in sorted order $[0, 1, 1, 3, 3, 3, 3, 4, 4, 6, 6, 6, 6]$ with corresponding data $[Y, O, U, A, R, E, A, W, E, S, O, M, E]$ (stable)
+
+</details>
+
+##### **4.11. Radix Sort Complexity for Programs** (Problem Set 4, Problem 2)
+
+Consider a hierarchical structure of programs:
+- Each **program** is a sequence of at most $b$ **code blocks**
+- Each **code block** is a sequence of at most $c$ **instruction codes**
+- Each **instruction code** is an element of an instruction set of size $k$
+
+Estimate the worst-case time complexity of the Radix Sort algorithm on an array of $n$ programs when code blocks are sorted using:
+
+**(a)** Insertion Sort
+**(b)** Merge Sort
+**(c)** Radix Sort (with Counting Sort for instruction codes)
+
+Provide justification for each complexity in terms of $n$, $b$, $c$, and $k$. (**Important:** Comparing instruction codes takes $\Theta(1)$ time, but comparing code blocks or programs is NOT $\Theta(1)$.)
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Analyze radix sort where we sort by code blocks (not individual instructions). The cost of comparing code blocks depends on how we sort them.
+
+**(a) Code blocks sorted using Insertion Sort:**
+
+1. **Structure:** Radix sort makes $b$ passes over $n$ programs, sorting by each code block position
+2. **Cost per pass:** Each pass uses insertion sort to order $n$ code blocks. Insertion sort does $\Theta(n^2)$ comparisons in worst case, and each comparison takes $\Theta(c)$ (comparing two code blocks of length $c$)
+3. **Cost of one pass:** $\Theta(n^2 \cdot c)$
+4. **Total:** $b$ passes × $\Theta(n^2 \cdot c)$ per pass
+$$\boxed{T(n) = \Theta(n^2 bc)}$$
+
+**Justification:** Each of $b$ passes uses insertion sort ($O(n^2)$ comparisons), and each comparison between code blocks takes $\Theta(c)$ time.
+
+---
+
+**(b) Code blocks sorted using Merge Sort:**
+
+1. **Cost per pass:** Merge sort makes $\Theta(n \log n)$ comparisons, each taking $\Theta(c)$
+2. **Cost of one pass:** $\Theta(n \log n \cdot c)$
+3. **Total:** $b$ passes × $\Theta(n \log n \cdot c)$
+$$\boxed{T(n) = \Theta(nbc \log n)}$$
+
+**Justification:** Each of $b$ passes uses merge sort ($O(n \log n)$ comparisons), and each comparison takes $\Theta(c)$ time.
+
+---
+
+**(c) Code blocks sorted using Radix Sort (with Counting Sort for instructions):**
+
+1. **Structure:** Radix sort makes $b$ passes over $n$ programs. Each pass sorts by one code block, which itself is sorted by $c$ instruction codes using counting sort.
+
+2. **Cost of sorting one code block** (using radix sort with $c$ digits and alphabet size $k$):
+   - $c$ passes of counting sort
+   - Each pass: $\Theta(n + k)$ to count and place elements
+   - Cost per code block: $\Theta(c(n + k))$
+
+3. **Cost of one outer pass:** Sorting $n$ programs by one code block position takes $\Theta(c(n + k))$
+
+4. **Total:** $b$ outer passes × $\Theta(c(n + k))$
+$$\boxed{T(n) = \Theta(bc(n + k))}$$
+
+**Justification:** The outer radix sort makes $b$ passes. Each pass sorts code blocks using radix sort with $c$ digits and alphabet size $k$, which takes $\Theta(c(n + k))$.
+
+---
+
+**Summary Comparison:**
+| Method | Complexity |
+| --- | --- |
+| **(a) Insertion Sort** | $\Theta(n^2bc)$ |
+| **(b) Merge Sort** | $\Theta(nbc \log n)$ |
+| **(c) Radix Sort** | $\Theta(bc(n + k))$ |
+
+For large $n$, method (c) is superior when $k$ is not too large. Method (b) is better than (a) for large $n$, but (a) may be faster for very small $b$ and $c$.
+
+</details>
+
+##### **4.12. Decision Tree for Quicksort Variation** (Problem Set 4, Problem 3)
+
+Construct a decision tree for a variation of **Quick-Sort** where the pivot is always the **second** element of the subarray, for an input array of size **4**. Answer the following:
+
+1. How many leaves are there in the decision tree?
+2. What is the length of the shortest path from the root to a leaf?
+3. What is the length of the longest path from the root to a leaf?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A decision tree for quicksort shows all possible comparison outcomes when partitioning. With the second element as pivot, the tree structure differs from standard quicksort.
+
+**(a) Number of leaves:**
+
+A decision tree for any sorting algorithm on $n$ elements must have at least $n!$ leaves (one per distinct permutation). For $n = 4$:
+
+$$\text{Number of leaves} = 4! = 24$$
+
+Each leaf represents a final sorted permutation of the four elements.
+
+---
+
+**(b) Length of shortest path:**
+
+The shortest path occurs when the pivot choices are optimal, dividing the array nearly evenly at each step, requiring fewer comparisons.
+
+**Analysis:**
+- **First partition:** Using the 2nd element as pivot on 4 elements requires $\approx 3$ comparisons to partition into groups
+- **Best case (balanced partitions):**
+  - Level 0 (root): 1 problem of size 4
+  - Level 1: 2 subproblems (sizes 1-2 each) — 1 comparison (pivot placement)
+  - Level 2: Remaining elements — 0-1 comparisons (some may be size 1)
+
+**Optimal path example:**
+- Root: Compare elements to place 2nd element → 3 comparisons minimum to fully partition
+- If we get lucky with first partition (elements before pivot, pivot itself, elements after pivot), size 1: $\lceil \log_2(4!) \rceil = \lceil \log_2(24) \rceil = \lceil 4.58 \rceil = 5$
+
+**More careful analysis using decision tree height lower bound:**
+$$h \ge \log_2(n!) = \log_2(24) \approx 4.58$$
+
+So the minimum height is $\lceil 4.58 \rceil = 5$ comparisons.
+
+However, the shortest *path* (not requiring all leaves to be reached) can be shorter. If we find a sorted arrangement quickly, we may need as few as:
+
+For 4 elements with 2nd element as pivot, in the best case scenario:
+- Partition step: 3 comparisons to partition all elements around the 2nd element
+- Worst case for subsequent levels: $1 + 1 = 2$ additional comparisons
+
+But we must reach a leaf (valid permutation). The shortest actual path is around **5-6 comparisons** in the worst case scenario.
+
+**Answer: Shortest path length = 5** (based on lower bound $\lceil \log_2(4!) \rceil = 5$)
+
+---
+
+**(c) Length of longest path:**
+
+The longest path occurs when the pivot choices create highly unbalanced partitions (one partition has 0 elements, the other has 3).
+
+**Worst-case scenario:**
+- **First partition:** 2nd element is the smallest or largest
+  - Elements before pivot: 0 (or 3)
+  - Elements after pivot: 3 (or 0)
+  - Comparisons: 3
+
+- **Second partition:** Pivot is again smallest/largest in remaining 3 elements
+  - Creates subproblem of size 2
+  - Comparisons: 2
+
+- **Third partition:** Remaining 2 elements
+  - Comparisons: 1
+
+**Total comparisons in worst case:** $3 + 2 + 1 = 6$
+
+But we need to count the full decision path. The longest path continues until we have all elements sorted (reach a leaf). With $n = 4$ elements and unbalanced partitions:
+
+$$T_{\max} = 3 + 2 + 1 + 0 = 6 \text{ comparisons}$$
+
+This matches the worst-case recurrence for quicksort: $T(n) = T(n-1) + \Theta(n) = \Theta(n^2)$ in the worst case, which gives us 6 total comparisons for $n = 4$.
+
+**Answer: Longest path length = 6**
+
+---
+
+**Summary:**
+
+| Property | Value |
+| --- | --- |
+| **(a) Number of leaves** | $4! = 24$ |
+| **(b) Shortest path length** | 5 |
+| **(c) Longest path length** | 6 |
+
+**Interpretation:**
+- The tree must have 24 leaves (all permutations)
+- Best case: $\log_2(24) \approx 5$ comparisons to reach some leaf
+- Worst case: 6 comparisons when the pivot choices create unbalanced partitions
+
+</details>
+
+##### **4.13. The Magical Donut** (Homework, Coding Exercise A)
+
+Natasha prepared a big donut where the inner radius is $R_1$ and the outer radius is $R_2$ (concentric circles, origin at center). She throws $N$ frosting pieces that fall uniformly at random on the annulus surface.
+
+Given the Cartesian coordinates of the frostings, **sort them by distance from the center** (nearest to farthest). If two frostings have the same distance, sort by $x$-coordinate, then by $y$-coordinate.
+
+**Input:**
+- First line: three integers $N$ ($1 \le N \le 10^5$), $R_1$, $R_2$ ($1 \le R_1 < R_2 \le 10^9$)
+- Next $N$ lines: $X_i$, $Y_i$ where $R_1^2 \le X_i^2 + Y_i^2 \le R_2^2$ (all points unique, inside annulus)
+
+**Output:** Print $N$ points after sorting, one per line in format `X Y`
+
+**Example:**
+```
+Input:
+4 5 7
+0 -6
+5 0
+-7 0
+0 5
+
+Output:
+0 5
+5 0
+0 -6
+-7 0
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Compute squared distance for each point, then sort using a stable comparison with distance as primary key.
+
+1. **Compute squared distance:** $d_i^2 = X_i^2 + Y_i^2$ for each frosting $i$
+   - Using squared distance avoids floating-point errors
+   - Preserves ordering of distances
+
+2. **Create sorting key:** For each point $(X, Y)$, create triple $(d^2, X, Y)$ where $d^2$ is squared distance
+   - Primary sort: by $d^2$ (distance)
+   - Secondary sort: by $X$ (x-coordinate)
+   - Tertiary sort: by $Y$ (y-coordinate)
+
+3. **Sort points** using the triple as comparison key
+
+4. **Example walkthrough:**
+
+   | Point | $X^2 + Y^2$ | Distance | Sorted by $(d^2, X, Y)$ |
+   | --- | --- | --- | --- |
+   | $(0, -6)$ | $0 + 36 = 36$ | $6$ | $(36, 0, -6)$ |
+   | $(5, 0)$ | $25 + 0 = 25$ | $5$ | $(25, 5, 0)$ |
+   | $(-7, 0)$ | $49 + 0 = 49$ | $7$ | $(49, -7, 0)$ |
+   | $(0, 5)$ | $0 + 25 = 25$ | $5$ | $(25, 0, 5)$ |
+
+   **Sorted by $(d^2, X, Y)$:**
+   - $(25, 0, 5)$ — $(0, 5)$ ✓
+   - $(25, 5, 0)$ — $(5, 0)$ ✓
+   - $(36, 0, -6)$ — $(0, -6)$ ✓
+   - $(49, -7, 0)$ — $(-7, 0)$ ✓
+
+5. **Algorithm (pseudocode):**
+```python
+points = read_input()
+sorted_points = sort(points, key=lambda p: (p.x**2 + p.y**2, p.x, p.y))
+for point in sorted_points:
+    print(point.x, point.y)
+```
+
+6. **Complexity:** $\Theta(n \log n)$ for sorting (using built-in sort)
+
+**Answer:** Compute squared distance for each point, sort using triple $(d^2, X, Y)$ as key, and output sorted points.
+
+</details>
+
+##### **4.14. Cormen-Adabra** (Homework, Coding Exercise B)
+
+A wizard's spellbook contains $N$ distinct words. A spell is a sequence of indices referring to words from the spellbook. Spells are stored in arbitrary order. Your task is to **sort spells lexicographically** based on the concatenated strings of the words they reference.
+
+**Input:**
+- First line: $N$ (words) and $M$ (spells), where $1 \le N, M \le 10^4$
+- Second line: $N$ distinct words separated by spaces (each word: 1-20 lowercase letters)
+- Next $M$ lines: Spell definition
+  - Integer $K$ ($1 \le K \le 10$) — size of spell
+  - $K$ integers (1-indexed) representing word indices in the spell
+
+**Output:** Print $M$ spells in lexicographical order (concatenated form), using same format as input
+
+**Example:**
+```
+Input:
+15 3
+doing work great the are good things keep you and come up from perseverance hard
+4 9 5 1 3
+5 8 12 4 6 2
+8 3 7 11 13 15 2 10 14
+
+Output:
+8 3 7 11 13 15 2 10 14
+5 8 12 4 6 2
+4 9 5 1 3
+```
+
+**Explanation of spells (with word concatenation):**
+- Spell 1: indices $[9, 5, 1, 3]$ → words $[\text{you}, \text{are}, \text{doing}, \text{great}]$ → `youaredoinggreat`
+- Spell 2: indices $[8, 12, 4, 6, 2]$ → words $[\text{keep}, \text{up}, \text{the}, \text{good}, \text{work}]$ → `keepupthegoodwork`
+- Spell 3: indices $[3, 7, 11, 13, 15, 2, 10, 14]$ → words $[\text{great}, \text{things}, \text{come}, \text{from}, \text{hard}, \text{work}, \text{and}, \text{perseverance}]$ → `greatthingscomefromhardworkandperseverance`
+
+Sorted lexicographically: `greatthingscomefromhardworkandperseverance` < `keepupthegoodwork` < `youaredoinggreat`
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Concatenate words for each spell, then sort spells by the resulting strings lexicographically.
+
+1. **Read input:**
+   - Read $N$ words into array `words[]`
+   - For each of $M$ spells, read the indices
+
+2. **For each spell:**
+   - Concatenate the words referenced by its indices into a single string
+   - Store both the concatenated string and the original spell (indices)
+
+3. **Sort spells** by concatenated string lexicographically
+
+4. **Output** the sorted spells in original format (indices)
+
+5. **Algorithm (pseudocode):**
+```python
+N, M = read_integers()
+words = read_words()  # words[0] is word 1, etc.
+
+spells = []
+for i in range(M):
+    K = read_integer()
+    indices = read_integers()  # 1-indexed
+
+    # Concatenate words
+    concatenated = ""
+    for idx in indices:
+        concatenated += words[idx - 1]  # Convert to 0-indexed
+
+    # Store (concatenated string, original indices)
+    spells.append((concatenated, indices))
+
+# Sort by concatenated string
+spells.sort(key=lambda x: x[0])
+
+# Output sorted spells
+for concatenated, indices in spells:
+    print(len(indices), " ".join(map(str, indices)))
+```
+
+6. **Example execution:**
+
+   Words: `doing work great the are good things keep you and come up from perseverance hard`
+
+   Spell 1: `[9, 5, 1, 3]` → `you` + `are` + `doing` + `great` = `youaredoinggreat`
+
+   Spell 2: `[8, 12, 4, 6, 2]` → `keep` + `up` + `the` + `good` + `work` = `keepupthegoodwork`
+
+   Spell 3: `[3, 7, 11, 13, 15, 2, 10, 14]` → `great` + `things` + `come` + `from` + `hard` + `work` + `and` + `perseverance` = `greatthingscomefromhardworkandperseverance`
+
+   Sorted lexicographically:
+   1. `greatthingscomefromhardworkandperseverance` (Spell 3)
+   2. `keepupthegoodwork` (Spell 2)
+   3. `youaredoinggreat` (Spell 1)
+
+   Output:
+   ```
+   8 3 7 11 13 15 2 10 14
+   5 8 12 4 6 2
+   4 9 5 1 3
+   ```
+
+7. **Complexity:**
+   - Concatenation: $O(M \cdot K \cdot L)$ where $L$ is average word length (max $M \cdot 10 \cdot 20 = 2 \times 10^5$)
+   - Sorting: $O(M \log M)$ comparisons of strings (each comparison $O(K \cdot L) = O(200)$)
+   - Total: $O(M \log M \cdot K \cdot L) = O(10^4 \cdot \log(10^4) \cdot 10 \cdot 20) \approx O(3 \times 10^7)$ — acceptable
+
+**Answer:** Read all spells, concatenate their words, sort lexicographically by concatenated strings, and output sorted spells in original (index) format.</details>
