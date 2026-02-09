@@ -1386,11 +1386,7 @@ From $q_0$:
 *   Read 0 → go to $q_1$ (we have read one 0)
 *   Read 1 → go to $q_1$ (we have read one 1)
 
-From $q_1$ (first symbol was 0):
-*   Read 0 → go to $q_2$ (last two are "00")
-*   Read 1 → go to $q_3$ (last two are "01")
-
-Actually, we need to track which symbol was read first. Let me refine:
+We need to track which symbol was read first. The refined states are:
 
 *   **State $q_{0}$ (initial):** Nothing read.
 *   **State $q_{1a}$:** One symbol "0" read.
@@ -1651,173 +1647,11 @@ For input "B", the marble enters at B and hits X3.
 *   If $s_3 = R$: Marble goes right (to D) immediately. X3 flips to L.
     New state: $(s_1, s_2, L)$. Output: Accept (D).
 
-**Step 6: Determine accepting states**
+**Step 6: Model definition**
 
-We want acceptance when the marble exits at D. In an FSA model, we typically define accepting states as the states we're in after processing input. But actually, the output (C or D) determines acceptance, not the state.
+We define accepting states as those that are reached after processing an input where the marble exits at D. By computing all state transitions based on the lever mechanics:
 
-Hmm, let me reconsider. Perhaps the FSA should accept strings based on some pattern of inputs that leads to the marble exiting at D. But the problem says "Let acceptance correspond to the marble exiting at D; nonacceptance represents a marble exiting at C."
-
-This suggests that for each input symbol (A or B), we check if the output is D. So an input string is accepted if every marble ends up at D.
-
-Actually, re-reading: perhaps a single "marble" process is modeled, and we accept if the marble ends at D after all transitions. The state represents the lever configuration, and we transition based on input (which marble path).
-
-Let me model it differently:
-
-- States represent lever configurations
-- Inputs are {A, B}
-- Output depends on the current state and input
-- Accepting states are those where the last input led to the marble exiting at D... but that's still confusing.
-
-**Alternative interpretation:** Model it as a transducer or simply define certain states as "good" states based on the physics. Or define that an input sequence is accepted if the toy can process it and end in a state that represents "accepting."
-
-Actually, I think the simplest interpretation is:
-
-- For each input (A or B), we transition to a new state.
-- The "acceptance" of the marble (exiting at D) is encoded in the state transition itself.
-- A state is accepting if the most recent marble exit was at D.
-
-But that's complicated. Let me use a simpler model:
-
-**Simplified FSA model:**
-
-- States: The configurations of the three levers
-- Inputs: A or B
-- Output from a transition: Whether the marble exits at C or D
-- Accepting states: States that represent "the marble just exited at D"
-
-Actually, I'll model it differently. Let me make the accepting states those configurations where, if a marble enters, it exits at D.
-
-But the lever states change... Let me try a different approach.
-
-**Actual FSA Model:**
-
-States: Configurations of levers after processing. We label states as either "last output C" or "last output D."
-
-To simplify, let's have:
-
-- 8 states for lever configurations: $(X_1, X_2, X_3) \in \{L, R\}^3$
-- Initial state: $(L, L, L)$
-- No inherent accepting states; instead, we define that the FSA accepts if the output from processing all inputs is D.
-
-But for a standard FSA, we need explicit accepting states. Let's redefine:
-
-**Revised approach:**
-
-- States are 9: one initial state (before any marble), and 8 states after processing one marble, labeled by lever config and last output
-- Actually, the lever config already encodes the history of marbles processed.
-
-Let me just compute the state transitions and say a state is "accepting" if the levers are in a configuration where the next marble entering from either input would exit at D.
-
-Actually, the simplest: a state is accepting if, when we read input, the marble exits at D. But we need to decide which marble we're tracking.
-
-Let me use this interpretation:
-
-- States represent lever configurations
-- Reading an input (A or B) transitions to a new state
-- A state is accepting if, when we finish reading the input, the marble exited at D
-
-So for transitions:
-
-- Inputs A and B
-- States are the 8 configurations
-- Accepting states are those where the last input led to D exit
-
-Let me redefine:
-
-- States: The 8 lever configurations
-- Initial state: Suppose all L: $(L, L, L)$
-- For each state and input, determine the new state and output.
-- Accepting states: Those states that we reach when the output is D.
-
-With this interpretation, from state $(L, L, L)$ and input A:
-
-- Marble hits X1 (L position), exits at C. X1 flips to R.
-- New state: $(R, L, L)$. Output: C, so $(R, L, L)$ is non-accepting.
-
-From state $(L, L, L)$ and input B:
-
-- Marble hits X3 (L position), goes left to X2. X3 flips to R.
-- At X2 (L position), exits at C. X2 flips to R.
-- New state: $(L, R, R)$. Output: C, so $(L, R, R)$ is non-accepting.
-
-From state $(R, L, L)$ and input A:
-
-- Marble hits X1 (R position), goes right to X2. X1 flips to L.
-- At X2 (L position), exits at C. X2 flips to R.
-- New state: $(L, R, L)$. Output: C, non-accepting.
-
-From state $(R, L, L)$ and input B:
-
-- Marble hits X3 (L position), goes left to X2. X3 flips to R.
-- At X2 (L position), exits at C. X2 flips to R.
-- New state: $(R, R, R)$. Output: C, non-accepting.
-
-Hmm, lots of non-accepting. Let me recompute:
-
-From state $(R, R, L)$ and input A:
-
-- X1 is R, so marble goes right to X2. X1 flips to L.
-- X2 is R, so marble goes right to D. X2 flips to L.
-- New state: $(L, L, L)$. Output: D, accepting!
-
-So $(L, L, L)$ is reached from $(R, R, L)$ with input A, and the output is D.
-
-Let me compute all transitions and identify accepting states:
-
-From $(L, L, L)$:
-
-- A: X1 L → C. $(R, L, L)$ non-accepting.
-- B: X3 L → X2 L → C. $(L, R, R)$ non-accepting.
-
-From $(R, L, L)$:
-
-- A: X1 R → X2 L → C. $(L, R, L)$ non-accepting.
-- B: X3 L → X2 L → C. $(R, R, R)$ non-accepting.
-
-From $(L, R, L)$:
-
-- A: X1 L → C. $(R, R, L)$ non-accepting.
-- B: X3 L → X2 R → D. $(L, L, R)$ accepting.
-
-From $(R, R, L)$:
-
-- A: X1 R → X2 R → D. $(L, L, L)$ accepting.
-- B: X3 L → X2 R → D. $(R, L, R)$ accepting.
-
-From $(L, L, R)$:
-
-- A: X1 L → C. $(R, L, R)$ non-accepting.
-- B: X3 R → D. $(L, L, L)$ accepting.
-
-From $(R, L, R)$:
-
-- A: X1 R → X2 L → C. $(L, R, R)$ non-accepting.
-- B: X3 R → D. $(R, L, L)$ accepting.
-
-From $(L, R, R)$:
-
-- A: X1 L → C. $(R, R, R)$ non-accepting.
-- B: X3 R → D. $(L, R, L)$ accepting.
-
-From $(R, R, R)$:
-
-- A: X1 R → X2 R → D. $(L, R, R)$ accepting.
-- B: X3 R → D. $(R, R, L)$ accepting.
-
-**Accepting states:** $(L, L, L)$, $(L, L, R)$, $(R, L, R)$, $(L, R, R)$, $(R, R, R)$.
-
-Wait, that's many accepting states. Let me double-check one transition:
-
-From $(R, R, L)$ and input A:
-
-- Marble enters at A, hits X1 which is R (right position)
-- Marble goes to X2. X1 flips from R to L.
-- X2 is R (right position).
-- Marble goes to D. X2 flips from R to L.
-- New state: $(L, L, L)$. Output: D.
-- Since output is D, $(L, L, L)$ should be accepting. ✓
-
-**Step 7: Formal FSA definition**
+**Step 7: Formal FSA Definition**
 
 $$M_{\text{marble}} = (Q, \Sigma, \delta, q_0, F)$$
 
@@ -1841,7 +1675,7 @@ where:
 *   $q_0 = (L,L,L)$ (initial, but non-accepting initially)
 *   $F = \{(L,L,L), (L,L,R), (R,L,R), (L,R,R), (R,R,R)\}$
 
-**Step 8: Verify with examples**
+**Step 8: Verification with Examples**
 
 *   "A": $(L,L,L) \xrightarrow{A} (R,L,L)$ (non-accepting) → **REJECT** ✓
 *   "AB": $(L,L,L) \xrightarrow{A} (R,L,L) \xrightarrow{B} (R,R,R)$ (accepting) → **ACCEPT** ✓
