@@ -1,0 +1,3085 @@
+---
+title: "W4. C++ Type Casts, Type Identification, Deleted and Defaulted Functions, Initializing Members, Delegating Constructors, this Pointer, Constant Member Functions"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "February 11, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 The Problem with C-Style Type Casts**
+
+Before C++11, programmers used C-style casts for all type conversions. However, these casts are too generic and lack semantic clarity.
+
+###### **1.1.1 Traditional Casting Notation**
+
+C++ inherited two casting syntaxes from C:
+
+**C-style notation:**
+```cpp
+int x = (int)12.34;
+```
+
+**Functional notation:**
+```cpp
+int x = int(12.34);
+```
+
+Both of these forms are overly generic and can perform fundamentally different operations with the same syntax:
+
+```cpp
+int x = (int)12.34;         // Value conversion: modifies bits (rounding)
+
+int* px = &x;
+long a = (long)px;          // Reinterpretation: doesn't modify bits
+
+Derived* pd = new Derived();
+Base* pb = (Base*)pd;       // Upcasting: needs runtime check
+```
+
+###### **1.1.2 The Semantic Problem**
+
+The fundamental issue with traditional casts is **ambiguity of intent**. When you see `(Type)expression`, it's unclear what kind of conversion is happening:
+
+*   **Value conversion?** (e.g., `double` → `int` with data loss)
+*   **Reinterpretation?** (e.g., pointer → integer, no bit modification)
+*   **Upcasting/downcasting?** (e.g., `Derived*` → `Base*`)
+*   **Adding/removing constness?** (e.g., `const char*` → `char*`)
+
+This ambiguity makes code harder to read, maintain, and debug. You cannot easily search for specific types of casts, and the compiler cannot provide appropriate warnings.
+
+###### **1.1.3 The C++ Solution**
+
+C++ introduced **four specialized cast operators**, each with a specific purpose and clear semantics:
+
+1.  **`dynamic_cast<T>(v)`** - Safe runtime type conversion with checks
+2.  **`static_cast<T>(v)`** - Compile-time type conversion without runtime checks
+3.  **`const_cast<T>(v)`** - Add or remove const/volatile qualifiers
+4.  **`reinterpret_cast<T>(v)`** - Reinterpret bit patterns without modification
+
+Each cast operator has a distinct purpose, making code more self-documenting and allowing the compiler to catch errors.
+
+##### **1.2 Static and Dynamic Types Revisited**
+
+Before diving into cast operators, let's review an essential concept:
+
+**Static type** is the type specified in your source code - determined at compile time:
+
+```cpp
+Circle circle;
+Shape* figure = &circle;
+```
+
+Here, the **static type** of `figure` is `Shape*` (as declared).
+
+**Dynamic type** is the actual type of the object at runtime - what the pointer/reference actually points to:
+
+After the assignment above, the **dynamic type** of `figure` is `Circle*` (the actual object type).
+
+This distinction is crucial for understanding when to use `dynamic_cast` vs `static_cast`.
+
+##### **1.3 Dynamic Cast**
+
+**`dynamic_cast<T>(v)`** performs runtime-checked conversions between pointers or references in an inheritance hierarchy.
+
+###### **1.3.1 Basic Syntax and Requirements**
+
+```cpp
+dynamic_cast<T>(v)
+```
+
+**Requirements:**
+
+*   `T` must be a pointer or reference type
+*   `v` must be a pointer or reference to an object of a class type
+*   The base class must have **at least one virtual method** (this enables RTTI - Runtime Type Information)
+
+###### **1.3.2 How Dynamic Cast Works**
+
+**For pointers:** Returns `nullptr` if the cast fails (object is not of the target type).
+
+```cpp
+Base* pb = new Derived();
+Derived* pd = dynamic_cast<Derived*>(pb);
+
+if (pd != nullptr) {
+    // Cast succeeded: pb actually points to a Derived object
+    pd->derivedMethod();
+} else {
+    // Cast failed: pb doesn't point to a Derived object
+}
+```
+
+**For references:** Throws `std::bad_cast` exception if the cast fails.
+
+```cpp
+Base& rb = /* some base reference */;
+try {
+    Derived& rd = dynamic_cast<Derived&>(rb);
+    // Cast succeeded
+} catch (std::bad_cast& e) {
+    // Cast failed
+}
+```
+
+###### **1.3.3 When to Use Dynamic Cast**
+
+Use `dynamic_cast` when:
+
+*   You need to safely downcast from a base class pointer/reference to a derived class
+*   You're unsure of the actual runtime type of an object
+*   You need runtime type checking to prevent errors
+
+**Example:**
+
+```cpp
+class Base {
+public:
+    virtual void f() { }  // At least one virtual function required
+};
+
+class Derived : public Base {
+public:
+    void derivedMethod() { cout << "Derived!" << endl; }
+};
+
+Base* pb = new Derived();
+
+// C-style cast: DANGEROUS - no runtime check
+Derived* pd1 = (Derived*)pb;  // If pb doesn't point to Derived, undefined behavior!
+
+// Dynamic cast: SAFE - runtime check performed
+Derived* pd2 = dynamic_cast<Derived*>(pb);
+if (pd2 != nullptr) {
+    pd2->derivedMethod();  // Safe to call
+}
+```
+
+**Key advantage:** `dynamic_cast` performs runtime checks. If `pb` doesn't actually point to a `Derived` object, it returns `nullptr` instead of causing undefined behavior.
+
+###### **1.3.4 Performance Consideration**
+
+`dynamic_cast` has runtime overhead because it must check the object's actual type. For performance-critical code where you're certain of the type, consider `static_cast` instead (but be careful!).
+
+##### **1.4 Static Cast**
+
+**`static_cast<T>(v)`** performs compile-time conversions without runtime checks - faster but less safe than `dynamic_cast`.
+
+###### **1.4.1 Basic Syntax and Requirements**
+
+```cpp
+static_cast<T>(v)
+```
+
+**Requirements:**
+
+*   `T` can be a pointer, reference, or primitive type
+*   `v` can be a pointer, reference, or value
+*   Does **not require** virtual methods in the base class
+
+###### **1.4.2 How Static Cast Works**
+
+`static_cast` performs conversions that the compiler can verify at compile time, but without runtime safety checks:
+
+```cpp
+Base* pb = new Derived();
+
+Derived* pd1 = (Derived*)pb;             // C-style: no checks
+Derived* pd2 = static_cast<Derived*>(pb); // Same as above but more explicit
+```
+
+**The difference from `dynamic_cast`:**
+
+*   **No runtime checks** - the cast always succeeds
+*   **Faster** - no runtime overhead
+*   **Dangerous** - if `pb` doesn't actually point to `Derived`, the behavior is undefined
+
+###### **1.4.3 Common Use Cases**
+
+**1. Numeric conversions:**
+
+```cpp
+double d = 3.14;
+int i = static_cast<int>(d);  // Explicit conversion with potential data loss
+```
+
+**2. Upcasting (safe):**
+
+```cpp
+Derived* pd = new Derived();
+Base* pb = static_cast<Base*>(pd);  // Always safe (derived to base)
+```
+
+**3. Downcasting (dangerous):**
+
+```cpp
+Base* pb = /* ... */;
+Derived* pd = static_cast<Derived*>(pb);  // Only safe if you're CERTAIN pb points to Derived
+```
+
+**4. Void pointer conversions:**
+
+```cpp
+void* vp = /* ... */;
+int* ip = static_cast<int*>(vp);
+```
+
+###### **1.4.4 When to Use Static Cast**
+
+Use `static_cast` when:
+
+*   You're performing numeric conversions and want to be explicit about potential data loss
+*   You're **certain** of the dynamic type (e.g., you just created the object)
+*   Performance is critical and you can guarantee type safety
+*   You need to cast to/from void pointers
+
+**Rule of thumb:** If you're not 100% certain of the type, use `dynamic_cast` instead.
+
+##### **1.5 Const Cast**
+
+**`const_cast<T>(v)`** adds or removes const (or volatile) qualifiers. This is the **only** cast that can remove constness.
+
+###### **1.5.1 Basic Syntax**
+
+```cpp
+const_cast<T>(v)
+```
+
+*   Used to remove or add `const` or `volatile` qualifiers
+*   No actual operations are performed (compile-time construct)
+*   Does not change the bit pattern - purely a type system operation
+
+###### **1.5.2 Common Use Case: Interfacing with Legacy Code**
+
+Sometimes you need to pass a `const` object to a function that takes a non-const pointer but doesn't actually modify it:
+
+```cpp
+const char* str = "abcdef";
+
+void legacyFunction(char* s);  // Old API: doesn't modify s, but isn't marked const
+
+// Error: can't pass const char* to char*
+// legacyFunction(str);
+
+// OK: remove constness with const_cast
+legacyFunction(const_cast<char*>(str));
+```
+
+**⚠️ Warning:** This is **unsafe** if `legacyFunction` actually modifies the data:
+
+*   If the original object was truly const (like a string literal), modifying it causes undefined behavior
+*   Only use `const_cast` when you're **certain** the function won't modify the data
+
+###### **1.5.3 Safe vs. Unsafe Usage**
+
+**Safe usage:**
+
+```cpp
+const int* constPtr = /* ... */;
+void readOnly(int* p) {
+    cout << *p;  // Only reads, doesn't modify
+}
+
+// Safe if readOnly truly doesn't modify
+readOnly(const_cast<int*>(constPtr));
+```
+
+**Unsafe usage:**
+
+```cpp
+const int x = 42;
+int* px = const_cast<int*>(&x);
+*px = 100;  // UNDEFINED BEHAVIOR! x was originally const
+```
+
+###### **1.5.4 When to Use Const Cast**
+
+Use `const_cast` when:
+
+*   Interfacing with legacy C APIs that don't use const correctly
+*   You have a const object but need to call a non-const method that you know doesn't modify state
+*   You're implementing const-correctness incrementally in a large codebase
+
+**Best practice:** Avoid `const_cast` when possible. If you control the code, fix the function signature to be const-correct instead.
+
+##### **1.6 Reinterpret Cast**
+
+**`reinterpret_cast<T>(v)`** reinterprets the bit pattern of an object without modifying it - the most dangerous cast.
+
+###### **1.6.1 Basic Syntax and Purpose**
+
+```cpp
+reinterpret_cast<T>(v)
+```
+
+*   **Changes interpretation** of the binary representation
+*   **No actual operations** are performed (no bit modification)
+*   **No runtime checks** are performed
+*   Allows you to treat a value as if it were a completely different type
+
+###### **1.6.2 Common Use Cases**
+
+**1. Storing pointers as integers:**
+
+```cpp
+int x = 777;
+int* p = &x;
+
+// Convert pointer to integer (e.g., for hashing or low-level debugging)
+long internal = reinterpret_cast<long>(p);
+
+// Convert back to pointer
+int* back = reinterpret_cast<int*>(internal);
+```
+
+**2. Type-punning (viewing same memory as different types):**
+
+```cpp
+unsigned int bits = 0x41200000;  // Bit pattern
+float* f = reinterpret_cast<float*>(&bits);
+// Now *f interprets those bits as a float
+```
+
+**3. Converting between incompatible pointer types:**
+
+```cpp
+unsigned* px = /* ... */;
+int* py = reinterpret_cast<int*>(px);  // OK with reinterpret_cast
+```
+
+Without `reinterpret_cast`, this would be an error:
+
+```cpp
+unsigned* px = /* ... */;
+int* py = px;  // ERROR: incompatible types
+```
+
+###### **1.6.3 Dangers and Warnings**
+
+`reinterpret_cast` is **extremely dangerous**:
+
+*   Bypasses type safety completely
+*   Can cause undefined behavior if the reinterpretation is invalid
+*   Platform-dependent (pointer sizes, endianness, alignment)
+
+**Example of danger:**
+
+```cpp
+unsigned x = 777;
+unsigned* px = &x;
+
+int y = 999;
+int* py = &y;
+
+py = reinterpret_cast<int*>(px);  // "OK" syntax-wise
+*py = -1;  // Undefined behavior! Writing signed value to unsigned memory
+```
+
+###### **1.6.4 When to Use Reinterpret Cast**
+
+Use `reinterpret_cast` **only** when:
+
+*   Interfacing with low-level system APIs
+*   Implementing custom memory allocators
+*   Working with hardware registers or memory-mapped I/O
+*   Serialization/deserialization requiring raw memory access
+
+**For most application-level code, you should never need `reinterpret_cast`.**
+
+##### **1.7 Type Identification with typeid**
+
+The **`typeid`** operator allows you to identify types at runtime, complementing `dynamic_cast` for RTTI (Run-Time Type Information).
+
+###### **1.7.1 Basic Syntax**
+
+```cpp
+typeid(expression)   // Type of an expression
+typeid(type)         // Type itself
+```
+
+The `typeid` operator returns a reference to a `std::type_info` object containing information about the type.
+
+**Similarity to `sizeof`:**
+
+Just as `sizeof` can work with both types and expressions:
+```cpp
+sizeof(int)      // Size of type
+sizeof(x)        // Size of expression's type
+```
+
+`typeid` works the same way:
+```cpp
+typeid(int)      // Type info for int
+typeid(x)        // Type info for x's type
+```
+
+###### **1.7.2 The type_info Class**
+
+From ISO C++ Standard, Section 17.7.3:
+
+```cpp
+namespace std {
+    class type_info {
+    public:
+        virtual ~type_info();
+        bool operator==(const type_info& rhs) const noexcept;
+        bool before(const type_info& rhs) const noexcept;
+        size_t hash_code() const noexcept;
+        const char* name() const noexcept;
+
+        type_info(const type_info&) = delete;            // Cannot be copied
+        type_info& operator=(const type_info&) = delete; // Cannot be copied
+    };
+}
+```
+
+**Key operations:**
+
+1.  **Get the type name:** `name()` returns a string representation
+2.  **Compare types:** `operator==` checks if two types are the same
+3.  **Hash the type:** `hash_code()` for use in hash tables
+
+**Note:** Nobody really knows what `before()` means (it's implementation-defined), so it's rarely used.
+
+###### **1.7.3 Using typeid**
+
+**Checking dynamic types:**
+
+```cpp
+Base* pb = new Derived();
+
+const std::type_info& info = typeid(*pb);  // Dynamic type (Derived)
+cout << "Type: " << info.name() << endl;
+```
+
+**Comparing types:**
+
+```cpp
+Base* pb = new Derived();
+
+if (typeid(*pb) == typeid(Derived)) {
+    cout << "pb points to a Derived object" << endl;
+}
+
+if (typeid(*pb) == typeid(Base)) {
+    cout << "pb points to a Base object" << endl;  // Won't print
+}
+```
+
+**Important distinction:**
+
+```cpp
+Base* pb = new Derived();
+
+typeid(pb)   // Type: Base* (static type of the pointer)
+typeid(*pb)  // Type: Derived (dynamic type of the object)
+```
+
+###### **1.7.4 When to Use typeid**
+
+Use `typeid` when:
+
+*   You need to know the actual runtime type of an object
+*   Implementing custom serialization/reflection systems
+*   Debugging (printing type information)
+*   Implementing type-based dispatch without dynamic_cast
+
+**However:** Overusing `typeid` can indicate poor OOP design. Prefer polymorphism (virtual functions) over explicit type checking.
+
+###### **1.7.5 Comparison: typeid vs dynamic_cast**
+
+| Feature | `typeid` | `dynamic_cast` |
+|---------|----------|----------------|
+| Purpose | Identify type | Convert type |
+| Returns | `type_info` reference | Pointer/reference or nullptr |
+| Use case | Type checking | Safe downcasting |
+| Performance | Fast | Slower (traverses inheritance) |
+
+Often you can use either:
+
+```cpp
+// Using typeid
+if (typeid(*pb) == typeid(Derived)) {
+    Derived* pd = static_cast<Derived*>(pb);
+    pd->derivedMethod();
+}
+
+// Using dynamic_cast (preferred)
+if (Derived* pd = dynamic_cast<Derived*>(pb)) {
+    pd->derivedMethod();
+}
+```
+
+The `dynamic_cast` approach is generally preferred as it's more idiomatic C++.
+
+##### **1.8 Deleted and Defaulted Functions**
+
+C++11 introduced explicit control over special member functions using `= default` and `= delete` specifiers.
+
+###### **1.8.1 The Problem: Automatic Generation Rules**
+
+The compiler can automatically generate certain special member functions:
+
+```cpp
+class T {
+    // Compiler may generate:
+    T();                        // Default constructor
+    T(const T&);                // Copy constructor
+    T(T&&);                     // Move constructor
+    virtual ~T();               // Destructor
+    T& operator=(const T&);     // Copy assignment
+    T&& operator=(T&&);         // Move assignment
+};
+```
+
+**However,** the rules for when these are generated are **extremely complicated**:
+
+*   If you define any constructor, the default constructor is not generated
+*   If you define a move constructor, copy operations are deleted
+*   If you define a destructor, copy assignment generation is "not recommended"
+*   Many other complex rules...
+
+**The problem:** These rules are hard to remember and can lead to subtle bugs.
+
+###### **1.8.2 Motivation: Non-Copyable Objects**
+
+A common idiom is creating objects that cannot be copied:
+
+**Old approach (before C++11):**
+
+```cpp
+class NonCopyable {
+public:
+    NonCopyable() { }
+private:
+    // Declare but don't define - causes linker error if called
+    NonCopyable(const NonCopyable&);
+    NonCopyable& operator=(const NonCopyable&);
+};
+```
+
+**Problems with this approach:**
+
+*   **Intent unclear:** Why are these private? To prevent copying or for another reason?
+*   **Linker errors:** If a friend function tries to copy, you get a linker error (not compile error)
+*   **Must define default constructor:** Because defining any constructor suppresses default generation
+
+###### **1.8.3 The Solution: = delete**
+
+**Modern approach with `= delete`:**
+
+```cpp
+class NonCopyable {
+public:
+    NonCopyable() = default;                              // Generate default constructor
+    NonCopyable(const NonCopyable&) = delete;             // Delete copy constructor
+    NonCopyable& operator=(const NonCopyable&) = delete;  // Delete copy assignment
+};
+```
+
+**Advantages:**
+
+*   **Clear intent:** Explicitly states these operations are forbidden
+*   **Compile-time errors:** Attempting to copy gives immediate compile error
+*   **No need for empty constructor body:** `= default` generates it automatically
+*   **Works for any function:** Not just special members
+
+###### **1.8.4 Using = default**
+
+**Example 1: Forcing default constructor generation**
+
+```cpp
+class A {
+public:
+    A(int x) { }  // Defining this suppresses default constructor
+};
+
+A a;  // ERROR: no default constructor
+```
+
+**Solution:**
+
+```cpp
+class A {
+public:
+    A(int x) { }
+    A() = default;  // Force generation of default constructor
+};
+
+A a;  // OK now
+```
+
+**Example 2: Explicit about generated functions**
+
+Even when the compiler would generate a function, explicitly defaulting it makes intent clear:
+
+```cpp
+class C {
+public:
+    C() = default;                        // Explicit: this class is default-constructible
+    C(const C&) = default;                // Explicit: this class is copyable
+    C& operator=(const C&) = default;     // Explicit: this class is copy-assignable
+    ~C() = default;                       // Explicit: destructor is not virtual
+};
+```
+
+###### **1.8.5 Using = delete for More Than Special Members**
+
+**Preventing heap allocation:**
+
+```cpp
+class StackOnly {
+public:
+    void* operator new(size_t) = delete;  // Prevent heap allocation
+};
+
+StackOnly* ps = new StackOnly();  // ERROR: operator new is deleted
+StackOnly s;                       // OK: stack allocation
+```
+
+**Preventing unwanted conversions:**
+
+```cpp
+void foo(double x) { /* ... */ }
+
+foo(3.14);  // OK: double literal
+foo(3);     // OK: int converts to double
+foo(true);  // OK: bool converts to double (unintended!)
+```
+
+To allow only `double`:
+
+```cpp
+void foo(double x) { /* ... */ }
+void foo(int) = delete;      // Block int
+void foo(bool) = delete;     // Block bool
+
+foo(3.14);  // OK
+foo(3);     // ERROR: deleted function
+foo(true);  // ERROR: deleted function
+```
+
+**Even more restrictive - allow ONLY double:**
+
+```cpp
+template<typename T>
+void foo(T) = delete;  // Delete ALL other types
+
+void foo(double x) { /* ... */ }  // Only this overload allowed
+
+foo(3.14);   // OK: exact match for double
+foo(3);      // ERROR: would instantiate deleted template
+foo(2.71F);  // ERROR: float would instantiate deleted template
+```
+
+###### **1.8.6 Best Practices**
+
+1.  **Be explicit:** Use `= default` and `= delete` to clearly state intent
+2.  **Don't rely on automatic generation rules:** They're too complex
+3.  **Use for any function:** Not just special members
+4.  **Prefer compile-time errors:** `= delete` gives better error messages than private declarations
+
+##### **1.9 Initializing Bases and Members**
+
+When creating derived class objects, you must properly initialize both the base class subobject and the derived class members.
+
+###### **1.9.1 The Constructor Execution Order**
+
+When a derived class object is created, constructors execute in this order:
+
+1.  **Base class constructor** (initializes base subobject)
+2.  **Member initializers** (in declaration order)
+3.  **Derived class constructor body**
+
+```cpp
+class Base {
+    int m;
+public:
+    Base() { m = 0; }
+    Base(int i) { m = i; }
+};
+
+class Derived : public Base {
+    int md;
+public:
+    Derived() { md = 7; }
+};
+
+Derived d;  // What happens?
+```
+
+**Question:** Which `Base` constructor is called?
+
+###### **1.9.2 The Problem**
+
+The base class might have multiple constructors. How do you specify which one to use?
+
+```cpp
+class Derived : public Base {
+public:
+    Derived() { md = 7; }  // Which Base constructor is called?
+    int md;
+};
+```
+
+**Default behavior:** If you don't specify, the base class **default constructor** is called. But what if there is no default constructor, or you want to call a different one?
+
+###### **1.9.3 Constructor Initializer Lists (Ctor-initializer)**
+
+The **constructor initializer list** (also called **member initializer list**) specifies which base constructor to call and how to initialize members:
+
+```cpp
+class Derived : public Base {
+public:
+    Derived() : Base(1), md(7) { }
+    //          ^^^^^^^^  ^^^^^
+    //          |         Member initializer
+    //          Base class initializer
+    int md;
+};
+```
+
+**Syntax:**
+
+```cpp
+DerivedConstructor(parameters) : BaseClass(args), member1(value1), member2(value2) {
+    // Constructor body
+}
+```
+
+###### **1.9.4 Initializing Base Classes**
+
+**Basic example:**
+
+```cpp
+class Base {
+public:
+    Base() { m = 0; }
+    Base(int i) { m = i; }
+    int m;
+};
+
+class Derived : public Base {
+public:
+    Derived() : Base(1) { md = 7; }  // Call Base(int) constructor
+    int md;
+};
+
+Derived d;  // Calls Base(1), then initializes md = 7
+```
+
+**Multiple parameters:**
+
+```cpp
+class Base {
+public:
+    Base(int x, int y) { /* ... */ }
+};
+
+class Derived : public Base {
+public:
+    Derived() : Base(10, 20) { /* ... */ }
+};
+```
+
+###### **1.9.5 Initializing Data Members**
+
+You can (and should) initialize members in the initializer list:
+
+```cpp
+class C {
+    int m1;
+    int m2;
+    T m3;  // Some class type
+public:
+    C() : m1(5), m2(10), m3(15) { }  // Member initialization
+};
+```
+
+**Why use initializer lists for members?**
+
+1.  **More efficient:** Members are directly initialized (not default-constructed then assigned)
+2.  **Required for:** Const members, reference members, members without default constructors
+3.  **Clearer:** Separates initialization from other logic
+
+###### **1.9.6 Initialization vs. Assignment**
+
+**Method 1: Assignment in body (less efficient)**
+
+```cpp
+class C {
+    int md;
+    T md2;  // Some class type
+public:
+    C() {
+        md = 7;      // Assignment (for primitive types, OK)
+        md2 = T(5);  // Default-construction, then assignment (inefficient)
+    }
+};
+```
+
+**Method 2: Initialization in list (preferred)**
+
+```cpp
+class C {
+    int md;
+    T md2;
+public:
+    C() : md(7), md2(5) {  // Direct initialization
+    }
+};
+```
+
+For class types, Method 1 performs two operations:
+
+1.  Default-construct `md2`
+2.  Assign `T(5)` to `md2`
+
+Method 2 performs one operation:
+
+1.  Directly construct `md2` with value 5
+
+###### **1.9.7 Required Initialization Cases**
+
+**Const members:**
+
+```cpp
+class C {
+    const T md2;
+public:
+    C() { md2 = expression; }  // ERROR: cannot assign to const
+    C() : md2(expression) { }  // OK: initialization
+};
+```
+
+**Reference members:**
+
+```cpp
+class C {
+    int& ref;
+public:
+    C(int& r) : ref(r) { }  // Must use initializer list
+};
+```
+
+**Members without default constructors:**
+
+```cpp
+class NoDefault {
+public:
+    NoDefault(int x) { }  // No default constructor
+};
+
+class C {
+    NoDefault nd;
+public:
+    C() : nd(42) { }  // Must initialize in list
+};
+```
+
+##### **1.10 Delegating Constructors**
+
+**Delegating constructors** (C++11) allow one constructor to call another constructor of the same class, reducing code duplication.
+
+###### **1.10.1 The Problem: Code Duplication**
+
+Often, multiple constructors perform common initialization:
+
+```cpp
+class C {
+    int x, y;
+public:
+    C() {
+        // Common initialization
+        x = 0;
+        y = 0;
+        // Specific logic
+    }
+
+    C(int val) {
+        // Common initialization (duplicated!)
+        x = 0;
+        y = 0;
+        // Specific logic
+        x = val;
+    }
+};
+```
+
+**Old solution:** Extract common code to a private method:
+
+```cpp
+class C {
+    int x, y;
+private:
+    void init() {  // Common initialization
+        x = 0;
+        y = 0;
+    }
+public:
+    C() {
+        init();
+        // Specific actions
+    }
+
+    C(int val) {
+        init();
+        // Specific actions
+        x = val;
+    }
+};
+```
+
+###### **1.10.2 The Modern Solution: Delegating Constructors**
+
+Instead of a separate `init()` method, one constructor can delegate to another:
+
+```cpp
+class C {
+    int x, y;
+public:
+    C() {  // Target constructor
+        x = 0;
+        y = 0;
+    }
+
+    C(int val) : C() {  // Delegating constructor
+        x = val;  // Specific actions
+    }
+};
+```
+
+**Syntax:** In the initializer list, call another constructor: `ConstructorName(args)`
+
+###### **1.10.3 Execution Order**
+
+When a delegating constructor is called:
+
+1.  The **target constructor** executes completely (including its body)
+2.  Then the **delegating constructor's body** executes
+
+```cpp
+class C {
+public:
+    C() {
+        cout << "Common initialization" << endl;
+    }
+
+    C(int x) : C() {
+        cout << "Specific initialization" << endl;
+    }
+};
+
+C c(42);
+// Output:
+// Common initialization
+// Specific initialization
+```
+
+###### **1.10.4 Terminology**
+
+```cpp
+class C {
+public:
+    C(int) { }        // Target constructor
+    C() : C(42) { }   // Delegating constructor
+};
+```
+
+*   **Target constructor:** The constructor being called
+*   **Delegating constructor:** The constructor that delegates to another
+*   **Primary constructor:** A common design pattern where one constructor does the main initialization, and others delegate to it
+
+###### **1.10.5 Rules and Restrictions**
+
+**Cannot mix delegation with member initialization:**
+
+```cpp
+class C {
+    int x;
+public:
+    C(int val) : x(val) { }
+    C() : C(0), x(10) { }  // ERROR: cannot delegate and initialize members
+};
+```
+
+**Cannot create circular delegation:**
+
+```cpp
+class C {
+public:
+    C(int) { }
+    C(): C(42) { }         // Delegates to C(int)
+    C(char c): C(42.0) { } // ERROR: circular delegation
+    C(double d): C('a') { } // ERROR: circular delegation
+};
+```
+
+**Delegation must be exclusive:**
+
+If you delegate, you cannot also:
+*   Initialize base classes
+*   Initialize members
+*   Call other constructors
+
+###### **1.10.6 Benefits**
+
+1.  **Reduce duplication:** Common initialization code in one place
+2.  **Better maintainability:** Changes to common initialization only needed once
+3.  **Clearer intent:** Explicit that one constructor builds on another
+
+##### **1.11 The this Pointer**
+
+Inside member functions, the special pointer **`this`** points to the object on which the member function was called.
+
+###### **1.11.1 What is this?**
+
+**`this`** is an implicit parameter available in all non-static member functions:
+
+```cpp
+class C {
+    int member;
+public:
+    void f(int i) {
+        member = i;        // Implicitly: this->member = i
+        this->member = i;  // Explicitly using this
+    }
+};
+```
+
+By definition, these are equivalent:
+```cpp
+member = i;
+this->member = i;
+```
+
+###### **1.11.2 Why this is Needed**
+
+**1. Disambiguating names:**
+
+When a parameter has the same name as a member:
+
+```cpp
+class Point {
+    double x, y;
+public:
+    void setX(double x) {
+        this->x = x;  // this->x is the member, x is the parameter
+    }
+};
+```
+
+**2. Returning the object itself:**
+
+Useful for method chaining:
+
+```cpp
+class Builder {
+public:
+    Builder& setWidth(int w) {
+        width = w;
+        return *this;  // Return reference to current object
+    }
+
+    Builder& setHeight(int h) {
+        height = h;
+        return *this;
+    }
+private:
+    int width, height;
+};
+
+Builder b;
+b.setWidth(10).setHeight(20);  // Method chaining
+```
+
+**3. Passing the object to other functions:**
+
+```cpp
+void externalFunction(C* obj);
+
+class C {
+public:
+    void f() {
+        externalFunction(this);  // Pass pointer to current object
+    }
+};
+```
+
+**4. Checking for self-assignment:**
+
+```cpp
+class C {
+public:
+    C& operator=(const C& other) {
+        if (this != &other) {  // Check if assigning to self
+            // Perform assignment
+        }
+        return *this;
+    }
+};
+```
+
+###### **1.11.3 Type of this**
+
+For a class `C`:
+
+*   In a non-const member function: `this` has type `C* const` (constant pointer to C)
+*   In a const member function: `this` has type `const C* const` (constant pointer to const C)
+
+**Why `this` is a constant pointer:**
+
+```cpp
+C* const this;  // Implicit declaration
+```
+
+This prevents you from changing what `this` points to:
+
+```cpp
+class C {
+public:
+    void bad() {
+        this = &other;  // ERROR: cannot modify this
+    }
+};
+```
+
+###### **1.11.4 How Member Functions Actually Work**
+
+Member functions receive `this` as a **hidden first parameter**:
+
+```cpp
+class C {
+public:
+    int m;
+    void f(int i) { m = 7; }
+};
+```
+
+The compiler transforms this to something like:
+
+```cpp
+void f(C* this, int i) {  // Hidden 'this' parameter
+    this->m = 7;
+}
+```
+
+When you call a member function:
+
+```cpp
+C c;
+c.f(1);    // Becomes: f(&c, 1)
+
+C* p = new C();
+p->f(1);   // Becomes: f(p, 1)
+```
+
+The compiler automatically passes the address of the object as the first argument.
+
+###### **1.11.5 Static Member Functions**
+
+**Static member functions** do not have a `this` pointer because they don't belong to any instance:
+
+```cpp
+class C {
+    int member;
+    static int sMember;
+public:
+    static void f() {
+        member = 5;   // ERROR: no 'this' pointer
+        sMember = 7;  // OK: static member
+    }
+};
+```
+
+##### **1.12 Constant Member Functions**
+
+**Constant member functions** promise not to modify the object's state - they treat `this` as a pointer to const.
+
+###### **1.12.1 The const Qualifier**
+
+Add `const` after the parameter list to declare a const member function:
+
+```cpp
+class C {
+    int member;
+public:
+    void f1() {            // Non-const member function
+        member = 5;        // OK: can modify
+    }
+
+    void f2() const {      // Const member function
+        member = 5;        // ERROR: cannot modify
+        int x = member;    // OK: can read
+    }
+};
+```
+
+###### **1.12.2 The Type of this in Const Member Functions**
+
+**Regular member function:**
+```cpp
+void f() {
+    // this has type: C* const
+    // Can modify object through this
+}
+```
+
+**Const member function:**
+```cpp
+void f() const {
+    // this has type: const C* const
+    // Cannot modify object through this
+}
+```
+
+The const qualifier changes `this` from a pointer-to-modifiable to a pointer-to-const.
+
+###### **1.12.3 When Const Member Functions Are Required**
+
+Const member functions can be called on const objects; non-const functions cannot:
+
+```cpp
+class C {
+public:
+    void f1() { }
+    void f2() const { }
+};
+
+C c1;
+c1.f1();  // OK
+c1.f2();  // OK
+
+const C c2;
+c2.f1();  // ERROR: f1 can modify c2
+c2.f2();  // OK: f2 cannot modify c2
+```
+
+**Why this matters:** When you pass objects by const reference (a common pattern for efficiency), you can only call const member functions:
+
+```cpp
+void process(const C& obj) {
+    obj.f1();  // ERROR: f1 is not const
+    obj.f2();  // OK: f2 is const
+}
+```
+
+###### **1.12.4 Best Practice: Mark Methods const When Possible**
+
+If a member function doesn't modify the object's state, mark it const:
+
+```cpp
+class Point {
+    double x, y;
+public:
+    double getX() const { return x; }  // Doesn't modify, should be const
+    double getY() const { return y; }
+
+    void setX(double newX) { x = newX; }  // Modifies, cannot be const
+};
+```
+
+**Benefits:**
+
+1.  **Documents intent:** Clearly states the function doesn't modify state
+2.  **Enables use with const objects:** Function can be called on const objects
+3.  **Better compiler optimization:** Compiler knows the object won't change
+4.  **Interface flexibility:** Makes your class more usable in const contexts
+
+###### **1.12.5 Const Overloading**
+
+You can have two versions of the same function - one const, one non-const:
+
+```cpp
+class C {
+    int* data;
+public:
+    // Non-const version
+    int* getData() {
+        return data;  // Returns modifiable pointer
+    }
+
+    // Const version
+    const int* getData() const {
+        return data;  // Returns const pointer
+    }
+};
+
+C c1;
+int* p1 = c1.getData();  // Calls non-const version
+
+const C c2;
+const int* p2 = c2.getData();  // Calls const version
+```
+
+The compiler chooses based on whether the object is const.
+
+##### **1.13 Function Declaration vs. Definition**
+
+Understanding the distinction between declaration and definition is crucial for organizing C++ code into header and source files.
+
+###### **1.13.1 Declarations and Definitions**
+
+**Declaration:** Introduces a name and its type to the compiler.
+
+**Definition:** Provides the complete implementation.
+
+**For functions:**
+
+```cpp
+int f(int x);           // Declaration (function prototype)
+int f(int x) { ... }    // Definition (includes body)
+```
+
+**For classes:**
+
+```cpp
+class C;                // Declaration (forward declaration)
+class C { ... };        // Definition (complete class)
+```
+
+###### **1.13.2 Header and Source Files**
+
+C++ projects typically separate declarations and definitions:
+
+**Header file (Library.h):**
+```cpp
+// Declarations only
+int f(int x);
+
+class C {
+    int member;
+public:
+    void method(int x);  // Declaration
+};
+```
+
+**Source file (Library.cpp):**
+```cpp
+#include "Library.h"
+
+// Definitions
+int f(int x) {
+    return x * 2;
+}
+
+void C::method(int x) {  // Note: C::method syntax
+    member = x;
+}
+```
+
+**User code (main.cpp):**
+```cpp
+#include "Library.h"
+
+int main() {
+    f(42);
+
+    C obj;
+    obj.method(10);
+}
+```
+
+###### **1.13.3 Member Function Definitions Outside Class**
+
+When defining member functions outside the class, use the **scope resolution operator**:
+
+```cpp
+// In header
+class C {
+public:
+    void f(int x);  // Declaration
+};
+
+// In source file
+void C::f(int x) {  // C::f specifies this is a member of C
+    // Implementation
+}
+```
+
+**The `::` tells the compiler:**
+
+"This `f` is not a free function; it's the `f` that belongs to class `C`."
+
+###### **1.13.4 Why Separate Declaration and Definition?**
+
+**1. Compilation independence:**
+
+*   Header contains the interface
+*   Multiple source files can include the same header
+*   Source files compile independently
+*   Only recompile files that changed
+
+**2. Encapsulation:**
+
+*   Users see only the interface (header)
+*   Implementation details hidden in source file
+*   Can change implementation without affecting users
+
+**3. Reduced dependencies:**
+
+*   Headers are small, compile quickly
+*   Large implementations don't slow down every compilation
+
+#### **2. Definitions**
+
+*   **C-style cast**: Traditional C casting syntax `(Type)expression` or `Type(expression)` that performs any type conversion without clear semantic distinction.
+*   **Dynamic cast**: `dynamic_cast<T>(v)` - performs runtime-checked conversions in inheritance hierarchies, returning nullptr (for pointers) or throwing an exception (for references) if the cast fails.
+*   **Static cast**: `static_cast<T>(v)` - performs compile-time conversions without runtime checks, faster but potentially unsafe if the type is incorrect.
+*   **Const cast**: `const_cast<T>(v)` - adds or removes const/volatile qualifiers; the only cast that can remove constness.
+*   **Reinterpret cast**: `reinterpret_cast<T>(v)` - reinterprets the bit pattern of an object as a different type without modifying bits; the most dangerous cast.
+*   **Static type**: The type specified in source code, determined at compile time (e.g., `Shape*` for a `Shape*` pointer).
+*   **Dynamic type**: The actual type of the object at runtime (e.g., `Circle` when a `Shape*` points to a `Circle` object).
+*   **Type identification**: The process of determining an object's type at runtime using `typeid`.
+*   **`typeid` operator**: Returns a reference to a `std::type_info` object containing runtime type information about an expression or type.
+*   **`std::type_info`**: Standard library class containing runtime type information; supports comparison and provides type name.
+*   **RTTI (Runtime Type Information)**: Compiler-generated information about object types, required for `dynamic_cast` and `typeid` to work; requires at least one virtual function.
+*   **`= default`**: Specifier that explicitly requests compiler generation of a special member function with default behavior.
+*   **`= delete`**: Specifier that explicitly prohibits use of a function, generating compile-time errors if called.
+*   **Automatic generation**: Compiler's implicit creation of special member functions (default constructor, copy constructor, move constructor, destructor, copy/move assignment) under certain conditions.
+*   **Constructor initializer list**: Syntax after constructor parameters (`: base(args), member(value)`) for initializing base classes and members before the constructor body executes.
+*   **Member initialization list**: The portion of a constructor initializer list that initializes data members.
+*   **Base class initialization**: Specification in a constructor initializer list of which base class constructor to call.
+*   **Delegating constructor**: A constructor that calls another constructor of the same class in its initializer list to reuse initialization logic.
+*   **Target constructor**: The constructor being called by a delegating constructor.
+*   **`this` pointer**: Implicit pointer available in non-static member functions that points to the object on which the member function was called; type is `C* const` or `const C* const`.
+*   **Constant member function**: Member function declared with `const` qualifier that promises not to modify the object's state; `this` becomes pointer-to-const.
+*   **Const overloading**: Having two versions of a member function, one const and one non-const, with the compiler selecting based on object's constness.
+*   **Function declaration**: Introduction of a function's name and signature without providing implementation.
+*   **Function definition**: Complete specification of a function including its body/implementation.
+*   **Scope resolution operator (`::`)**: Operator used to specify class membership for out-of-class member function definitions (`ClassName::functionName`).
+*   **Header file**: File (typically `.h` or `.hpp`) containing declarations (interfaces) that multiple source files can include.
+*   **Source file**: File (typically `.cpp`) containing definitions (implementations) of functions and member functions.
+*   **Forward declaration**: Declaration of a class name without full definition (`class ClassName;`), allowing pointers/references before complete definition.
+
+#### **3. Examples**
+
+##### **4.1. Implementing a Non-Copyable Class** (Lecture 4, Example)
+
+Create a class that can be instantiated but cannot be copied, demonstrating proper use of `= default` and `= delete`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use `= delete` to explicitly prevent copying, and `= default` to explicitly request compiler-generated functions.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class UniqueResource {
+private:
+    int* data;
+    int id;
+    static int nextId;
+
+public:
+    // Default constructor - explicitly defaulted
+    UniqueResource() = default;
+
+    // Parameterized constructor
+    UniqueResource(int value) : data(new int(value)), id(nextId++) {
+        cout << "Resource " << id << " created with value " << value << endl;
+    }
+
+    // Copy constructor - explicitly deleted
+    UniqueResource(const UniqueResource&) = delete;
+
+    // Copy assignment - explicitly deleted
+    UniqueResource& operator=(const UniqueResource&) = delete;
+
+    // Move constructor - can still move unique resources
+    UniqueResource(UniqueResource&& other) noexcept
+        : data(other.data), id(other.id) {
+        other.data = nullptr;
+        cout << "Resource " << id << " moved" << endl;
+    }
+
+    // Move assignment
+    UniqueResource& operator=(UniqueResource&& other) noexcept {
+        if (this != &other) {
+            delete data;
+            data = other.data;
+            id = other.id;
+            other.data = nullptr;
+            cout << "Resource " << id << " move-assigned" << endl;
+        }
+        return *this;
+    }
+
+    // Destructor
+    ~UniqueResource() {
+        if (data != nullptr) {
+            cout << "Resource " << id << " destroyed" << endl;
+            delete data;
+        } else {
+            cout << "Resource " << id << " (moved-from) destroyed" << endl;
+        }
+    }
+
+    void print() const {
+        if (data != nullptr) {
+            cout << "Resource " << id << ": " << *data << endl;
+        } else {
+            cout << "Resource " << id << ": (moved-from state)" << endl;
+        }
+    }
+};
+
+int UniqueResource::nextId = 1;
+
+int main() {
+    cout << "=== Creating resources ===" << endl;
+    UniqueResource r1(42);
+    UniqueResource r2(100);
+
+    cout << "\n=== Printing resources ===" << endl;
+    r1.print();
+    r2.print();
+
+    // Copy operations are deleted
+    // UniqueResource r3 = r1;  // ERROR: copy constructor deleted
+    // r2 = r1;                  // ERROR: copy assignment deleted
+
+    cout << "\n=== Moving resource ===" << endl;
+    UniqueResource r3 = std::move(r1);  // OK: move constructor
+
+    cout << "\n=== After move ===" << endl;
+    r1.print();  // r1 is in moved-from state
+    r3.print();  // r3 now owns the resource
+
+    cout << "\n=== Exiting (destructors called) ===" << endl;
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Creating resources ===
+Resource 1 created with value 42
+Resource 2 created with value 100
+
+=== Printing resources ===
+Resource 1: 42
+Resource 2: 100
+
+=== Moving resource ===
+Resource 1 moved
+
+=== After move ===
+Resource 1: (moved-from state)
+Resource 1: 42
+
+=== Exiting (destructors called) ===
+Resource 2 destroyed
+Resource 1 destroyed
+Resource 1 (moved-from) destroyed
+```
+
+**Explanation:**
+
+1.  **Explicit deletion:**
+    *   Copy constructor deleted: `UniqueResource(const UniqueResource&) = delete`
+    *   Copy assignment deleted: `operator=(const UniqueResource&) = delete`
+    *   Attempting to copy causes **compile-time error**
+2.  **Move semantics:**
+    *   Move constructor and assignment are still allowed
+    *   Enables transferring ownership without copying
+3.  **Clear intent:**
+    *   Code explicitly documents that this class represents a unique resource
+    *   Anyone reading the class definition immediately understands it's non-copyable
+4.  **Compile-time enforcement:**
+    *   Errors caught at compilation, not runtime
+    *   Better error messages than old private-declaration approach
+
+**Common use cases for non-copyable classes:**
+
+*   File handles (only one handle should own a file)
+*   Network connections (copying a connection doesn't make sense)
+*   Thread objects (threads are unique)
+*   Smart pointers like `std::unique_ptr`
+
+**Answer:** Explicitly delete copy operations with `= delete` to prevent copying. Move operations can still be provided for transfer of ownership.
+
+</details>
+
+##### **4.2. Constructor Initializer Lists** (Lecture 4, Example)
+
+Demonstrate proper use of constructor initializer lists for both base class initialization and member initialization.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Constructor initializer lists initialize base classes and members before the constructor body executes, which is more efficient and sometimes required.
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+class Base {
+protected:
+    int m1, m2;
+public:
+    Base() : m1(0), m2(0) {
+        cout << "Base default constructor" << endl;
+    }
+
+    Base(int a, int b) : m1(a), m2(b) {
+        cout << "Base(int, int) constructor: m1=" << m1 << ", m2=" << m2 << endl;
+    }
+};
+
+class Derived : public Base {
+private:
+    int md;
+    const int constMember;
+    string name;
+
+public:
+    // Using initializer list to specify base constructor and initialize members
+    Derived(int a, int b, int d, string n)
+        : Base(a, b),              // Initialize base class
+          md(d),                   // Initialize member
+          constMember(999),        // Initialize const member (REQUIRED)
+          name(n)                  // Initialize string member
+    {
+        cout << "Derived constructor: md=" << md
+             << ", constMember=" << constMember
+             << ", name=" << name << endl;
+    }
+
+    void print() const {
+        cout << "Base: m1=" << m1 << ", m2=" << m2 << endl;
+        cout << "Derived: md=" << md << ", constMember=" << constMember
+             << ", name=" << name << endl;
+    }
+};
+
+// Example showing why initializer lists are required for certain members
+class RequiresInitializerList {
+private:
+    const int constValue;          // Must be initialized
+    int& refValue;                 // Must be initialized
+    string str;                    // Has default constructor but more efficient to initialize
+
+public:
+    // ALL of these MUST use initializer list
+    RequiresInitializerList(int val, int& ref, string s)
+        : constValue(val),         // const: must be initialized, cannot be assigned
+          refValue(ref),           // reference: must be initialized, cannot be rebound
+          str(s)                   // more efficient than default-construct + assign
+    {
+        // This would not work:
+        // constValue = val;       // ERROR: cannot assign to const
+        // refValue = ref;         // ERROR: cannot rebind reference
+        // str = s;                // Works but less efficient (default construct + assign)
+    }
+
+    void print() const {
+        cout << "constValue=" << constValue
+             << ", refValue=" << refValue
+             << ", str=" << str << endl;
+    }
+};
+
+int main() {
+    cout << "=== Creating Derived object ===" << endl;
+    Derived d(10, 20, 30, "MyObject");
+    d.print();
+
+    cout << "\n=== Creating RequiresInitializerList object ===" << endl;
+    int x = 42;
+    RequiresInitializerList r(100, x, "Hello");
+    r.print();
+
+    // Modify x to show reference works
+    x = 999;
+    cout << "\nAfter modifying x:" << endl;
+    r.print();
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Creating Derived object ===
+Base(int, int) constructor: m1=10, m2=20
+Derived constructor: md=30, constMember=999, name=MyObject
+Base: m1=10, m2=20
+Derived: md=30, constMember=999, name=MyObject
+
+=== Creating RequiresInitializerList object ===
+constValue=100, refValue=42, str=Hello
+
+After modifying x:
+constValue=100, refValue=999, str=Hello
+```
+
+**Explanation:**
+
+1.  **Base class initialization:**
+    *   `Base(a, b)` in initializer list specifies which base constructor to call
+    *   Base constructor executes first, before derived members are initialized
+2.  **Member initialization:**
+    *   Members initialized in the order they're declared in the class, not the order in the initializer list
+    *   More efficient than assignment in constructor body (especially for class types)
+3.  **Required cases:**
+    *   **Const members:** Can only be initialized, not assigned
+    *   **Reference members:** Must be bound at initialization
+    *   **Members without default constructors:** Must be explicitly initialized
+4.  **Efficiency:**
+    *   Initializer list: Direct initialization
+    *   Constructor body assignment: Default construction + assignment (two steps)
+
+**Common mistake - wrong initialization order:**
+
+```cpp
+class Wrong {
+    int b;
+    int a;
+public:
+    Wrong() : a(5), b(a + 1) { }  // WRONG! b is initialized before a
+};
+```
+
+Members are always initialized in **declaration order**, not initializer list order. Here, `b` is initialized before `a` (because `b` is declared first), so `b` gets an undefined value of `a`.
+
+**Answer:** Use initializer lists to: 1) specify base constructor, 2) initialize const/reference members, 3) improve efficiency. Initialization order follows declaration order.
+
+</details>
+
+##### **4.3. Delegating Constructors** (Lecture 4, Example)
+
+Demonstrate using delegating constructors to reduce code duplication when multiple constructors share common initialization logic.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Delegating constructors allow one constructor to call another, centralizing common initialization logic.
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+class Rectangle {
+private:
+    double width;
+    double height;
+    string color;
+    static int objectCount;
+    int id;
+
+    // Private helper for common initialization
+    void logCreation() {
+        cout << "Rectangle #" << id << " created: "
+             << width << "x" << height << " (" << color << ")" << endl;
+    }
+
+public:
+    // Target constructor - performs the main initialization
+    Rectangle(double w, double h, string c)
+        : width(w), height(h), color(c), id(++objectCount) {
+        logCreation();
+    }
+
+    // Delegating constructor - creates a square
+    Rectangle(double side)
+        : Rectangle(side, side, "white") {  // Delegates to target constructor
+        cout << "  (Created as square)" << endl;
+    }
+
+    // Delegating constructor - default color
+    Rectangle(double w, double h)
+        : Rectangle(w, h, "white") {  // Delegates to target constructor
+        cout << "  (Used default color)" << endl;
+    }
+
+    // Delegating constructor - default rectangle
+    Rectangle()
+        : Rectangle(1.0, 1.0, "white") {  // Delegates to target constructor
+        cout << "  (Default 1x1 rectangle)" << endl;
+    }
+
+    double area() const {
+        return width * height;
+    }
+
+    void print() const {
+        cout << "Rectangle #" << id << ": " << width << "x" << height
+             << ", color=" << color << ", area=" << area() << endl;
+    }
+};
+
+int Rectangle::objectCount = 0;
+
+int main() {
+    cout << "=== Creating rectangles with different constructors ===" << endl;
+
+    cout << "\n1. Full specification:" << endl;
+    Rectangle r1(5.0, 3.0, "red");
+
+    cout << "\n2. Width and height only (default color):" << endl;
+    Rectangle r2(4.0, 2.0);
+
+    cout << "\n3. Square (single dimension):" << endl;
+    Rectangle r3(3.0);
+
+    cout << "\n4. Default constructor:" << endl;
+    Rectangle r4;
+
+    cout << "\n=== Printing all rectangles ===" << endl;
+    r1.print();
+    r2.print();
+    r3.print();
+    r4.print();
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Creating rectangles with different constructors ===
+
+1. Full specification:
+Rectangle #1 created: 5x3 (red)
+
+2. Width and height only (default color):
+Rectangle #2 created: 4x2 (white)
+  (Used default color)
+
+3. Square (single dimension):
+Rectangle #3 created: 3x3 (white)
+  (Created as square)
+
+4. Default constructor:
+Rectangle #4 created: 1x1 (white)
+  (Default 1x1 rectangle)
+
+=== Printing all rectangles ===
+Rectangle #1: 5x3, color=red, area=15
+Rectangle #2: 4x2, color=white, area=8
+Rectangle #3: 3x3, color=white, area=9
+Rectangle #4: 1x1, color=white, area=1
+```
+
+**Explanation:**
+
+1.  **Target constructor:** `Rectangle(double, double, string)` contains all the initialization logic
+2.  **Delegating constructors:** Other constructors delegate to the target:
+    *   `Rectangle(double)` - creates a square by passing same value twice
+    *   `Rectangle(double, double)` - uses default color "white"
+    *   `Rectangle()` - uses all defaults
+3.  **Execution order:**
+    *   Target constructor executes completely (including body)
+    *   Then delegating constructor's body executes
+4.  **Benefits:**
+    *   Common initialization logic in one place
+    *   Easy to maintain - changes only needed in target constructor
+    *   Clear hierarchy of constructors
+
+**Alternative without delegation (old style):**
+
+```cpp
+class Rectangle {
+    // ...
+private:
+    void init(double w, double h, string c) {
+        width = w;
+        height = h;
+        color = c;
+        id = ++objectCount;
+        logCreation();
+    }
+
+public:
+    Rectangle(double w, double h, string c) { init(w, h, c); }
+    Rectangle(double side) { init(side, side, "white"); }
+    Rectangle(double w, double h) { init(w, h, "white"); }
+    Rectangle() { init(1.0, 1.0, "white"); }
+};
+```
+
+The delegating constructor approach is cleaner and more idiomatic in modern C++.
+
+**Answer:** Delegating constructors call another constructor via initializer list (`: ConstructorName(args)`), centralizing initialization logic and reducing duplication.
+
+</details>
+
+##### **4.4. C-Style Casts: The Problem** (Tutorial 4, Example 1)
+
+Analyze the problems with C-style casts and understand why C++ introduced specialized cast operators.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** C-style casts are too generic and hide the programmer's intent, making code harder to understand and maintain.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    virtual ~Base() { }
+};
+
+class Derived : public Base {
+public:
+    void derivedMethod() { cout << "Derived method" << endl; }
+};
+
+int main() {
+    cout << "=== Problem 1: Value Conversion ===" << endl;
+    // Standard conversion: double → int (data loss)
+    int x = (int)12.34;
+    cout << "Converted 12.34 to int: " << x << endl;
+    cout << "Intent: Value conversion with rounding" << endl;
+
+    cout << "\n=== Problem 2: Pointer Reinterpretation ===" << endl;
+    // Reinterpretation: pointer → long (no bit modification)
+    int* px = &x;
+    long a = (long)px;
+    cout << "Pointer value as long: " << a << endl;
+    cout << "Intent: View pointer bits as integer" << endl;
+
+    cout << "\n=== Problem 3: Unsafe Upcasting ===" << endl;
+    // Downcasting without runtime checks
+    Derived* pd = new Derived();
+    Base* pb = (Base*)pd;
+    cout << "Upcasted Derived* to Base*" << endl;
+    cout << "Intent: Type hierarchy navigation (needs safety check)" << endl;
+
+    cout << "\n=== The Problem ===" << endl;
+    cout << "All three use identical syntax: (Type)expression" << endl;
+    cout << "But they do COMPLETELY DIFFERENT things:" << endl;
+    cout << "  1. Value conversion (modifies bits)" << endl;
+    cout << "  2. Reinterpretation (keeps bits, changes view)" << endl;
+    cout << "  3. Type hierarchy navigation (needs runtime check)" << endl;
+    cout << "\nSolution: Use specific cast operators!" << endl;
+
+    delete pb;
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Problem 1: Value Conversion ===
+Converted 12.34 to int: 12
+Intent: Value conversion with rounding
+
+=== Problem 2: Pointer Reinterpretation ===
+Pointer value as long: 140732920755324
+Intent: View pointer bits as integer
+
+=== Problem 3: Unsafe Upcasting ===
+Upcasted Derived* to Base*
+Intent: Type hierarchy navigation (needs safety check)
+
+=== The Problem ===
+All three use identical syntax: (Type)expression
+But they do COMPLETELY DIFFERENT things:
+  1. Value conversion (modifies bits)
+  2. Reinterpretation (keeps bits, changes view)
+  3. Type hierarchy navigation (needs runtime check)
+
+Solution: Use specific cast operators!
+```
+
+**Explanation:**
+
+1.  **Same syntax, different semantics:**
+    *   `(int)12.34` performs arithmetic conversion
+    *   `(long)px` reinterprets pointer bits
+    *   `(Base*)pd` navigates type hierarchy
+2.  **Why this is problematic:**
+    *   Code reader cannot tell intent
+    *   Compiler cannot provide appropriate warnings
+    *   Hard to search for specific cast types in codebase
+    *   Maintenance difficulty
+3.  **The C++ solution:**
+    *   `static_cast<int>(12.34)` - explicit value conversion
+    *   `reinterpret_cast<long>(px)` - explicit reinterpretation
+    *   `dynamic_cast<Derived*>(pb)` - safe type hierarchy navigation
+
+**Answer:** C-style casts hide programmer intent. C++ provides four specialized cast operators with clear semantics: `static_cast`, `dynamic_cast`, `const_cast`, and `reinterpret_cast`.
+
+</details>
+
+##### **4.5. Dynamic Cast in Action** (Tutorial 4, Example 2)
+
+Demonstrate safe downcasting using `dynamic_cast` with runtime type checking.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `dynamic_cast` performs runtime checks, returning `nullptr` if the cast is invalid, preventing undefined behavior.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    virtual void f() { cout << "Base::f" << endl; }
+    virtual ~Base() { }
+};
+
+class Derived : public Base {
+public:
+    void f() override { cout << "Derived::f" << endl; }
+    void derivedMethod() { cout << "Derived-specific method" << endl; }
+};
+
+int main() {
+    cout << "=== C-Style Cast: DANGEROUS ===" << endl;
+    Base* pb1 = new Base();  // Actually points to Base, not Derived
+
+    // C-style cast: NO RUNTIME CHECK
+    Derived* pd1 = (Derived*)pb1;
+    cout << "C-style cast succeeded (no checks performed)" << endl;
+    // pd1->derivedMethod();  // UNDEFINED BEHAVIOR! pb1 doesn't point to Derived
+    cout << "Calling derivedMethod() would cause undefined behavior!" << endl;
+
+    cout << "\n=== Dynamic Cast: SAFE ===" << endl;
+    Base* pb2 = new Base();  // Actually points to Base, not Derived
+
+    // Dynamic cast: PERFORMS RUNTIME CHECK
+    Derived* pd2 = dynamic_cast<Derived*>(pb2);
+
+    if (pd2 != nullptr) {
+        cout << "Cast succeeded" << endl;
+        pd2->derivedMethod();
+    } else {
+        cout << "Cast failed: pb2 doesn't point to Derived (returned nullptr)" << endl;
+        cout << "Safe! No undefined behavior." << endl;
+    }
+
+    cout << "\n=== Dynamic Cast: Success Case ===" << endl;
+    Base* pb3 = new Derived();  // Actually points to Derived
+
+    Derived* pd3 = dynamic_cast<Derived*>(pb3);
+
+    if (pd3 != nullptr) {
+        cout << "Cast succeeded: pb3 actually points to Derived" << endl;
+        pd3->derivedMethod();
+    } else {
+        cout << "Cast failed" << endl;
+    }
+
+    cout << "\n=== Comparison ===" << endl;
+    cout << "C-style cast: Fast but UNSAFE (no checks)" << endl;
+    cout << "dynamic_cast:  Slower but SAFE (runtime checks)" << endl;
+    cout << "  - Returns nullptr if cast fails (for pointers)" << endl;
+    cout << "  - Throws bad_cast if cast fails (for references)" << endl;
+    cout << "  - Requires at least one virtual function in base" << endl;
+
+    delete pb1;
+    delete pb2;
+    delete pb3;
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== C-Style Cast: DANGEROUS ===
+C-style cast succeeded (no checks performed)
+Calling derivedMethod() would cause undefined behavior!
+
+=== Dynamic Cast: SAFE ===
+Cast failed: pb2 doesn't point to Derived (returned nullptr)
+Safe! No undefined behavior.
+
+=== Dynamic Cast: Success Case ===
+Cast succeeded: pb3 actually points to Derived
+Derived-specific method
+
+=== Comparison ===
+C-style cast: Fast but UNSAFE (no checks)
+dynamic_cast:  Slower but SAFE (runtime checks)
+  - Returns nullptr if cast fails (for pointers)
+  - Throws bad_cast if cast fails (for references)
+  - Requires at least one virtual function in base
+```
+
+**Explanation:**
+
+1.  **C-style cast danger:**
+    *   Always succeeds at compile time
+    *   No runtime validation
+    *   Can create invalid pointers leading to undefined behavior
+2.  **dynamic_cast safety:**
+    *   Checks actual object type at runtime
+    *   Returns `nullptr` if object is not of target type
+    *   Prevents undefined behavior
+3.  **Requirements:**
+    *   Base class must have at least one virtual function (enables RTTI)
+    *   Slightly slower due to runtime check
+4.  **When to use:**
+    *   When you're not 100% sure of the actual type
+    *   When safety is more important than performance
+    *   When working with polymorphic hierarchies
+
+**Answer:** `dynamic_cast` provides runtime type safety by checking if the conversion is valid, returning `nullptr` for invalid pointer casts instead of causing undefined behavior.
+
+</details>
+
+##### **4.6. Static Cast for Known-Safe Conversions** (Tutorial 4, Example 3)
+
+Demonstrate when and why to use `static_cast` for compile-time conversions.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `static_cast` is faster than `dynamic_cast` but requires programmer certainty about type safety.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    virtual void f() { cout << "Base::f" << endl; }
+    virtual ~Base() { }
+};
+
+class Derived : public Base {
+public:
+    void f() override { cout << "Derived::f" << endl; }
+    void derivedMethod() { cout << "Derived method" << endl; }
+};
+
+int main() {
+    cout << "=== Use Case 1: Numeric Conversions ===" << endl;
+    double d = 3.14159;
+    int i = static_cast<int>(d);  // Explicit about data loss
+    cout << "static_cast<int>(3.14159) = " << i << endl;
+    cout << "Explicit: programmer acknowledges data loss" << endl;
+
+    cout << "\n=== Use Case 2: Upcasting (Always Safe) ===" << endl;
+    Derived* pd = new Derived();
+    Base* pb = static_cast<Base*>(pd);  // Derived → Base (safe)
+    cout << "Upcasted Derived* to Base* (always safe)" << endl;
+    pb->f();  // Polymorphic call
+
+    cout << "\n=== Use Case 3: Downcasting (ONLY if certain) ===" << endl;
+    Base* pb2 = new Derived();  // We KNOW it points to Derived
+
+    // Safe because we're certain pb2 points to Derived
+    Derived* pd2 = static_cast<Derived*>(pb2);
+    cout << "Downcasted Base* to Derived* (we're certain of type)" << endl;
+    pd2->derivedMethod();
+
+    cout << "\n=== Comparison with dynamic_cast ===" << endl;
+    cout << "static_cast: No runtime overhead, no safety checks" << endl;
+    cout << "dynamic_cast: Runtime overhead, but provides safety" << endl;
+    cout << "\nWhen to use static_cast:" << endl;
+    cout << "  1. You're 100% certain of the actual type" << endl;
+    cout << "  2. Performance is critical" << endl;
+    cout << "  3. Numeric conversions (explicit data loss)" << endl;
+
+    cout << "\n=== DANGER: Wrong Use ===" << endl;
+    Base* pb3 = new Base();  // Points to Base, NOT Derived
+    Derived* pd3 = static_cast<Derived*>(pb3);  // WRONG! No check performed
+    cout << "Cast succeeded but UNSAFE - pd3 doesn't point to valid Derived" << endl;
+    // pd3->derivedMethod();  // UNDEFINED BEHAVIOR!
+    cout << "Would cause undefined behavior if we call derived methods" << endl;
+
+    delete pb;
+    delete pb2;
+    delete pb3;
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Use Case 1: Numeric Conversions ===
+static_cast<int>(3.14159) = 3
+Explicit: programmer acknowledges data loss
+
+=== Use Case 2: Upcasting (Always Safe) ===
+Upcasted Derived* to Base* (always safe)
+Derived::f
+
+=== Use Case 3: Downcasting (ONLY if certain) ===
+Downcasted Base* to Derived* (we're certain of type)
+Derived method
+
+=== Comparison with dynamic_cast ===
+static_cast: No runtime overhead, no safety checks
+dynamic_cast: Runtime overhead, but provides safety
+
+When to use static_cast:
+  1. You're 100% certain of the actual type
+  2. Performance is critical
+  3. Numeric conversions (explicit data loss)
+
+=== DANGER: Wrong Use ===
+Cast succeeded but UNSAFE - pd3 doesn't point to valid Derived
+Would cause undefined behavior if we call derived methods
+```
+
+**Explanation:**
+
+1.  **static_cast advantages:**
+    *   No runtime overhead
+    *   Faster than `dynamic_cast`
+    *   Explicit about intent
+2.  **Safe uses:**
+    *   Upcasting (always safe by type system)
+    *   Numeric conversions (explicit data loss)
+    *   Downcasting when you're absolutely certain
+3.  **Dangerous uses:**
+    *   Downcasting without certainty
+    *   Can cause undefined behavior
+    *   No safety net
+4.  **Rule of thumb:**
+    *   Use `dynamic_cast` by default for downcasting
+    *   Use `static_cast` only when performance is critical AND you're certain
+    *   Always prefer safety over speed unless profiling proves otherwise
+
+**Answer:** `static_cast` performs compile-time conversions without runtime checks. Use for safe upcasts, explicit numeric conversions, and performance-critical downcasts where type is guaranteed. Prefer `dynamic_cast` when type certainty is questionable.
+
+</details>
+
+##### **4.7. Const Cast for Const Correctness** (Tutorial 4, Example 4)
+
+Demonstrate when `const_cast` is necessary and when it's dangerous.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `const_cast` removes const qualification but should be used sparingly and only when you're certain the function won't actually modify the data.
+
+```cpp
+#include <iostream>
+#include <cstring>
+using namespace std;
+
+// Legacy function that doesn't use const correctly
+void legacyPrint(char* str) {
+    // This function only reads, doesn't modify
+    cout << "String: " << str << endl;
+}
+
+// Another legacy function (pretend it's from old C library)
+void legacyProcess(char* str) {
+    // Actually modifies the string!
+    for (size_t i = 0; i < strlen(str); i++) {
+        str[i] = toupper(str[i]);
+    }
+}
+
+int main() {
+    cout << "=== Safe Use: Read-Only Legacy API ===" << endl;
+    const char* message = "Hello, World!";
+
+    // Error without const_cast:
+    // legacyPrint(message);  // ERROR: can't pass const char* to char*
+
+    // OK with const_cast (safe because legacyPrint doesn't modify)
+    legacyPrint(const_cast<char*>(message));
+    cout << "Safe: legacyPrint only reads the string" << endl;
+
+    cout << "\n=== UNSAFE Use: Modifying Legacy API ===" << endl;
+    const char* constMessage = "Dangerous";
+
+    cout << "Before: " << constMessage << endl;
+
+    // DANGEROUS! legacyProcess actually modifies the string
+    // legacyProcess(const_cast<char*>(constMessage));  // UNDEFINED BEHAVIOR!
+    cout << "Cannot safely use const_cast here - legacyProcess modifies data" << endl;
+    cout << "Would cause undefined behavior (string literal is in read-only memory)" << endl;
+
+    cout << "\n=== Safe Alternative: Copy First ===" << endl;
+    char buffer[100];
+    strcpy(buffer, "Hello");
+    cout << "Before: " << buffer << endl;
+
+    const char* constPtr = buffer;  // Now const
+    char* mutablePtr = const_cast<char*>(constPtr);  // Remove const
+    legacyProcess(mutablePtr);  // Safe: original wasn't const
+
+    cout << "After: " << buffer << endl;
+
+    cout << "\n=== Best Practice ===" << endl;
+    cout << "1. Avoid const_cast when possible" << endl;
+    cout << "2. Only use when interfacing with legacy APIs" << endl;
+    cout << "3. Ensure the underlying object wasn't originally const" << endl;
+    cout << "4. Document why const_cast is necessary" << endl;
+    cout << "5. Consider wrapping legacy API with const-correct interface" << endl;
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Safe Use: Read-Only Legacy API ===
+String: Hello, World!
+Safe: legacyPrint only reads the string
+
+=== UNSAFE Use: Modifying Legacy API ===
+Before: Dangerous
+Cannot safely use const_cast here - legacyProcess modifies data
+Would cause undefined behavior (string literal is in read-only memory)
+
+=== Safe Alternative: Copy First ===
+Before: Hello
+After: HELLO
+
+=== Best Practice ===
+1. Avoid const_cast when possible
+2. Only use when interfacing with legacy APIs
+3. Ensure the underlying object wasn't originally const
+4. Document why const_cast is necessary
+5. Consider wrapping legacy API with const-correct interface
+```
+
+**Explanation:**
+
+1.  **Safe usage:**
+    *   Removing const to call read-only function with incorrect signature
+    *   Original object wasn't truly const (was created as non-const)
+2.  **Unsafe usage:**
+    *   Removing const from string literal (undefined behavior if modified)
+    *   Removing const from truly const object
+3.  **The key rule:**
+    *   Safe if: Object was created non-const, just viewed through const pointer/reference
+    *   Unsafe if: Object was originally created as const
+4.  **Why this matters:**
+    *   Const objects may be placed in read-only memory
+    *   Modifying them causes segmentation fault or silent corruption
+    *   Compiler optimizations assume const objects don't change
+
+**Better solution than const_cast:**
+
+```cpp
+// Instead of using const_cast, fix the API:
+void properPrint(const char* str) {  // Now const-correct
+    cout << "String: " << str << endl;
+}
+
+// Or create a wrapper:
+void safeLegacyPrint(const char* str) {
+    legacyPrint(const_cast<char*>(str));  // Encapsulate the cast
+}
+```
+
+**Answer:** `const_cast` removes const qualification. Safe only when: 1) interfacing with legacy APIs, 2) function doesn't actually modify data, 3) original object wasn't truly const. Prefer fixing API over using `const_cast`.
+
+</details>
+
+##### **4.8. Reinterpret Cast for Low-Level Operations** (Tutorial 4, Example 5)
+
+Demonstrate `reinterpret_cast` for low-level bit manipulation and pointer storage.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `reinterpret_cast` reinterprets bit patterns without changing them - the most dangerous cast, reserved for systems programming.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "=== Use Case 1: Pointer ↔ Integer Conversion ===" << endl;
+    int x = 777;
+    int* p = &x;
+
+    cout << "Original pointer: " << p << endl;
+    cout << "Points to value: " << *p << endl;
+
+    // Store pointer as integer (e.g., for hashing, debugging)
+    long ptrAsInt = reinterpret_cast<long>(p);
+    cout << "Pointer as long: " << ptrAsInt << endl;
+
+    // Convert back to pointer
+    int* pBack = reinterpret_cast<int*>(ptrAsInt);
+    cout << "Converted back: " << pBack << endl;
+    cout << "Still points to: " << *pBack << endl;
+
+    cout << "\n=== Use Case 2: Type Punning (View Memory Differently) ===" << endl;
+    unsigned int bits = 0x3F800000;  // IEEE 754 representation of 1.0f
+    cout << "As unsigned int: " << bits << endl;
+
+    // View these bits as a float
+    float* fptr = reinterpret_cast<float*>(&bits);
+    cout << "Same bits as float: " << *fptr << endl;
+
+    cout << "\n=== Use Case 3: Incompatible Pointer Types ===" << endl;
+    unsigned int ux = 777;
+    unsigned int* pux = &ux;
+
+    // This would be an error without cast:
+    // int* pix = pux;  // ERROR: incompatible types
+
+    // reinterpret_cast allows it
+    int* pix = reinterpret_cast<int*>(pux);
+    cout << "unsigned* converted to int*" << endl;
+    cout << "Value: " << *pix << endl;
+
+    cout << "\n=== DANGER: Platform-Specific ===" << endl;
+    cout << "sizeof(void*) = " << sizeof(void*) << endl;
+    cout << "sizeof(long) = " << sizeof(long) << endl;
+
+    if (sizeof(void*) != sizeof(long)) {
+        cout << "WARNING: Pointer-to-long conversion may lose data!" << endl;
+        cout << "Use intptr_t or uintptr_t from <cstdint> instead" << endl;
+    } else {
+        cout << "OK: Pointer fits in long on this platform" << endl;
+    }
+
+    cout << "\n=== When to Use reinterpret_cast ===" << endl;
+    cout << "1. Low-level memory operations" << endl;
+    cout << "2. Hardware register access" << endl;
+    cout << "3. Binary serialization/deserialization" << endl;
+    cout << "4. Implementing custom memory allocators" << endl;
+    cout << "5. Interfacing with C APIs using void*" << endl;
+    cout << "\nFor application code: Almost NEVER!" << endl;
+
+    cout << "\n=== Better Alternatives ===" << endl;
+    cout << "• For pointer storage: use uintptr_t (from <cstdint>)" << endl;
+    cout << "• For type punning: use union or memcpy (safer)" << endl;
+    cout << "• For different pointer types: redesign to avoid need" << endl;
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Use Case 1: Pointer ↔ Integer Conversion ===
+Original pointer: 0x7ffeefbff5ac
+Points to value: 777
+Pointer as long: 140732920755372
+Converted back: 0x7ffeefbff5ac
+Still points to: 777
+
+=== Use Case 2: Type Punning (View Memory Differently) ===
+As unsigned int: 1065353216
+Same bits as float: 1
+
+=== Use Case 3: Incompatible Pointer Types ===
+unsigned* converted to int*
+Value: 777
+
+=== DANGER: Platform-Specific ===
+sizeof(void*) = 8
+sizeof(long) = 8
+OK: Pointer fits in long on this platform
+
+=== When to Use reinterpret_cast ===
+1. Low-level memory operations
+2. Hardware register access
+3. Binary serialization/deserialization
+4. Implementing custom memory allocators
+5. Interfacing with C APIs using void*
+
+For application code: Almost NEVER!
+
+=== Better Alternatives ===
+• For pointer storage: use uintptr_t (from <cstdint>)
+• For type punning: use union or memcpy (safer)
+• For different pointer types: redesign to avoid need
+```
+
+**Explanation:**
+
+1.  **What it does:**
+    *   Reinterprets bit pattern without modification
+    *   No conversion, just different view
+    *   Bypasses type system completely
+2.  **Common uses:**
+    *   Storing pointers as integers
+    *   Type punning (viewing same memory as different type)
+    *   Converting between incompatible pointer types
+3.  **Dangers:**
+    *   Platform-specific behavior
+    *   Alignment issues
+    *   Undefined behavior if misused
+    *   Breaks type safety
+4.  **Why it's dangerous:**
+    *   Can violate strict aliasing rules
+    *   May cause misaligned access (crashes on some platforms)
+    *   Endianness issues
+    *   Pointer size assumptions
+
+**Safer alternatives:**
+
+```cpp
+#include <cstdint>
+
+// Instead of reinterpret_cast<long>(ptr):
+uintptr_t ptrAsInt = reinterpret_cast<uintptr_t>(ptr);  // Guaranteed to fit
+
+// Instead of reinterpret_cast for type punning:
+union FloatInt {
+    float f;
+    uint32_t i;
+};
+FloatInt fi;
+fi.i = 0x3F800000;
+float value = fi.f;  // Safer than reinterpret_cast
+```
+
+**Answer:** `reinterpret_cast` reinterprets bits without conversion. Use ONLY for: systems programming, hardware access, or binary serialization. For application code, prefer safer alternatives like `uintptr_t` or unions.
+
+</details>
+
+##### **4.9. Using typeid for Type Identification** (Tutorial 4, Example 6)
+
+Demonstrate using `typeid` to identify object types at runtime and compare types in a polymorphic hierarchy.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `typeid` provides runtime type information, useful for type checking and debugging polymorphic hierarchies.
+
+```cpp
+#include <iostream>
+#include <typeinfo>
+using namespace std;
+
+class Animal {
+public:
+    virtual ~Animal() { }  // Virtual destructor (required for RTTI)
+};
+
+class Dog : public Animal {
+public:
+    void bark() { cout << "Woof!" << endl; }
+};
+
+class Cat : public Animal {
+public:
+    void meow() { cout << "Meow!" << endl; }
+};
+
+void identifyAnimal(Animal* a) {
+    cout << "Type: " << typeid(*a).name() << endl;
+
+    // Compare with specific types
+    if (typeid(*a) == typeid(Dog)) {
+        cout << "This is a Dog" << endl;
+        Dog* d = static_cast<Dog*>(a);  // Safe because we checked
+        d->bark();
+    } else if (typeid(*a) == typeid(Cat)) {
+        cout << "This is a Cat" << endl;
+        Cat* c = static_cast<Cat*>(a);  // Safe because we checked
+        c->meow();
+    } else if (typeid(*a) == typeid(Animal)) {
+        cout << "This is a generic Animal" << endl;
+    }
+}
+
+int main() {
+    Dog dog;
+    Cat cat;
+    Animal animal;
+
+    Animal* ptr;
+
+    // Test with different objects
+    cout << "=== Testing with Dog ===" << endl;
+    ptr = &dog;
+    identifyAnimal(ptr);
+
+    cout << "\n=== Testing with Cat ===" << endl;
+    ptr = &cat;
+    identifyAnimal(ptr);
+
+    cout << "\n=== Testing with Animal ===" << endl;
+    ptr = &animal;
+    identifyAnimal(ptr);
+
+    // Demonstrating difference between static and dynamic type
+    cout << "\n=== Static vs Dynamic Type ===" << endl;
+    Animal* ptrToDog = new Dog();
+
+    cout << "Static type (pointer): " << typeid(ptrToDog).name() << endl;
+    cout << "Dynamic type (object): " << typeid(*ptrToDog).name() << endl;
+
+    // Can use this for conditional behavior
+    if (typeid(*ptrToDog) == typeid(Dog)) {
+        cout << "Confirmed: pointer points to a Dog" << endl;
+    }
+
+    delete ptrToDog;
+
+    return 0;
+}
+```
+
+**Possible Output:**
+```
+=== Testing with Dog ===
+Type: 3Dog
+This is a Dog
+Woof!
+
+=== Testing with Cat ===
+Type: 3Cat
+This is a Cat
+Meow!
+
+=== Testing with Animal ===
+Type: 6Animal
+This is a generic Animal
+
+=== Static vs Dynamic Type ===
+Static type (pointer): P6Animal
+Dynamic type (object): 3Dog
+Confirmed: pointer points to a Dog
+```
+
+**Note:** The exact output of `type_info::name()` is implementation-defined and may look different on your compiler (e.g., "Dog", "class Dog", or mangled names).
+
+**Explanation:**
+
+1.  **Basic usage:** `typeid(*ptr)` gets the dynamic type of the object
+2.  **Type comparison:** `typeid(obj) == typeid(Type)` checks if object is of specific type
+3.  **Static vs Dynamic:**
+    *   `typeid(ptr)` gives type of the pointer (`Animal*`)
+    *   `typeid(*ptr)` gives type of the object (actual type like `Dog`)
+4.  **Practical use:** Can identify type and then safely cast to perform type-specific operations
+
+**Alternative using dynamic_cast (generally preferred):**
+
+```cpp
+void identifyAnimal(Animal* a) {
+    if (Dog* d = dynamic_cast<Dog*>(a)) {
+        cout << "This is a Dog" << endl;
+        d->bark();
+    } else if (Cat* c = dynamic_cast<Cat*>(a)) {
+        cout << "This is a Cat" << endl;
+        c->meow();
+    }
+}
+```
+
+**Answer:** `typeid` returns `type_info` reference for runtime type checking. Use `typeid(*ptr)` for dynamic type, `typeid(ptr)` for static type. Compare with `==` operator.
+
+</details>
+
+##### **4.10. Bank Account Class - Complete Implementation** (Lab 4, Task 1)
+
+Implement a complete bank account system demonstrating:
+
+*   Base class `Account` with basic operations
+*   Derived class `SavingsAccount` with interest calculation
+*   Use of `this` pointer
+*   Constant member functions
+*   Deleted functions for copy prevention
+*   Defaulted constructor
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Building a complete class hierarchy demonstrating all major C++ class features from this lecture.
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+class Account {
+private:
+    int accountNumber;
+    double balance;
+    string ownerName;
+
+public:
+    // Defaulted default constructor
+    Account() = default;
+
+    // Parameterized constructor
+    Account(int accNum, double initialBalance, string owner)
+        : accountNumber(accNum), balance(initialBalance), ownerName(owner) {
+        cout << "Account created for " << ownerName << endl;
+    }
+
+    // Deleted copy constructor and assignment operator
+    Account(const Account&) = delete;
+    Account& operator=(const Account&) = delete;
+
+    // Deposit money (uses this pointer for demonstration)
+    void deposit(double amount) {
+        if (amount > 0) {
+            this->balance += amount;  // Explicit use of this
+            cout << "Deposited: $" << amount << endl;
+        } else {
+            cout << "Invalid deposit amount" << endl;
+        }
+    }
+
+    // Withdraw money (ensures balance doesn't go negative)
+    void withdraw(double amount) {
+        if (amount > 0 && this->balance >= amount) {
+            this->balance -= amount;
+            cout << "Withdrawn: $" << amount << endl;
+        } else {
+            cout << "Invalid withdrawal or insufficient funds" << endl;
+        }
+    }
+
+    // Constant member functions (don't modify state)
+    double getBalance() const {
+        return balance;
+    }
+
+    int getAccountNumber() const {
+        return accountNumber;
+    }
+
+    string getOwnerName() const {
+        return ownerName;
+    }
+
+    // Virtual destructor for proper inheritance
+    virtual ~Account() {
+        cout << "Account destroyed for " << ownerName << endl;
+    }
+};
+
+class SavingsAccount : public Account {
+private:
+    double interestRate;  // Annual interest rate (e.g., 2.5 for 2.5%)
+
+public:
+    // Constructor delegating to base class
+    SavingsAccount(int accNum, double initialBalance, string owner, double rate)
+        : Account(accNum, initialBalance, owner), interestRate(rate) {
+        cout << "SavingsAccount created with " << interestRate << "% interest" << endl;
+    }
+
+    // Calculate and deposit interest
+    void calculateInterest() {
+        double interest = this->getBalance() * (interestRate / 100.0);
+        cout << "Calculating interest: $" << interest << endl;
+        this->deposit(interest);  // Use inherited deposit method
+    }
+
+    // Constant member function
+    double getInterestRate() const {
+        return interestRate;
+    }
+
+    ~SavingsAccount() {
+        cout << "SavingsAccount destroyed" << endl;
+    }
+};
+
+int main() {
+    cout << "=== Creating Savings Account ===" << endl;
+    SavingsAccount savings(123456, 1000.0, "John Doe", 2.5);
+
+    cout << "\n=== Initial State ===" << endl;
+    cout << "Account Number: " << savings.getAccountNumber() << endl;
+    cout << "Owner's Name: " << savings.getOwnerName() << endl;
+    cout << "Current Balance: $" << savings.getBalance() << endl;
+    cout << "Interest Rate: " << savings.getInterestRate() << "%" << endl;
+
+    cout << "\n=== Performing Transactions ===" << endl;
+    savings.deposit(500.0);
+    savings.withdraw(200.0);
+
+    cout << "\n=== After Transactions ===" << endl;
+    cout << "Current Balance: $" << savings.getBalance() << endl;
+
+    cout << "\n=== Calculating Interest ===" << endl;
+    savings.calculateInterest();
+
+    cout << "\n=== Final State ===" << endl;
+    cout << "Final Balance: $" << savings.getBalance() << endl;
+
+    // Attempting to copy would cause compile error
+    // SavingsAccount copy = savings;  // ERROR: copy constructor deleted
+    // Account acc2 = savings;         // ERROR: copy constructor deleted
+
+    cout << "\n=== Exiting (destructors called) ===" << endl;
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Creating Savings Account ===
+Account created for John Doe
+SavingsAccount created with 2.5% interest
+
+=== Initial State ===
+Account Number: 123456
+Owner's Name: John Doe
+Current Balance: $1000
+Interest Rate: 2.5%
+
+=== Performing Transactions ===
+Deposited: $500
+Withdrawn: $200
+
+=== After Transactions ===
+Current Balance: $1300
+
+=== Calculating Interest ===
+Calculating interest: $32.5
+Deposited: $32.5
+
+=== Final State ===
+Final Balance: $1332.5
+
+=== Exiting (destructors called) ===
+SavingsAccount destroyed
+Account destroyed for John Doe
+```
+
+**Explanation:**
+
+1.  **Defaulted constructor:** `Account() = default` explicitly generates default constructor
+2.  **Deleted functions:** Copy constructor and assignment deleted to prevent account duplication
+3.  **this pointer:**
+    *   Used explicitly in `deposit()` and `withdraw()` for clarity
+    *   `this->balance` accesses member through pointer
+4.  **Constant member functions:**
+    *   `getBalance()`, `getAccountNumber()`, `getOwnerName()` marked const
+    *   Can be called on const Account objects
+    *   Promise not to modify object state
+5.  **Inheritance:**
+    *   `SavingsAccount` inherits from `Account`
+    *   Uses base class constructor in initializer list
+    *   Extends functionality with interest calculation
+6.  **Virtual destructor:**
+    *   Ensures proper cleanup when deleting through base pointer
+    *   Destructors called in reverse order (derived, then base)
+
+**Design decisions:**
+
+*   Accounts cannot be copied (unique resource)
+*   Balance can only be modified through deposit/withdraw (encapsulation)
+*   Const member functions allow reading state without modification risk
+*   Interest calculation uses existing deposit method (code reuse)
+
+**Answer:** Complete implementation demonstrating defaulted/deleted functions, this pointer usage, const correctness, proper initialization, and inheritance.
+
+</details>
+
+##### **4.11. Shape Hierarchy with Type Casting** (Lab 4, Task 2)
+
+Implement a shape hierarchy and demonstrate the four different cast types in practical scenarios.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Using the appropriate cast type for different scenarios in an inheritance hierarchy.
+
+```cpp
+#include <iostream>
+#include <cmath>
+using namespace std;
+
+class Shape {
+public:
+    virtual double area() const = 0;      // Pure virtual
+    virtual double perimeter() const = 0; // Pure virtual
+    virtual ~Shape() { }                  // Virtual destructor
+};
+
+class Rectangle : public Shape {
+private:
+    double width;
+    double height;
+
+public:
+    Rectangle(double w, double h) : width(w), height(h) { }
+
+    double area() const override {
+        return width * height;
+    }
+
+    double perimeter() const override {
+        return 2 * (width + height);
+    }
+
+    // Rectangle-specific method
+    double diagonal() const {
+        return sqrt(width * width + height * height);
+    }
+
+    double getWidth() const { return width; }
+    double getHeight() const { return height; }
+};
+
+class Circle : public Shape {
+private:
+    double radius;
+
+public:
+    Circle(double r) : radius(r) { }
+
+    double area() const override {
+        return M_PI * radius * radius;
+    }
+
+    double perimeter() const override {
+        return 2 * M_PI * radius;
+    }
+
+    // Circle-specific method
+    double diameter() const {
+        return 2 * radius;
+    }
+
+    double getRadius() const { return radius; }
+};
+
+int main() {
+    Rectangle rectangle(5.0, 3.0);
+    Circle circle(4.0);
+
+    Shape* shape = &rectangle;
+
+    cout << "=== Demonstrate static casting [1] ===" << endl;
+    // Static cast: Compile-time downcast (no runtime check)
+    // Safe here because we KNOW shape points to Rectangle
+    const Rectangle* rectPtr = static_cast<const Rectangle*>(shape);
+    cout << "Rectangle width: " << rectPtr->getWidth() << endl;
+    cout << "Rectangle height: " << rectPtr->getHeight() << endl;
+    cout << "Rectangle diagonal: " << rectPtr->diagonal() << endl;
+
+    cout << "\n=== Demonstrate dynamic casting [2] ===" << endl;
+    // Dynamic cast: Runtime type checking
+    // Check if shape is actually a Circle
+    if (const Circle* circPtr = dynamic_cast<const Circle*>(shape)) {
+        cout << "Shape is a Circle with radius: " << circPtr->getRadius() << endl;
+    } else {
+        cout << "Shape is NOT a Circle" << endl;
+    }
+
+    // Now point to circle and check again
+    shape = &circle;
+    if (const Circle* circPtr = dynamic_cast<const Circle*>(shape)) {
+        cout << "Shape is a Circle with radius: " << circPtr->getRadius() << endl;
+        cout << "Circle diameter: " << circPtr->diameter() << endl;
+    } else {
+        cout << "Shape is NOT a Circle" << endl;
+    }
+
+    cout << "\n=== Demonstrate const casting [3] ===" << endl;
+    // Const cast: Remove const qualifier
+    // WARNING: Only safe if the original object wasn't const
+    const Rectangle* constRectPtr = &rectangle;
+
+    // Need to modify through a const pointer (normally not allowed)
+    // Remove const to call non-const method
+    Rectangle* mutableRectPtr = const_cast<Rectangle*>(constRectPtr);
+
+    // Now can call non-const methods (if they existed)
+    cout << "Successfully removed const (use with caution!)" << endl;
+    cout << "Area: " << mutableRectPtr->area() << endl;
+
+    cout << "\n=== Demonstrate reinterpret casting [4] ===" << endl;
+    // Reinterpret cast: Low-level bit reinterpretation
+    int intValue = 42;
+
+    // Treat the integer's bits as if they were a double
+    // WARNING: This is just for demonstration - meaningless operation!
+    double* doublePtr = reinterpret_cast<double*>(&intValue);
+
+    cout << "Integer value: " << intValue << endl;
+    cout << "Integer address: " << &intValue << endl;
+    cout << "Reinterpreted as double pointer: " << doublePtr << endl;
+    // Don't dereference doublePtr - it doesn't point to a valid double!
+
+    // More practical use: store pointer as integer
+    Shape* shapePtr = &rectangle;
+    long ptrAsInt = reinterpret_cast<long>(shapePtr);
+    cout << "Pointer stored as integer: " << ptrAsInt << endl;
+
+    // Convert back
+    Shape* restoredPtr = reinterpret_cast<Shape*>(ptrAsInt);
+    cout << "Restored pointer area: " << restoredPtr->area() << endl;
+
+    cout << "\n=== Summary ===" << endl;
+    cout << "1. static_cast: Fast compile-time cast (use when type is known)" << endl;
+    cout << "2. dynamic_cast: Safe runtime cast (use when type is uncertain)" << endl;
+    cout << "3. const_cast: Remove const (use rarely, with caution)" << endl;
+    cout << "4. reinterpret_cast: Bit reinterpretation (use for low-level operations)" << endl;
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Demonstrate static casting [1] ===
+Rectangle width: 5
+Rectangle height: 3
+Rectangle diagonal: 5.83095
+
+=== Demonstrate dynamic casting [2] ===
+Shape is NOT a Circle
+Shape is a Circle with radius: 4
+Circle diameter: 8
+
+=== Demonstrate const casting [3] ===
+Successfully removed const (use with caution!)
+Area: 15
+
+=== Demonstrate reinterpret casting [4] ===
+Integer value: 42
+Integer address: 0x7ffeefbff5ac
+Reinterpreted as double pointer: 0x7ffeefbff5ac
+Pointer stored as integer: 140732920755372
+Restored pointer area: 15
+
+=== Summary ===
+1. static_cast: Fast compile-time cast (use when type is known)
+2. dynamic_cast: Safe runtime cast (use when type is uncertain)
+3. const_cast: Remove const (use rarely, with caution)
+4. reinterpret_cast: Bit reinterpretation (use for low-level operations)
+```
+
+**Explanation:**
+
+1.  **static_cast [1]:**
+    *   Downcast from `Shape*` to `const Rectangle*`
+    *   Compile-time cast - no runtime checking
+    *   Safe here because we know `shape` points to `Rectangle`
+    *   Faster than `dynamic_cast` but requires programmer certainty
+2.  **dynamic_cast [2]:**
+    *   Runtime type checking
+    *   Returns `nullptr` if cast fails (object is not of target type)
+    *   First check fails (shape points to Rectangle, not Circle)
+    *   Second check succeeds (shape now points to Circle)
+    *   Safer but has runtime overhead
+3.  **const_cast [3]:**
+    *   Removes const qualification
+    *   Allows calling non-const methods through const pointer
+    *   Only safe if original object wasn't const
+    *   Use sparingly - indicates potential design issue
+4.  **reinterpret_cast [4]:**
+    *   Reinterprets bit pattern without conversion
+    *   Used to store pointer as integer and restore it
+    *   Most dangerous cast - bypasses type system
+    *   Use only for low-level operations
+
+**When to use each:**
+
+*   **Use `static_cast`** when you're certain of the type (performance-critical code)
+*   **Use `dynamic_cast`** when you need runtime safety (uncertain about type)
+*   **Use `const_cast`** when interfacing with legacy APIs (avoid if possible)
+*   **Use `reinterpret_cast`** for system programming only (almost never in application code)
+
+**Answer:** Demonstrated all four cast types in practical scenarios. `static_cast` for known-safe conversions, `dynamic_cast` for runtime-safe downcasts, `const_cast` for const removal, `reinterpret_cast` for low-level operations.
+
+</details>
