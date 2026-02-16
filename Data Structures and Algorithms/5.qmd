@@ -1,0 +1,917 @@
+---
+title: "W5. Dynamic Programming, Maximum Subarray, Longest Common Subsequence, Rod Cutting, Knapsack Problem"
+author: "Nikolai Kudasov"
+date: "February 16, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Introduction to Dynamic Programming**
+
+**Dynamic Programming (DP)** is a powerful algorithmic technique for solving optimization problems by breaking them down into overlapping subproblems, solving each subproblem once, and storing the results to avoid redundant computation. Unlike divide-and-conquer, where subproblems are independent, dynamic programming exploits the fact that subproblems overlap — the same subproblem may appear multiple times in different branches of the recursion.
+
+The name "dynamic programming" is somewhat misleading — it has nothing to do with writing programs dynamically. The term was coined by Richard Bellman in the 1950s. "Programming" here refers to optimization (as in "linear programming"), and "dynamic" refers to solving problems in stages over time.
+
+###### **1.1.1 When to Use Dynamic Programming**
+
+Dynamic programming is applicable when a problem has two key properties:
+
+1. **Optimal substructure:** An optimal solution to the problem contains optimal solutions to subproblems. In other words, you can build an optimal solution from optimal solutions to smaller instances of the same problem.
+2. **Overlapping subproblems:** The same subproblems are solved multiple times when using a naive recursive approach. This creates an opportunity for optimization by storing solutions.
+
+**Real-world analogy:** Imagine planning the shortest route from your home to work, passing through various intermediate locations. If you've already computed the shortest path from location A to work, you can reuse that information whenever you consider routes passing through A — you don't need to recalculate it each time.
+
+###### **1.1.2 Optimization Problems**
+
+An **optimization problem** has the following structure:
+
+1. A problem may have **many possible solutions** (candidates)
+2. Each solution has an associated **value** (usually numerical)
+3. The goal is to find a solution with an **optimal value** (minimum or maximum)
+
+Note that there may be multiple optimal solutions with the same optimal value. Dynamic programming helps us find at least one such optimal solution efficiently.
+
+**Example optimization problems we've seen:**
+
+- **Sorting:** Among all permutations of an array, find one that is sorted
+- **Shortest path:** Among all paths between two points, find one with minimum total distance
+- **Maximum subarray:** Among all subarrays, find one with maximum sum
+
+##### **1.2 Steps in Developing a Dynamic Programming Algorithm**
+
+There are four essential steps to developing a dynamic programming solution:
+
+**Step 1: Characterize the structure of an optimal solution**
+
+Analyze how an optimal solution can be constructed from optimal solutions to subproblems. This step is crucial — you must identify the recursive structure of the problem.
+
+**Important:** For dynamic programming to be efficient, the optimal solution must **reuse solutions** to overlapping subproblems. If subproblems don't overlap (as in merge sort), divide-and-conquer is more appropriate than dynamic programming.
+
+**Step 2: Recursively define the value of an optimal solution**
+
+Express the value of an optimal solution in terms of the values of optimal solutions to smaller subproblems. This typically results in a recurrence relation.
+
+**Step 3: Compute the values of optimal solutions**
+
+Use either a **bottom-up** (tabulation) or **top-down** (memoization) approach to compute the optimal values, ensuring each subproblem is solved only once.
+
+**Step 4: Reconstruct an optimal solution**
+
+Use the information accumulated while computing optimal values to construct an actual optimal solution (not just its value).
+
+Note: Step 4 can be omitted if only the optimal value is needed, not the solution itself.
+
+##### **1.3 Bottom-Up vs Top-Down Approaches**
+
+There are two main ways to implement dynamic programming:
+
+###### **1.3.1 Bottom-Up Approach (Tabulation)**
+
+The bottom-up approach builds solutions iteratively from smaller to larger subproblems:
+
+1. **Initialize a table** (array) to store solutions to subproblems
+2. **Fill the table** starting from the smallest subproblems, working up to larger ones
+3. **Extract the solution** for the original problem from the table
+
+**Advantages:**
+
+- Usually more efficient (no function call overhead)
+- Easier to analyze space complexity
+- Can optimize space by discarding unneeded values
+
+**Disadvantages:**
+
+- Must determine the correct order to fill the table
+- May compute solutions to unnecessary subproblems
+
+**Example:** Computing Fibonacci numbers from $F_0$ and $F_1$ upward to $F_n$.
+
+###### **1.3.2 Top-Down Approach (Memoization)**
+
+The top-down approach uses recursion with caching:
+
+1. A **recursive function** first checks if the result for given parameters is already known
+2. If yes, it **returns the cached result**
+3. Otherwise, it **computes the result** recursively and **stores it before returning**
+
+**Advantages:**
+
+- More intuitive — follows the natural recursive structure
+- Only computes necessary subproblems
+- Easier to implement (often just add memoization to naive recursion)
+
+**Disadvantages:**
+
+- Function call overhead
+- Risk of stack overflow for deep recursion
+- Harder to optimize space usage
+
+**Example:** Computing Fibonacci with a dictionary/map to cache previously computed values.
+
+##### **1.4 Example: Fibonacci Numbers**
+
+The Fibonacci sequence is a classic example to illustrate the difference between naive recursion and dynamic programming.
+
+**Sequence:** $0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, \ldots$
+
+**Recurrence:** $F_n = F_{n-1} + F_{n-2}$ with $F_0 = 0$ and $F_1 = 1$.
+
+###### **1.4.1 Naive Recursive Solution**
+
+```python
+def fibonacci(n):
+    if n == 0:
+        return 0
+    if n == 1:
+        return 1
+    else:
+        return fibonacci(n-1) + fibonacci(n-2)
+```
+
+**Analysis:**
+
+- **Time complexity:** $\Theta(\phi^n)$ where $\phi = \frac{1+\sqrt{5}}{2} \approx 1.618$ (golden ratio)
+  - The recurrence $T(n) = T(n-1) + T(n-2) + O(1)$ gives exponential growth
+  - Upper bound: $T(n) \le 2T(n-1) = O(2^n)$
+  - Exact solution: $T(n) = \Theta(F_n) = \Theta(\phi^n)$
+- **Space complexity:** $\Theta(n)$ due to recursion depth
+
+**Why is this slow?** The call tree has massive redundancy. For example, computing `f(6)` requires computing `f(4)` twice, `f(3)` three times, `f(2)` five times, etc. The number of calls grows exponentially.
+
+###### **1.4.2 Bottom-Up Dynamic Programming**
+
+```python
+def fibonacci(n):
+    fib = [0] * (n + 1)
+    fib[0] = 0
+    fib[1] = 1
+    for i in range(2, n + 1):
+        fib[i] = fib[i - 1] + fib[i - 2]
+    return fib[n]
+```
+
+**Analysis:**
+
+- **Time complexity:** $\Theta(n)$ — single loop from 2 to $n$
+- **Space complexity:** $\Theta(n)$ for the array
+
+**Can we improve space?** Yes! Since we only need the previous two values, we can use just two variables instead of an array, achieving $\Theta(1)$ space:
+
+```python
+def fibonacci(n):
+    if n == 0: return 0
+    if n == 1: return 1
+    prev2, prev1 = 0, 1
+    for i in range(2, n + 1):
+        current = prev1 + prev2
+        prev2, prev1 = prev1, current
+    return prev1
+```
+
+###### **1.4.3 Top-Down Dynamic Programming (Memoization)**
+
+```python
+def fibonacci(n):
+    memo = {}
+    return fib_memo(n, memo)
+
+def fib_memo(n, memo):
+    if n in memo:
+        return memo[n]
+    if n == 0:
+        result = 0
+    elif n == 1:
+        result = 1
+    else:
+        result = fib_memo(n-1, memo) + fib_memo(n-2, memo)
+    memo[n] = result
+    return result
+```
+
+**Analysis:**
+
+- **Time complexity:** $\Theta(n)$ — each value computed exactly once
+- **Space complexity:** $\Theta(n)$ for the dictionary and recursion stack
+
+##### **1.5 Maximum Subarray Problem**
+
+###### **1.5.1 Problem Definition**
+
+**Input:** A sequence of $n$ numbers $\langle a_1, a_2, \ldots, a_n \rangle$.
+
+**Output:** Indices $l$ and $r$ such that $\sum_{i=l}^{r} a_i$ is maximized over all possible choices of $1 \le l \le r \le n$.
+
+In other words, find the contiguous subarray with the largest sum.
+
+**Applications:**
+
+1. **Time series analysis:** Finding periods of maximum gain or loss
+2. **Stock trading:** Finding the best period to buy and hold (input represents daily price changes)
+3. **Signal processing:** Detecting regions of maximum intensity
+
+**Example:** For the array $A = [-2, 1, -3, 4, -1, 2, 1, -5, 4]$:
+
+- The maximum subarray is $[4, -1, 2, 1]$ (indices 4-7) with sum $6$
+
+**Previous solutions we've seen:**
+
+- **Brute force:** Check all $O(n^2)$ possible subarrays — $\Theta(n^2)$ time
+- **Divide and conquer:** Split array in half, check left, right, and crossing — $\Theta(n \log n)$ time
+
+Now we'll see a **dynamic programming solution** that achieves $\Theta(n)$ time.
+
+###### **1.5.2 Dynamic Programming Approach**
+
+**Key insight:** For each position $i$, we can define:
+
+- **maxSuffixValue(A, i):** The maximum sum of any subarray ending at position $i$
+- **maxSuffix(A, i):** The starting index of that maximum suffix
+
+The crucial observation: the maximum suffix ending at position $i$ either:
+
+1. **Extends** the maximum suffix ending at position $i-1$ (if that suffix has positive sum), or
+2. **Starts fresh** at position $i$ (if extending would decrease the sum)
+
+**Recurrence for maximum suffix sum:**
+
+$$\text{maxSuffixValue}(A, i) = \begin{cases}
+A[1], & \text{if } i = 1 \\
+\max(\text{maxSuffixValue}(A, i-1) + A[i], A[i]), & \text{otherwise}
+\end{cases}$$
+
+**Why this works:** If the best subarray ending at position $i-1$ has a positive sum, we should extend it by including $A[i]$ (giving sum + $A[i]$). If it has a non-positive sum, we're better off starting fresh at $A[i]$.
+
+**Recurrence for suffix starting position:**
+
+$$\text{maxSuffix}(A, i) = \begin{cases}
+1, & \text{if } i = 1 \\
+j, & \text{if } j = \text{maxSuffix}(A, i-1) \text{ and } \text{maxSuffixValue}(A, i-1) > 0 \\
+i, & \text{otherwise}
+\end{cases}$$
+
+**Finding the overall maximum:** Track the maximum over all suffix values:
+
+$$\text{maxSum} = \max_{1 \le i \le n} \text{maxSuffixValue}(A, i)$$
+
+###### **1.5.3 Kadane's Algorithm**
+
+The bottom-up implementation of this idea is known as **Kadane's Algorithm**:
+
+```python
+def max_subarray(A, n):
+    max_suffix_sum = A[1]
+    max_sum = max_suffix_sum
+    for i in range(2, n + 1):
+        max_suffix_sum = max(max_suffix_sum + A[i], A[i])
+        max_sum = max(max_sum, max_suffix_sum)
+    return max_sum
+```
+
+**How it works:**
+
+- `max_suffix_sum` tracks the maximum subarray sum ending at the current position
+- `max_sum` tracks the overall maximum seen so far
+- At each position, we decide: extend the current subarray or start a new one
+
+**Analysis:**
+
+- **Time complexity:** $\Theta(n)$ — single pass through the array
+- **Space complexity:** $\Theta(1)$ — only two variables
+
+This is optimal! We cannot do better than $\Theta(n)$ since we must examine each element at least once.
+
+**To get the actual subarray indices:** Maintain additional variables to track the start and end positions:
+
+```python
+def max_subarray_with_indices(A, n):
+    max_suffix_sum = A[1]
+    max_sum = max_suffix_sum
+    start = 1  # start of current suffix
+    best_start = 1  # start of best subarray
+    best_end = 1    # end of best subarray
+
+    for i in range(2, n + 1):
+        if max_suffix_sum + A[i] > A[i]:
+            max_suffix_sum = max_suffix_sum + A[i]
+        else:
+            max_suffix_sum = A[i]
+            start = i  # start new suffix here
+
+        if max_suffix_sum > max_sum:
+            max_sum = max_suffix_sum
+            best_start = start
+            best_end = i
+
+    return (best_start, best_end, max_sum)
+```
+
+##### **1.6 Longest Common Subsequence Problem**
+
+###### **1.6.1 Subsequences**
+
+A sequence $Z = \langle z_1, z_2, \ldots, z_k \rangle$ is a **subsequence** of $X = \langle x_1, x_2, \ldots, x_m \rangle$ if there exists a strictly increasing sequence of indices $\langle i_1, i_2, \ldots, i_k \rangle$ such that $z_j = x_{i_j}$ for all $j$.
+
+**In simpler terms:** You can obtain $Z$ from $X$ by deleting some (possibly zero) elements without rearranging the remaining elements.
+
+**Examples:**
+
+- $\langle B, D, A \rangle$ is a subsequence of $\langle A, B, C, B, D, A, B \rangle$ (select indices 2, 5, 6)
+- $\langle B, C, D, B \rangle$ is a subsequence of $\langle A, B, C, B, D, A, B \rangle$ (select indices 2, 3, 5, 7)
+- $\langle A, C, D, C \rangle$ is **not** a subsequence of $\langle A, B, C, B, D, A, B \rangle$ because after selecting C at index 3 and D at index 5, there is no C after position 5
+
+**Key difference from substring:** A substring must be contiguous, but a subsequence need not be.
+
+###### **1.6.2 Common Subsequences**
+
+A sequence $Z$ is a **common subsequence** of $X$ and $Y$ if $Z$ is a subsequence of both $X$ and $Y$.
+
+**Example:** For $X = \langle A, B, C, B, D, A, B \rangle$ and $Y = \langle B, D, C, A, B, A \rangle$:
+
+- $\langle B, C, A \rangle$ is a common subsequence
+- $\langle B, C, D \rangle$ is **not** a common subsequence (not a subsequence of $Y$ in the correct order)
+- $\langle B, C, A, B \rangle$ is a common subsequence
+
+###### **1.6.3 Problem Definition**
+
+**Longest Common Subsequence (LCS) Problem:**
+
+**Input:** Two sequences $X = \langle x_1, x_2, \ldots, x_m \rangle$ and $Y = \langle y_1, y_2, \ldots, y_n \rangle$.
+
+**Output:** A common subsequence of $X$ and $Y$ with maximum length.
+
+**Applications:**
+
+1. **Text similarity:** Measuring how similar two documents or strings are
+2. **DNA analysis:** Comparing and searching amino acid chains
+3. **Version control:** Computing differences between file versions (the `diff` command)
+4. **Plagiarism detection:** Finding copied passages
+
+**Brute force approach:**
+
+1. Enumerate all $2^m$ subsequences of $X$
+2. For each, check if it's a subsequence of $Y$ (takes $O(n)$ time)
+3. Keep track of the longest one found
+
+**Time complexity:** $O(n \cdot 2^m)$ — completely impractical for even moderate-sized inputs.
+
+###### **1.6.4 Optimal Substructure**
+
+**Theorem (Optimal Substructure of LCS):**
+
+Let $X_i = \langle x_1, \ldots, x_i \rangle$ denote the prefix of $X$ of length $i$, and similarly for $Y_j$. Let $Z_k = \langle z_1, \ldots, z_k \rangle$ be an LCS of $X$ and $Y$. Then:
+
+1. **If $x_m = y_n$:** Then $z_k = x_m = y_n$ and $Z_{k-1} = \text{LCS}(X_{m-1}, Y_{n-1})$.
+
+   *Explanation:* If the last characters match, they must be in the LCS. Remove them and solve the smaller problem.
+2. **If $x_m \neq y_n$:** Then either:
+   - $z_k \neq x_m$, in which case $Z_k = \text{LCS}(X_{m-1}, Y_n)$, or
+   - $z_k \neq y_n$, in which case $Z_k = \text{LCS}(X_m, Y_{n-1})$
+
+   *Explanation:* If the last characters don't match, at least one is not in the LCS. Try removing each and take the better result.
+
+This gives us a recursive structure perfect for dynamic programming!
+
+###### **1.6.5 Recursive Solution**
+
+Define $\text{LCS}'(X_m, Y_n)$ as the **length** of the LCS of $X_m$ and $Y_n$:
+
+$$\text{LCS}'(X_m, Y_n) = \begin{cases}
+0, & \text{if } m = 0 \text{ or } n = 0 \\
+1 + \text{LCS}'(X_{m-1}, Y_{n-1}), & \text{if } x_m = y_n \\
+\max(\text{LCS}'(X_{m-1}, Y_n), \text{LCS}'(X_m, Y_{n-1})), & \text{otherwise}
+\end{cases}$$
+
+**Base case:** Empty sequences have LCS of length 0.
+
+**Recursive cases:**
+
+- **Characters match:** Include the matching character and solve the smaller problem
+- **Characters don't match:** Try excluding each character separately and take the maximum
+
+###### **1.6.6 Bottom-Up Dynamic Programming Solution**
+
+We build a 2D table $C[i, j]$ where $C[i, j]$ stores the length of LCS of $X_i$ and $Y_j$.
+
+Additionally, we maintain a table $B[i, j]$ to track which choice we made (for reconstructing the solution):
+
+- **"XY"** (or "↖"): Characters matched, came from $C[i-1, j-1]$
+- **"X"** (or "←"): Came from $C[i, j-1]$ (excluded $y_j$)
+- **"Y"** (or "↑"): Came from $C[i-1, j]$ (excluded $x_i$)
+
+**Algorithm:**
+
+```python
+def LCS_length(X, m, Y, n):
+    # Create tables
+    B = [[None] * n for _ in range(m)]  # 1-indexed
+    C = [[0] * (n + 1) for _ in range(m + 1)]  # 0-indexed
+
+    # Initialize base cases
+    for i in range(1, m + 1):
+        C[i][0] = 0
+    for j in range(1, n + 1):
+        C[0][j] = 0
+
+    # Fill the table
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if X[i] == Y[j]:
+                C[i][j] = C[i - 1][j - 1] + 1
+                B[i][j] = "XY"  # diagonal arrow
+            elif C[i][j - 1] < C[i - 1][j]:
+                C[i][j] = C[i - 1][j]
+                B[i][j] = "Y"   # up arrow
+            else:
+                C[i][j] = C[i][j - 1]
+                B[i][j] = "X"   # left arrow
+
+    return C, B
+```
+
+**Analysis:**
+
+- **Time complexity:** $\Theta(m \cdot n)$ — fill an $m \times n$ table
+- **Space complexity:** $\Theta(m \cdot n)$ for the tables
+
+**Reconstructing the LCS:** Follow the arrows in table $B$ backward from $B[m, n]$:
+
+```python
+def reconstruct_LCS(B, X, i, j):
+    if i == 0 or j == 0:
+        return []
+    if B[i][j] == "XY":
+        return reconstruct_LCS(B, X, i-1, j-1) + [X[i]]
+    elif B[i][j] == "Y":
+        return reconstruct_LCS(B, X, i-1, j)
+    else:
+        return reconstruct_LCS(B, X, i, j-1)
+```
+
+##### **1.7 Classic Dynamic Programming Problems**
+
+###### **1.7.1 Rod Cutting Problem**
+
+**Problem:** A company produces rods of length $n$ and wants to cut them into smaller pieces for sale. Each length has a market price. Cuts are free. How should the rod be cut to maximize revenue?
+
+**Input:** Rod length $n$ and a price table $p[1 \ldots n]$ where $p[i]$ is the price for a rod of length $i$.
+
+**Output:** A way to cut the rod that maximizes total revenue.
+
+**Example:** For $n = 7$ and prices:
+
+| Length (m) | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|:---|:---|:---|:---|:---|:---|:---|:---|
+| Price ($) | 1 | 5 | 8 | 9 | 10 | 17 | 17 |
+
+Some options:
+
+- Don't cut: revenue = $17
+- Cut as 1 + 6: revenue = $1 + $17 = $18 ✓ (optimal)
+- Cut as 2 + 2 + 3: revenue = $5 + $5 + $8 = $18 ✓ (also optimal)
+
+**Optimal substructure:** The maximum revenue $r_n$ for a rod of length $n$ can be obtained by:
+
+1. Cutting off a piece of length $i$ (for some $1 \le i \le n$) and selling it for $p_i$
+2. Optimally cutting the remaining piece of length $n - i$
+
+This gives the recurrence:
+
+$$r_n = \max_{1 \le i \le n} (p_i + r_{n-i})$$
+
+with base case $r_0 = 0$.
+
+**Dynamic programming solution (bottom-up):**
+
+```python
+def rod_cutting(p, n):
+    r = [0] * (n + 1)
+    for j in range(1, n + 1):
+        max_revenue = -float('inf')
+        for i in range(1, j + 1):
+            max_revenue = max(max_revenue, p[i] + r[j - i])
+        r[j] = max_revenue
+    return r[n]
+```
+
+**Time complexity:** $\Theta(n^2)$ — nested loops
+
+**Space complexity:** $\Theta(n)$ for the array
+
+###### **1.7.2 0-1 Knapsack Problem**
+
+**Problem:** You have a knapsack with capacity $W$ kg and $n$ items, each with a weight $w_i$ and value $v_i$. Select a subset of items to maximize total value without exceeding the weight capacity.
+
+**Input:**
+
+- Capacity $W$
+- Arrays $w[1 \ldots n]$ (weights) and $v[1 \ldots n]$ (values)
+
+**Output:** A subset $S \subseteq \{1, \ldots, n\}$ such that $\sum_{i \in S} w_i \le W$ and $\sum_{i \in S} v_i$ is maximized.
+
+**Example:** Capacity $W = 35$ kg, items:
+
+| Item | Suitcase | Tablet | Laptop | Water | Tent | Plug | Bed |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Weight (kg)** | 12 | 2 | 6 | 3 | 24 | 1 | 9 |
+| **Value ($)** | 36 | 4 | 24 | 2 | 64 | 1 | 22 |
+
+**Why greedy doesn't work:** You might think "take items with highest value-to-weight ratio first," but this doesn't always give the optimal solution.
+
+**Optimal substructure:** Define $K(i, w)$ as the maximum value achievable using the first $i$ items with weight limit $w$. Then:
+
+$$K(i, w) = \begin{cases}
+0, & \text{if } i = 0 \text{ or } w = 0 \\
+K(i-1, w), & \text{if } w_i > w \text{ (item too heavy)} \\
+\max(K(i-1, w), v_i + K(i-1, w - w_i)), & \text{otherwise}
+\end{cases}$$
+
+**Explanation:**
+
+- **Base case:** No items or no capacity means zero value
+- **Item too heavy:** Can't include it, so the answer is the same as without this item
+- **Can include item:** Choose the better option between including it or not
+
+**Dynamic programming solution:**
+
+```python
+def knapsack(W, w, v, n):
+    K = [[0] * (W + 1) for _ in range(n + 1)]
+
+    for i in range(1, n + 1):
+        for wt in range(1, W + 1):
+            if w[i] > wt:
+                K[i][wt] = K[i-1][wt]
+            else:
+                K[i][wt] = max(K[i-1][wt], v[i] + K[i-1][wt - w[i]])
+
+    return K[n][W]
+```
+
+**Time complexity:** $\Theta(nW)$ — pseudo-polynomial (depends on $W$, not just $n$)
+
+**Space complexity:** $\Theta(nW)$
+
+**Note on complexity:** This is called **pseudo-polynomial** because the running time depends on the numeric value of $W$, not just the number of items $n$. If $W$ is very large (say, $2^{100}$), the algorithm becomes impractical even though "the input size" appears small.
+
+##### **1.8 Comparison: Divide-and-Conquer vs Dynamic Programming**
+
+Both paradigms break problems into subproblems, but they differ in a crucial way:
+
+| Aspect | Divide-and-Conquer | Dynamic Programming |
+|:---|:---|:---|
+| **Subproblem overlap** | Subproblems are independent | Subproblems overlap |
+| **When to use** | Subproblems solved once each | Same subproblem solved many times |
+| **Implementation** | Direct recursion | Tabulation or memoization |
+| **Examples** | Merge sort, quicksort, binary search | Fibonacci, LCS, knapsack, rod cutting |
+| **Memory** | Recursion stack only | Stores all subproblem solutions |
+
+**Key insight:** If you find yourself solving the same subproblem repeatedly in your recursion tree, dynamic programming can help by storing those solutions.
+
+#### **2. Definitions**
+
+*   **Dynamic Programming (DP)**: An algorithmic technique for solving optimization problems by breaking them into overlapping subproblems, solving each once, and storing results to avoid redundant computation.
+*   **Optimization Problem**: A problem with many candidate solutions, each with an associated value, where the goal is to find a solution with optimal (minimum or maximum) value.
+*   **Optimal Substructure**: A property where an optimal solution to a problem contains optimal solutions to its subproblems.
+*   **Overlapping Subproblems**: A property where the same subproblems are encountered multiple times when solving a problem recursively.
+*   **Bottom-Up Approach (Tabulation)**: A DP implementation that iteratively fills a table from smallest to largest subproblems.
+*   **Top-Down Approach (Memoization)**: A DP implementation using recursion with a cache to store and reuse previously computed results.
+*   **Memoization**: The technique of storing the results of expensive function calls and returning the cached result when the same inputs occur again.
+*   **Subsequence**: A sequence derived from another by deleting some elements without changing the order of remaining elements.
+*   **Common Subsequence**: A sequence that is a subsequence of two or more given sequences.
+*   **Longest Common Subsequence (LCS)**: The longest sequence that is a subsequence of two given sequences.
+*   **Maximum Subarray**: The contiguous subarray with the largest sum within a one-dimensional array.
+*   **Kadane's Algorithm**: An $O(n)$ algorithm for solving the maximum subarray problem using dynamic programming.
+*   **Rod Cutting Problem**: An optimization problem of cutting a rod into pieces to maximize revenue given length-dependent prices.
+*   **0-1 Knapsack Problem**: An optimization problem of selecting items to maximize value while staying within a weight capacity constraint, where each item can be taken at most once.
+*   **Pseudo-Polynomial Time**: A time complexity that appears polynomial in the numeric value of the input but exponential in the input size (number of bits).
+
+#### **3. Formulas**
+
+*   **Fibonacci Recurrence**: $F_n = F_{n-1} + F_{n-2}$ with $F_0 = 0$, $F_1 = 1$
+*   **Fibonacci Time Complexity (Naive Recursion)**: $T(n) = \Theta(\phi^n)$ where $\phi = \frac{1+\sqrt{5}}{2} \approx 1.618$
+*   **Fibonacci Time Complexity (DP)**: $\Theta(n)$
+*   **Golden Ratio**: $\phi = \frac{1+\sqrt{5}}{2}$
+*   **Maximum Suffix Value**: $\text{maxSuffixValue}(A, i) = \begin{cases} A[1], & \text{if } i = 1 \\ \max(\text{maxSuffixValue}(A, i-1) + A[i], A[i]), & \text{otherwise} \end{cases}$
+*   **Maximum Subarray Time Complexity (Kadane)**: $\Theta(n)$
+*   **LCS Recurrence**: $\text{LCS}'(X_m, Y_n) = \begin{cases} 0, & \text{if } m = 0 \text{ or } n = 0 \\ 1 + \text{LCS}'(X_{m-1}, Y_{n-1}), & \text{if } x_m = y_n \\ \max(\text{LCS}'(X_{m-1}, Y_n), \text{LCS}'(X_m, Y_{n-1})), & \text{otherwise} \end{cases}$
+*   **LCS Time Complexity**: $\Theta(mn)$ where $m = |X|$ and $n = |Y|$
+*   **LCS Space Complexity**: $\Theta(mn)$
+*   **Rod Cutting Recurrence**: $r_n = \max_{1 \le i \le n} (p_i + r_{n-i})$ with $r_0 = 0$
+*   **Rod Cutting Time Complexity**: $\Theta(n^2)$
+*   **Knapsack Recurrence**: $K(i, w) = \begin{cases} 0, & \text{if } i = 0 \text{ or } w = 0 \\ K(i-1, w), & \text{if } w_i > w \\ \max(K(i-1, w), v_i + K(i-1, w - w_i)), & \text{otherwise} \end{cases}$
+*   **Knapsack Time Complexity**: $\Theta(nW)$ (pseudo-polynomial)
+*   **Knapsack Space Complexity**: $\Theta(nW)$
+
+#### **4. Examples**
+
+##### **4.1. Compute Fibonacci Number Recursively** (Lecture 5, Example 1)
+
+Compute $F_6$ using the naive recursive algorithm. How many function calls are made?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Trace the recursive calls to see the massive redundancy.
+
+**Recursive definition:**
+
+```
+F(0) = 0
+F(1) = 1
+F(n) = F(n-1) + F(n-2) for n ≥ 2
+```
+
+**Call tree for F(6):**
+
+```
+                    F(6)
+                   /    \
+              F(5)      F(4)
+             /   \      /   \
+        F(4)   F(3)  F(3)  F(2)
+        / \    / \    / \   / \
+      F(3) F(2) F(2) F(1) F(2) F(1) F(1) F(0)
+      ...  (continues with more branches)
+```
+
+**Count of calls for each value:**
+
+- $F(0)$: 5 calls
+- $F(1)$: 8 calls
+- $F(2)$: 5 calls
+- $F(3)$: 3 calls
+- $F(4)$: 2 calls
+- $F(5)$: 1 call
+- $F(6)$: 1 call
+
+**Total calls:** $1 + 1 + 3 + 5 + 9 + 15 = 25$ calls (approximately)
+
+More precisely, the number of calls $T(n)$ follows: $T(n) = T(n-1) + T(n-2) + 1 \approx 2F_n - 1 = \Theta(\phi^n)$
+
+**Answer:** Computing $F(6)$ requires 25 function calls. This exponential growth makes naive recursion impractical for even moderate values.
+
+</details>
+
+##### **4.2. Fibonacci with Bottom-Up DP** (Lecture 5, Example 2)
+
+Compute $F_{10}$ using bottom-up dynamic programming. Show the table.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Build the table iteratively from $F_0$ upward.
+
+**Table construction:**
+
+| $i$ | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|
+| $F_i$ | 0 | 1 | 1 | 2 | 3 | 5 | 8 | 13 | 21 | 34 | 55 |
+
+**Steps:**
+
+1. Initialize: $F_0 = 0$, $F_1 = 1$
+2. For $i = 2$ to $10$: $F_i = F_{i-1} + F_{i-2}$
+   - $F_2 = F_1 + F_0 = 1 + 0 = 1$
+   - $F_3 = F_2 + F_1 = 1 + 1 = 2$
+   - $F_4 = F_3 + F_2 = 2 + 1 = 3$
+   - $F_5 = F_4 + F_3 = 3 + 2 = 5$
+   - $F_6 = F_5 + F_4 = 5 + 3 = 8$
+   - $F_7 = F_6 + F_5 = 8 + 5 = 13$
+   - $F_8 = F_7 + F_6 = 13 + 8 = 21$
+   - $F_9 = F_8 + F_7 = 21 + 13 = 34$
+   - $F_{10} = F_9 + F_8 = 34 + 21 = 55$
+
+**Answer:** $F_{10} = 55$. This required only 10 additions (one per entry), compared to hundreds of function calls with naive recursion.
+
+</details>
+
+##### **4.3. Maximum Subarray Using Kadane's Algorithm** (Lecture 5, Example 3)
+
+Find the maximum subarray of $A = [-2, 1, -3, 4, -1, 2, 1, -5, 4]$ using dynamic programming.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Track the maximum sum ending at each position and the overall maximum.
+
+**Trace through the algorithm:**
+
+| $i$ | $A[i]$ | $\text{max\_suffix\_sum}$ (before) | $\text{max\_suffix\_sum} + A[i]$ | $A[i]$ | $\text{max\_suffix\_sum}$ (after) | $\text{max\_sum}$ |
+|:---|:---|:---|:---|:---|:---|:---|
+| 1 | -2 | — | — | -2 | -2 | -2 |
+| 2 | 1 | -2 | $-2 + 1 = -1$ | 1 | 1 ✓ | 1 |
+| 3 | -3 | 1 | $1 + (-3) = -2$ | -3 | -2 | 1 |
+| 4 | 4 | -2 | $-2 + 4 = 2$ | 4 | 4 ✓ | 4 |
+| 5 | -1 | 4 | $4 + (-1) = 3$ ✓ | -1 | 3 | 4 |
+| 6 | 2 | 3 | $3 + 2 = 5$ ✓ | 2 | 5 | 5 |
+| 7 | 1 | 5 | $5 + 1 = 6$ ✓ | 1 | 6 | 6 |
+| 8 | -5 | 6 | $6 + (-5) = 1$ ✓ | -5 | 1 | 6 |
+| 9 | 4 | 1 | $1 + 4 = 5$ ✓ | 4 | 5 | 6 |
+
+**Explanation:**
+
+- At position 2, extending the suffix from position 1 gives $-1$, but starting fresh at position 2 gives $1$ → choose 1
+- At position 4, extending gives $2$, but starting fresh gives $4$ → choose 4 (start new subarray)
+- From positions 4-7, we keep extending (all extensions are better than starting fresh)
+- The maximum overall is 6, occurring at position 7
+
+**To find indices:** The maximum subarray is $[4, -1, 2, 1]$ (positions 4-7) with sum 6.
+
+**Answer:** Maximum subarray sum is 6, from indices 4 to 7.
+
+</details>
+
+##### **4.4. LCS of Two Sequences** (Lecture 5, Exercise 5.1)
+
+Apply the LCS algorithm to:
+
+- $X = \langle A, B, C, B, D, A, B \rangle$
+- $Y = \langle B, D, C, A, B, A \rangle$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Build the DP table comparing all prefixes of $X$ and $Y$.
+
+**Build the table $C[i, j]$:**
+
+|   | $j=0$ | B | D | C | A | B | A |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **$i=0$** | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **A** | 0 | 0 | 0 | 0 | 1 | 1 | 1 |
+| **B** | 0 | 1 | 1 | 1 | 1 | 2 | 2 |
+| **C** | 0 | 1 | 1 | 2 | 2 | 2 | 2 |
+| **B** | 0 | 1 | 1 | 2 | 2 | 3 | 3 |
+| **D** | 0 | 1 | 2 | 2 | 2 | 3 | 3 |
+| **A** | 0 | 1 | 2 | 2 | 3 | 3 | 4 |
+| **B** | 0 | 1 | 2 | 2 | 3 | 4 | 4 |
+
+**Reconstructing the LCS:** Trace backward from $C[7, 6] = 4$ following the arrows:
+
+- $(7, 6)$: $B = B$, diagonal → Include B
+- $(6, 5)$: $A = A$, diagonal → Include A
+- $(5, 4)$: $D \neq A$, came from left or up
+- Continue tracing...
+
+One LCS is $\langle B, C, A, B \rangle$ with length 4.
+
+**Answer:** The length of the LCS is 4. One LCS is $\langle B, C, A, B \rangle$.
+
+</details>
+
+##### **4.5. Rod Cutting Problem** (Lecture 5, Exercise 5.3)
+
+Apply the rod cutting algorithm to a rod of length $n = 10$ with prices:
+
+| Length $i$ | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|
+| Price $p[i]$ | 1 | 5 | 8 | 9 | 10 | 17 | 17 | 20 | 24 | 30 |
+
+Fill in the table for optimal revenue $r[i]$ for each length $i$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For each length, try all possible first cuts and take the maximum.
+
+**DP table calculation:**
+
+| Length $i$ | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|:---|
+| Revenue $r[i]$ | 0 | 1 | 5 | 8 | 10 | 13 | 17 | 18 | 22 | 25 | 30 |
+
+**Step-by-step calculations:**
+
+1.  **$i = 1$:** $r[1] = \max(p[1] + r[0]) = 1 + 0 = 1$
+2.  **$i = 2$:** $r[2] = \max(p[1] + r[1], p[2] + r[0]) = \max(1 + 1, 5 + 0) = 5$
+3.  **$i = 3$:** $r[3] = \max(p[1] + r[2], p[2] + r[1], p[3] + r[0]) = \max(1 + 5, 5 + 1, 8 + 0) = 8$
+4.  **$i = 4$:** $r[4] = \max(p[1] + r[3], p[2] + r[2], p[3] + r[1], p[4] + r[0])$
+    - $= \max(1 + 8, 5 + 5, 8 + 1, 9 + 0) = \max(9, 10, 9, 9) = 10$
+5.  **$i = 5$:** $r[5] = \max(1 + 10, 5 + 8, 8 + 5, 9 + 1, 10 + 0) = \max(11, 13, 13, 10, 10) = 13$
+6.  **$i = 6$:** $r[6] = \max(1 + 13, 5 + 10, 8 + 8, 9 + 5, 10 + 1, 17 + 0)$
+    - $= \max(14, 15, 16, 14, 11, 17) = 17$
+7.  **$i = 7$:** $r[7] = \max(1 + 17, 5 + 13, 8 + 10, 9 + 8, 10 + 5, 17 + 1, 17 + 0)$
+    - $= \max(18, 18, 18, 17, 15, 18, 17) = 18$
+8.  **$i = 8$:** $r[8] = 22$ (best is $6 + 2 = 17 + 5 = 22$)
+9.  **$i = 9$:** $r[9] = 25$ (best is $6 + 3 = 17 + 8 = 25$)
+10. **$i = 10$:** $r[10] = 30$ (don't cut at all)
+
+**Answer:** The optimal revenue for length 10 is $30. One optimal cutting is to not cut at all (sell the whole rod for $30).
+
+</details>
+
+##### **4.6. 0-1 Knapsack Problem** (Lecture 5, Exercise 5.6)
+
+Fill in the DP table for the knapsack problem with capacity $W = 24$ kg and items:
+
+| Item | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|:---|:---|:---|:---|:---|:---|:---|:---|
+| **Weight (kg)** | 12 | 2 | 6 | 3 | 24 | 1 | 9 |
+| **Value ($)** | 36 | 4 | 24 | 2 | 64 | 1 | 22 |
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Build a table $K[i, w]$ where $K[i, w]$ is the maximum value using the first $i$ items with weight limit $w$.
+
+**Analysis:** For capacity 24 kg:
+
+- Item 5 (tent) weighs exactly 24 kg and has value $64
+- This single item gives maximum value
+- Other combinations give less:
+  - Items 1+3+6: weight = 12+6+1 = 19 kg, value = 36+24+1 = $61
+  - Items 1+7+6: weight = 12+9+1 = 22 kg, value = 36+22+1 = $59
+
+**Answer:** Maximum value is $64, achieved by taking only the tent (item 5).
+
+</details>
+
+##### **4.7. Compare Fibonacci Implementations** (Tutorial Problem)
+
+Compare the number of operations for computing $F_{20}$ using:
+
+a) Naive recursion
+b) Memoization
+c) Bottom-up DP
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Count the number of addition operations or function calls.
+
+**(a) Naive Recursion:**
+
+- Number of calls: $T(n) = T(n-1) + T(n-2) + 1 \approx 2F_n - 1$
+- For $n = 20$: $F_{20} = 6765$, so approximately $2 \times 6765 - 1 = 13,529$ calls
+- Each non-base call performs 1 addition
+- **Total additions:** Approximately 6,765
+
+**(b) Memoization:**
+
+- Each value $F_0, F_1, \ldots, F_{20}$ is computed exactly once
+- Total function calls: $n + 1 = 21$
+- Total additions: $n - 1 = 19$ (since $F_0$ and $F_1$ don't require addition)
+- **Total operations:** 21 lookups/stores + 19 additions = 40 operations
+
+**(c) Bottom-Up DP:**
+
+- Loop from $i = 2$ to $n = 20$: that's 19 iterations
+- Each iteration: 1 addition
+- **Total operations:** 19 additions
+
+**Comparison:**
+
+| Method | Function Calls | Additions | Complexity |
+|:---|:---:|:---:|:---|
+| Naive Recursion | ~13,529 | ~6,765 | $O(2^n)$ |
+| Memoization | 21 | 19 | $O(n)$ |
+| Bottom-Up DP | 0 (no recursion) | 19 | $O(n)$ |
+
+**Answer:** Bottom-up DP is the most efficient, requiring only 19 additions. Naive recursion is exponentially slower.
+
+</details>
+
+##### **4.8. Rod Cutting with Cost Per Cut** (Lecture 5, Problem 5.4)
+
+Modify the rod cutting problem: each cut costs $c$ dollars. How does this change the recurrence?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Subtract the cutting cost when making a cut.
+
+**Modified recurrence:**
+
+If we make a cut, we get:
+
+- Revenue from the first piece: $p_i$
+- Revenue from the remaining piece: $r_{n-i}$
+- **But:** We pay cost $c$ for making the cut
+
+So the recurrence becomes:
+
+$$r_n = \max\begin{cases}
+p_n & \text{(no cut)} \\
+\max_{1 \le i < n} (p_i + r_{n-i} - c) & \text{(make a cut)}
+\end{cases}$$
+
+**Alternatively:**
+
+$$r_n = \max\left(p_n, \max_{1 \le i < n} (p_i + r_{n-i} - c)\right)$$
+
+**Key difference:** Now it might be optimal to make fewer cuts (or no cuts) if the cutting cost is high.
+
+**Example:** If $n = 4$, $p = [1, 5, 8, 9]$, and $c = 2$:
+
+- No cut: revenue = $9
+- Cut as 1+3: revenue = $1 + $8 - $2 = $7
+- Cut as 2+2: revenue = $5 + $5 - $2 = $8
+- Cut as 1+1+2: revenue = $1 + $1 + $5 - $4 = $3 (two cuts!)
+
+Best: No cut, revenue $9.
+
+**Answer:** The recurrence includes $-c$ for each cut made: $r_n = \max(p_n, \max_{1 \le i < n}(p_i + r_{n-i} - c))$.
+
+</details>

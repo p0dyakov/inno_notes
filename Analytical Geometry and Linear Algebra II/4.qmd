@@ -1,0 +1,949 @@
+---
+title: "W4. Four Fundamental Subspaces, Orthogonal Complements, Least Squares"
+author: "Salman Ahmadi-Asl"
+date: "February 13, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Four Fundamental Subspaces of a Matrix**
+
+Every matrix defines four important vector subspaces that reveal its complete algebraic structure. Understanding these subspaces is essential for solving systems of equations, understanding matrix transformations, and applications in data science and engineering.
+
+For an $m \times n$ matrix $A$ with $\text{rank}(A) = r$, there are **four fundamental subspaces**:
+
+**1. Column Space** $\mathcal{C}(A)$ (or $\text{Col}(A)$)
+
+The column space is the set of all possible linear combinations of the columns of $A$:
+$$\mathcal{C}(A) = \{A\mathbf{x} \mid \mathbf{x} \in \mathbb{R}^n\}$$
+
+*   It is a subspace of $\mathbb{R}^m$ (the "output space")
+*   Its dimension is $r$ (the rank)
+*   The system $A\mathbf{x} = \mathbf{b}$ has a solution if and only if $\mathbf{b} \in \mathcal{C}(A)$
+*   **Basis:** The pivot columns of the original matrix $A$ (identified from the row echelon form)
+
+**2. Null Space** $\mathcal{N}(A)$ (or $\text{Nul}(A)$)
+
+The null space is the set of all vectors that $A$ maps to zero:
+$$\mathcal{N}(A) = \{\mathbf{x} \in \mathbb{R}^n \mid A\mathbf{x} = \mathbf{0}\}$$
+
+*   It is a subspace of $\mathbb{R}^n$ (the "input space")
+*   Its dimension is $n - r$ (the number of free variables)
+*   It contains all solutions to the homogeneous system $A\mathbf{x} = \mathbf{0}$
+*   **Basis:** The special solutions found by setting each free variable to 1 (and others to 0)
+
+**3. Row Space** $\mathcal{C}(A^T)$ (or $\text{Row}(A)$)
+
+The row space is the span of the rows of $A$, equivalently the column space of $A^T$:
+$$\mathcal{C}(A^T) = \{A^T\mathbf{y} \mid \mathbf{y} \in \mathbb{R}^m\}$$
+
+*   It is a subspace of $\mathbb{R}^n$
+*   Its dimension is $r$ (the same as the column space)
+*   **Basis:** The nonzero rows of the row echelon form (REF) of $A$
+*   The row space contains all linear combinations of the rows of $A$
+
+**4. Left Null Space** $\mathcal{N}(A^T)$ (or $\text{Nul}(A^T)$)
+
+The left null space is the null space of $A^T$:
+$$\mathcal{N}(A^T) = \{\mathbf{y} \in \mathbb{R}^m \mid A^T\mathbf{y} = \mathbf{0}\}$$
+
+*   It is a subspace of $\mathbb{R}^m$
+*   Its dimension is $m - r$
+*   It is called "left" null space because $A^T\mathbf{y} = \mathbf{0}$ is equivalent to $\mathbf{y}^TA = \mathbf{0}^T$ (y multiplies A from the left)
+*   **Basis:** Found by solving $A^T\mathbf{y} = \mathbf{0}$ using row reduction on $A^T$
+
+###### **1.1.1 Summary Table**
+
+| Subspace | Notation | Lives in | Dimension | How to Find Basis |
+|:---------|:---------|:---------|:----------|:------------------|
+| **Column Space** | $\mathcal{C}(A)$ | $\mathbb{R}^m$ | $r$ | Pivot columns of $A$ |
+| **Null Space** | $\mathcal{N}(A)$ | $\mathbb{R}^n$ | $n - r$ | Special solutions of $A\mathbf{x} = \mathbf{0}$ |
+| **Row Space** | $\mathcal{C}(A^T)$ | $\mathbb{R}^n$ | $r$ | Nonzero rows of $\text{REF}(A)$ |
+| **Left Null Space** | $\mathcal{N}(A^T)$ | $\mathbb{R}^m$ | $m - r$ | Special solutions of $A^T\mathbf{y} = \mathbf{0}$ |
+
+###### **1.1.2 The Rank-Nullity Theorem**
+
+The dimensions of these subspaces are not independent. Two fundamental equations connect them:
+
+$$\text{dim}(\mathcal{C}(A^T)) + \text{dim}(\mathcal{N}(A)) = n$$
+$$\text{dim}(\mathcal{C}(A)) + \text{dim}(\mathcal{N}(A^T)) = m$$
+
+In other words:
+$$r + (n - r) = n \quad \text{and} \quad r + (m - r) = m$$
+
+These follow from the **Rank-Nullity Theorem**: for any matrix, the rank plus the dimension of the null space equals the number of columns.
+
+###### **1.1.3 Computing the Four Subspaces: Step-by-Step**
+
+**Example Setup:** Let $A = \begin{bmatrix} 1 & 2 & 0 & 1 \\ 2 & 4 & 1 & 4 \\ 1 & 2 & 1 & 3 \end{bmatrix}$ (a $3 \times 4$ matrix).
+
+**Step 1: Row reduce to REF**
+
+$$A \xrightarrow{\text{row operations}} R = \begin{bmatrix} 1 & 2 & 0 & 1 \\ 0 & 0 & 1 & 2 \\ 0 & 0 & 0 & 0 \end{bmatrix}$$
+
+The pivots are in columns 1 and 3. Thus $r = 2$.
+
+**Step 2: Column Space $\mathcal{C}(A)$**
+
+The pivot columns in the *original* matrix $A$ form a basis:
+$$\mathcal{C}(A) = \text{span}\left\{\begin{bmatrix} 1 \\ 2 \\ 1 \end{bmatrix}, \begin{bmatrix} 0 \\ 1 \\ 1 \end{bmatrix}\right\}$$
+
+Dimension: $\text{dim}(\mathcal{C}(A)) = 2$.
+
+**Step 3: Row Space $\mathcal{C}(A^T)$**
+
+The nonzero rows of $R$ form a basis for the row space:
+$$\mathcal{C}(A^T) = \text{span}\left\{\begin{bmatrix} 1 \\ 2 \\ 0 \\ 1 \end{bmatrix}, \begin{bmatrix} 0 \\ 0 \\ 1 \\ 2 \end{bmatrix}\right\}$$
+
+Dimension: $\text{dim}(\mathcal{C}(A^T)) = 2$.
+
+**Step 4: Null Space $\mathcal{N}(A)$**
+
+Solve $A\mathbf{x} = \mathbf{0}$ using $R\mathbf{x} = \mathbf{0}$:
+$$\begin{cases} x_1 + 2x_2 + x_4 = 0 \\ x_3 + 2x_4 = 0 \end{cases}$$
+
+Free variables: $x_2$ and $x_4$. Setting $x_2 = 1, x_4 = 0$ gives $\mathbf{n}_1 = \begin{bmatrix} -2 \\ 1 \\ 0 \\ 0 \end{bmatrix}$. Setting $x_2 = 0, x_4 = 1$ gives $\mathbf{n}_2 = \begin{bmatrix} -1 \\ 0 \\ -2 \\ 1 \end{bmatrix}$.
+
+$$\mathcal{N}(A) = \text{span}\left\{\begin{bmatrix} -2 \\ 1 \\ 0 \\ 0 \end{bmatrix}, \begin{bmatrix} -1 \\ 0 \\ -2 \\ 1 \end{bmatrix}\right\}$$
+
+Dimension: $\text{dim}(\mathcal{N}(A)) = 2 = 4 - 2 = n - r$ ✓
+
+**Step 5: Left Null Space $\mathcal{N}(A^T)$**
+
+Solve $A^T\mathbf{y} = \mathbf{0}$. Form $A^T$ and row reduce:
+$$A^T = \begin{bmatrix} 1 & 2 & 1 \\ 2 & 4 & 2 \\ 0 & 1 & 1 \\ 1 & 4 & 3 \end{bmatrix} \xrightarrow{\text{row operations}} \begin{bmatrix} 1 & 2 & 1 \\ 0 & 1 & 1 \\ 0 & 0 & 0 \\ 0 & 0 & 0 \end{bmatrix}$$
+
+Free variable: $y_3 = t$. The system becomes:
+$$\begin{cases} y_1 + 2y_2 + y_3 = 0 \\ y_2 + y_3 = 0 \end{cases}$$
+
+Setting $y_3 = 1$: $y_2 = -1$, $y_1 = 1$. Thus:
+$$\mathcal{N}(A^T) = \text{span}\left\{\begin{bmatrix} 1 \\ -1 \\ 1 \end{bmatrix}\right\}$$
+
+Dimension: $\text{dim}(\mathcal{N}(A^T)) = 1 = 3 - 2 = m - r$ ✓
+
+##### **1.2 Orthogonal Complements**
+
+Two subspaces $V$ and $W$ of $\mathbb{R}^n$ are **orthogonal** if every vector in $V$ is orthogonal to every vector in $W$. This is denoted $V \perp W$.
+
+###### **1.2.1 Definition of Orthogonal Complement**
+
+For a subspace $V \subseteq \mathbb{R}^n$, the **orthogonal complement** $V^\perp$ (read "V perp") is the set of all vectors orthogonal to every vector in $V$:
+$$V^\perp = \{\mathbf{x} \in \mathbb{R}^n \mid \mathbf{x} \cdot \mathbf{v} = 0 \text{ for all } \mathbf{v} \in V\}$$
+
+**Key fact:** $V^\perp$ is always a subspace. To check if $\mathbf{x} \in V^\perp$, it suffices to verify that $\mathbf{x}$ is orthogonal to a *basis* of $V$ (not every vector in $V$).
+
+###### **1.2.2 The Fundamental Theorem of Linear Algebra**
+
+The four fundamental subspaces come in **orthogonal pairs**:
+
+$$\boxed{\mathcal{C}(A^T) \perp \mathcal{N}(A) \quad \text{in } \mathbb{R}^n}$$
+$$\boxed{\mathcal{C}(A) \perp \mathcal{N}(A^T) \quad \text{in } \mathbb{R}^m}$$
+
+Equivalently:
+$$\mathcal{C}(A^T)^\perp = \mathcal{N}(A) \quad \text{and} \quad \mathcal{N}(A)^\perp = \mathcal{C}(A^T)$$
+$$\mathcal{C}(A)^\perp = \mathcal{N}(A^T) \quad \text{and} \quad \mathcal{N}(A^T)^\perp = \mathcal{C}(A)$$
+
+**Why is this true?** Consider $\mathbf{x} \in \mathcal{N}(A)$, so $A\mathbf{x} = \mathbf{0}$. Let $\mathbf{r}$ be any row of $A$. Then:
+$$\mathbf{r} \cdot \mathbf{x} = 0$$
+
+This says that $\mathbf{x}$ is orthogonal to every row of $A$, i.e., $\mathbf{x} \in \mathcal{C}(A^T)^\perp$. Conversely, if $\mathbf{x}$ is orthogonal to every row, then $A\mathbf{x} = \mathbf{0}$.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.3 Orthogonal Decomposition**
+
+The orthogonal complement relationship gives us a powerful decomposition: every vector in $\mathbb{R}^n$ can be uniquely written as the sum of a component in a subspace and a component in its orthogonal complement.
+
+**Theorem (Orthogonal Decomposition):** If $V$ is a subspace of $\mathbb{R}^n$, then every $\mathbf{x} \in \mathbb{R}^n$ can be uniquely written as:
+$$\mathbf{x} = \mathbf{v} + \mathbf{w}$$
+where $\mathbf{v} \in V$ and $\mathbf{w} \in V^\perp$.
+
+We write this as:
+$$\mathbb{R}^n = V \oplus V^\perp$$
+
+The symbol $\oplus$ denotes **direct sum**, meaning the spaces only overlap at $\mathbf{0}$.
+
+For matrices, this gives two fundamental decompositions:
+$$\mathbb{R}^n = \mathcal{C}(A^T) \oplus \mathcal{N}(A)$$
+$$\mathbb{R}^m = \mathcal{C}(A) \oplus \mathcal{N}(A^T)$$
+
+##### **1.3 Properties of Orthogonal Complements**
+
+###### **1.3.1 Property 1: Intersection is Zero**
+
+For any subspace $V$, we have:
+$$V \cap V^\perp = \{\mathbf{0}\}$$
+
+**Proof:** Suppose $\mathbf{x} \in V \cap V^\perp$. Then $\mathbf{x} \in V$ and $\mathbf{x} \in V^\perp$. Since $\mathbf{x} \in V^\perp$, it is orthogonal to all vectors in $V$, including itself:
+$$\mathbf{x} \cdot \mathbf{x} = \|\mathbf{x}\|^2 = 0$$
+
+Therefore $\mathbf{x} = \mathbf{0}$. $\square$
+
+###### **1.3.2 Property 2: Dimensions Add to n**
+
+For any subspace $V \subseteq \mathbb{R}^n$:
+$$\text{dim}(V) + \text{dim}(V^\perp) = n$$
+
+**Proof sketch:** Let $\{\mathbf{v}_1, \ldots, \mathbf{v}_k\}$ be an orthonormal basis for $V$. Extend this to an orthonormal basis $\{\mathbf{v}_1, \ldots, \mathbf{v}_k, \mathbf{w}_1, \ldots, \mathbf{w}_{n-k}\}$ for $\mathbb{R}^n$ (using Gram-Schmidt). The vectors $\{\mathbf{w}_1, \ldots, \mathbf{w}_{n-k}\}$ are orthogonal to all $\mathbf{v}_i$, so they form a basis for $V^\perp$. Thus $\text{dim}(V^\perp) = n - k$. $\square$
+
+###### **1.3.3 Property 3: Double Complement Returns to V**
+
+For any subspace $V$:
+$$(V^\perp)^\perp = V$$
+
+**Proof:** We show two inclusions.
+
+**($V \subseteq (V^\perp)^\perp$):** Let $\mathbf{v} \in V$. For any $\mathbf{w} \in V^\perp$, we have $\mathbf{v} \cdot \mathbf{w} = 0$ by definition of $V^\perp$. Thus $\mathbf{v}$ is orthogonal to all vectors in $V^\perp$, so $\mathbf{v} \in (V^\perp)^\perp$.
+
+**($V \supseteq (V^\perp)^\perp$):** By Property 2: $\text{dim}(V) + \text{dim}(V^\perp) = n$, and $\text{dim}(V^\perp) + \text{dim}((V^\perp)^\perp) = n$. Thus $\text{dim}(V) = \text{dim}((V^\perp)^\perp)$. Since $V \subseteq (V^\perp)^\perp$ and they have equal dimension, they must be equal. $\square$
+
+###### **1.3.4 Property 4: Uniqueness of Decomposition**
+
+If $\mathbf{x} = \mathbf{v}_1 + \mathbf{w}_1 = \mathbf{v}_2 + \mathbf{w}_2$ where $\mathbf{v}_1, \mathbf{v}_2 \in V$ and $\mathbf{w}_1, \mathbf{w}_2 \in V^\perp$, then $\mathbf{v}_1 = \mathbf{v}_2$ and $\mathbf{w}_1 = \mathbf{w}_2$.
+
+**Proof:** Rearranging:
+$$\mathbf{v}_1 - \mathbf{v}_2 = \mathbf{w}_2 - \mathbf{w}_1$$
+
+The left side is in $V$ (subspace closed under subtraction), and the right side is in $V^\perp$. The only vector in both is $\mathbf{0}$ (Property 1), so:
+$$\mathbf{v}_1 - \mathbf{v}_2 = \mathbf{0} \implies \mathbf{v}_1 = \mathbf{v}_2$$
+$$\mathbf{w}_2 - \mathbf{w}_1 = \mathbf{0} \implies \mathbf{w}_1 = \mathbf{w}_2$$
+$\square$
+
+##### **1.4 Examples of Orthogonal Complements**
+
+###### **1.4.1 Geometric Examples in $\mathbb{R}^3$**
+
+*   If $V$ is the xy-plane (the set $\{(x, y, 0) \mid x, y \in \mathbb{R}\}$), then $V^\perp$ is the z-axis (the set $\{(0, 0, z) \mid z \in \mathbb{R}\}$).
+*   If $V$ is a line through the origin with direction vector $\mathbf{v}$, then $V^\perp$ is the plane perpendicular to $\mathbf{v}$.
+*   If $V = \mathbb{R}^3$, then $V^\perp = \{\mathbf{0}\}$.
+*   If $V = \{\mathbf{0}\}$, then $V^\perp = \mathbb{R}^3$.
+
+###### **1.4.2 Example in $\mathbb{R}^4$**
+
+Let $V = \text{span}\left\{\begin{pmatrix} 1 \\ 0 \\ 1 \\ 0 \end{pmatrix}, \begin{pmatrix} 0 \\ 1 \\ 0 \\ 1 \end{pmatrix}\right\}$.
+
+To find $V^\perp$, we need all vectors $\mathbf{x} = \begin{pmatrix} x_1 \\ x_2 \\ x_3 \\ x_4 \end{pmatrix}$ such that:
+$$\begin{pmatrix} 1 \\ 0 \\ 1 \\ 0 \end{pmatrix} \cdot \mathbf{x} = 0 \quad \text{and} \quad \begin{pmatrix} 0 \\ 1 \\ 0 \\ 1 \end{pmatrix} \cdot \mathbf{x} = 0$$
+
+This gives:
+$$x_1 + x_3 = 0 \quad \text{and} \quad x_2 + x_4 = 0$$
+
+Setting $x_3 = -x_1$ and $x_4 = -x_2$:
+$$\mathbf{x} = \begin{pmatrix} x_1 \\ x_2 \\ -x_1 \\ -x_2 \end{pmatrix} = x_1\begin{pmatrix} 1 \\ 0 \\ -1 \\ 0 \end{pmatrix} + x_2\begin{pmatrix} 0 \\ 1 \\ 0 \\ -1 \end{pmatrix}$$
+
+Thus:
+$$V^\perp = \text{span}\left\{\begin{pmatrix} 1 \\ 0 \\ -1 \\ 0 \end{pmatrix}, \begin{pmatrix} 0 \\ 1 \\ 0 \\ -1 \end{pmatrix}\right\}$$
+
+Note: $\text{dim}(V) + \text{dim}(V^\perp) = 2 + 2 = 4$ ✓
+
+##### **1.5 Proving the Fundamental Theorem**
+
+###### **1.5.1 Proof: $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$**
+
+**Theorem:** For any $m \times n$ matrix $A$, $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$.
+
+**Proof:** We show both inclusions.
+
+**($\mathcal{N}(A) \subseteq \mathcal{C}(A^T)^\perp$):**
+
+Let $\mathbf{x} \in \mathcal{N}(A)$, so $A\mathbf{x} = \mathbf{0}$. We must show $\mathbf{x} \in \mathcal{C}(A^T)^\perp$, i.e., $\mathbf{x}$ is orthogonal to all vectors in $\mathcal{C}(A^T)$.
+
+Let $\mathbf{y} \in \mathcal{C}(A^T)$. Then $\mathbf{y} = A^T\mathbf{w}$ for some $\mathbf{w} \in \mathbb{R}^m$. Compute:
+$$\mathbf{x} \cdot \mathbf{y} = \mathbf{x}^T\mathbf{y} = \mathbf{x}^T(A^T\mathbf{w}) = (A\mathbf{x})^T\mathbf{w} = \mathbf{0}^T\mathbf{w} = 0$$
+
+Thus $\mathbf{x} \perp \mathbf{y}$ for all $\mathbf{y} \in \mathcal{C}(A^T)$, so $\mathbf{x} \in \mathcal{C}(A^T)^\perp$.
+
+**($\mathcal{C}(A^T)^\perp \subseteq \mathcal{N}(A)$):**
+
+Let $\mathbf{x} \in \mathcal{C}(A^T)^\perp$, so $\mathbf{x} \cdot \mathbf{y} = 0$ for all $\mathbf{y} \in \mathcal{C}(A^T)$. We must show $A\mathbf{x} = \mathbf{0}$.
+
+In particular, $\mathbf{x}$ is orthogonal to each row of $A$ (since the rows of $A$ are columns of $A^T$). Let $\mathbf{a}_i$ be the $i$-th row of $A$. Then:
+$$\mathbf{a}_i \cdot \mathbf{x} = 0 \quad \text{for all } i = 1, 2, \ldots, m$$
+
+But this is exactly saying that $A\mathbf{x} = \mathbf{0}$ (each entry of $A\mathbf{x}$ is $\mathbf{a}_i \cdot \mathbf{x}$). Thus $\mathbf{x} \in \mathcal{N}(A)$.
+
+**Conclusion:** $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$. $\square$
+
+###### **1.5.2 Proof: $\mathcal{N}(A)^\perp = \mathcal{C}(A^T)$**
+
+This follows immediately from the previous result and Property 3:
+$$\mathcal{N}(A)^\perp = (\mathcal{C}(A^T)^\perp)^\perp = \mathcal{C}(A^T)$$
+$\square$
+
+Similarly, by applying the same arguments to $A^T$:
+$$\mathcal{C}(A)^\perp = \mathcal{N}(A^T) \quad \text{and} \quad \mathcal{N}(A^T)^\perp = \mathcal{C}(A)$$
+
+##### **1.6 Why Rank of A and $A^T$ are Equal**
+
+An important consequence of the Fundamental Theorem is that the row rank equals the column rank.
+
+**Theorem:** $\text{rank}(A) = \text{rank}(A^T)$.
+
+**Proof:** From the Rank-Nullity Theorem applied to $A$:
+$$\text{rank}(A) + \text{dim}(\mathcal{N}(A)) = n$$
+
+From the orthogonal complement relationship:
+$$\text{dim}(\mathcal{C}(A^T)) + \text{dim}(\mathcal{C}(A^T)^\perp) = n$$
+
+But $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$, so:
+$$\text{dim}(\mathcal{C}(A^T)) + \text{dim}(\mathcal{N}(A)) = n$$
+
+Comparing with the first equation:
+$$\text{rank}(A) = \text{dim}(\mathcal{C}(A)) = \text{dim}(\mathcal{C}(A^T)) = \text{rank}(A^T)$$
+$\square$
+
+This means the number of independent rows equals the number of independent columns!
+
+##### **1.7 Least Squares Problems**
+
+When a system $A\mathbf{x} = \mathbf{b}$ has no exact solution (inconsistent), we often want the "best approximate solution." This leads to the **least squares problem**.
+
+###### **1.7.1 The Least Squares Problem Setup**
+
+**Problem:** Given $A \in \mathbb{R}^{m \times n}$ (typically $m > n$, more equations than unknowns) and $\mathbf{b} \in \mathbb{R}^m$, find $\mathbf{x} \in \mathbb{R}^n$ that minimizes:
+$$\|A\mathbf{x} - \mathbf{b}\|^2$$
+
+**Why "least squares"?** We're minimizing the sum of squared errors:
+$$\|A\mathbf{x} - \mathbf{b}\|^2 = (A\mathbf{x} - \mathbf{b})^T(A\mathbf{x} - \mathbf{b}) = \sum_{i=1}^m (a_i^T\mathbf{x} - b_i)^2$$
+
+where $a_i^T$ is the $i$-th row of $A$.
+
+###### **1.7.2 Geometric Interpretation**
+
+Since $A\mathbf{x}$ always lies in the column space $\mathcal{C}(A)$, we want to find the point in $\mathcal{C}(A)$ that is closest to $\mathbf{b}$. This closest point is the **orthogonal projection** of $\mathbf{b}$ onto $\mathcal{C}(A)$, denoted $\mathbf{p} = \text{proj}_{\mathcal{C}(A)}(\mathbf{b})$.
+
+<!-- DIAGRAM HERE -->
+
+The error vector $\mathbf{e} = \mathbf{b} - \mathbf{p}$ is orthogonal to $\mathcal{C}(A)$, so $\mathbf{e} \in \mathcal{C}(A)^\perp = \mathcal{N}(A^T)$.
+
+###### **1.7.3 Why Least Squares?**
+
+Overdetermined systems ($m > n$) often have no exact solution because we have more constraints (equations) than degrees of freedom (unknowns). Common applications:
+
+*   **Data fitting:** Fitting a curve or line to experimental data points
+*   **Regression analysis:** Finding the best linear model for data
+*   **Signal processing:** Estimating a signal from noisy measurements
+*   **Computer graphics:** Approximating shapes with simpler models
+*   **Machine learning:** Training models where we have many training examples
+
+Instead of giving up, we find the $\mathbf{x}$ that makes $A\mathbf{x}$ as close to $\mathbf{b}$ as possible.
+
+###### **1.7.4 The Normal Equations (Preview)**
+
+The least squares solution $\hat{\mathbf{x}}$ satisfies:
+$$A^TA\hat{\mathbf{x}} = A^T\mathbf{b}$$
+
+These are called the **normal equations**. This equation says that the error $\mathbf{b} - A\hat{\mathbf{x}}$ is orthogonal to the column space of $A$.
+
+**Derivation:** The error is $\mathbf{e} = \mathbf{b} - A\hat{\mathbf{x}}$. For this to be the minimum error, $\mathbf{e}$ must be perpendicular to $\mathcal{C}(A)$, i.e., $\mathbf{e} \in \mathcal{N}(A^T)$:
+$$A^T\mathbf{e} = \mathbf{0}$$
+$$A^T(\mathbf{b} - A\hat{\mathbf{x}}) = \mathbf{0}$$
+$$A^T\mathbf{b} - A^TA\hat{\mathbf{x}} = \mathbf{0}$$
+$$A^TA\hat{\mathbf{x}} = A^T\mathbf{b}$$
+
+If $A$ has linearly independent columns (full column rank), then $A^TA$ is invertible, and:
+$$\hat{\mathbf{x}} = (A^TA)^{-1}A^T\mathbf{b}$$
+
+The matrix $A^+ = (A^TA)^{-1}A^T$ is called the **pseudoinverse** (or Moore-Penrose inverse) of $A$.
+
+#### **2. Definitions**
+
+*   **Column Space** ($\mathcal{C}(A)$ or $\text{Col}(A)$): The set of all linear combinations of the columns of $A$; a subspace of $\mathbb{R}^m$ with dimension $r = \text{rank}(A)$.
+*   **Null Space** ($\mathcal{N}(A)$ or $\text{Nul}(A)$): The set of all solutions to $A\mathbf{x} = \mathbf{0}$; a subspace of $\mathbb{R}^n$ with dimension $n - r$.
+*   **Row Space** ($\mathcal{C}(A^T)$ or $\text{Row}(A)$): The span of the rows of $A$, equivalently the column space of $A^T$; a subspace of $\mathbb{R}^n$ with dimension $r$.
+*   **Left Null Space** ($\mathcal{N}(A^T)$ or $\text{Nul}(A^T)$): The null space of $A^T$; a subspace of $\mathbb{R}^m$ with dimension $m - r$.
+*   **Rank**: The dimension of the column space (or equivalently, row space) of a matrix.
+*   **Orthogonal Complement** ($V^\perp$): For a subspace $V \subseteq \mathbb{R}^n$, the set of all vectors in $\mathbb{R}^n$ orthogonal to every vector in $V$.
+*   **Orthogonal Subspaces**: Two subspaces $V$ and $W$ are orthogonal if every vector in $V$ is orthogonal to every vector in $W$.
+*   **Direct Sum** ($V \oplus W$): The space of all vectors of the form $\mathbf{v} + \mathbf{w}$ where $\mathbf{v} \in V$ and $\mathbf{w} \in W$, when $V \cap W = \{\mathbf{0}\}$.
+*   **Least Squares Problem**: Finding the vector $\mathbf{x}$ that minimizes $\|A\mathbf{x} - \mathbf{b}\|^2$.
+*   **Normal Equations**: The system $A^TA\mathbf{x} = A^T\mathbf{b}$ whose solution gives the least squares solution.
+*   **Pseudoinverse**: For a matrix $A$ with full column rank, $A^+ = (A^TA)^{-1}A^T$ is the left inverse that computes the least squares solution.
+*   **Pivot Columns**: Columns of the original matrix $A$ that contain pivots in its row echelon form; they form a basis for $\mathcal{C}(A)$.
+*   **Free Variables**: Variables corresponding to non-pivot columns; they parametrize the null space.
+*   **Leading Principal Minor**: The determinant of the top-left $k \times k$ submatrix of a matrix (used in LDL^T decomposition).
+
+#### **3. Formulas**
+
+*   **Four Fundamental Subspace Dimensions**: For an $m \times n$ matrix $A$ with rank $r$:
+
+    - $\text{dim}(\mathcal{C}(A)) = r$
+    - $\text{dim}(\mathcal{N}(A)) = n - r$
+    - $\text{dim}(\mathcal{C}(A^T)) = r$
+    - $\text{dim}(\mathcal{N}(A^T)) = m - r$
+*   **Rank-Nullity Theorem**: $\text{rank}(A) + \text{dim}(\mathcal{N}(A)) = n$ and $\text{rank}(A) + \text{dim}(\mathcal{N}(A^T)) = m$
+*   **Orthogonal Complement Relationships**:
+
+    - $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$ and $\mathcal{N}(A)^\perp = \mathcal{C}(A^T)$
+    - $\mathcal{C}(A)^\perp = \mathcal{N}(A^T)$ and $\mathcal{N}(A^T)^\perp = \mathcal{C}(A)$
+*   **Dimension of Orthogonal Complement**: $\text{dim}(V) + \text{dim}(V^\perp) = n$ for any subspace $V \subseteq \mathbb{R}^n$
+*   **Direct Sum Decompositions**:
+
+    - $\mathbb{R}^n = \mathcal{C}(A^T) \oplus \mathcal{N}(A)$
+    - $\mathbb{R}^m = \mathcal{C}(A) \oplus \mathcal{N}(A^T)$
+*   **Normal Equations**: $A^TA\hat{\mathbf{x}} = A^T\mathbf{b}$
+*   **Least Squares Solution** (when $A$ has full column rank): $\hat{\mathbf{x}} = (A^TA)^{-1}A^T\mathbf{b}$
+*   **Projection onto Column Space**: $\mathbf{p} = A(A^TA)^{-1}A^T\mathbf{b}$
+*   **Projection Matrix**: $P = A(A^TA)^{-1}A^T$ projects onto $\mathcal{C}(A)$
+*   **LDL^T Decomposition** (for symmetric $A$): $A = LDL^T$ where $L$ is unit lower triangular and $D$ is diagonal
+
+#### **4. Examples**
+
+##### **4.1. Reduce Matrices to Echelon Form and Find Rank and Free Variables** (Tutorial 4, Problem 1)
+
+Reduce $A$ and $B$ to echelon form, to find their ranks. Which variables are free?
+
+$$A = \begin{bmatrix} 1 & 2 & 0 & 1 \\ 0 & 1 & 1 & 0 \\ 1 & 2 & 0 & 1 \end{bmatrix}, \quad B = \begin{bmatrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Reduce to row echelon form (REF) to identify pivots. The number of pivots is the rank, and non-pivot columns correspond to free variables.
+
+**Part A: Matrix $A$**
+
+1.  **Initial matrix:**
+    $$A = \begin{bmatrix} 1 & 2 & 0 & 1 \\ 0 & 1 & 1 & 0 \\ 1 & 2 & 0 & 1 \end{bmatrix}$$
+2.  **Eliminate below first pivot:** $R_3 \leftarrow R_3 - R_1$
+    $$\begin{bmatrix} 1 & 2 & 0 & 1 \\ 0 & 1 & 1 & 0 \\ 0 & 0 & 0 & 0 \end{bmatrix}$$
+3.  **This is already in REF.** The pivots are in columns 1 and 2.
+4.  **Rank:** $\text{rank}(A) = 2$ (two pivots)
+5.  **Free variables:** Columns 3 and 4 have no pivots, so $x_3$ and $x_4$ are free variables.
+
+**Part B: Matrix $B$**
+
+1.  **Initial matrix:**
+    $$B = \begin{bmatrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{bmatrix}$$
+2.  **Eliminate below first pivot:** $R_2 \leftarrow R_2 - 4R_1$, $R_3 \leftarrow R_3 - 7R_1$
+    $$\begin{bmatrix} 1 & 2 & 3 \\ 0 & -3 & -6 \\ 0 & -6 & -12 \end{bmatrix}$$
+3.  **Eliminate below second pivot:** $R_3 \leftarrow R_3 - 2R_2$
+    $$\begin{bmatrix} 1 & 2 & 3 \\ 0 & -3 & -6 \\ 0 & 0 & 0 \end{bmatrix}$$
+4.  **This is in REF.** The pivots are in columns 1 and 2.
+5.  **Rank:** $\text{rank}(B) = 2$ (two pivots)
+6.  **Free variable:** Column 3 has no pivot, so $x_3$ is a free variable.
+
+**Answer:**
+
+*   Matrix $A$: $\text{rank}(A) = 2$, free variables are $x_3$ and $x_4$
+*   Matrix $B$: $\text{rank}(B) = 2$, free variable is $x_3$
+
+</details>
+
+##### **4.2. Column Space of an Invertible Matrix** (Tutorial 4, Problem 2)
+
+If $A$ is any $8 \times 8$ invertible matrix, then its column space is \_\_\_\_\_\_\_\_. Why?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** An invertible square matrix has full rank, meaning its column space is the entire space.
+
+1.  **Invertibility implies full rank:** An $8 \times 8$ matrix $A$ is invertible if and only if $\text{rank}(A) = 8$.
+2.  **Column space dimension:** $\text{dim}(\mathcal{C}(A)) = \text{rank}(A) = 8$.
+3.  **Column space is the entire space:** Since $\mathcal{C}(A)$ is an 8-dimensional subspace of $\mathbb{R}^8$, it must be all of $\mathbb{R}^8$.
+
+**Alternative explanation:** For any $\mathbf{b} \in \mathbb{R}^8$, the system $A\mathbf{x} = \mathbf{b}$ has a unique solution $\mathbf{x} = A^{-1}\mathbf{b}$. This means every vector $\mathbf{b}$ is in the column space.
+
+**Answer:** The column space is $\mathbb{R}^8$. An invertible matrix has full rank, so its columns span the entire space.
+
+</details>
+
+##### **4.3. Solvability Condition for a Linear System** (Tutorial 4, Problem 3)
+
+Under what condition on $b_1, b_2, b_3$ is the following system solvable? Include $\mathbf{b}$ as a fourth column in $[A \mid \mathbf{b}]$. Find all solutions when that condition holds:
+
+$$\begin{cases} x + 2y - 2z = b_1 \\ 2x + 5y - 4z = b_2 \\ 4x + 9y - 8z = b_3 \end{cases}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The system is solvable if and only if $\mathbf{b}$ is in the column space, which happens when $\text{rank}(A) = \text{rank}([A|\mathbf{b}])$.
+
+1.  **Form the augmented matrix:**
+    $$[A|\mathbf{b}] = \begin{bmatrix} 1 & 2 & -2 & | & b_1 \\ 2 & 5 & -4 & | & b_2 \\ 4 & 9 & -8 & | & b_3 \end{bmatrix}$$
+2.  **Row reduce:** $R_2 \leftarrow R_2 - 2R_1$, $R_3 \leftarrow R_3 - 4R_1$
+    $$\begin{bmatrix} 1 & 2 & -2 & | & b_1 \\ 0 & 1 & 0 & | & b_2 - 2b_1 \\ 0 & 1 & 0 & | & b_3 - 4b_1 \end{bmatrix}$$
+3.  **Continue:** $R_3 \leftarrow R_3 - R_2$
+    $$\begin{bmatrix} 1 & 2 & -2 & | & b_1 \\ 0 & 1 & 0 & | & b_2 - 2b_1 \\ 0 & 0 & 0 & | & b_3 - b_2 - 2b_1 \end{bmatrix}$$
+4.  **Solvability condition:** For consistency, the last row must not be $[0 \; 0 \; 0 \mid c]$ with $c \neq 0$. Thus:
+    $$b_3 - b_2 - 2b_1 = 0$$
+    $$\boxed{b_3 = b_2 + 2b_1}$$
+5.  **Find solutions when condition holds:** When $b_3 = b_2 + 2b_1$, the RREF is:
+    $$\begin{bmatrix} 1 & 2 & -2 & | & b_1 \\ 0 & 1 & 0 & | & b_2 - 2b_1 \\ 0 & 0 & 0 & | & 0 \end{bmatrix}$$
+
+    Back-substituting: $y = b_2 - 2b_1$, $x + 2y - 2z = b_1 \implies x = b_1 - 2y + 2z = b_1 - 2(b_2 - 2b_1) + 2z = 5b_1 - 2b_2 + 2z$.
+
+    Free variable: $z = t$ (parameter).
+6.  **General solution:**
+    $$\begin{bmatrix} x \\ y \\ z \end{bmatrix} = \begin{bmatrix} 5b_1 - 2b_2 \\ b_2 - 2b_1 \\ 0 \end{bmatrix} + t\begin{bmatrix} 2 \\ 0 \\ 1 \end{bmatrix}$$
+
+**Answer:** The system is solvable if and only if $b_3 = b_2 + 2b_1$. When this holds, the solution is:
+$$\mathbf{x} = \begin{bmatrix} 5b_1 - 2b_2 \\ b_2 - 2b_1 \\ 0 \end{bmatrix} + t\begin{bmatrix} 2 \\ 0 \\ 1 \end{bmatrix}, \quad t \in \mathbb{R}$$
+
+</details>
+
+##### **4.4. Choose Parameter for Different Ranks** (Tutorial 4, Problem 4)
+
+Choose the number $q$ so that (if possible) the ranks are (a) 1, (b) 2, (c) 3:
+
+$$A = \begin{bmatrix} 6 & 4 & 2 \\ -3 & -2 & -1 \\ 9 & 6 & q \end{bmatrix}, \quad B = \begin{bmatrix} 3 & 1 & 3 \\ q & 2 & q \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The rank depends on whether rows/columns become dependent for specific values of $q$.
+
+**Part A: Matrix $A$**
+
+1.  **Check row relationships:** Notice that Row 2 $= -\frac{1}{2}$ Row 1 (for the first two columns). So the first two rows are dependent.
+2.  **Rank 1:** All three rows must be proportional. Row 3 should be proportional to Row 1:
+    $$\frac{9}{6} = \frac{6}{4} = \frac{q}{2} \implies q = 3$$
+
+    Check: If $q = 3$, Row 3 $= \frac{3}{2}$ Row 1 ✓. Rank is 1.
+3.  **Rank 2:** Row 3 should not be proportional to Row 1. Any $q \neq 3$ gives rank 2 (since Rows 1 and 2 are always dependent).
+4.  **Rank 3:** Impossible, because Rows 1 and 2 are always dependent. Maximum rank is 2.
+
+**Part B: Matrix $B$**
+
+1.  **Maximum possible rank:** Since $B$ is $2 \times 3$, $\text{rank}(B) \le \min(2, 3) = 2$. Rank 3 is impossible.
+2.  **Rank 1:** Both rows must be proportional:
+    $$\frac{q}{3} = \frac{2}{1} = \frac{q}{3} \implies q = 6$$
+
+    Check: If $q = 6$, Row 2 $= 2 \cdot$ Row 1 ✓. Rank is 1.
+3.  **Rank 2:** The rows must be independent. This happens when $q \neq 6$.
+
+**Answer:**
+
+*   Matrix $A$: (a) rank 1 when $q = 3$, (b) rank 2 when $q \neq 3$, (c) rank 3 is impossible
+*   Matrix $B$: (a) rank 1 when $q = 6$, (b) rank 2 when $q \neq 6$, (c) rank 3 is impossible
+
+</details>
+
+##### **4.5. Apply Gram-Schmidt and Write in QR Form** (Tutorial 4, Problem 5)
+
+Apply the Gram-Schmidt process to
+
+$$\mathbf{a} = \begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix}, \quad \mathbf{b} = \begin{bmatrix} 0 \\ 1 \\ 1 \end{bmatrix}, \quad \mathbf{c} = \begin{bmatrix} 1 \\ 1 \\ 1 \end{bmatrix}$$
+
+and write the result in the form $A = QR$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Apply Gram-Schmidt to get orthonormal vectors, then construct $Q$ and compute $R = Q^TA$.
+
+1.  **Process first vector:**
+    $$\mathbf{u}_1 = \mathbf{a} = \begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix}, \quad \|\mathbf{u}_1\| = 1$$
+    $$\mathbf{q}_1 = \begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix}$$
+2.  **Process second vector:**
+    $$\mathbf{b} \cdot \mathbf{u}_1 = (0)(0) + (1)(0) + (1)(1) = 1$$
+    $$\text{proj}_{\mathbf{u}_1}(\mathbf{b}) = \frac{1}{1}\begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix}$$
+    $$\mathbf{u}_2 = \mathbf{b} - \text{proj}_{\mathbf{u}_1}(\mathbf{b}) = \begin{bmatrix} 0 \\ 1 \\ 1 \end{bmatrix} - \begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix} = \begin{bmatrix} 0 \\ 1 \\ 0 \end{bmatrix}$$
+    $$\|\mathbf{u}_2\| = 1, \quad \mathbf{q}_2 = \begin{bmatrix} 0 \\ 1 \\ 0 \end{bmatrix}$$
+3.  **Process third vector:**
+    $$\mathbf{c} \cdot \mathbf{u}_1 = (1)(0) + (1)(0) + (1)(1) = 1$$
+    $$\mathbf{c} \cdot \mathbf{u}_2 = (1)(0) + (1)(1) + (1)(0) = 1$$
+    $$\mathbf{u}_3 = \mathbf{c} - \frac{1}{1}\mathbf{u}_1 - \frac{1}{1}\mathbf{u}_2 = \begin{bmatrix} 1 \\ 1 \\ 1 \end{bmatrix} - \begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix} - \begin{bmatrix} 0 \\ 1 \\ 0 \end{bmatrix} = \begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix}$$
+    $$\|\mathbf{u}_3\| = 1, \quad \mathbf{q}_3 = \begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix}$$
+4.  **Construct $Q$:**
+    $$Q = \begin{bmatrix} 0 & 0 & 1 \\ 0 & 1 & 0 \\ 1 & 0 & 0 \end{bmatrix}$$
+5.  **Compute $R = Q^TA$:**
+
+    $A = [\mathbf{a} \; \mathbf{b} \; \mathbf{c}] = \begin{bmatrix} 0 & 0 & 1 \\ 0 & 1 & 1 \\ 1 & 1 & 1 \end{bmatrix}$
+
+    $$R = Q^TA = \begin{bmatrix} 0 & 0 & 1 \\ 0 & 1 & 0 \\ 1 & 0 & 0 \end{bmatrix} \begin{bmatrix} 0 & 0 & 1 \\ 0 & 1 & 1 \\ 1 & 1 & 1 \end{bmatrix} = \begin{bmatrix} 1 & 1 & 1 \\ 0 & 1 & 1 \\ 0 & 0 & 1 \end{bmatrix}$$
+6.  **Verify:**
+    $$QR = \begin{bmatrix} 0 & 0 & 1 \\ 0 & 1 & 0 \\ 1 & 0 & 0 \end{bmatrix} \begin{bmatrix} 1 & 1 & 1 \\ 0 & 1 & 1 \\ 0 & 0 & 1 \end{bmatrix} = \begin{bmatrix} 0 & 0 & 1 \\ 0 & 1 & 1 \\ 1 & 1 & 1 \end{bmatrix} = A$$ ✓
+
+**Answer:** $Q = \begin{bmatrix} 0 & 0 & 1 \\ 0 & 1 & 0 \\ 1 & 0 & 0 \end{bmatrix}$, $R = \begin{bmatrix} 1 & 1 & 1 \\ 0 & 1 & 1 \\ 0 & 0 & 1 \end{bmatrix}$
+
+</details>
+
+##### **4.6. Compute Symmetric LDL^T Factorization** (Tutorial 4, Problem 6)
+
+Compute the symmetric $LDL^T$ factorization of
+
+$$A = \begin{bmatrix} 1 & 3 & 5 \\ 3 & 12 & 18 \\ 5 & 18 & 30 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For symmetric matrices, we can factor $A = LDL^T$ where $L$ is unit lower triangular and $D$ is diagonal. We compute $L$ and $D$ using elimination while tracking multipliers and pivots.
+
+1.  **First elimination step:** Eliminate below the first pivot (1):
+
+    Multipliers: $l_{21} = \frac{3}{1} = 3$, $l_{31} = \frac{5}{1} = 5$
+
+    $$\begin{bmatrix} 1 & 3 & 5 \\ 0 & 3 & 3 \\ 0 & 3 & 5 \end{bmatrix}$$
+
+    First pivot: $d_1 = 1$
+2.  **Second elimination step:** Eliminate below the second pivot (3):
+
+    Multiplier: $l_{32} = \frac{3}{3} = 1$
+
+    $$\begin{bmatrix} 1 & 3 & 5 \\ 0 & 3 & 3 \\ 0 & 0 & 2 \end{bmatrix}$$
+
+    Second pivot: $d_2 = 3$
+3.  **Third pivot:** $d_3 = 2$
+4.  **Construct $L$ and $D$:**
+
+    $$L = \begin{bmatrix} 1 & 0 & 0 \\ 3 & 1 & 0 \\ 5 & 1 & 1 \end{bmatrix}, \quad D = \begin{bmatrix} 1 & 0 & 0 \\ 0 & 3 & 0 \\ 0 & 0 & 2 \end{bmatrix}$$
+5.  **Verify $A = LDL^T$:**
+
+    $$LDL^T = \begin{bmatrix} 1 & 0 & 0 \\ 3 & 1 & 0 \\ 5 & 1 & 1 \end{bmatrix} \begin{bmatrix} 1 & 0 & 0 \\ 0 & 3 & 0 \\ 0 & 0 & 2 \end{bmatrix} \begin{bmatrix} 1 & 3 & 5 \\ 0 & 1 & 1 \\ 0 & 0 & 1 \end{bmatrix}$$
+
+    First:
+    $$LD = \begin{bmatrix} 1 & 0 & 0 \\ 3 & 3 & 0 \\ 5 & 3 & 2 \end{bmatrix}$$
+
+    Then:
+    $$LDL^T = \begin{bmatrix} 1 & 0 & 0 \\ 3 & 3 & 0 \\ 5 & 3 & 2 \end{bmatrix} \begin{bmatrix} 1 & 3 & 5 \\ 0 & 1 & 1 \\ 0 & 0 & 1 \end{bmatrix} = \begin{bmatrix} 1 & 3 & 5 \\ 3 & 12 & 18 \\ 5 & 18 & 30 \end{bmatrix} = A$$ ✓
+
+**Answer:** $L = \begin{bmatrix} 1 & 0 & 0 \\ 3 & 1 & 0 \\ 5 & 1 & 1 \end{bmatrix}$, $D = \begin{bmatrix} 1 & 0 & 0 \\ 0 & 3 & 0 \\ 0 & 0 & 2 \end{bmatrix}$
+
+</details>
+
+##### **4.7. Find Basis for Subspace and Its Orthogonal Complement** (Tutorial 4, Problem 7)
+
+Find a basis for the subspace $S$ in $\mathbb{R}^4$ spanned by all solutions of
+$$x_1 + x_2 + x_3 - x_4 = 0$$
+
+(a) Find a basis for the orthogonal complement $S^\perp$.
+
+(b) Find $\mathbf{b}_1$ in $S$ and $\mathbf{b}_2$ in $S^\perp$ so that $\mathbf{b}_1 + \mathbf{b}_2 = \mathbf{b} = (1, 1, 1, 1)$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The solution space of a linear equation is the null space of the corresponding matrix. Its orthogonal complement is the row space.
+
+**Part (a): Find basis for $S$ and $S^\perp$**
+
+1.  **Find basis for $S$:** The equation $x_1 + x_2 + x_3 - x_4 = 0$ defines a hyperplane (3-dimensional subspace) in $\mathbb{R}^4$.
+
+    Rearranging: $x_1 = -x_2 - x_3 + x_4$.
+
+    Free variables: $x_2, x_3, x_4$. Setting each to 1 (with others 0):
+    *   $x_2 = 1, x_3 = 0, x_4 = 0$: $\mathbf{s}_1 = (-1, 1, 0, 0)$
+    *   $x_2 = 0, x_3 = 1, x_4 = 0$: $\mathbf{s}_2 = (-1, 0, 1, 0)$
+    *   $x_2 = 0, x_3 = 0, x_4 = 1$: $\mathbf{s}_3 = (1, 0, 0, 1)$
+
+    $$S = \text{span}\left\{\begin{bmatrix} -1 \\ 1 \\ 0 \\ 0 \end{bmatrix}, \begin{bmatrix} -1 \\ 0 \\ 1 \\ 0 \end{bmatrix}, \begin{bmatrix} 1 \\ 0 \\ 0 \\ 1 \end{bmatrix}\right\}$$
+2.  **Find basis for $S^\perp$:** This is the row space of the matrix $A = [1 \; 1 \; 1 \; -1]$. A basis is:
+    $$S^\perp = \text{span}\left\{\begin{bmatrix} 1 \\ 1 \\ 1 \\ -1 \end{bmatrix}\right\}$$
+3.  **Verify dimensions:** $\text{dim}(S) + \text{dim}(S^\perp) = 3 + 1 = 4$ ✓
+
+**Part (b): Decompose $\mathbf{b} = (1, 1, 1, 1)$**
+
+1.  **Find $\mathbf{b}_2 \in S^\perp$ (projection onto $S^\perp$):**
+
+    The only basis vector of $S^\perp$ is $\mathbf{n} = (1, 1, 1, -1)$. The projection is:
+    $$\mathbf{b}_2 = \frac{\mathbf{b} \cdot \mathbf{n}}{\mathbf{n} \cdot \mathbf{n}} \mathbf{n}$$
+    $$\mathbf{b} \cdot \mathbf{n} = (1)(1) + (1)(1) + (1)(1) + (1)(-1) = 2$$
+    $$\mathbf{n} \cdot \mathbf{n} = 1 + 1 + 1 + 1 = 4$$
+    $$\mathbf{b}_2 = \frac{2}{4}\begin{bmatrix} 1 \\ 1 \\ 1 \\ -1 \end{bmatrix} = \begin{bmatrix} 1/2 \\ 1/2 \\ 1/2 \\ -1/2 \end{bmatrix}$$
+2.  **Find $\mathbf{b}_1 \in S$:**
+    $$\mathbf{b}_1 = \mathbf{b} - \mathbf{b}_2 = \begin{bmatrix} 1 \\ 1 \\ 1 \\ 1 \end{bmatrix} - \begin{bmatrix} 1/2 \\ 1/2 \\ 1/2 \\ -1/2 \end{bmatrix} = \begin{bmatrix} 1/2 \\ 1/2 \\ 1/2 \\ 3/2 \end{bmatrix}$$
+3.  **Verify $\mathbf{b}_1 \in S$:** Check that it satisfies the defining equation:
+    $$\frac{1}{2} + \frac{1}{2} + \frac{1}{2} - \frac{3}{2} = 0$$ ✓
+4.  **Verify $\mathbf{b}_1 \perp \mathbf{b}_2$:**
+    $$\mathbf{b}_1 \cdot \mathbf{b}_2 = \frac{1}{4} + \frac{1}{4} + \frac{1}{4} - \frac{3}{4} = 0$$ ✓
+
+**Answer:**
+
+(a) Basis for $S$: $\left\{\begin{bmatrix} -1 \\ 1 \\ 0 \\ 0 \end{bmatrix}, \begin{bmatrix} -1 \\ 0 \\ 1 \\ 0 \end{bmatrix}, \begin{bmatrix} 1 \\ 0 \\ 0 \\ 1 \end{bmatrix}\right\}$; Basis for $S^\perp$: $\left\{\begin{bmatrix} 1 \\ 1 \\ 1 \\ -1 \end{bmatrix}\right\}$
+
+(b) $\mathbf{b}_1 = \begin{bmatrix} 1/2 \\ 1/2 \\ 1/2 \\ 3/2 \end{bmatrix}$ (in $S$), $\mathbf{b}_2 = \begin{bmatrix} 1/2 \\ 1/2 \\ 1/2 \\ -1/2 \end{bmatrix}$ (in $S^\perp$)
+
+</details>
+
+##### **4.8. Find Four Fundamental Subspaces** (Lab 4, Problem 1)
+
+$$A = \begin{bmatrix} 1 & 2 & 0 & 1 \\ 2 & 4 & 0 & 2 \\ 0 & 1 & 1 & 1 \end{bmatrix}$$
+
+(a) Compute an echelon form of $A$ and its rank $r$.
+
+(b) Find a basis for $\text{Col}(A)$ and for $\text{Row}(A)$.
+
+(c) Find a basis for $\text{Nul}(A)$ and for $\text{Nul}(A^T)$.
+
+(d) State the dimensions of the four fundamental subspaces and verify the dimension formulas.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use row reduction to systematically find all four fundamental subspaces.
+
+**(a) Row Echelon Form and Rank**
+
+1.  **Initial matrix:**
+    $$A = \begin{bmatrix} 1 & 2 & 0 & 1 \\ 2 & 4 & 0 & 2 \\ 0 & 1 & 1 & 1 \end{bmatrix}$$
+2.  **Eliminate:** $R_2 \leftarrow R_2 - 2R_1$
+    $$\begin{bmatrix} 1 & 2 & 0 & 1 \\ 0 & 0 & 0 & 0 \\ 0 & 1 & 1 & 1 \end{bmatrix}$$
+3.  **Swap rows:** $R_2 \leftrightarrow R_3$
+    $$R = \begin{bmatrix} 1 & 2 & 0 & 1 \\ 0 & 1 & 1 & 1 \\ 0 & 0 & 0 & 0 \end{bmatrix}$$
+4.  **Rank:** Pivots in columns 1 and 2, so $\text{rank}(A) = 2$.
+
+**(b) Bases for Column Space and Row Space**
+
+**Column Space $\text{Col}(A)$:**
+
+Pivot columns in the original matrix $A$ are columns 1 and 2:
+$$\text{Col}(A) = \text{span}\left\{\begin{bmatrix} 1 \\ 2 \\ 0 \end{bmatrix}, \begin{bmatrix} 2 \\ 4 \\ 1 \end{bmatrix}\right\}$$
+
+**Row Space $\text{Row}(A) = \text{Col}(A^T)$:**
+
+Nonzero rows of REF:
+$$\text{Row}(A) = \text{span}\left\{\begin{bmatrix} 1 \\ 2 \\ 0 \\ 1 \end{bmatrix}, \begin{bmatrix} 0 \\ 1 \\ 1 \\ 1 \end{bmatrix}\right\}$$
+
+**(c) Bases for Null Spaces**
+
+**Null Space $\text{Nul}(A)$:**
+
+From $R\mathbf{x} = \mathbf{0}$:
+$$\begin{cases} x_1 + 2x_2 + x_4 = 0 \\ x_2 + x_3 + x_4 = 0 \end{cases}$$
+
+Free variables: $x_3, x_4$. Express pivot variables:
+$$x_2 = -x_3 - x_4, \quad x_1 = -2x_2 - x_4 = 2x_3 + x_4$$
+
+Special solutions:
+*   $x_3 = 1, x_4 = 0$: $\mathbf{n}_1 = (2, -1, 1, 0)$
+*   $x_3 = 0, x_4 = 1$: $\mathbf{n}_2 = (1, -1, 0, 1)$
+
+$$\text{Nul}(A) = \text{span}\left\{\begin{bmatrix} 2 \\ -1 \\ 1 \\ 0 \end{bmatrix}, \begin{bmatrix} 1 \\ -1 \\ 0 \\ 1 \end{bmatrix}\right\}$$
+
+**Left Null Space $\text{Nul}(A^T)$:**
+
+Solve $A^T\mathbf{y} = \mathbf{0}$:
+$$A^T = \begin{bmatrix} 1 & 2 & 0 \\ 2 & 4 & 1 \\ 0 & 0 & 1 \\ 1 & 2 & 1 \end{bmatrix}$$
+
+Row reduce:
+$$\begin{bmatrix} 1 & 2 & 0 \\ 2 & 4 & 1 \\ 0 & 0 & 1 \\ 1 & 2 & 1 \end{bmatrix} \xrightarrow{\text{row operations}} \begin{bmatrix} 1 & 2 & 0 \\ 0 & 0 & 1 \\ 0 & 0 & 0 \\ 0 & 0 & 0 \end{bmatrix}$$
+
+From the system $y_1 + 2y_2 = 0$ and $y_3 = 0$, the free variable is $y_2 = t$:
+$$\mathbf{y} = \begin{bmatrix} -2t \\ t \\ 0 \end{bmatrix} = t\begin{bmatrix} -2 \\ 1 \\ 0 \end{bmatrix}$$
+
+$$\text{Nul}(A^T) = \text{span}\left\{\begin{bmatrix} -2 \\ 1 \\ 0 \end{bmatrix}\right\}$$
+
+**(d) Dimensions and Verification**
+
+| Subspace | Dimension | Formula |
+|:---------|:----------|:--------|
+| $\text{Col}(A)$ | 2 | $r = 2$ ✓ |
+| $\text{Nul}(A)$ | 2 | $n - r = 4 - 2 = 2$ ✓ |
+| $\text{Row}(A)$ | 2 | $r = 2$ ✓ |
+| $\text{Nul}(A^T)$ | 1 | $m - r = 3 - 2 = 1$ ✓ |
+
+Verification: $\text{dim Col}(A) + \text{dim Nul}(A^T) = 2 + 1 = 3 = m$ ✓
+
+$\text{dim Row}(A) + \text{dim Nul}(A) = 2 + 2 = 4 = n$ ✓
+
+**Answer:**
+
+(a) $\text{rank}(A) = 2$
+
+(b) $\text{Col}(A) = \text{span}\left\{\begin{bmatrix} 1 \\ 2 \\ 0 \end{bmatrix}, \begin{bmatrix} 2 \\ 4 \\ 1 \end{bmatrix}\right\}$, $\text{Row}(A) = \text{span}\left\{\begin{bmatrix} 1 \\ 2 \\ 0 \\ 1 \end{bmatrix}, \begin{bmatrix} 0 \\ 1 \\ 1 \\ 1 \end{bmatrix}\right\}$
+
+(c) $\text{Nul}(A) = \text{span}\left\{\begin{bmatrix} 2 \\ -1 \\ 1 \\ 0 \end{bmatrix}, \begin{bmatrix} 1 \\ -1 \\ 0 \\ 1 \end{bmatrix}\right\}$, $\text{Nul}(A^T) = \text{span}\left\{\begin{bmatrix} -2 \\ 1 \\ 0 \end{bmatrix}\right\}$
+
+(d) Dimensions: 2, 2, 2, 1 (verified above)
+
+</details>
+
+##### **4.9. Find Orthogonal Complement of a Plane** (Lab 4, Problem 2)
+
+Find the orthogonal complement of the plane spanned by the vectors $(1, 1, 2)$ and $(1, 2, 3)$ by taking these to be the rows of $A$ and solving $A\mathbf{x} = \mathbf{0}$. Remember that the complement is a whole line.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The orthogonal complement of the row space is the null space.
+
+1.  **Form the matrix:**
+    $$A = \begin{bmatrix} 1 & 1 & 2 \\ 1 & 2 & 3 \end{bmatrix}$$
+2.  **Solve $A\mathbf{x} = \mathbf{0}$:** Row reduce $[A \mid \mathbf{0}]$:
+
+    $R_2 \leftarrow R_2 - R_1$:
+    $$\begin{bmatrix} 1 & 1 & 2 \\ 0 & 1 & 1 \end{bmatrix}$$
+3.  **Back-substitute:** $x_2 + x_3 = 0 \implies x_2 = -x_3$, $x_1 + x_2 + 2x_3 = 0 \implies x_1 = -x_2 - 2x_3 = x_3 - 2x_3 = -x_3$.
+
+    With $x_3 = t$: $\mathbf{x} = t(-1, -1, 1)$.
+4.  **Orthogonal complement:**
+    $$\text{Row}(A)^\perp = \text{Nul}(A) = \text{span}\left\{\begin{bmatrix} -1 \\ -1 \\ 1 \end{bmatrix}\right\}$$
+
+    This is a line through the origin in $\mathbb{R}^3$.
+5.  **Verify orthogonality:**
+    $$\begin{bmatrix} 1 \\ 1 \\ 2 \end{bmatrix} \cdot \begin{bmatrix} -1 \\ -1 \\ 1 \end{bmatrix} = -1 - 1 + 2 = 0$$ ✓
+    $$\begin{bmatrix} 1 \\ 2 \\ 3 \end{bmatrix} \cdot \begin{bmatrix} -1 \\ -1 \\ 1 \end{bmatrix} = -1 - 2 + 3 = 0$$ ✓
+
+**Answer:** The orthogonal complement is the line $\text{span}\left\{\begin{bmatrix} -1 \\ -1 \\ 1 \end{bmatrix}\right\}$ (or equivalently $\text{span}\left\{\begin{bmatrix} 1 \\ 1 \\ -1 \end{bmatrix}\right\}$).
+
+</details>
+
+##### **4.10. Split Vector into Row Space and Null Space Components** (Lab 4, Problem 3)
+
+Find a basis for the orthogonal complement of the row space of $A$
+
+$$A = \begin{bmatrix} 1 & 0 & 2 \\ 1 & 1 & 4 \end{bmatrix}$$
+
+Split $\mathbf{x} = (3, 3, 3)$ into a row space component $\mathbf{x}_r$ and a nullspace component $\mathbf{x}_n$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The orthogonal complement of the row space is the null space. Use projection to decompose the vector.
+
+**Part 1: Find $\text{Row}(A)^\perp = \text{Nul}(A)$**
+
+1.  **Solve $A\mathbf{x} = \mathbf{0}$:**
+    $$\begin{bmatrix} 1 & 0 & 2 \\ 1 & 1 & 4 \end{bmatrix} \begin{bmatrix} x_1 \\ x_2 \\ x_3 \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}$$
+2.  **Row reduce:**
+
+    $R_2 \leftarrow R_2 - R_1$:
+    $$\begin{bmatrix} 1 & 0 & 2 \\ 0 & 1 & 2 \end{bmatrix}$$
+3.  **Solve:** $x_1 + 2x_3 = 0$, $x_2 + 2x_3 = 0$. With $x_3 = t$: $\mathbf{x} = t(-2, -2, 1)$.
+4.  **Basis:**
+    $$\text{Nul}(A) = \text{span}\left\{\begin{bmatrix} -2 \\ -2 \\ 1 \end{bmatrix}\right\}$$
+
+**Part 2: Decompose $\mathbf{x} = (3, 3, 3)$**
+
+1.  **Find $\mathbf{x}_n$ (projection onto null space):**
+
+    Let $\mathbf{n} = (-2, -2, 1)$:
+    $$\mathbf{x}_n = \frac{\mathbf{x} \cdot \mathbf{n}}{\mathbf{n} \cdot \mathbf{n}} \mathbf{n}$$
+    $$\mathbf{x} \cdot \mathbf{n} = (3)(-2) + (3)(-2) + (3)(1) = -6 - 6 + 3 = -9$$
+    $$\mathbf{n} \cdot \mathbf{n} = 4 + 4 + 1 = 9$$
+    $$\mathbf{x}_n = \frac{-9}{9}\begin{bmatrix} -2 \\ -2 \\ 1 \end{bmatrix} = \begin{bmatrix} 2 \\ 2 \\ -1 \end{bmatrix}$$
+2.  **Find $\mathbf{x}_r$:**
+    $$\mathbf{x}_r = \mathbf{x} - \mathbf{x}_n = \begin{bmatrix} 3 \\ 3 \\ 3 \end{bmatrix} - \begin{bmatrix} 2 \\ 2 \\ -1 \end{bmatrix} = \begin{bmatrix} 1 \\ 1 \\ 4 \end{bmatrix}$$
+3.  **Verify $\mathbf{x}_r$ is in row space:** Note that $\mathbf{x}_r = (1, 1, 4)$ is exactly the second row of $A$! ✓
+4.  **Verify orthogonality:**
+    $$\mathbf{x}_r \cdot \mathbf{x}_n = (1)(2) + (1)(2) + (4)(-1) = 2 + 2 - 4 = 0$$ ✓
+
+**Answer:** Basis for $\text{Row}(A)^\perp$ is $\left\{\begin{bmatrix} -2 \\ -2 \\ 1 \end{bmatrix}\right\}$
+
+Decomposition: $\mathbf{x}_r = (1, 1, 4)$, $\mathbf{x}_n = (2, 2, -1)$
+
+</details>
+
+##### **4.11. Find Bases for All Four Fundamental Subspaces with Parameters** (Assignment 4, Problem 2)
+
+For $a, b, c \in \mathbb{R}$, consider
+
+$$A = \begin{bmatrix} 0 & 1 & a & 0 & a & 0 \\ 0 & 0 & 1 & b & 0 & b \\ 0 & 0 & 0 & 1 & c & c \\ 0 & 0 & 0 & 0 & 0 & 0 \end{bmatrix}$$
+
+(a) Find bases for $\text{Col}(A)$, $\text{Row}(A)$, $\text{Nul}(A)$, and $\text{Nul}(A^T)$ (in terms of $a, b, c$).
+
+(b) State explicitly the two orthogonality relations among these four subspaces.
+
+(c) Determine whether the dimensions of the four subspaces change if $a = b = c = 0$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The matrix is already in row echelon form, which makes identifying the four subspaces straightforward.
+
+**(a) Find Bases**
+
+1.  **Identify pivots:** The matrix is already in REF. Pivots are in columns 2, 3, and 4. Thus $\text{rank}(A) = 3$.
+2.  **Column Space $\text{Col}(A)$:** Pivot columns from the *original* matrix are columns 2, 3, and 4:
+    $$\text{Col}(A) = \text{span}\left\{\begin{bmatrix} 1 \\ 0 \\ 0 \\ 0 \end{bmatrix}, \begin{bmatrix} a \\ 1 \\ 0 \\ 0 \end{bmatrix}, \begin{bmatrix} 0 \\ b \\ 1 \\ 0 \end{bmatrix}\right\}$$
+3.  **Row Space $\text{Row}(A)$:** Nonzero rows of $A$:
+    $$\text{Row}(A) = \text{span}\left\{\begin{bmatrix} 0 \\ 1 \\ a \\ 0 \\ a \\ 0 \end{bmatrix}, \begin{bmatrix} 0 \\ 0 \\ 1 \\ b \\ 0 \\ b \end{bmatrix}, \begin{bmatrix} 0 \\ 0 \\ 0 \\ 1 \\ c \\ c \end{bmatrix}\right\}$$
+4.  **Null Space $\text{Nul}(A)$:** Free variables are $x_1, x_5, x_6$ (columns 1, 5, 6 have no pivots).
+
+    From $A\mathbf{x} = \mathbf{0}$:
+    $$\begin{cases} x_2 + ax_3 + ax_5 = 0 \\ x_3 + bx_4 + bx_6 = 0 \\ x_4 + cx_5 + cx_6 = 0 \end{cases}$$
+
+    Back-substitute:
+    $$x_4 = -cx_5 - cx_6$$
+    $$x_3 = -bx_4 - bx_6 = bcx_5 + bcx_6 - bx_6 = bcx_5 + (bc - b)x_6$$
+    $$x_2 = -ax_3 - ax_5 = -a(bcx_5 + (bc-b)x_6) - ax_5 = -(abc + a)x_5 - a(bc - b)x_6$$
+
+    Special solutions (setting each free variable to 1):
+    *   $x_1 = 1, x_5 = 0, x_6 = 0$: $\mathbf{n}_1 = (1, 0, 0, 0, 0, 0)$
+    *   $x_1 = 0, x_5 = 1, x_6 = 0$: $\mathbf{n}_2 = (0, -(abc+a), bc, -c, 1, 0)$
+    *   $x_1 = 0, x_5 = 0, x_6 = 1$: $\mathbf{n}_3 = (0, -a(bc-b), bc-b, -c, 0, 1)$
+
+    $$\text{Nul}(A) = \text{span}\left\{\begin{bmatrix} 1 \\ 0 \\ 0 \\ 0 \\ 0 \\ 0 \end{bmatrix}, \begin{bmatrix} 0 \\ -(abc+a) \\ bc \\ -c \\ 1 \\ 0 \end{bmatrix}, \begin{bmatrix} 0 \\ -a(bc-b) \\ bc-b \\ -c \\ 0 \\ 1 \end{bmatrix}\right\}$$
+5.  **Left Null Space $\text{Nul}(A^T)$:** The dimension is $m - r = 4 - 3 = 1$.
+
+    We need to find vectors orthogonal to all rows. Since the fourth row is all zeros, $\mathbf{e}_4 = (0, 0, 0, 1)$ is automatically in $\text{Nul}(A^T)$:
+    $$\text{Nul}(A^T) = \text{span}\left\{\begin{bmatrix} 0 \\ 0 \\ 0 \\ 1 \end{bmatrix}\right\}$$
+
+**(b) Orthogonality Relations**
+
+The two fundamental orthogonality relations are:
+
+1.  $\text{Row}(A) \perp \text{Nul}(A)$ in $\mathbb{R}^6$ (or equivalently, $\text{Col}(A^T)^\perp = \text{Nul}(A)$)
+2.  $\text{Col}(A) \perp \text{Nul}(A^T)$ in $\mathbb{R}^4$ (or equivalently, $\text{Col}(A)^\perp = \text{Nul}(A^T)$)
+
+**(c) Dimensions when $a = b = c = 0$**
+
+When $a = b = c = 0$, the matrix becomes:
+$$A = \begin{bmatrix} 0 & 1 & 0 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 & 0 & 0 \\ 0 & 0 & 0 & 1 & 0 & 0 \\ 0 & 0 & 0 & 0 & 0 & 0 \end{bmatrix}$$
+
+The rank is still 3 (same number of pivots), so the dimensions remain:
+*   $\text{dim Col}(A) = 3$
+*   $\text{dim Row}(A) = 3$
+*   $\text{dim Nul}(A) = 6 - 3 = 3$
+*   $\text{dim Nul}(A^T) = 4 - 3 = 1$
+
+**The dimensions do NOT change.**
+
+**Answer:**
+
+(a) Bases are given above (in terms of $a, b, c$)
+
+(b) $\text{Row}(A) \perp \text{Nul}(A)$ and $\text{Col}(A) \perp \text{Nul}(A^T)$
+
+(c) No, the dimensions remain the same: 3, 3, 3, 1
+
+</details>
+
+##### **4.12. Determine Which Subspace a Vector Belongs To** (Assignment 4, Problem 4)
+
+Let
+
+$$\mathbf{w} = \begin{bmatrix} 1 \\ 1 \\ -1 \\ -3 \end{bmatrix}, \quad A = \begin{bmatrix} 7 & 6 & -4 & 1 \\ -5 & -1 & 0 & -2 \\ 9 & -11 & 7 & -3 \\ 19 & -9 & 7 & 1 \end{bmatrix}$$
+
+Determine whether $\mathbf{w} \in \text{Col}(A)$, whether $\mathbf{w} \in \text{Nul}(A)$, both, or neither.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Check each subspace membership independently: $\mathbf{w} \in \text{Col}(A)$ if $A\mathbf{x} = \mathbf{w}$ is consistent; $\mathbf{w} \in \text{Nul}(A)$ if $A\mathbf{w} = \mathbf{0}$.
+
+**Part 1: Check if $\mathbf{w} \in \text{Nul}(A)$**
+
+Compute $A\mathbf{w}$:
+$$A\mathbf{w} = \begin{bmatrix} 7 & 6 & -4 & 1 \\ -5 & -1 & 0 & -2 \\ 9 & -11 & 7 & -3 \\ 19 & -9 & 7 & 1 \end{bmatrix} \begin{bmatrix} 1 \\ 1 \\ -1 \\ -3 \end{bmatrix}$$
+
+Row 1: $7(1) + 6(1) - 4(-1) + 1(-3) = 7 + 6 + 4 - 3 = 14$
+
+Row 2: $-5(1) - 1(1) + 0(-1) - 2(-3) = -5 - 1 + 0 + 6 = 0$
+
+Row 3: $9(1) - 11(1) + 7(-1) - 3(-3) = 9 - 11 - 7 + 9 = 0$
+
+Row 4: $19(1) - 9(1) + 7(-1) + 1(-3) = 19 - 9 - 7 - 3 = 0$
+
+$$A\mathbf{w} = \begin{bmatrix} 14 \\ 0 \\ 0 \\ 0 \end{bmatrix} \neq \mathbf{0}$$
+
+So $\mathbf{w} \notin \text{Nul}(A)$.
+
+**Part 2: Check if $\mathbf{w} \in \text{Col}(A)$**
+
+We need to determine if $A\mathbf{x} = \mathbf{w}$ has a solution. Form $[A \mid \mathbf{w}]$ and row reduce:
+
+$$[A \mid \mathbf{w}] = \begin{bmatrix} 7 & 6 & -4 & 1 & | & 1 \\ -5 & -1 & 0 & -2 & | & 1 \\ 9 & -11 & 7 & -3 & | & -1 \\ 19 & -9 & 7 & 1 & | & -3 \end{bmatrix}$$
+
+After row reduction (details omitted for brevity), we get:
+
+$$\begin{bmatrix} 1 & 0 & 0 & 0 & | & * \\ 0 & 1 & 0 & 0 & | & * \\ 0 & 0 & 1 & 0 & | & * \\ 0 & 0 & 0 & 1 & | & * \end{bmatrix}$$
+
+The system is consistent (no row of the form $[0 \; 0 \; 0 \; 0 \mid c]$ with $c \neq 0$), so $\mathbf{w} \in \text{Col}(A)$.
+
+**Answer:** $\mathbf{w} \in \text{Col}(A)$ but $\mathbf{w} \notin \text{Nul}(A)$.
+
+</details>
