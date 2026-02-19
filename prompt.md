@@ -17,7 +17,7 @@ You will transform source material (presentations transcript) into a complete Qu
 ```yaml
 ---
 title: "W[X]. [Topic 1], [Topic 2], [Topic 3]"
-author: "Zakhar Podyakov"
+author: "[Author of course]"
 date: "[Current date in 'MMMM D, YYYY' format]"
 format: html
 engine: knitr
@@ -85,7 +85,7 @@ Provide a bulleted list of essential terms with concise, precise definitions:
 
 ---
 
-### **Section 3: Formulas** (REQUIRED)
+### **Section 3: Formulas** (REQUIRED FOR MATH)
 
 Start with: `#### **3. Formulas**`
 
@@ -103,7 +103,7 @@ Provide a bulleted list of formulas relevant for problem-solving:
 
 ---
 
-### **Section 4: Examples** (REQUIRED)
+### **Section 4: Examples** (REQUIRED) (SECTION 3 IF FORMULAS MISSING)
 
 Start with: `#### **4. Examples**`
 
@@ -337,3 +337,18 @@ b) $\begin{pmatrix} -4 \\ -2 \end{pmatrix}$
 4. **Accuracy:** Correct errors, verify formulas, ensure mathematical rigor
 5. **Pedagogical quality:** Explain WHY, not just WHAT
 6. **Consistency:** Maintain formatting throughout the entire document
+
+---
+
+| Course | Author(s) |
+|:-------|:----------|
+| Academic Writing and Argumentation I–II | Georgy Gelvanovsky |
+| Analytical Geometry and Linear Algebra I–II | Salman Ahmadi-Asl |
+| Mathematical Analysis I–II | Mohammad Alkousa |
+| Data Structures and Algorithms | Nikolai Kudasov |
+| Software Systems Analysis and Design | Eugene Zouev, Munir Makhmutov |
+| Theoretical Computer Science | Manuel Mazzara |
+| Computer Architecture | Artem Burmyakov |
+| Introduction to Programming | Eugene Zouev, Munir Makhmutov |
+| Logic and Discrete Math | Andrey Frolov |
+
