@@ -228,7 +228,7 @@ def process_file(filepath):
                 and ends_with_colon(line)
                 and not is_list_item(line)
                 and i + 1 < len(lines)
-                and re.match(r'^\s*- ', lines[i + 1])):
+                and re.match(r'^\s*[-*+] ', lines[i + 1])):
             result.append('')
             added += 1
 
