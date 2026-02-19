@@ -60,8 +60,8 @@ AI_PATTERNS = [
 
 
 def is_list_item(line):
-    """Line starts with a list marker like '1. ' or '- '."""
-    return bool(re.match(r'^\s*(\d+\.\s|- )', line))
+    """Line starts with a list marker like '1. ', '- ', or '* '."""
+    return bool(re.match(r'^\s*(\d+\.\s|[-*+] )', line))
 
 
 def ends_with_colon(line):
