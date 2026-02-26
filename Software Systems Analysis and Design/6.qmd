@@ -1,0 +1,1407 @@
+---
+title: "W6. C++ Templates Part 2, Functional Objects, Lambda Expressions"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "February 26, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Technical Details: Template Synonyms and Default Arguments**
+
+Before diving into advanced template features, there are two important technical details that every C++ programmer should know about template syntax.
+
+###### **1.1.1 `typename` vs. `class` — Identical Notation**
+
+When declaring a type parameter in a template header, you can use either the `typename` keyword or the `class` keyword. They are completely interchangeable in this context:
+
+```cpp
+template <typename T>   // Using 'typename'
+class C { ... };
+
+template <class T>      // Using 'class' — identical meaning
+class C { ... };
+```
+
+Both mean exactly the same thing: "T is a type parameter." The `class` keyword predates `typename` (it was used in early C++ before `typename` was introduced), so you will encounter both forms in real-world code. In this context, `class` does **not** mean that the actual type must be a class — it can be `int`, `double`, or any type at all.
+
+###### **1.1.2 Default Template Arguments**
+
+Just like function parameters can have default values, template parameters can have **default arguments**. This lets you omit some (or all) type arguments when instantiating a template:
+
+```cpp
+template <typename elem = char>   // Default type: char
+class String {
+    // ...
+};
+
+String<char> s;      // OK: explicit argument
+String<> ps1;        // OK: uses default → String<char>
+String ps2;          // ERROR: angle brackets cannot be omitted entirely
+```
+
+Multiple parameters with defaults work similarly, but there is a critical rule: **defaults must appear after non-default parameters** (just like with function parameters):
+
+```cpp
+template <int N = 10, typename elem = char>
+class List { ... };
+
+List<5, int> lst1;    // OK: both provided
+List<7>      lst2;    // OK: List<7, char>
+List<>       lst3;    // OK: List<10, char>
+List         lst4;    // ERROR: angle brackets cannot be omitted
+List<, int*> lst5;    // ERROR: cannot skip first argument with a comma
+```
+
+The incorrect ordering would be `<int N = 10, typename elem>` with no default — `elem` after a defaulted `N` would be fine, but you cannot have a non-defaulted parameter after a defaulted one.
+
+##### **1.2 Function Template Instantiation (Continued)**
+
+###### **1.2.1 Incomplete Instantiation**
+
+Consider a template that takes both a **non-type parameter** (an integer) and a **type parameter**:
+
+```cpp
+template <unsigned N, typename T>
+T Power(T v) {
+    T res = v;
+    for (int i = 1; i < N; i++)
+        res *= v;
+    return res;
+}
+```
+
+This template raises `v` to the power `N`. When you call it, the compiler needs to know *both* `N` and `T`. But what if you only provide some of them explicitly?
+
+*   **Complete explicit instantiation** — all parameters specified explicitly:
+    ```cpp
+    int d1 = Power<5, int>(1.2);   // N=5, T=int (explicit)
+    ```
+    The compiler uses `int` for `T`, so `1.2` is first *converted* to `int` (becoming `1`), then `Power<5, int>(1)` returns `1`.
+*   **Incomplete explicit instantiation** — some parameters deduced from arguments:
+    ```cpp
+    double d2 = Power<5>(1.2);     // N=5 (explicit), T=double (deduced from 1.2)
+    ```
+    Here `N = 5` is taken from the explicit instantiation, and `T = double` is *deduced* from the argument `1.2`. The computation proceeds entirely in `double`, yielding approximately `2.48832`.
+
+This explains why `d1` and `d2` are different: in the first case, the `double` literal `1.2` is *truncated* to `int` before the computation.
+
+###### **1.2.2 The Three Kinds of Instantiation**
+
+For a template `F` with two type parameters:
+
+```cpp
+template <typename T1, typename T2>
+void F(T1 v1, T2 v2) { ... }
+```
+
+There are three ways to instantiate it:
+
+| Call | Kind | Description |
+|------|------|-------------|
+| `F<int, float>(v1, v2)` | Complete explicit | All types given explicitly |
+| `F<int>(v1, v2)` | Incomplete explicit | First type explicit, rest deduced |
+| `F(v1, v2)` | Implicit | All types deduced from arguments |
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.3 Standard Conversion and How to Prevent It**
+
+When a template parameter is deduced from an argument, the compiler applies **standard conversions** — for example, an array decays to a pointer:
+
+```cpp
+template <typename T>
+int spaceOf(T x) {
+    int bytes = sizeof(x);
+    return bytes / 4 + (bytes % 4 > 0);
+}
+
+int arr[10];          // sizeof(arr) = 40
+cout << spaceOf(arr); // T deduced as int* (pointer!), sizeof(int*) = 8 → prints 2
+```
+
+The array `arr` **decays** to `int*` during type deduction, losing its size information. To prevent this conversion and preserve the array type, pass the parameter **by reference**:
+
+```cpp
+template <typename T>
+int spaceOf(T& x) {            // Pass by reference: no decay
+    int bytes = sizeof(x);
+    return bytes / 4 + (bytes % 4 > 0);
+}
+
+cout << spaceOf(arr);          // T deduced as int[10], sizeof = 40 → prints 10
+cout << spaceOf<int[10]>();     // Same result, explicit type version
+```
+
+Passing by reference prevents the standard array-to-pointer conversion, so `T` is deduced as the full array type `int[10]`.
+
+##### **1.3 Explicit Specialization**
+
+So far, templates use a *single* implementation for *all* types. But sometimes one implementation does not fit all cases. Consider a class template with a `less` comparison method:
+
+```cpp
+template <typename T>
+class C {
+public:
+    bool less(T& v1, T& v2) {
+        return v1 < v2;   // Works for int, double, etc.
+    }
+};
+```
+
+This works perfectly for numeric types:
+
+```cpp
+C<int>    c1;
+bool l1 = c1.less(1, 2);         // true: uses operator<
+
+C<double> c2;
+bool l2 = c2.less(1.2, 3.4);     // true: uses operator<
+```
+
+But what about C-style strings (`const char*`)? The `<` operator compares **pointer addresses**, not the string contents. So `c3.less("abcd", "abcx")` would compare memory addresses — clearly wrong.
+
+###### **1.3.1 Explicit Specialization Syntax**
+
+The solution is to provide an **explicit specialization** — a completely separate implementation for a specific type. This is written with an empty `template<>` header and the target type in the class name:
+
+```cpp
+// Generic form: works for all types using operator<
+template <typename T>
+class C {
+public:
+    bool less(T& v1, T& v2) {
+        return v1 < v2;
+    }
+};
+
+// Explicit specialization: specific implementation for const char*
+template <>
+class C<const char*> {
+public:
+    bool less(const char* v1, const char* v2) {
+        return strcmp(v1, v2) < 0;   // Correct string comparison
+    }
+};
+```
+
+Key points about the syntax:
+
+*   `template <>` — the empty angle brackets signal "this is a specialization, not a new template"
+*   `C<const char*>` — the specific type that triggers this specialization
+*   The body can be **completely different** from the primary template
+
+###### **1.3.2 How the Compiler Chooses**
+
+The compiler automatically selects the appropriate version:
+
+```cpp
+C<int>         c1;  // → uses generic form
+C<double>      c2;  // → uses generic form
+C<const char*> c3;  // → uses explicit specialization
+```
+
+```cpp
+bool l1 = c1.less(1, 2);              // Generic: 1 < 2 = true
+bool l2 = c2.less(1.2, 3.4);         // Generic: 1.2 < 3.4 = true
+bool l4 = c3.less("abcd", "abcx");   // Specialization: strcmp = true
+```
+
+###### **1.3.3 Summary of Explicit Specialization Rules**
+
+*   You can define explicit specialization(s) for any specific type argument(s)
+*   The specialization's implementation may differ completely from the primary template
+*   All specializations together with the primary template form **one family of classes**
+*   Every use — whether primary or specialized — is resolved entirely at **compile time**
+
+###### **1.3.4 Instantiation vs. Specialization — The Key Distinction**
+
+These two terms are often confused:
+
+*   **Instantiation**: The compiler *automatically generates* a class or function from the primary template by substituting the actual type. You do not write this code — the compiler creates it.
+*   **Specialization**: *You* write a separate implementation for a specific type. The compiler uses it instead of generating from the primary template.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.3.5 Compile-Time Factorial: A Metaprogramming Example**
+
+Explicit specialization enables a powerful technique: **compile-time computation**. The standard recursive factorial function runs at runtime:
+
+```cpp
+unsigned long Fact(unsigned N) {
+    if (N < 2) return 1;
+    return N * Fact(N - 1);
+}
+```
+
+We can instead make the compiler compute the factorial at compile time using a recursive function template with explicit specializations as the **base cases**:
+
+**First (broken) attempt** — the template calls itself recursively without a stopping condition:
+
+```cpp
+template <unsigned N>
+unsigned long Fact() {
+    if (N < 2) return 1;
+    return N * Fact<N - 1>();   // Infinite compile-time recursion!
+}
+```
+
+Even though the `if` check is there, the compiler instantiates `Fact<N-1>` regardless, leading to infinite recursion (`Fact<3>` → `Fact<2>` → `Fact<1>` → `Fact<0>` → `Fact<UINT_MAX>` → ...).
+
+**Correct solution** — add explicit specializations for the base cases:
+
+```cpp
+// Primary template: N! = N × (N-1)!
+template <unsigned N>
+unsigned long Fact() {
+    return N * Fact<N - 1>();
+}
+
+// Explicit specialization: base case 0! = 1
+template <>
+unsigned long Fact<0>() {
+    return 1;
+}
+
+// Explicit specialization: base case 1! = 1
+template <>
+unsigned long Fact<1>() {
+    return 1;
+}
+```
+
+Now `Fact<3>()` causes the compiler to instantiate `Fact<3>` (→ calls `Fact<2>`) and `Fact<2>` (→ calls `Fact<1>`). `Fact<1>` is the explicit specialization that returns `1` — no further instantiation. The chain terminates. The entire computation happens at **compile time**: the call `Fact<5>()` is replaced by the constant `120` in the compiled binary.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.4 Partial Specialization**
+
+Explicit specialization targets *one specific type*. But what if you want a different implementation for an *entire category* of types, such as all pointer types?
+
+###### **1.4.1 The Problem**
+
+Continuing the `C<T>` example with the `less` method: suppose you add an explicit specialization for `const char*` (string comparison via `strcmp`). Now consider two `int*` pointers:
+
+```cpp
+int* x = ..., *y = ...;
+C<int*> c;
+c.less(x, y);   // Which template is used?
+```
+
+The generic form would compare pointer *addresses* — not the values they point to. You need a different implementation for `C<int*>`, `C<double*>`, `C<float*>`, etc. Writing an explicit specialization for every possible pointer type is impractical.
+
+###### **1.4.2 Partial Specialization Syntax**
+
+A **partial specialization** provides a different implementation for a *subset* of types — here, all pointer types:
+
+```cpp
+// Generic form: for all types
+template <typename T>
+class C {
+public:
+    bool less(const T& v1, const T& v2) { return v1 < v2; }
+};
+
+// Explicit specialization: for const char* specifically
+template <>
+class C<const char*> {
+public:
+    bool less(const char* v1, const char* v2) { return strcmp(v1, v2) < 0; }
+};
+
+// Partial specialization: for ALL pointer types (except const char*)
+template <typename T>
+class C<T*> {
+public:
+    bool less(T* v1, T* v2) { return *v1 < *v2; }   // Dereference and compare values
+};
+```
+
+The partial specialization header `template <typename T>` looks like a regular template header. The specialization is indicated by the `<T*>` in `class C<T*>` — the type pattern that defines the subset.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.4.3 Type Subset Patterns**
+
+You can specialize a template for various categories of types:
+
+| Pattern | Subset |
+|---------|--------|
+| `C<const T>` | All `const` types |
+| `C<T*>` | All pointer types |
+| `C<T&>` | All reference types |
+| `C<T[N]>` | All fixed-size array types |
+| `C<type (*)(T)>` | Pointers to functions with parameter of type `T` |
+| `C<T (*)()>` | Pointers to functions returning type `T` |
+
+###### **1.4.4 The Template Concept — Full Picture**
+
+After learning all three forms, here is the complete picture:
+
+| Form | Syntax | Purpose |
+|------|--------|---------|
+| Primary template | `template <typename T> class C { ... }` | General implementation for all types |
+| Explicit specialization | `template <> class C<int> { ... }` | Special implementation for one specific type |
+| Partial specialization | `template <typename T> class C<T*> { ... }` | Special implementation for a subset of types |
+
+###### **1.4.5 Template Parameters — Three Kinds**
+
+Templates can have three different kinds of parameters:
+
+1.  **Type parameters** — the actual argument is a type:
+    ```cpp
+    template <typename T>
+    class C1 { ... };
+    C1<int> c1;
+    ```
+2.  **Non-type parameters** — the actual argument is a constant value, address, or non-local variable:
+    ```cpp
+    template <int N, int* P>
+    class C2 { ... };
+    C2<10, &p> c2;
+    ```
+3.  **Template parameters** (template template parameters) — the actual argument is itself a template:
+    ```cpp
+    template <template <typename X> class Container>
+    class C3 { ... };
+
+    template <typename TT> class A1 { ... };
+    C3<A1> c3;   // A1 is passed as a template argument
+    ```
+
+Template template parameters let you write a class that is generic not just over element types, but also over the *container* used to store them — for example, a `Stack` that can work on top of either an `Array` or a `List`.
+
+##### **1.5 Functional Objects and Template Adapters**
+
+Until now, algorithms like `find` were hardcoded to search for specific values. This section introduces a more powerful and flexible design: **functional objects**.
+
+###### **1.5.1 The Problem: Hardcoded Conditions**
+
+A naive `find` function for integer arrays:
+
+```cpp
+const int* find1(const int* pool, int n, int x) {
+    const int* p = pool;
+    for (int i = 0; i < n; i++) {
+        if (*p == x) return p;   // Hardcoded equality check
+        p++;
+    }
+    return 0;   // Not found
+}
+```
+
+This only works for equality comparison. What if you want "find the first element greater than 5" or "find the first element in range [0, 100]"?
+
+###### **1.5.2 Function Pointers: A First Step**
+
+The classic solution is to pass a **function pointer** (callback):
+
+```cpp
+const int* find2(const int* pool, int n, bool (*cond)(int)) {
+    const int* p = pool;
+    for (int i = 0; i < n; i++) {
+        if (cond(*p)) return p;
+        p++;
+    }
+    return 0;
+}
+
+// Usage:
+bool cond_eq5(int x) { return x == 5; }
+bool cond_range_0_100(int x) { return (x >= 0) && (x <= 100); }
+
+int* p1 = find2(A, 100, cond_eq5);
+int* p2 = find2(A, 100, cond_range_0_100);
+```
+
+This is flexible, but has performance drawbacks:
+
+*   The function call through a pointer prevents inlining
+*   On modern pipelined CPUs, indirect calls cause pipeline stalls
+
+###### **1.5.3 Functional Objects: A Better Solution**
+
+A **functional type** is any type that has a user-defined **call operator** `operator()`. An object of such a type is called a **functional object** (or *functor*):
+
+```cpp
+class C {
+public:
+    int operator()(int x) { return expr; }
+};
+
+C c;
+int z = c(1);   // Equivalent to c.operator()(1)
+```
+
+The call `c(1)` looks exactly like a function call, but the compiler knows the *static type* of `c` — so `operator()` can be **inlined**, eliminating the overhead of an indirect call.
+
+###### **1.5.4 Generalized Comparator Template**
+
+We can generalize the concept into a template comparator:
+
+```cpp
+template <typename T, T N>
+class Greater {
+public:
+    bool operator()(T x) const { return x > N; }   // inline
+};
+```
+
+Now `find2` can be rewritten to accept `Greater<int, 5>` as its condition:
+
+```cpp
+const int* find2(const int* pool, int n, Greater<int, 5> c) {
+    const int* p = pool;
+    for (int i = 0; i < n; i++) {
+        if (c(*p)) return p;
+        p++;
+    }
+    return 0;
+}
+```
+
+But this still only searches integer arrays with one fixed comparator. The next step is to make `find` itself a template.
+
+###### **1.5.5 Generic Find: The Full Solution**
+
+```cpp
+template <typename T, typename Comparator>
+T* find3(T* pool, int n, Comparator comp) {
+    T* p = pool;
+    for (int i = 0; i < n; i++) {
+        if (comp(*p)) return p;
+        p++;
+    }
+    return 0;
+}
+```
+
+This is the ideal solution:
+
+*   Works with arrays of **any type** `T`
+*   Accepts **any condition** via `Comparator`
+*   `comp(*p)` is **inlined** by the compiler (no pointer overhead)
+
+Usage with different comparators:
+
+```cpp
+int* p = find3(A, 100, Greater<int, 5>());
+int* q = find3(A, 100, Greater_equal<int, 10>());
+int* r = find3(A, 100, Less<int, 0>());
+```
+
+Note the `()` at the end of `Greater<int, 5>()` — this creates a **temporary object** (an instance of the comparator class) to pass to `find3`.
+
+###### **1.5.6 Template Adapters**
+
+A **template adapter** is a class that wraps or combines other functional objects to build new predicates. Instead of writing every comparator from scratch, you can build complex predicates by *composing* simpler ones:
+
+```cpp
+// A general two-argument comparator
+template <typename T>
+class Compare {
+public:
+    bool operator()(T x, T y) const { return x < y; }
+};
+
+// Adapter: checks if x is positive (i.e., 0 < x)
+template <typename T>
+class Positive {
+public:
+    bool operator()(T x) const {
+        return Compare<T>()(0, x);   // Creates Compare<T> and calls it
+    }
+};
+
+// Adapter: checks if x < N
+template <typename T, T N>
+class Less {
+public:
+    bool operator()(T x) const {
+        return Compare<T>()(x, N);
+    }
+};
+```
+
+The expression `Compare<T>()` creates a temporary `Compare<T>` object. Then `(0, x)` calls its `operator()`. This design is the basis for the Standard Library's `<functional>` header.
+
+##### **1.6 Functional Programming and Lambda Expressions**
+
+Modern C++ (since C++11) supports **functional programming** features. At its core, functional programming treats functions as first-class values — you can store, pass, and return functions just like integers or strings.
+
+###### **1.6.1 The Two Cornerstones of Functional Programming**
+
+1.  **Immutable objects**: Operations should transform data into new data without modifying the original. Methods should have no side effects — given the same input, they always return the same output. This makes programs easier to test, verify, and parallelize.
+2.  **Functions as first-class citizens**: Functions are values. You can define them anywhere, assign them to variables, pass them as arguments, and return them from other functions.
+
+C++ supports functional features while remaining a multi-paradigm language. Here are the four ways to define a function-like entity in C++:
+
+*   As an **instance member function**
+*   As a **static class member function**
+*   As a **standalone function**
+*   As a **functional object** (an object with `operator()`)
+*   As a **lambda expression** (introduced in C++11)
+
+###### **1.6.2 Lambda Expressions: Syntax**
+
+A **lambda expression** is an *anonymous function* — a function without a name, defined inline wherever you need it. The syntax:
+
+```
+[capture](parameters) -> return_type { body }
+```
+
+Example:
+
+```cpp
+auto f = [](int x) { return x + 1; };   // Lambda: add 1 to x
+
+int y = f(5);    // y = 6
+auto f1 = f;     // Lambdas can be assigned
+```
+
+The `[]` at the start is the **capture list** (explained shortly). The return type is **deduced** automatically from the `return` statement (in simple cases).
+
+###### **1.6.3 Lambda as an Anonymous Function Literal**
+
+Just as integer literals like `5` or `3.14` are unnamed constant values, a lambda is an **unnamed function literal**:
+
+*   `5`, `3.14`, `"abcd"` — unnamed objects (literals)
+*   `[](int x) { return x + 1; }` — unnamed function (function literal)
+
+You can even call a lambda immediately without storing it first:
+
+```cpp
+[](int x) { return x - 1; }(7);   // Calls the lambda immediately with argument 7
+// Weird but legal! Result: 6
+```
+
+Or in shorthand for the simplest possible lambda (no parameters, void return):
+
+```cpp
+[](){}()   // Valid C++: lambda with no params, empty body, called immediately
+```
+
+###### **1.6.4 Specifying the Return Type**
+
+The compiler deduces the return type automatically in many cases, but you can also specify it explicitly:
+
+| Lambda | Return Type |
+|--------|-------------|
+| `[](int x) { return x + 1; }` | Deduced as `int` (single `return`) |
+| `[](int& x) { ++x; }` | Assumed `void` (no `return`) |
+| `[](int x) -> int { cout << "Hi"; return x + 1; }` | Explicitly `int` |
+| `[] { return sizeof(int); }` | Deduced; `()` can be omitted if no params |
+
+Since C++14, explicit return types are rarely needed — the compiler can deduce them even for multi-statement lambdas.
+
+###### **1.6.5 Closures: Capturing the Surrounding Context**
+
+A lambda that references only its own parameters is called a **closed term**:
+
+```cpp
+[](int x) { return x + 1; }   // No external dependencies
+```
+
+A lambda that references variables from the *surrounding scope* is called an **open term** or **closure**. The `[]` capture list controls exactly how these external variables are captured:
+
+| Capture Syntax | Meaning |
+|----------------|---------|
+| `[]` | Capture nothing (closed term) |
+| `[x]` | Capture `x` by **value** (immutable copy) |
+| `[&x]` | Capture `x` by **reference** |
+| `[=]` | Capture all used variables by value |
+| `[&]` | Capture all used variables by reference |
+| `[=, &a]` | Capture all by value, except `a` by reference |
+| `[*this]` | Capture `this` pointer by value |
+| `[this]` | Capture `this` pointer by reference |
+
+**Capture by value** — takes an immutable copy at the time the lambda is created:
+
+```cpp
+int more = 1;
+auto addMore1 = [more](int x) { return x + more; };
+addMore1(10);   // Returns 11
+more = 9999;
+addMore1(10);   // Still returns 11 (captured the value 1, not a reference)
+```
+
+**Capture by reference** — sees the current value of the variable each time:
+
+```cpp
+int more = 1;
+auto addMore2 = [&more](int x) { return x + more; };
+addMore2(10);   // Returns 11
+more = 9999;
+addMore2(10);   // Returns 10009 (sees the updated value)
+```
+
+**Mutable captured values** — by default, value-captured variables are immutable inside the lambda. Use `mutable` to allow modification (modifies the lambda's *copy*, not the original):
+
+```cpp
+int more = 1;
+auto addMore4 = [more](int x) mutable {
+    more++;           // OK: modifies the lambda's copy
+    return x + more;
+};
+addMore4(10);        // Returns 12 (lambda's copy: 1 → 2)
+cout << more;        // Prints 1 (original unchanged)
+more = 10;
+addMore4(10);        // Returns 13 (lambda's copy now: 2 → 3, independent of original)
+```
+
+**Global variables** do not need to be captured — they are always accessible and modifiable from inside any lambda:
+
+```cpp
+int more = 1;  // global
+auto addMore = [](int x) { return x + more; };  // OK: more is global
+```
+
+###### **1.6.6 Lambda's Internal Representation**
+
+Under the hood, the compiler transforms every lambda into an anonymous class with `operator()`:
+
+```cpp
+// This lambda:
+[](int x) { return x + 1; }
+
+// Is internally equivalent to:
+class __LambdaName__ {
+public:
+    int operator()(int x) const { return x + 1; }
+};
+__LambdaName__()   // Temporary object created when lambda is written
+```
+
+So `[](int x) { return x + 1; }(7)` is the same as `__LambdaName__()(7)`.
+
+For closures with captures, the captured variables become **data members** of the anonymous class.
+
+###### **1.6.7 Lambda's Type**
+
+The type of a lambda is a **unique, anonymous compiler-generated type**. You cannot write it yourself. To store a lambda, use `auto`:
+
+```cpp
+auto f = [](int x) { return x + 1; };
+```
+
+For storing and passing lambdas in a type-erased way, use `std::function<Signature>` from the `<functional>` header:
+
+```cpp
+std::function<int(int)> f = [](int x) { return x + 1; };
+f(5);   // Returns 6
+```
+
+###### **1.6.8 Lambda with STL Algorithms**
+
+Lambdas are particularly powerful when combined with STL algorithms. Instead of writing a named function just to pass to `std::sort` or `std::for_each`, you write the logic inline:
+
+```cpp
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int x = 10;
+vector<int> numbers = {5, 2, 8, 1, 9, 3, 6};
+
+// Sort ascending using a lambda comparator
+sort(numbers.begin(), numbers.end(), [](int a, int b) {
+    return a < b;
+});
+
+// Print each element plus x, capturing x by reference
+for_each(numbers.begin(), numbers.end(), [&x](int num) {
+    cout << num + x << " ";
+});
+```
+
+#### **2. Definitions**
+
+*   **Template parameter**: A placeholder in a template definition; can be a type parameter (`typename T`), a non-type parameter (e.g., `int N`), or a template parameter (another template).
+*   **Default template argument**: A default type or value for a template parameter, used when the argument is omitted at instantiation (angle brackets `<>` still required).
+*   **Complete explicit instantiation**: Template instantiation where all template parameters are specified explicitly in angle brackets at the call site.
+*   **Incomplete explicit instantiation**: Template instantiation where some parameters are given explicitly and the rest are deduced from the function arguments.
+*   **Implicit instantiation**: Template instantiation where all template parameters are deduced automatically from the types of the actual function arguments.
+*   **Standard conversion**: An automatic type conversion applied by the compiler during template argument deduction; for example, an array decays to a pointer.
+*   **Explicit specialization**: A manually written, completely separate implementation of a template for one specific type, introduced with `template <>`.
+*   **Partial specialization**: An implementation of a class template for a *subset* of types (e.g., all pointer types), using a type pattern instead of a specific type.
+*   **Primary template**: The original, general-purpose template definition from which instantiations and specializations are derived.
+*   **Template template parameter**: A template parameter whose actual argument is itself a template (not a type or value).
+*   **Metaprogramming**: Using the C++ template system to perform computations at compile time rather than at runtime.
+*   **Functional type**: Any type that has `operator()` defined, making objects of that type callable with function-call syntax.
+*   **Functional object (functor)**: An instance of a functional type — an object that can be called like a function.
+*   **Template adapter**: A class template that wraps or composes other functional objects to produce new predicates or operations.
+*   **Lambda expression**: An anonymous, inline function defined with `[capture](params) { body }` syntax; introduced in C++11.
+*   **Capture list**: The `[]` part of a lambda expression that specifies which variables from the surrounding scope are captured, and whether they are captured by value or by reference.
+*   **Closure**: A lambda expression that captures variables from its surrounding scope, creating a function with embedded state.
+*   **Closed term**: A lambda that does not depend on any external variables (empty capture list `[]`).
+*   **Open term**: A lambda that depends on variables from the surrounding scope (non-empty capture list).
+*   **Mutable lambda**: A lambda declared with the `mutable` keyword, allowing modification of value-captured variables (modifying the lambda's own copy, not the original).
+*   **`std::function`**: A standard library class template that provides a type-erased wrapper for any callable entity (function pointer, functor, or lambda).
+*   **Immutable object**: In functional programming, an object whose state cannot change after creation; operations produce new objects instead of modifying existing ones.
+
+#### **3. Examples**
+
+##### **3.1. Analyze Default Template Argument Behavior** (Lecture 6, Example 1)
+
+Given the following template:
+
+```cpp
+template <typename elem = char>
+class String { /* ... */ };
+```
+
+Which of the following declarations are valid, and what type is used for `elem` in each valid case?
+
+```cpp
+String<char> s;
+String<> ps1;
+String ps2;
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** When a template has a default argument, you can omit the argument but must still write the angle brackets `<>`. Omitting angle brackets entirely is a compile error.
+
+1.  **`String<char> s;`** — **Valid.** Explicit argument `char` is provided. `elem = char`.
+2.  **`String<> ps1;`** — **Valid.** Empty angle brackets explicitly invoke the default. `elem = char` (the default).
+3.  **`String ps2;`** — **Invalid.** You cannot write a template instantiation without angle brackets at all. This is a compile error.
+
+**Answer:**
+
+*   `String<char> s` — valid, `elem = char`
+*   `String<> ps1` — valid, `elem = char` (default used)
+*   `String ps2` — **compile error**: angle brackets cannot be omitted for template types
+
+</details>
+
+##### **3.2. Explain the Difference Between `Power<5>(1.2)` and `Power<5, int>(1.2)`** (Lecture 6, Example 2)
+
+Given:
+
+```cpp
+template <unsigned N, typename T>
+T Power(T v) {
+    T res = v;
+    for (int i = 1; i < N; i++)
+        res *= v;
+    return res;
+}
+
+int main() {
+    double d1 = Power<5>(1.2);
+    double d2 = Power<5, int>(1.2);
+    std::cout << d1 << " " << d2;
+}
+```
+
+Why are the values of `d1` and `d2` different?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Incomplete vs. complete instantiation — the type of `T` determines whether the argument `1.2` is truncated to `int` before computation.
+
+1.  **`Power<5>(1.2)` — incomplete explicit instantiation:**
+    *   `N = 5` is taken from the explicit instantiation `<5>`
+    *   `T` is *deduced* from the argument `1.2` → `T = double`
+    *   The compiler generates `double Power<5>(double v)`
+    *   Computation: $1.2^5 = 1.2 \times 1.2 \times 1.2 \times 1.2 \times 1.2 \approx 2.48832$
+    *   `d1 ≈ 2.48832`
+2.  **`Power<5, int>(1.2)` — complete explicit instantiation:**
+    *   `N = 5`, `T = int` — both taken from `<5, int>`
+    *   The compiler generates `int Power<5>(int v)`
+    *   The argument `1.2` is *converted to* `int` → becomes `1`
+    *   Computation: $1^5 = 1$
+    *   Result `1` is converted back to `double` for assignment: `d2 = 1.0`
+
+**Answer:** `d1 ≈ 2.48832`, `d2 = 1.0`. They differ because in `Power<5, int>`, the `double` literal `1.2` is truncated to `int` (value `1`) before the power computation.
+
+</details>
+
+##### **3.3. Explicit Specialization for String Comparison** (Lecture 6, Example 3)
+
+Given the generic `C<T>` template and usage with `const char*`:
+
+```cpp
+template <typename T>
+class C {
+public:
+    bool less(T& v1, T& v2) { return v1 < v2; }
+};
+
+C<const char*> c3;
+bool result = c3.less("abcd", "abcx");
+```
+
+(a) What does the generic template compute for `const char*` types?
+(b) Write an explicit specialization that correctly compares C-style strings.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `operator<` for pointers compares memory addresses, not string content. An explicit specialization replaces the generic implementation for a specific type.
+
+**(a) Generic template behavior for `const char*`:**
+
+The expression `v1 < v2` compares the *pointer values* (memory addresses of the string literals). The result is implementation-defined and has nothing to do with lexicographic string order. This is wrong for string comparison.
+
+**(b) Explicit specialization:**
+
+```cpp
+template <>
+class C<const char*> {
+public:
+    bool less(const char* v1, const char* v2) {
+        return strcmp(v1, v2) < 0;
+    }
+};
+```
+
+*   `template <>` — empty angle brackets: signals an explicit specialization
+*   `C<const char*>` — this specialization applies only when `T = const char*`
+*   `strcmp(v1, v2) < 0` — returns `true` if `v1` comes before `v2` lexicographically
+
+Now:
+```cpp
+C<int>         c1; c1.less(1, 2);           // Uses generic form
+C<const char*> c3; c3.less("abcd", "abcx"); // Uses specialization → strcmp
+```
+
+**Answer:** The generic form compares pointer addresses (wrong for strings). The explicit specialization uses `strcmp` for correct lexicographic comparison.
+
+</details>
+
+##### **3.4. Compile-Time Factorial with Explicit Specializations** (Lecture 6, Example 4)
+
+Explain why the following template causes an infinite loop at compile time, and provide a correct implementation using explicit specializations:
+
+```cpp
+// Broken version
+template <unsigned N>
+unsigned long Fact() {
+    if (N < 2) return 1;
+    return N * Fact<N - 1>();
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The compiler instantiates templates at compile time. Even if a branch is never *executed* at runtime, the compiler still *instantiates* all referenced templates — leading to infinite compile-time recursion without a proper base case.
+
+**Why the broken version fails:**
+
+When the compiler processes `Fact<3>()`, it sees the call `Fact<3 - 1>()` = `Fact<2>()`. It must instantiate `Fact<2>`, which references `Fact<1>`, which references `Fact<0>`, which references `Fact<UINT_MAX>`, and so on — infinite recursion. The `if (N < 2)` check is evaluated at *runtime*, but instantiation happens at *compile time*.
+
+**Correct implementation:**
+
+```cpp
+// Primary template: recursive case
+template <unsigned N>
+unsigned long Fact() {
+    return N * Fact<N - 1>();
+}
+
+// Base case: 0! = 1
+template <>
+unsigned long Fact<0>() {
+    return 1;
+}
+
+// Base case: 1! = 1
+template <>
+unsigned long Fact<1>() {
+    return 1;
+}
+```
+
+**How it works:**
+
+```
+Fact<3>() → 3 * Fact<2>()
+Fact<2>() → 2 * Fact<1>()
+Fact<1>() → 1   ← explicit specialization, terminates!
+```
+
+The compiler instantiates `Fact<3>`, `Fact<2>`, then hits `Fact<1>` — the explicit specialization returns `1` without calling `Fact<0>`. Recursion stops. The result `6` is computed entirely at compile time.
+
+**Answer:** The broken version causes infinite compile-time instantiation because the `if` check is a runtime construct, not a compile-time termination. The fix is to add explicit specializations for `N=0` and `N=1` that immediately return `1` without recursing.
+
+</details>
+
+##### **3.5. Partial Specialization for Pointer Types** (Lecture 6, Example 5)
+
+Given the following templates:
+
+```cpp
+template <typename T>
+class C {
+public:
+    bool less(const T& v1, const T& v2) { return v1 < v2; }
+};
+
+template <>
+class C<const char*> {
+public:
+    bool less(const char* v1, const char* v2) { return strcmp(v1, v2) < 0; }
+};
+```
+
+Add a partial specialization for all pointer types (except `const char*`) that compares the *pointed-to values*, not the addresses.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Partial specialization uses a type pattern (here `T*`) to match an entire category of types. The compiler picks the most specific matching specialization.
+
+```cpp
+// Partial specialization for all T* types
+template <typename T>
+class C<T*> {
+public:
+    bool less(T* v1, T* v2) {
+        return *v1 < *v2;   // Dereference to compare actual values
+    }
+};
+```
+
+Now the compiler resolves each instantiation as follows:
+
+*   `C<int>` — uses **generic form** (no match for int in specializations)
+*   `C<double>` — uses **generic form**
+*   `C<const char*>` — uses **explicit specialization** (most specific match)
+*   `C<int*>` — uses **partial specialization** with `T = int`
+*   `C<double*>` — uses **partial specialization** with `T = double`
+
+```cpp
+int a = 3, b = 5;
+C<int*> cp;
+bool result = cp.less(&a, &b);   // *(&a) < *(&b) → 3 < 5 → true
+```
+
+**Answer:** The partial specialization `template <typename T> class C<T*>` matches all pointer types. For `C<int*>`, `T` is deduced as `int`, and the body dereferences both pointers to compare values.
+
+</details>
+
+##### **3.6. Fibonacci Numbers with Explicit Specializations** (Lecture 6, Exercise 3)
+
+Implement a compile-time Fibonacci function using a function template with explicit specializations for the base cases:
+
+$\text{Fib}(1) = 1$, $\text{Fib}(2) = 1$, $\text{Fib}(N) = \text{Fib}(N-1) + \text{Fib}(N-2)$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Just like compile-time factorial, compile-time Fibonacci requires explicit specializations as base cases to stop the template recursion. Without them, the compiler would recurse infinitely.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+// Primary template: Fib(N) = Fib(N-1) + Fib(N-2)
+template <unsigned N>
+unsigned long Fib() {
+    return Fib<N - 1>() + Fib<N - 2>();
+}
+
+// Base case: Fib(1) = 1
+template <>
+unsigned long Fib<1>() {
+    return 1;
+}
+
+// Base case: Fib(2) = 1
+template <>
+unsigned long Fib<2>() {
+    return 1;
+}
+
+int main() {
+    cout << Fib<1>() << endl;   // 1
+    cout << Fib<2>() << endl;   // 1
+    cout << Fib<3>() << endl;   // 2
+    cout << Fib<5>() << endl;   // 5
+    cout << Fib<10>() << endl;  // 55
+}
+```
+
+**How it works for `Fib<5>()`:**
+
+```
+Fib<5> = Fib<4> + Fib<3>
+Fib<4> = Fib<3> + Fib<2>
+Fib<3> = Fib<2> + Fib<1>
+Fib<2> = 1  ← specialization
+Fib<1> = 1  ← specialization
+```
+
+All computation happens at compile time. The call `Fib<10>()` is replaced by the constant `55` in the binary.
+
+**Answer:** The primary template computes `Fib<N-1>() + Fib<N-2>()`. Explicit specializations for `N=1` and `N=2` return `1` and terminate the recursion.
+
+</details>
+##### **3.7. Functional Objects: Generic Find** (Tutorial 6, Problem 1)
+
+Given the `find3` function template:
+
+```cpp
+template <typename T, typename Comparator>
+T* find3(T* pool, int n, Comparator comp) {
+    T* p = pool;
+    for (int i = 0; i < n; i++) {
+        if (comp(*p)) return p;
+        p++;
+    }
+    return 0;
+}
+```
+
+And the comparator templates:
+
+```cpp
+template <typename T, T N>
+class Greater {
+public:
+    bool operator()(T x) const { return x > N; }
+};
+
+template <typename T, T N>
+class Less {
+public:
+    bool operator()(T x) const { return x < N; }
+};
+```
+
+Write code to find (a) the first element greater than 5, and (b) the first element less than 0, in an integer array `int A[100]`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `find3` accepts any callable object whose `operator()` takes one `T` argument. The comparator object is passed as a temporary `Comparator()`.
+
+**(a) First element greater than 5:**
+
+```cpp
+int* p = find3(A, 100, Greater<int, 5>());
+//                     ^^^^^^^^^^^^^^^^
+//                     Creates a temporary Greater<int,5> object
+if (p != nullptr) {
+    cout << "Found: " << *p << endl;
+} else {
+    cout << "Not found" << endl;
+}
+```
+
+*   `T` is deduced as `int` from `A` (which is `int*`)
+*   `Comparator` is deduced as `Greater<int, 5>`
+*   For each element, the compiler calls `comp(*p)` which inlines to `*p > 5`
+
+**(b) First element less than 0:**
+
+```cpp
+int* q = find3(A, 100, Less<int, 0>());
+if (q != nullptr) {
+    cout << "Found negative: " << *q << endl;
+}
+```
+
+**Answer:**
+
+```cpp
+int* p = find3(A, 100, Greater<int, 5>());   // (a)
+int* q = find3(A, 100, Less<int, 0>());      // (b)
+```
+
+</details>
+
+##### **3.8. Lambda Closures: Capture by Value vs. Reference** (Tutorial 6, Problem 2)
+
+Trace the output of the following program and explain each result:
+
+```cpp
+int more = 1;
+
+auto addMore1 = [more](int x) { return x + more; };
+auto addMore2 = [&more](int x) { return x + more; };
+
+cout << addMore1(10) << endl;  // (a)
+cout << addMore2(10) << endl;  // (b)
+
+more = 9999;
+
+cout << addMore1(10) << endl;  // (c)
+cout << addMore2(10) << endl;  // (d)
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Value capture (`[more]`) makes an immutable copy at lambda creation. Reference capture (`[&more]`) always sees the current value of the variable.
+
+1.  **`addMore1(10)` before change (a):** `more` was captured by value as `1`. Returns $10 + 1 = 11$.
+2.  **`addMore2(10)` before change (b):** `more` is captured by reference. Current value is `1`. Returns $10 + 1 = 11$.
+3.  **`addMore1(10)` after `more = 9999` (c):** The lambda holds its own copy of `more = 1`, independent of the original. Returns $10 + 1 = 11$. Unchanged.
+4.  **`addMore2(10)` after `more = 9999` (d):** The lambda holds a reference to `more`. Current value is `9999`. Returns $10 + 9999 = 10009$.
+
+**Answer:**
+
+```
+11    // (a): value capture, more=1
+11    // (b): reference capture, more=1
+11    // (c): value capture, copy still holds 1
+10009 // (d): reference capture, sees updated more=9999
+```
+
+</details>
+
+##### **3.9. Standard Conversion and Its Prevention** (Lab 6, Problem 1)
+
+Explain the output of the following program and the reason `spaceOf(arr)` gives different results in the two versions:
+
+**Version 1 — pass by value:**
+```cpp
+template <typename T>
+int spaceOf(T x) {
+    int bytes = sizeof(x);
+    return bytes / 4 + (bytes % 4 > 0);
+}
+
+int arr[10];
+cout << spaceOf(arr) << endl;        // Output: ?
+cout << spaceOf<int[10]>() << endl;  // This version takes no argument
+```
+
+**Version 2 — pass by reference:**
+```cpp
+template <typename T>
+int spaceOf(T& x) {
+    int bytes = sizeof(x);
+    return bytes / 4 + (bytes % 4 > 0);
+}
+
+int arr[10];
+cout << spaceOf(arr) << endl;        // Output: ?
+cout << spaceOf<int[10]>() << endl;  // This version takes no argument
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Arrays decay to pointers when passed by value. Passing by reference prevents this decay and preserves the array type.
+
+**Version 1 (pass by value):**
+
+*   `spaceOf(arr)`: The array `arr` decays to `int*` during argument passing. `T` is deduced as `int*`. `sizeof(int*)` is typically 8 bytes on a 64-bit system. Result: $8/4 + (8\%4 > 0) = 2 + 0 = 2$.
+*   The template with no argument `spaceOf<int[10]>()` uses the type directly: `sizeof(int[10]) = 40`. Result: $40/4 + (40\%4 > 0) = 10 + 0 = 10$.
+
+**Version 2 (pass by reference):**
+
+*   `spaceOf(arr)`: Passing by reference (`T& x`) prevents array-to-pointer decay. `T` is deduced as `int[10]`. `sizeof(int[10]) = 40`. Result: $40/4 + 0 = 10$.
+*   Same result as explicit `spaceOf<int[10]>()`.
+
+**Summary:**
+
+| Call | Version 1 (by value) | Version 2 (by reference) |
+|------|----------------------|--------------------------|
+| `spaceOf(arr)` | 2 (pointer size) | 10 (array size) |
+| `spaceOf<int[10]>()` | 10 | 10 |
+
+**Answer:** Version 1 outputs `2` for `spaceOf(arr)` because the array decays to a pointer. Version 2 outputs `10` because the reference prevents decay and `sizeof` measures the full array.
+
+</details>
+
+##### **3.10. Create a Wrapper Class Template with Explicit Specialization** (Lab 6, Task 1)
+
+Create a class template called `Wrapper` that wraps a single value of any type and provides a `getValue()` member function. Then, provide an explicit specialization for `const char*` where `getValue()` returns the **length** of the string instead of the string itself.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The generic template stores and returns the value. The explicit specialization for `const char*` overrides this behavior to return the string length.
+
+```cpp
+#include <iostream>
+#include <cstring>
+using namespace std;
+
+// Generic template: stores and returns any value
+template <typename T>
+class Wrapper {
+    T value;
+public:
+    Wrapper(T v) : value(v) { }
+    T getValue() const { return value; }
+};
+
+// Explicit specialization: for const char* return string length
+template <>
+class Wrapper<const char*> {
+    const char* value;
+public:
+    Wrapper(const char* v) : value(v) { }
+    size_t getValue() const { return strlen(value); }
+};
+
+int main() {
+    Wrapper<int>    wi(42);
+    Wrapper<double> wd(3.14);
+    Wrapper<const char*> ws("Hello");
+
+    cout << wi.getValue() << endl;  // 42
+    cout << wd.getValue() << endl;  // 3.14
+    cout << ws.getValue() << endl;  // 5 (length of "Hello")
+}
+```
+
+**Answer:** The generic `Wrapper<T>` stores and returns the value unchanged. `Wrapper<const char*>` stores the pointer but returns `strlen(value)` — the number of characters in the string.
+
+</details>
+
+##### **3.11. Implement a Dictionary Class Template with Partial Specialization** (Lab 6, Task 2)
+
+(a) Implement a `Dictionary<K, V>` class template with member functions `get(K key)`, `put(K key, V value)`, `remove(K key)`, and `size()`.
+
+(b) Add a partial specialization `Dictionary<K, int>` where `get(K key)` returns the **absolute value** of the stored integer, and `size()` returns the **sum** of all values.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The partial specialization `Dictionary<K, int>` covers all cases where `V = int`, regardless of `K`. It provides completely different semantics for `get` and `size`.
+
+```cpp
+#include <iostream>
+#include <map>
+#include <cstdlib>
+#include <numeric>
+using namespace std;
+
+// Generic Dictionary template
+template <typename K, typename V>
+class Dictionary {
+    map<K, V> data;
+public:
+    V get(K key) const {
+        return data.at(key);   // Throws if key not found
+    }
+    void put(K key, V value) {
+        data[key] = value;
+    }
+    void remove(K key) {
+        data.erase(key);
+    }
+    int size() const {
+        return data.size();
+    }
+};
+
+// Partial specialization for int values
+template <typename K>
+class Dictionary<K, int> {
+    map<K, int> data;
+public:
+    int get(K key) const {
+        return abs(data.at(key));   // Return absolute value
+    }
+    void put(K key, int value) {
+        data[key] = value;
+    }
+    void remove(K key) {
+        data.erase(key);
+    }
+    int size() const {
+        int sum = 0;
+        for (auto& pair : data)
+            sum += pair.second;
+        return sum;   // Return sum of all values
+    }
+};
+
+int main() {
+    // Generic version
+    Dictionary<string, double> d1;
+    d1.put("pi", 3.14);
+    d1.put("e", 2.71);
+    cout << d1.get("pi") << endl;   // 3.14
+    cout << d1.size() << endl;      // 2 (count)
+
+    // Partial specialization (K=string, V=int)
+    Dictionary<string, int> d2;
+    d2.put("x", -5);
+    d2.put("y", 3);
+    cout << d2.get("x") << endl;   // 5 (absolute value of -5)
+    cout << d2.size() << endl;     // -2 (sum: -5 + 3)
+}
+```
+
+**Answer:** The generic template provides standard map behavior. The partial specialization for `int` values overrides `get` to return `abs(value)` and `size` to return the sum of all stored integers.
+
+</details>
+
+##### **3.12. Implement Custom Map and Filter with Lambdas** (Lab 6, Task 3)
+
+Implement `customMap` and `customFilter` functions that accept a `vector<int>` and a callback function pointer. Then demonstrate them with lambda expressions.
+
+*   `customMap(vec, func)` applies `func` to each element and returns a new vector with results.
+*   `customFilter(vec, pred)` returns a new vector containing only elements for which `pred` returns `true`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Both functions take a function pointer. You can pass a lambda expression directly where a function pointer is expected (if the lambda has no captures).
+
+```cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+
+// Map: apply func to every element
+vector<int> customMap(const vector<int>& vec, int (*func)(int)) {
+    vector<int> result;
+    for (int elem : vec) {
+        result.push_back(func(elem));
+    }
+    return result;
+}
+
+// Filter: keep elements for which pred returns true
+vector<int> customFilter(const vector<int>& vec, bool (*pred)(int)) {
+    vector<int> result;
+    for (int elem : vec) {
+        if (pred(elem)) result.push_back(elem);
+    }
+    return result;
+}
+
+int main() {
+    vector<int> nums = {1, 2, 3, 4, 5};
+
+    // Map: square each element
+    auto squared = customMap(nums, [](int x) { return x * x; });
+    // squared = {1, 4, 9, 16, 25}
+
+    // Map: double each element
+    auto doubled = customMap(nums, [](int x) { return x * 2; });
+    // doubled = {2, 4, 6, 8, 10}
+
+    // Filter: keep only odd numbers
+    auto odds = customFilter(nums, [](int x) { return x % 2 != 0; });
+    // odds = {1, 3, 5}
+
+    // Filter: keep only even numbers
+    auto evens = customFilter(nums, [](int x) { return x % 2 == 0; });
+    // evens = {2, 4}
+
+    // Print results
+    for (int v : squared) cout << v << " ";  // 1 4 9 16 25
+    cout << endl;
+    for (int v : odds) cout << v << " ";     // 1 3 5
+    cout << endl;
+}
+```
+
+**Answer:** `customMap` builds a new vector by applying `func` to each element. `customFilter` builds a new vector of elements satisfying `pred`. Lambdas with no capture list `[]` are implicitly convertible to function pointers.
+
+</details>
+
