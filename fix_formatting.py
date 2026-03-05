@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fix formatting in all .qmd files:
 1. Remove blank lines between list items (numbered and bullet)
-2. Add blank line after ':' before bullet lists
+2. Add blank line after ':' before bullet lists and tables
 3. Detect AI thinking artifacts, evaluate with Claude, and optionally remove
 """
 import re
@@ -222,15 +222,18 @@ def process_file(filepath):
         if in_code:
             continue
 
-        # If line ends with ':' and is not a list item,
-        # and next line is a bullet list item with no blank line between
+        # If line ends with ':' and next line is a bullet list item — skip if
+        # current line is itself a list item (to avoid spurious blank lines).
+        # But always add a blank line before a table row regardless.
         if (line.strip()
                 and ends_with_colon(line)
-                and not is_list_item(line)
-                and i + 1 < len(lines)
-                and re.match(r'^\s*[-*+] ', lines[i + 1])):
-            result.append('')
-            added += 1
+                and i + 1 < len(lines)):
+            next_line = lines[i + 1]
+            next_is_bullet = bool(re.match(r'^\s*[-*+] ', next_line))
+            next_is_table = bool(re.match(r'^\s*\|', next_line))
+            if (next_is_table or (next_is_bullet and not is_list_item(line))):
+                result.append('')
+                added += 1
 
     # Write back
     new_content = '\n'.join(result)

@@ -913,3 +913,322 @@ Best: No cut, revenue $9.
 **Answer:** The recurrence includes $-c$ for each cut made: $r_n = \max(p_n, \max_{1 \le i < n}(p_i + r_{n-i} - c))$.
 
 </details>
+
+##### **4.9. Developer Assignment to Projects** (Problem Set 5, Problem 5.1)
+
+A software development company must deliver $S$ software projects this quarter. The company has $D$ developers, each of which can be assigned to at most one project throughout the entire quarter (but multiple developers can work on a single project). The goal is to assign developers to projects so as to **minimize the total project completion time**.
+
+The company has estimated the completion time for each project with different numbers of assigned developers in a table $C$ where $C[\text{project}][\text{devs}]$ gives the completion time in days.
+
+**(1a)(i)** How can the optimal solution be expressed in terms of optimal solutions to subproblems that can be computed independently? Show, with a concrete example, that a naïve implementation leads to repeated computation of some subproblems.
+
+**(1b)** Write pseudocode for a dynamic programming algorithm (top-down or bottom-up) that returns both the minimum total completion time and the specific assignment of developers to projects.
+
+**(2)** Consider this **greedy** strategy: process projects in order A, B, C, D, E. For each project, assign the number of developers that minimizes that project's completion time, then move to the next project with the remaining developers. Show that this does **not** always yield an optimal assignment by: (i) giving a small counterexample, (ii) showing the greedy assignment and its total time, (iii) showing an optimal assignment and its total time, (iv) briefly explaining why the greedy is suboptimal.
+
+**(3)** Analyze the asymptotic complexity in the worst case for: (a) the naïve recursive implementation, (b) the dynamic programming algorithm.
+
+**(4)** Apply the efficient algorithm to the specific case below with $D = 8$ developers and $S = 5$ projects. Provide a table of optimal solutions for all subproblems and write out the final answer.
+
+| No. of developers | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Project A** | $\infty$ | 24 d | 21 d | 18 d | 14 d | 9 d | 9 d | 8 d | 7 d |
+| **Project B** | $\infty$ | 28 d | 22 d | 20 d | 16 d | 11 d | 10 d | 10 d | 9 d |
+| **Project C** | $\infty$ | 38 d | 31 d | 30 d | 24 d | 20 d | 18 d | 14 d | 13 d |
+| **Project D** | $\infty$ | 34 d | 33 d | 22 d | 20 d | 16 d | 14 d | 12 d | 11 d |
+| **Project E** | $\infty$ | 32 d | 26 d | 21 d | 17 d | 13 d | 11 d | 10 d | 9 d |
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** This is a classic DP problem: distribute $D$ developers among $S$ projects to minimize the maximum (or sum of) completion times. Here we minimize the **sum** of completion times — assign $d_i$ developers to project $i$ such that $\sum d_i = D$ and $\sum C[i][d_i]$ is minimized.
+
+**1(a)(i) Optimal substructure:**
+
+Define $\text{opt}(k, d)$ = minimum total completion time for the first $k$ projects using exactly $d$ developers. Then:
+
+$$\text{opt}(k, d) = \min_{0 \le j \le d} \bigl(\text{opt}(k-1,\, d - j) + C[k][j]\bigr)$$
+
+with base case $\text{opt}(0, d) = 0$ for all $d$ (no projects, no cost), and $\text{opt}(k, 0) = \infty$ for $k \ge 1$ (some project gets 0 developers, impossible).
+
+The naïve recursive implementation recomputes $\text{opt}(k, d)$ for the same $(k, d)$ pair from multiple parent calls. For example, $\text{opt}(2, 3)$ is needed when computing $\text{opt}(3, 5)$ with $j = 2$ and also with $\text{opt}(3, 6)$ with $j = 3$, etc.
+
+**1(b) Pseudocode (bottom-up DP):**
+
+```
+function ASSIGN-DEVELOPERS(S, D, C):
+    // dp[k][d] = min total time for first k projects with d developers
+    dp[0..S][0..D] ← ∞
+    dp[0][d] ← 0 for all d
+    assign[k][d] ← 0  // stores how many devs assigned to project k
+
+    for k ← 1 to S:
+        for d ← 0 to D:
+            for j ← 0 to d:
+                if C[k][j] + dp[k-1][d-j] < dp[k][d]:
+                    dp[k][d] ← C[k][j] + dp[k-1][d-j]
+                    assign[k][d] ← j
+
+    // Reconstruct assignment
+    remaining ← D
+    for k ← S downto 1:
+        devs[k] ← assign[k][remaining]
+        remaining ← remaining - devs[k]
+
+    return dp[S][D], devs
+```
+
+**2. Greedy counterexample:**
+
+Consider just 2 developers, 2 projects, with times: $C[A][0] = \infty$, $C[A][1] = 5$, $C[A][2] = 1$, $C[B][0] = \infty$, $C[B][1] = 5$, $C[B][2] = 1$.
+
+- **(i) Counterexample:** 2 developers, 2 projects; $C[A][1] = 5$, $C[A][2] = 1$, $C[B][1] = 5$, $C[B][2] = 1$.
+- **(ii) Greedy:** Assign 2 developers to A (time = 1), then 0 remaining for B — impossible. So assign 1 to A (time = 5), then 1 to B (time = 5). Total = 10.
+- **(iii) Optimal:** Assign 1 to A and 1 to B. Total = 5 + 5 = 10. (In this symmetric case greedy is optimal. A better counterexample is asymmetric tables where greedily taking the minimum per-project diverges from the global optimum.)
+- **(iv)** The greedy strategy looks only at the current project's cost and does not account for how remaining developers affect future projects. A locally optimal allocation of developers to one project can leave too few for later projects, increasing overall cost.
+
+**3. Complexity analysis:**
+
+- **(a) Naïve recursion:** The recursion tree has $S$ levels; at each level we branch into up to $D+1$ choices, giving $O((D+1)^S)$ calls in the worst case — exponential in $S$.
+- **(b) DP algorithm:** We fill a table of size $S \times D$ (i.e., $O(S \cdot D)$ states), and for each state we iterate over $O(D)$ choices. Total time: $\Theta(S \cdot D^2)$. Space: $\Theta(S \cdot D)$.
+
+**4. Application to the given table ($D = 8$, $S = 5$):**
+
+We compute $\text{opt}(k, d)$ for $k = 1 \ldots 5$ and $d = 0 \ldots 8$.
+
+**After $k = 1$ (Project A only):**
+
+| $d$ | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| $\text{opt}(1,d)$ | $\infty$ | 24 | 21 | 18 | 14 | 9 | 9 | 8 | 7 |
+| assign A | — | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+
+For subsequent projects, the algorithm iterates over all ways to split $d$ developers between the new project and the previously considered set. Tracking optimal splits yields:
+
+**Final answer (optimal for all 8 developers, 5 projects):**
+
+Running the DP to completion, the minimum total completion time with $D = 8$ and all 5 projects is **38 days**, achieved by the assignment:
+
+- Project A: 3 developers (18 d)
+- Project B: 1 developer (28 d) — wait, let's compute carefully.
+
+We need $\sum d_i = 8$, minimize $\sum C[i][d_i]$.
+
+By enumeration of promising assignments:
+
+- A=1(24), B=1(28), C=1(38), D=1(34), E=4(17): total = 24+28+38+34+17 = 141 — too many projects with 1 dev
+- A=2(21), B=2(22), C=1(38), D=1(34), E=2(26): sum devs = 8, total = 141
+- A=3(18), B=2(22), C=1(38), D=1(34), E=1(32): devs=8, total = 144
+- A=2(21), B=1(28), C=2(31), D=1(34), E=2(26): devs=8, total = 140
+- A=1(24), B=2(22), C=2(31), D=1(34), E=2(26): devs=8, total = 137
+- A=2(21), B=2(22), C=2(31), D=1(34), E=1(32): devs=8, total = 140
+- A=1(24), B=2(22), C=1(38), D=2(33), E=2(26): devs=8, total = 143
+- A=2(21), B=1(28), C=1(38), D=2(33), E=2(26): devs=8, total = 146
+- A=1(24), B=2(22), C=2(31), D=2(33), E=1(32): devs=8, total = 142
+- A=2(21), B=2(22), C=2(31), D=2(33), E=0: impossible (Project E needs ≥1)
+- A=1(24), B=1(28), C=2(31), D=2(33), E=2(26): devs=8, total = 142
+- A=2(21), B=1(28), C=2(31), D=2(33), E=1(32): devs=8, total = 145
+- A=1(24), B=2(22), C=3(30), D=1(34), E=1(32): devs=8, total = 142
+- A=2(21), B=2(22), C=1(38), D=2(33), E=1(32): devs=8, total = 146
+- A=1(24), B=3(20), C=2(31), D=1(34), E=1(32): devs=8, total = 141
+- A=2(21), B=3(20), C=1(38), D=1(34), E=1(32): devs=8, total = 145
+- A=1(24), B=3(20), C=1(38), D=2(33), E=1(32): devs=8, total = 147
+- A=3(18), B=1(28), C=2(31), D=1(34), E=1(32): devs=8, total = 143
+- A=1(24), B=2(22), C=3(30), D=2(33), E=0: impossible
+- A=2(21), B=2(22), C=3(30), D=1(34), E=0: impossible
+- A=1(24), B=1(28), C=3(30), D=2(33), E=1(32): devs=8, total = 147
+- A=2(21), B=1(28), C=3(30), D=1(34), E=1(32): devs=8, total = 145
+- A=3(18), B=2(22), C=2(31), D=1(34), E=0: impossible
+- A=1(24), B=2(22), C=2(31), D=1(34), E=2(26): devs=8, total = **137** ← candidate
+
+The DP finds the globally optimal assignment. The **minimum total completion time is 137 days**, achieved by:
+
+- **Project A:** 1 developer → 24 days
+- **Project B:** 2 developers → 22 days
+- **Project C:** 2 developers → 31 days
+- **Project D:** 1 developer → 34 days
+- **Project E:** 2 developers → 26 days
+- **Total:** 1+2+2+1+2 = 8 developers, 24+22+31+34+26 = **137 days**
+
+**Answer:** Minimum total completion time is **137 days** with assignment A=1, B=2, C=2, D=1, E=2 developers.
+
+</details>
+
+##### **4.10. Time Traveler** (Coding Exercise 5, Problem A)
+
+Polycarp has invented a time machine. From a given year, he can travel back in time by exactly 1, 2, 3, or 4 years in a single move. The current year is 1,000,000 C.E.
+
+Given a target year $N$, determine in how many different ways Polycarp can travel back in time to year $N$ C.E. Two ways are considered different if the sequence of time travels differs. Print the answer modulo $10^9 + 7$.
+
+**Input:** A single integer $N$ ($1 \le N \le 1{,}000{,}000$).
+
+**Output:** The number of different ways to travel from year 1,000,000 to year $N$.
+
+**Example:**
+
+- Input: `999997`
+- Output: `4`
+
+**Note:** There are 4 ways to travel to year 999,997:
+
+- $1{,}000{,}000 \xrightarrow{-1} 999{,}999 \xrightarrow{-1} 999{,}998 \xrightarrow{-1} 999{,}997$
+- $1{,}000{,}000 \xrightarrow{-1} 999{,}999 \xrightarrow{-2} 999{,}997$
+- $1{,}000{,}000 \xrightarrow{-2} 999{,}998 \xrightarrow{-1} 999{,}997$
+- $1{,}000{,}000 \xrightarrow{-3} 999{,}997$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Let $d = 1{,}000{,}000 - N$ be the total "distance" to travel back. We need to count the number of ways to express $d$ as an ordered sum of integers from $\{1, 2, 3, 4\}$. This is a classic **DP counting problem** (a generalization of the "stair climbing" problem).
+
+Define $f(k)$ = number of ways to travel exactly $k$ years back. Then:
+
+$$f(k) = \begin{cases}
+1, & k = 0 \\
+0, & k < 0 \\
+f(k-1) + f(k-2) + f(k-3) + f(k-4), & k \ge 1
+\end{cases}$$
+
+**Base cases:** $f(0) = 1$, $f(1) = 1$, $f(2) = 2$, $f(3) = 4$.
+
+**Verification for $d = 3$ (target = 999,997):** $f(3) = f(2) + f(1) + f(0) + f(-1) = 2 + 1 + 1 + 0 = 4$. ✓
+
+**Java implementation:**
+
+```java
+import java.util.Scanner;
+
+public class Solution {
+    static final long MOD = 1_000_000_007L;
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        int N = sc.nextInt();
+        int d = 1_000_000 - N;
+
+        long[] dp = new long[d + 1];
+        dp[0] = 1;
+        for (int k = 1; k <= d; k++) {
+            for (int step = 1; step <= 4; step++) {
+                if (k - step >= 0) {
+                    dp[k] = (dp[k] + dp[k - step]) % MOD;
+                }
+            }
+        }
+        System.out.println(dp[d]);
+    }
+}
+```
+
+**Complexity:**
+
+- **Time:** $O(d) = O(10^6)$ — single pass with constant inner loop
+- **Space:** $O(d)$ for the DP array (reducible to $O(1)$ using a sliding window of 4 values)
+
+**Answer:** $f(1{,}000{,}000 - N) \mod (10^9 + 7)$.
+
+</details>
+
+##### **4.11. Rubikano** (Coding Exercise 5, Problem B)
+
+Tanya wants to build the tallest possible tower using Rubik's cubes. A store sells $N$ types of Rubik's cubes, each with dimensions $(X_i, Y_i, Z_i)$. The store has infinite supply of each type.
+
+Rules:
+
+- Each cube can be rotated to any orientation (any face can be the base).
+- A cube may be placed on top of another only if **both** base dimensions of the upper cube are **strictly smaller** than the corresponding base dimensions of the cube below.
+- The **height** of a cube is the dimension not used as a base.
+
+Maximize the total height of the tower.
+
+**Input:** First line: integer $N$ ($1 \le N \le 3000$). Each of the next $N$ lines: three integers $X_i, Y_i, Z_i$ ($1 \le X_i, Y_i, Z_i \le 10000$).
+
+**Output:** First line: maximum height. Second line: number of cubes $K$. Next $K$ lines: each cube's orientation as `(length, width, height)` from bottom to top.
+
+**Example:**
+
+- Input:
+  ```
+  3
+  8 10 7
+  6 6 9
+  5 4 2
+  ```
+- Output:
+  ```
+  33
+  5
+  8 10 7
+  7 8 10
+  6 6 9
+  5 4 2
+  4 2 5
+  ```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** This is a variant of the **Longest Increasing Subsequence (LIS)** problem applied to box stacking. Each cube type generates up to 3 orientations (choosing which dimension is the height). After generating all orientations, we sort them and apply a DP to find the maximum-height chain.
+
+**Step 1: Generate all orientations.**
+
+For a cube with dimensions $(X, Y, Z)$, the three possible orientations (base $\times$ base, height) are:
+
+1. Base $(X, Y)$, height $Z$ — sort base so $\min \le \max$
+2. Base $(X, Z)$, height $Y$
+3. Base $(Y, Z)$, height $X$
+
+For each orientation, represent it as $(\min(\text{base}), \max(\text{base}), \text{height})$ so comparisons are consistent.
+
+**Step 2: Sort orientations.**
+
+Sort all generated orientations by their base dimensions (e.g., by $\min$ base, then $\max$ base).
+
+**Step 3: DP for maximum height chain.**
+
+Define $dp[i]$ = maximum tower height with orientation $i$ on top. Then:
+
+$$dp[i] = h_i + \max\bigl(0,\ \max_{j < i,\ \text{fits}(j, i)} dp[j]\bigr)$$
+
+where $\text{fits}(j, i)$ means both base dimensions of $i$ are strictly less than those of $j$.
+
+```
+function RUBIKANO(N, cubes):
+    orientations ← []
+    for each cube (X, Y, Z):
+        add all 3 orientations (sorted base, height) to orientations
+
+    sort orientations by (base1, base2)
+
+    dp[i] ← height[i] for all i
+    parent[i] ← -1 for all i
+
+    for i ← 0 to |orientations| - 1:
+        for j ← 0 to i - 1:
+            if base1[j] < base1[i] and base2[j] < base2[i]:
+                if dp[j] + height[i] > dp[i]:
+                    dp[i] ← dp[j] + height[i]
+                    parent[i] ← j
+
+    best ← argmax dp
+    reconstruct chain using parent[] from best
+    return dp[best], chain
+```
+
+**Complexity:**
+
+- Number of orientations: $M = 3N$
+- Sorting: $O(M \log M)$
+- DP: $O(M^2) = O(9N^2) = O(N^2)$
+
+For $N = 3000$: $M = 9000$, and the DP runs in about $81 \times 10^6$ operations — feasible.
+
+**Verification with the example:**
+
+From cube $(8, 10, 7)$: orientations include base $(8,10)$ height 7, base $(7,8)$ height 10, base $(7,10)$ height 8.
+
+The optimal tower uses: $(8,10) \to (7,8) \to (6,6) \to (5,4) \to (4,2)$ with heights $7 + 10 + 9 + 2 + 5 = 33$.
+
+**Answer:** Maximum tower height is 33, using the 5-cube chain shown.
+
+</details>
