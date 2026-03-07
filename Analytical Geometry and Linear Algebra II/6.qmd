@@ -1,0 +1,832 @@
+---
+title: "W7. Eigenvalues, Eigenvectors, Diagonalization of Matrices"
+author: "Salman Ahmadi-Asl"
+date: "March 7, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Introduction to Eigenvalues and Eigenvectors**
+
+In linear algebra, **eigenvalues** and **eigenvectors** represent one of the most powerful concepts for understanding the structure and behavior of matrices. At their core, eigenvalues and eigenvectors answer a fundamental question: *Are there any special directions in space where a linear transformation behaves like simple scaling?*
+
+When we apply a matrix $A$ to a vector $\mathbf{v}$, we typically get a vector that points in a completely different direction and has a different magnitude. However, for certain special vectors—called **eigenvectors**—the matrix transformation only scales the vector without changing its direction. The scaling factor is the **eigenvalue**.
+
+**Definition (Eigenvector and Eigenvalue):** Let $A$ be an $n \times n$ matrix. A **nonzero vector** $\mathbf{v}$ is called an **eigenvector** of $A$ if there exists a scalar $\lambda$ such that:
+
+$$A\mathbf{v} = \lambda\mathbf{v}$$
+
+The scalar $\lambda$ is called the **eigenvalue** corresponding to $\mathbf{v}$.
+
+This equation is the defining property: when we multiply $A$ by the eigenvector $\mathbf{v}$, we get the same vector multiplied by a constant. The vector "stays on its line" through the origin—its direction is unchanged, only its magnitude (and possibly sign) changes.
+
+**Geometric Intuition:** Imagine a matrix as a transformation that stretches, rotates, and shears space. An eigenvector points in a direction that is special for this transformation: applying the transformation along this direction is equivalent to scaling. This makes eigenvectors the "natural axes" or "principal directions" of the transformation.
+
+###### **1.1.1 Simple Examples**
+
+Let's verify with a concrete example. Consider the matrix $A = \begin{bmatrix} 2 & 1 \\ 1 & 2 \end{bmatrix}$ and the vector $\mathbf{v} = \begin{bmatrix} 1 \\ 1 \end{bmatrix}$.
+
+Compute $A\mathbf{v}$:
+
+$$A\mathbf{v} = \begin{bmatrix} 2 & 1 \\ 1 & 2 \end{bmatrix} \begin{bmatrix} 1 \\ 1 \end{bmatrix} = \begin{bmatrix} 3 \\ 3 \end{bmatrix} = 3 \begin{bmatrix} 1 \\ 1 \end{bmatrix}$$
+
+Since $A\mathbf{v} = 3\mathbf{v}$, the vector $\begin{bmatrix} 1 \\ 1 \end{bmatrix}$ is an eigenvector with eigenvalue $\lambda = 3$.
+
+##### **1.2 Finding Eigenvalues: The Characteristic Equation**
+
+To find eigenvalues systematically, we use the characteristic equation. Starting from the definition $A\mathbf{v} = \lambda\mathbf{v}$, we can rewrite this as:
+
+$$A\mathbf{v} - \lambda\mathbf{v} = \mathbf{0}$$
+
+$$(A - \lambda I)\mathbf{v} = \mathbf{0}$$
+
+where $I$ is the identity matrix. This is a homogeneous system of linear equations. For a *nonzero* solution $\mathbf{v}$ to exist, the matrix $(A - \lambda I)$ must be **singular** (non-invertible), which happens if and only if:
+
+$$\det(A - \lambda I) = 0$$
+
+This equation is called the **characteristic equation** of $A$. The left side, $\det(A - \lambda I)$, is called the **characteristic polynomial** and is a polynomial of degree $n$ in the variable $\lambda$.
+
+**Algorithm to Find Eigenvalues:**
+
+1.  **Compute the characteristic polynomial:** Calculate $\det(A - \lambda I)$.
+2.  **Set equal to zero:** Solve $\det(A - \lambda I) = 0$.
+3.  **Find the roots:** The roots of the characteristic polynomial are the eigenvalues of $A$.
+
+**Important Note:** The Fundamental Theorem of Algebra guarantees that over the complex numbers $\mathbb{C}$, every $n \times n$ matrix has at least one eigenvalue (and at most $n$ distinct eigenvalues). However, a real matrix may have complex eigenvalues.
+
+**Special Case—Triangular Matrices:** If $A$ is upper or lower triangular, the characteristic polynomial becomes:
+
+$$\det(A - \lambda I) = \prod_{i=1}^n (a_{ii} - \lambda)$$
+
+Therefore, **the eigenvalues of a triangular matrix are exactly its diagonal entries**.
+
+##### **1.3 Finding Eigenvectors**
+
+Once we have found an eigenvalue $\lambda$, we find the corresponding eigenvectors by solving the homogeneous system:
+
+$$(A - \lambda I)\mathbf{v} = \mathbf{0}$$
+
+The set of all solutions to this equation forms the **eigenspace** for eigenvalue $\lambda$. This is a subspace of $\mathbb{R}^n$ and is always nonempty (it contains at least the zero vector). From this eigenspace, we select *nonzero* vectors to be our eigenvectors.
+
+**Algorithm to Find Eigenvectors:**
+
+1.  **Form the matrix** $(A - \lambda I)$ by subtracting $\lambda$ from the diagonal entries of $A$.
+2.  **Row reduce** $(A - \lambda I)$ to find its null space.
+3.  **Express solutions parametrically** in terms of free variables.
+4.  **Identify basis vectors** for the null space—these are the eigenvectors.
+
+##### **1.4 Trace and Determinant Relationships**
+
+Two important relationships connect eigenvalues to properties we can compute directly from the matrix:
+
+**Trace Property:** The sum of all eigenvalues (counted with algebraic multiplicity) equals the trace of $A$:
+
+$$\lambda_1 + \lambda_2 + \cdots + \lambda_n = \text{tr}(A) = a_{11} + a_{22} + \cdots + a_{nn}$$
+
+**Determinant Property:** The product of all eigenvalues (counted with algebraic multiplicity) equals the determinant of $A$:
+
+$$\lambda_1 \cdot \lambda_2 \cdots \lambda_n = \det(A)$$
+
+These properties provide useful checks when computing eigenvalues by hand. If your computed eigenvalues don't satisfy these relationships, you've made an error.
+
+##### **1.5 Linear Independence of Eigenvectors**
+
+A crucial property that guarantees nice structure is:
+
+**Theorem:** If $\mathbf{v}_1, \mathbf{v}_2, \ldots, \mathbf{v}_k$ are eigenvectors corresponding to *distinct* eigenvalues $\lambda_1, \lambda_2, \ldots, \lambda_k$, then these vectors are **linearly independent**.
+
+This means that eigenvectors corresponding to different eigenvalues can never be linearly dependent. This property is fundamental to diagonalization.
+
+##### **1.6 Introduction to Diagonalization**
+
+The ultimate goal of eigenvalue analysis is often **diagonalization**—rewriting the matrix in a simpler form using its eigenvalues and eigenvectors.
+
+An $n \times n$ matrix $A$ is **diagonalizable** if we can find an invertible matrix $P$ and a diagonal matrix $D$ such that:
+
+$$A = PDP^{-1}$$
+
+Equivalently, $D = P^{-1}AP$.
+
+What are $P$ and $D$?
+- The diagonal matrix $D$ has the eigenvalues of $A$ on its diagonal: $D = \text{diag}(\lambda_1, \lambda_2, \ldots, \lambda_n)$.
+- The matrix $P$ has the corresponding eigenvectors as its columns: $P = [\mathbf{v}_1 \ \mathbf{v}_2 \ \ldots \ \mathbf{v}_n]$.
+
+**When Can We Diagonalize?** The key requirement is that we need $n$ *linearly independent* eigenvectors. This is automatically satisfied if:
+
+- **Case 1:** $A$ has $n$ *distinct* eigenvalues. In this case, the corresponding $n$ eigenvectors are automatically linearly independent.
+- **Case 2:** $A$ has repeated eigenvalues. We must check that for each repeated eigenvalue $\lambda$, the number of linearly independent eigenvectors equals its multiplicity in the characteristic polynomial. This is checked by examining the dimension of the eigenspace.
+
+A matrix that has repeated eigenvalues but fewer than $n$ linearly independent eigenvectors is called **defective** or **not diagonalizable**.
+
+###### **1.6.1 Why Diagonalization is Useful**
+
+Diagonalization is powerful because it simplifies matrix computations:
+
+1. **Powers of matrices:** If $A = PDP^{-1}$, then $A^k = PD^kP^{-1}$. Since $D$ is diagonal, $D^k$ is easy to compute: $D^k = \text{diag}(\lambda_1^k, \lambda_2^k, \ldots, \lambda_n^k)$.
+2. **Solving differential equations:** Systems of differential equations $\frac{d\mathbf{x}}{dt} = A\mathbf{x}$ are easily solved when $A$ is diagonalized.
+3. **Understanding transformations:** Diagonalization reveals the "principal axes" along which the transformation acts simply as scaling.
+
+##### **1.7 Spectral Properties**
+
+Several fundamental theorems describe special properties related to eigenvalues:
+
+**Theorem (Cayley-Hamilton):** Every square matrix satisfies its own characteristic equation. If $p(\lambda) = \det(A - \lambda I)$ is the characteristic polynomial, then $p(A) = 0$ (the zero matrix).
+
+**Theorem (Spectral Mapping):** If $A$ has eigenvalues $\lambda_1, \ldots, \lambda_n$, and $p(x)$ is any polynomial, then $p(A)$ has eigenvalues $p(\lambda_1), \ldots, p(\lambda_n)$.
+
+**Theorem (Symmetric Matrices):** If $A$ is a *real symmetric* matrix (i.e., $A = A^T$), then:
+
+- All eigenvalues are real numbers
+- Eigenvectors corresponding to distinct eigenvalues are orthogonal
+- $A$ is always diagonalizable by an orthogonal matrix $Q$: $A = Q\Lambda Q^T$
+
+##### **1.8 Special Cases and Applications**
+
+Understanding eigenvalues is essential across mathematics and science:
+
+*   **Physics:** Eigenvalues represent natural frequencies of vibrating systems, principal stresses in materials, and energy levels in quantum mechanics.
+*   **Computer Science:** PageRank (Google's algorithm) is based on eigenvalues, as is facial recognition and image compression.
+*   **Data Science:** Principal Component Analysis (PCA), a fundamental technique in machine learning, uses eigenvalues to reduce dimensionality.
+*   **Economics:** Eigenvalue analysis models input-output systems and portfolio optimization.
+
+#### **2. Definitions**
+
+*   **Eigenvalue**: A scalar $\lambda$ such that $A\mathbf{v} = \lambda\mathbf{v}$ for some nonzero vector $\mathbf{v}$ of matrix $A$.
+*   **Eigenvector**: A nonzero vector $\mathbf{v}$ such that $A\mathbf{v} = \lambda\mathbf{v}$ for some scalar $\lambda$ (eigenvalue) of matrix $A$.
+*   **Characteristic Polynomial**: The polynomial $p(\lambda) = \det(A - \lambda I)$ for an $n \times n$ matrix $A$.
+*   **Characteristic Equation**: The equation $\det(A - \lambda I) = 0$, whose roots are the eigenvalues of $A$.
+*   **Eigenspace**: The set of all eigenvectors (plus the zero vector) corresponding to a given eigenvalue $\lambda$; equivalently, the null space of $(A - \lambda I)$.
+*   **Algebraic Multiplicity**: The multiplicity of an eigenvalue $\lambda$ as a root of the characteristic polynomial.
+*   **Geometric Multiplicity**: The dimension of the eigenspace of eigenvalue $\lambda$ (i.e., the number of linearly independent eigenvectors for that eigenvalue).
+*   **Diagonalizable Matrix**: A square matrix $A$ for which there exists an invertible matrix $P$ and diagonal matrix $D$ such that $A = PDP^{-1}$.
+*   **Defective Matrix**: A square matrix that has repeated eigenvalues but is not diagonalizable (geometric multiplicity < algebraic multiplicity for some eigenvalue).
+*   **Trace of a Matrix**: The sum of the diagonal entries: $\text{tr}(A) = \sum_{i=1}^n a_{ii}$. This equals the sum of eigenvalues.
+*   **Similar Matrices**: Two matrices $A$ and $B$ are similar if there exists an invertible matrix $P$ such that $B = P^{-1}AP$. Similar matrices have the same eigenvalues.
+*   **Orthogonal Matrix**: A square matrix $Q$ such that $Q^T Q = QQ^T = I$, i.e., $Q^{-1} = Q^T$.
+*   **Spectral Theorem**: The theorem stating that every real symmetric matrix is diagonalizable by an orthogonal matrix.
+
+#### **3. Formulas**
+
+*   **Eigenvalue-Eigenvector Relationship**: $A\mathbf{v} = \lambda\mathbf{v}$ (defining equation)
+*   **Characteristic Equation**: $\det(A - \lambda I) = 0$
+*   **Finding Eigenvectors**: $(A - \lambda I)\mathbf{v} = \mathbf{0}$ (solve this homogeneous system)
+*   **Trace and Sum of Eigenvalues**: $\text{tr}(A) = \lambda_1 + \lambda_2 + \cdots + \lambda_n$
+*   **Determinant and Product of Eigenvalues**: $\det(A) = \lambda_1 \cdot \lambda_2 \cdots \lambda_n$
+*   **Diagonalization**: $A = PDP^{-1}$ where $P = [\mathbf{v}_1 \ \mathbf{v}_2 \ \ldots \ \mathbf{v}_n]$ and $D = \text{diag}(\lambda_1, \lambda_2, \ldots, \lambda_n)$
+*   **Powers via Diagonalization**: $A^k = PD^kP^{-1}$ where $D^k = \text{diag}(\lambda_1^k, \lambda_2^k, \ldots, \lambda_n^k)$
+*   **Inverse via Diagonalization**: $A^{-1} = PD^{-1}P^{-1}$ where $D^{-1} = \text{diag}(1/\lambda_1, 1/\lambda_2, \ldots, 1/\lambda_n)$ (if $A$ is invertible)
+*   **Spectral Decomposition (Symmetric Matrices)**: $A = Q\Lambda Q^T$ where $Q$ is orthogonal and $\Lambda$ is diagonal
+*   **Eigenvalue of Matrix Power**: If $\lambda$ is an eigenvalue of $A$, then $\lambda^k$ is an eigenvalue of $A^k$
+*   **Eigenvalue of Inverse**: If $\lambda$ is an eigenvalue of an invertible matrix $A$, then $1/\lambda$ is an eigenvalue of $A^{-1}$
+*   **Cayley-Hamilton Theorem**: $p(A) = 0$ where $p(\lambda) = \det(A - \lambda I)$ is the characteristic polynomial
+
+#### **4. Examples**
+
+##### **4.1. Verify Eigenvalue and Find Eigenvalues** (Lecture 7, Example 1)
+
+Find the eigenvalues of the matrix $\mathbf{A} = \begin{bmatrix} 1 & -1 \\ 2 & 4 \end{bmatrix}$. Verify that the trace equals the sum of the eigenvalues and that the determinant equals their product.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The characteristic equation $\det(A - \lambda I) = 0$ provides the eigenvalues. These satisfy the trace and determinant relationships.
+
+1.  **Set up the characteristic equation:**
+    $$\det(\mathbf{A} - \lambda\mathbf{I}) = \det \begin{bmatrix} 1 - \lambda & -1 \\ 2 & 4 - \lambda \end{bmatrix} = 0$$
+2.  **Calculate the determinant:**
+    $$(1 - \lambda)(4 - \lambda) - (-1)(2) = 0$$
+    $$4 - \lambda - 4\lambda + \lambda^2 + 2 = 0$$
+    $$\lambda^2 - 5\lambda + 6 = 0$$
+3.  **Use the quadratic formula:**
+    $$\lambda = \frac{5 \pm \sqrt{25 - 24}}{2} = \frac{5 \pm 1}{2}$$
+
+    Therefore: $\lambda_1 = 3$ and $\lambda_2 = 2$
+4.  **Verify trace property:**
+    $$\text{tr}(\mathbf{A}) = 1 + 4 = 5$$
+    $$\lambda_1 + \lambda_2 = 3 + 2 = 5 \quad \checkmark$$
+5.  **Verify determinant property:**
+    $$\det(\mathbf{A}) = 1 \cdot 4 - (-1) \cdot 2 = 4 + 2 = 6$$
+    $$\lambda_1 \cdot \lambda_2 = 3 \cdot 2 = 6 \quad \checkmark$$
+
+**Answer:** Eigenvalues are $\lambda_1 = 3$ and $\lambda_2 = 2$. Both trace and determinant relationships are verified.
+
+</details>
+
+##### **4.2. Determine if a Vector is an Eigenvector** (Lecture 7, Example 2)
+
+Consider the matrix $\mathbf{A} = \begin{bmatrix} 2 & 2 \\ -4 & 8 \end{bmatrix}$ and vector $\mathbf{v} = \begin{bmatrix} 1 \\ 1 \end{bmatrix}$. Is $\mathbf{v}$ an eigenvector of $\mathbf{A}$? If so, what is the eigenvalue?
+
+Also consider the matrix $\mathbf{B} = \begin{bmatrix} 1 & 3 \\ 2 & 6 \end{bmatrix}$ and vector $\mathbf{w} = \begin{bmatrix} -3 \\ 1 \end{bmatrix}$. Is $\mathbf{w}$ an eigenvector of $\mathbf{B}$? If so, what is the eigenvalue?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A vector is an eigenvector if $A\mathbf{v} = \lambda\mathbf{v}$ for some scalar $\lambda$. Compute $A\mathbf{v}$ and check if it's a scalar multiple of $\mathbf{v}$.
+
+**(a) For matrix $\mathbf{A}$ and vector $\mathbf{v}$:**
+
+1.  **Compute $\mathbf{A}\mathbf{v}$:**
+    $$\mathbf{A}\mathbf{v} = \begin{bmatrix} 2 & 2 \\ -4 & 8 \end{bmatrix} \begin{bmatrix} 1 \\ 1 \end{bmatrix} = \begin{bmatrix} 2 + 2 \\ -4 + 8 \end{bmatrix} = \begin{bmatrix} 4 \\ 4 \end{bmatrix}$$
+2.  **Check if this is a scalar multiple of $\mathbf{v}$:**
+    $$\begin{bmatrix} 4 \\ 4 \end{bmatrix} = 4 \begin{bmatrix} 1 \\ 1 \end{bmatrix}$$
+
+    Yes! This means $\mathbf{A}\mathbf{v} = 4\mathbf{v}$.
+
+**(b) For matrix $\mathbf{B}$ and vector $\mathbf{w}$:**
+
+1.  **Compute $\mathbf{B}\mathbf{w}$:**
+    $$\mathbf{B}\mathbf{w} = \begin{bmatrix} 1 & 3 \\ 2 & 6 \end{bmatrix} \begin{bmatrix} -3 \\ 1 \end{bmatrix} = \begin{bmatrix} -3 + 3 \\ -6 + 6 \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}$$
+2.  **Check if this is a scalar multiple of $\mathbf{w}$:**
+    $$\begin{bmatrix} 0 \\ 0 \end{bmatrix} = 0 \begin{bmatrix} -3 \\ 1 \end{bmatrix}$$
+
+    Yes! This means $\mathbf{B}\mathbf{w} = 0\mathbf{w}$.
+
+**Answer:**
+
+- Yes, $\mathbf{v}$ is an eigenvector of $\mathbf{A}$ with eigenvalue $\lambda = 4$.
+- Yes, $\mathbf{w}$ is an eigenvector of $\mathbf{B}$ with eigenvalue $\lambda = 0$.
+
+</details>
+
+##### **4.3. Find Three Matrices with Specified Eigenvalues** (Lecture 7, Example 3)
+
+Find three $2 \times 2$ matrices that have eigenvalues $\lambda_1 = 4$ and $\lambda_2 = 5$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** There are infinitely many matrices with the same eigenvalues. We can construct them using triangular or diagonal matrices, where eigenvalues appear on the diagonal.
+
+This problem has infinitely many solutions because the eigenvalues alone don't determine the matrix uniquely. The easiest examples use triangular or diagonal matrices:
+
+1.  **Diagonal matrix:**
+    $$\mathbf{D} = \begin{bmatrix} 4 & 0 \\ 0 & 5 \end{bmatrix}$$
+    Eigenvalues are clearly 4 and 5 (diagonal entries).
+2.  **Upper triangular matrix:**
+    $$\mathbf{U} = \begin{bmatrix} 4 & x \\ 0 & 5 \end{bmatrix}$$
+    where $x$ can be any nonzero number (e.g., $x = 1, 2, 3, \ldots$).
+    Eigenvalues are 4 and 5 (diagonal entries).
+3.  **Lower triangular matrix:**
+    $$\mathbf{L} = \begin{bmatrix} 4 & 0 \\ y & 5 \end{bmatrix}$$
+    where $y$ can be any nonzero number.
+    Eigenvalues are 4 and 5 (diagonal entries).
+
+**Answer:** Three possible matrices are:
+$$\begin{bmatrix} 4 & 0 \\ 0 & 5 \end{bmatrix}, \quad \begin{bmatrix} 4 & 1 \\ 0 & 5 \end{bmatrix}, \quad \begin{bmatrix} 4 & 0 \\ 2 & 5 \end{bmatrix}$$
+
+(Many other answers are possible.)
+
+</details>
+
+##### **4.4. Find Eigenvalues and Eigenvectors of a 3×3 Matrix** (Lecture 7, Example 4)
+
+Find the eigenvalues and eigenvectors of the matrix:
+$$\mathbf{A} = \begin{bmatrix} 0 & 6 & 8 \\ 0.5 & 0 & 0 \\ 0 & 0.5 & 0 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For a 3×3 matrix, we compute the characteristic polynomial using cofactor expansion, find the roots (eigenvalues), then solve the system $(A - \lambda I)\mathbf{v} = \mathbf{0}$ for each eigenvalue.
+
+**Step 1: Calculate the characteristic polynomial**
+
+$$f(\lambda) = \det(\mathbf{A} - \lambda\mathbf{I}) = \det \begin{bmatrix} -\lambda & 6 & 8 \\ 0.5 & -\lambda & 0 \\ 0 & 0.5 & -\lambda \end{bmatrix}$$
+
+Expand along the first column:
+$$f(\lambda) = -\lambda \det \begin{bmatrix} -\lambda & 0 \\ 0.5 & -\lambda \end{bmatrix} - 0.5 \det \begin{bmatrix} 6 & 8 \\ 0.5 & -\lambda \end{bmatrix} + 0$$
+
+$$= -\lambda(\lambda^2) - 0.5(-6\lambda - 4)$$
+$$= -\lambda^3 + 3\lambda + 2$$
+
+**Step 2: Factor and find eigenvalues**
+
+$$f(\lambda) = -(\lambda - 2)(\lambda + 1)^2 = 0$$
+
+Therefore: $\lambda_1 = 2$ (with multiplicity 1) and $\lambda_2 = -1$ (with multiplicity 2)
+
+**Step 3: Find eigenvectors for $\lambda_1 = 2$**
+
+Solve $(\mathbf{A} - 2\mathbf{I})\mathbf{v} = \mathbf{0}$:
+
+$$\begin{bmatrix} -2 & 6 & 8 \\ 0.5 & -2 & 0 \\ 0 & 0.5 & -2 \end{bmatrix} \begin{bmatrix} x \\ y \\ z \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \\ 0 \end{bmatrix}$$
+
+Row reduce to RREF:
+$$\begin{bmatrix} 1 & 0 & -16 \\ 0 & 1 & -4 \\ 0 & 0 & 0 \end{bmatrix}$$
+
+In parametric form: $x = 16t, y = 4t, z = t$
+
+$$\mathbf{v}_1 = t \begin{bmatrix} 16 \\ 4 \\ 1 \end{bmatrix}$$
+
+**Step 4: Find eigenvectors for $\lambda_2 = -1$**
+
+Solve $(\mathbf{A} + \mathbf{I})\mathbf{v} = \mathbf{0}$:
+
+$$\begin{bmatrix} 1 & 6 & 8 \\ 0.5 & 1 & 0 \\ 0 & 0.5 & 1 \end{bmatrix} \begin{bmatrix} x \\ y \\ z \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \\ 0 \end{bmatrix}$$
+
+Row reduce to RREF:
+$$\begin{bmatrix} 1 & 0 & -4 \\ 0 & 1 & 2 \\ 0 & 0 & 0 \end{bmatrix}$$
+
+In parametric form: $x = 4t, y = -2t, z = t$
+
+$$\mathbf{v}_2 = t \begin{bmatrix} 4 \\ -2 \\ 1 \end{bmatrix}$$
+
+**Answer:** Eigenvalues are $\lambda_1 = 2$ and $\lambda_2 = -1$ (multiplicity 2). Corresponding eigenvectors are $\mathbf{v}_1 = \begin{bmatrix} 16 \\ 4 \\ 1 \end{bmatrix}$ and $\mathbf{v}_2 = \begin{bmatrix} 4 \\ -2 \\ 1 \end{bmatrix}$ (each up to scalar multiples).
+
+</details>
+
+##### **4.5. Diagonalize a 2×2 Matrix** (Lecture 7, Example 5)
+
+Diagonalize the matrix:
+$$\mathbf{A} = \begin{bmatrix} \frac{1}{2} & \frac{3}{2} \\ \frac{3}{2} & \frac{1}{2} \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Diagonalization requires finding eigenvalues and eigenvectors, then forming matrices $\mathbf{C}$ (eigenvectors as columns) and $\mathbf{D}$ (eigenvalues on diagonal) such that $A = CDC^{-1}$.
+
+**Step 1: Find eigenvalues**
+
+$$\det(\mathbf{A} - \lambda\mathbf{I}) = \det \begin{bmatrix} \frac{1}{2} - \lambda & \frac{3}{2} \\ \frac{3}{2} & \frac{1}{2} - \lambda \end{bmatrix} = 0$$
+
+$$\left(\frac{1}{2} - \lambda\right)^2 - \frac{9}{4} = 0$$
+
+$$\lambda^2 - \lambda + \frac{1}{4} - \frac{9}{4} = 0$$
+
+$$\lambda^2 - \lambda - 2 = 0$$
+
+$$(\lambda + 1)(\lambda - 2) = 0$$
+
+Therefore: $\lambda_1 = -1$ and $\lambda_2 = 2$
+
+**Step 2: Find eigenvectors for $\lambda_1 = -1$**
+
+Solve $(\mathbf{A} + \mathbf{I})\mathbf{v} = \mathbf{0}$:
+
+$$\begin{bmatrix} \frac{3}{2} & \frac{3}{2} \\ \frac{3}{2} & \frac{3}{2} \end{bmatrix} \begin{bmatrix} x \\ y \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}$$
+
+This gives: $\frac{3}{2}x + \frac{3}{2}y = 0 \Rightarrow x = -y$
+
+$$\mathbf{v}_1 = \begin{bmatrix} -1 \\ 1 \end{bmatrix}$$
+
+**Step 3: Find eigenvectors for $\lambda_2 = 2$**
+
+Solve $(\mathbf{A} - 2\mathbf{I})\mathbf{v} = \mathbf{0}$:
+
+$$\begin{bmatrix} -\frac{3}{2} & \frac{3}{2} \\ \frac{3}{2} & -\frac{3}{2} \end{bmatrix} \begin{bmatrix} x \\ y \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}$$
+
+This gives: $-\frac{3}{2}x + \frac{3}{2}y = 0 \Rightarrow x = y$
+
+$$\mathbf{v}_2 = \begin{bmatrix} 1 \\ 1 \end{bmatrix}$$
+
+**Step 4: Form the diagonalization**
+
+$$\mathbf{C} = \begin{bmatrix} -1 & 1 \\ 1 & 1 \end{bmatrix}, \quad \mathbf{D} = \begin{bmatrix} -1 & 0 \\ 0 & 2 \end{bmatrix}$$
+
+To find $\mathbf{C}^{-1}$:
+$$\det(\mathbf{C}) = -1 - 1 = -2$$
+
+$$\mathbf{C}^{-1} = \frac{1}{-2} \begin{bmatrix} 1 & -1 \\ -1 & -1 \end{bmatrix} = \begin{bmatrix} -\frac{1}{2} & \frac{1}{2} \\ \frac{1}{2} & \frac{1}{2} \end{bmatrix}$$
+
+**Answer:**
+$$\mathbf{A} = \begin{bmatrix} -1 & 1 \\ 1 & 1 \end{bmatrix} \begin{bmatrix} -1 & 0 \\ 0 & 2 \end{bmatrix} \begin{bmatrix} -\frac{1}{2} & \frac{1}{2} \\ \frac{1}{2} & \frac{1}{2} \end{bmatrix}$$
+
+</details>
+
+##### **4.6. Use Diagonalization to Compute Matrix Powers** (Lecture 7, Example 6)
+
+For the matrix $\mathbf{A} = \begin{bmatrix} 4 & 3 \\ 1 & 2 \end{bmatrix}$, compute $\mathbf{A}^{100}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Using diagonalization, $A^{100} = CD^{100}C^{-1}$, where $D^{100}$ is easy to compute since $D$ is diagonal.
+
+**Step 1: Find eigenvalues**
+
+Using trace and determinant:
+$$\text{tr}(\mathbf{A}) = 4 + 2 = 6$$
+$$\det(\mathbf{A}) = 4 \cdot 2 - 3 \cdot 1 = 5$$
+
+So $\lambda_1 + \lambda_2 = 6$ and $\lambda_1 \cdot \lambda_2 = 5$.
+
+Solving $\lambda^2 - 6\lambda + 5 = 0$: $(\lambda - 1)(\lambda - 5) = 0$
+
+Therefore: $\lambda_1 = 5$ and $\lambda_2 = 1$
+
+**Step 2: Find eigenvectors for $\lambda_1 = 5$**
+
+Solve $(\mathbf{A} - 5\mathbf{I})\mathbf{v} = \mathbf{0}$:
+
+$$\begin{bmatrix} -1 & 3 \\ 1 & -3 \end{bmatrix} \begin{bmatrix} x \\ y \end{bmatrix} = \mathbf{0}$$
+
+This gives: $x = 3y$
+
+$$\mathbf{v}_1 = \begin{bmatrix} 3 \\ 1 \end{bmatrix}$$
+
+**Step 3: Find eigenvectors for $\lambda_2 = 1$**
+
+Solve $(\mathbf{A} - \mathbf{I})\mathbf{v} = \mathbf{0}$:
+
+$$\begin{bmatrix} 3 & 3 \\ 1 & 1 \end{bmatrix} \begin{bmatrix} x \\ y \end{bmatrix} = \mathbf{0}$$
+
+This gives: $x = -y$
+
+$$\mathbf{v}_2 = \begin{bmatrix} 1 \\ -1 \end{bmatrix}$$
+
+**Step 4: Form the diagonalization**
+
+$$\mathbf{C} = \begin{bmatrix} 3 & 1 \\ 1 & -1 \end{bmatrix}, \quad \mathbf{D} = \begin{bmatrix} 5 & 0 \\ 0 & 1 \end{bmatrix}$$
+
+**Step 5: Compute $\mathbf{A}^{100}$**
+
+$$\mathbf{A}^{100} = \mathbf{C} \mathbf{D}^{100} \mathbf{C}^{-1}$$
+
+$$\mathbf{D}^{100} = \begin{bmatrix} 5^{100} & 0 \\ 0 & 1 \end{bmatrix}$$
+
+Therefore:
+$$\mathbf{A}^{100} = \begin{bmatrix} 3 & 1 \\ 1 & -1 \end{bmatrix} \begin{bmatrix} 5^{100} & 0 \\ 0 & 1 \end{bmatrix} \begin{bmatrix} 3 & 1 \\ 1 & -1 \end{bmatrix}^{-1}$$
+
+(The numerical computation of $5^{100}$ is impractical without a computer, but the formula shows the approach.)
+
+**Answer:** $\mathbf{A}^{100} = \mathbf{C} \begin{bmatrix} 5^{100} & 0 \\ 0 & 1 \end{bmatrix} \mathbf{C}^{-1}$, which can be computed once $\mathbf{C}^{-1}$ is found.
+
+</details>
+
+##### **4.7. Verify Eigenvalue-Eigenvector Pair** (Assignment, Problem 4a)
+
+For matrix $D = \begin{pmatrix} 5 & -4 & 2 \\ -4 & 5 & 2 \\ 2 & 2 & 2 \end{pmatrix}$, verify that $\lambda = 1$ is an eigenvalue with eigenvector $\mathbf{v} = \begin{pmatrix} 2 \\ 2 \\ -1 \end{pmatrix}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** To verify an eigenvalue-eigenvector pair, compute $A\mathbf{v}$ and check if it equals $\lambda\mathbf{v}$.
+
+1.  **Compute $D\mathbf{v}$:**
+    $$D\mathbf{v} = \begin{pmatrix} 5 & -4 & 2 \\ -4 & 5 & 2 \\ 2 & 2 & 2 \end{pmatrix} \begin{pmatrix} 2 \\ 2 \\ -1 \end{pmatrix}$$
+2.  **Calculate each component:**
+    *   First row: $5(2) + (-4)(2) + 2(-1) = 10 - 8 - 2 = 0$
+    *   Second row: $(-4)(2) + 5(2) + 2(-1) = -8 + 10 - 2 = 0$
+    *   Third row: $2(2) + 2(2) + 2(-1) = 4 + 4 - 2 = 6$
+3.  **Result:**
+    $$D\mathbf{v} = \begin{pmatrix} 0 \\ 0 \\ 6 \end{pmatrix}$$
+4.  **Check against $\lambda\mathbf{v}$:**
+    $$\lambda\mathbf{v} = 1 \cdot \begin{pmatrix} 2 \\ 2 \\ -1 \end{pmatrix} = \begin{pmatrix} 2 \\ 2 \\ -1 \end{pmatrix}$$
+5.  **Compare:**
+    $$\begin{pmatrix} 0 \\ 0 \\ 6 \end{pmatrix} \neq \begin{pmatrix} 2 \\ 2 \\ -1 \end{pmatrix}$$
+
+**Answer:** The pair $\lambda = 1, \mathbf{v} = \begin{pmatrix} 2 \\ 2 \\ -1 \end{pmatrix}$ does **NOT** satisfy $D\mathbf{v} = \lambda\mathbf{v}$. There is an error in the original problem statement.
+
+</details>
+
+##### **4.8. Prove Eigenvalue Property for Invertible Matrices** (Assignment, Problem 5)
+
+Prove that if $\lambda$ is an eigenvalue of an invertible matrix $A$, then $1/\lambda$ is an eigenvalue of $A^{-1}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the definition of eigenvalue and properties of matrix inverses to transform the equation for $A$ into one for $A^{-1}$.
+
+**Proof:**
+
+1.  **Start with the given condition:** Suppose $\lambda$ is an eigenvalue of invertible matrix $A$ with eigenvector $\mathbf{v}$. Then:
+    $$A\mathbf{v} = \lambda\mathbf{v}$$
+2.  **Note that $\lambda \neq 0$:** Since $A$ is invertible, $\det(A) \neq 0$. But $\det(A) = \prod \lambda_i$, so no eigenvalue can be zero.
+3.  **Multiply both sides by $A^{-1}$:**
+    $$A^{-1}(A\mathbf{v}) = A^{-1}(\lambda\mathbf{v})$$
+    $$\mathbf{v} = \lambda A^{-1}\mathbf{v}$$
+4.  **Divide both sides by $\lambda$ (nonzero):**
+    $$\frac{1}{\lambda}\mathbf{v} = A^{-1}\mathbf{v}$$
+5.  **Rearrange to standard form:**
+    $$A^{-1}\mathbf{v} = \frac{1}{\lambda}\mathbf{v}$$
+6.  **Conclusion:** This shows that $\mathbf{v}$ is an eigenvector of $A^{-1}$ with eigenvalue $1/\lambda$.
+
+**Answer:** If $\lambda$ is an eigenvalue of invertible $A$, then $1/\lambda$ is an eigenvalue of $A^{-1}$, with the same eigenvector.
+
+</details>
+
+##### **4.9. True or False: Eigenvalue Properties** (Assignment, Problem 6)
+
+Determine whether each statement is true or false. Justify your answer.
+
+**(a)** If 0 is an eigenvalue of $A$, then $A$ is singular (non-invertible).
+
+**(b)** If $\lambda$ is an eigenvalue of $A$, then $\lambda^2$ is an eigenvalue of $A^2$.
+
+**(c)** A matrix can have different eigenvalues with the same eigenvector.
+
+**(d)** If $A$ and $B$ have the same eigenvalues, then $A = B$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Reason through each statement using the definitions and properties of eigenvalues and eigenvectors.
+
+**(a) TRUE:**
+
+If 0 is an eigenvalue of $A$, then there exists a nonzero vector $\mathbf{v}$ such that:
+$$A\mathbf{v} = 0\mathbf{v} = \mathbf{0}$$
+
+This means $\mathbf{v}$ is in the null space of $A$, so $A$ has a non-trivial null space. Therefore, $A$ is not invertible (singular).
+
+**(b) TRUE:**
+
+If $A\mathbf{v} = \lambda\mathbf{v}$, compute $A^2\mathbf{v}$:
+$$A^2\mathbf{v} = A(A\mathbf{v}) = A(\lambda\mathbf{v}) = \lambda A\mathbf{v} = \lambda(\lambda\mathbf{v}) = \lambda^2\mathbf{v}$$
+
+So $\mathbf{v}$ is an eigenvector of $A^2$ with eigenvalue $\lambda^2$.
+
+**(c) FALSE:**
+
+Suppose $\mathbf{v}$ is an eigenvector with two different eigenvalues $\lambda_1$ and $\lambda_2$:
+$$A\mathbf{v} = \lambda_1\mathbf{v} \quad \text{and} \quad A\mathbf{v} = \lambda_2\mathbf{v}$$
+
+Then:
+$$\lambda_1\mathbf{v} = \lambda_2\mathbf{v}$$
+$$(\lambda_1 - \lambda_2)\mathbf{v} = \mathbf{0}$$
+
+Since $\mathbf{v} \neq \mathbf{0}$, we must have $\lambda_1 = \lambda_2$. So each eigenvector corresponds to exactly one eigenvalue.
+
+**(d) FALSE:**
+
+Counter-example: Consider
+$$A = \begin{pmatrix} 1 & 0 \\ 0 & 2 \end{pmatrix} \quad \text{and} \quad B = \begin{pmatrix} 1 & 1 \\ 0 & 2 \end{pmatrix}$$
+
+$A$ is diagonal, so its eigenvalues are 1 and 2.
+
+For $B$, it's upper triangular, so its eigenvalues are also the diagonal entries: 1 and 2.
+
+However, $A \neq B$ (their off-diagonal entries differ).
+
+**Answer:** (a) TRUE, (b) TRUE, (c) FALSE, (d) FALSE.
+
+</details>
+
+##### **4.10. Find Eigenvalues from Trace and Determinant** (Assignment, Problem 8)
+
+The trace of a $2 \times 2$ matrix $F$ is 5 and $\det(F) = 6$. Find the eigenvalues of $F$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For a 2×2 matrix, the eigenvalues are roots of $\lambda^2 - \text{tr}(A)\lambda + \det(A) = 0$.
+
+1.  **Use the eigenvalue relationships:** If $\lambda_1$ and $\lambda_2$ are eigenvalues:
+    $$\lambda_1 + \lambda_2 = \text{tr}(F) = 5$$
+    $$\lambda_1 \cdot \lambda_2 = \det(F) = 6$$
+2.  **Form the characteristic equation:** The eigenvalues satisfy:
+    $$t^2 - (\lambda_1 + \lambda_2)t + \lambda_1\lambda_2 = 0$$
+    $$t^2 - 5t + 6 = 0$$
+3.  **Factor:**
+    $$(t - 2)(t - 3) = 0$$
+4.  **Solve:**
+    $$t = 2 \quad \text{or} \quad t = 3$$
+
+**Answer:** The eigenvalues of $F$ are $\lambda_1 = 2$ and $\lambda_2 = 3$.
+
+</details>
+
+##### **4.11. Find Eigenvalues of Triangular Matrix** (Assignment, Problem 1a)
+
+Find the eigenvalues and corresponding eigenvectors of the matrix:
+$$A = \begin{pmatrix} 4 & 1 \\ 2 & 3 \end{pmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For a 2×2 matrix, compute the characteristic polynomial, solve for eigenvalues, then find eigenvectors for each eigenvalue.
+
+**Step 1: Find eigenvalues**
+
+$$\det(A - \lambda I) = \det\begin{pmatrix} 4 - \lambda & 1 \\ 2 & 3 - \lambda \end{pmatrix} = 0$$
+
+$$(4 - \lambda)(3 - \lambda) - 2 = 0$$
+$$12 - 7\lambda + \lambda^2 - 2 = 0$$
+$$\lambda^2 - 7\lambda + 10 = 0$$
+$$(\lambda - 2)(\lambda - 5) = 0$$
+
+Therefore: $\lambda_1 = 2$ and $\lambda_2 = 5$
+
+**Step 2: Find eigenvector for $\lambda_1 = 2$**
+
+Solve $(A - 2I)\mathbf{v} = \mathbf{0}$:
+
+$$\begin{pmatrix} 2 & 1 \\ 2 & 1 \end{pmatrix} \begin{pmatrix} x \\ y \end{pmatrix} = \begin{pmatrix} 0 \\ 0 \end{pmatrix}$$
+
+This gives: $2x + y = 0 \Rightarrow y = -2x$
+
+$$\mathbf{v}_1 = \begin{pmatrix} 1 \\ -2 \end{pmatrix}$$
+
+**Step 3: Find eigenvector for $\lambda_2 = 5$**
+
+Solve $(A - 5I)\mathbf{v} = \mathbf{0}$:
+
+$$\begin{pmatrix} -1 & 1 \\ 2 & -2 \end{pmatrix} \begin{pmatrix} x \\ y \end{pmatrix} = \begin{pmatrix} 0 \\ 0 \end{pmatrix}$$
+
+This gives: $-x + y = 0 \Rightarrow y = x$
+
+$$\mathbf{v}_2 = \begin{pmatrix} 1 \\ 1 \end{pmatrix}$$
+
+**Answer:** Eigenvalues are $\lambda_1 = 2$ and $\lambda_2 = 5$. Corresponding eigenvectors are $\mathbf{v}_1 = \begin{pmatrix} 1 \\ -2 \end{pmatrix}$ and $\mathbf{v}_2 = \begin{pmatrix} 1 \\ 1 \end{pmatrix}$.
+
+</details>
+
+##### **4.12. Construct Matrix from Eigenvectors and Eigenvalues** (Assignment, Problem 3a)
+
+Let $A$ be a $2 \times 2$ matrix with eigenvalues $\lambda_1 = 3$ and $\lambda_2 = -2$, and corresponding eigenvectors $\mathbf{v}_1 = \begin{pmatrix} 1 \\ 2 \end{pmatrix}$ and $\mathbf{v}_2 = \begin{pmatrix} -1 \\ 1 \end{pmatrix}$. Find the matrix $A$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the defining equations $A\mathbf{v}_i = \lambda_i\mathbf{v}_i$ to set up a system of linear equations for the matrix entries.
+
+1.  **Write out the eigen-equations:** Let $A = \begin{pmatrix} a & b \\ c & d \end{pmatrix}$. Then:
+    $$A\mathbf{v}_1 = \lambda_1\mathbf{v}_1 \Rightarrow \begin{pmatrix} a & b \\ c & d \end{pmatrix} \begin{pmatrix} 1 \\ 2 \end{pmatrix} = 3 \begin{pmatrix} 1 \\ 2 \end{pmatrix}$$
+
+    $$A\mathbf{v}_2 = \lambda_2\mathbf{v}_2 \Rightarrow \begin{pmatrix} a & b \\ c & d \end{pmatrix} \begin{pmatrix} -1 \\ 1 \end{pmatrix} = -2 \begin{pmatrix} -1 \\ 1 \end{pmatrix}$$
+2.  **Expand first equation:**
+    $$\begin{pmatrix} a + 2b \\ c + 2d \end{pmatrix} = \begin{pmatrix} 3 \\ 6 \end{pmatrix}$$
+
+    This gives: $a + 2b = 3$ and $c + 2d = 6$
+3.  **Expand second equation:**
+    $$\begin{pmatrix} -a + b \\ -c + d \end{pmatrix} = \begin{pmatrix} 2 \\ -2 \end{pmatrix}$$
+
+    This gives: $-a + b = 2$ and $-c + d = -2$
+4.  **Solve the system:**
+    From equations 1 and 3:
+
+    *   Adding: $3b = 5 \Rightarrow b = \frac{5}{3}$
+    *   Then: $a = 3 - 2 \cdot \frac{5}{3} = 3 - \frac{10}{3} = -\frac{1}{3}$
+
+    From equations 2 and 4:
+
+    *   Adding: $3d = 4 \Rightarrow d = \frac{4}{3}$
+    *   Then: $c = 6 - 2 \cdot \frac{4}{3} = 6 - \frac{8}{3} = \frac{10}{3}$
+5.  **Form the matrix:**
+    $$A = \begin{pmatrix} -\frac{1}{3} & \frac{5}{3} \\ \frac{10}{3} & \frac{4}{3} \end{pmatrix}$$
+
+**Answer:** $A = \begin{pmatrix} -\frac{1}{3} & \frac{5}{3} \\ \frac{10}{3} & \frac{4}{3} \end{pmatrix}$
+
+</details>
+
+##### **4.13. Eigenspace and Algebraic/Geometric Multiplicity** (Assignment, Problem 2)
+
+For the matrix $C = \begin{pmatrix} 2 & 0 & 0 \\ 1 & 2 & 1 \\ -1 & 0 & 1 \end{pmatrix}$:
+
+(a) Find the characteristic polynomial of $C$.
+(b) Find all eigenvalues of $C$.
+(c) For each eigenvalue, find a basis for the corresponding eigenspace.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The characteristic polynomial is found via determinant. Eigenvalues are its roots. For each eigenvalue, the eigenspace is the null space of $(A - \lambda I)$.
+
+**Step 1: Find the characteristic polynomial**
+
+$$\det(C - \lambda I) = \det\begin{pmatrix} 2 - \lambda & 0 & 0 \\ 1 & 2 - \lambda & 1 \\ -1 & 0 & 1 - \lambda \end{pmatrix}$$
+
+Since the first column has two zeros, expand along it:
+$$(2 - \lambda) \det\begin{pmatrix} 2 - \lambda & 1 \\ 0 & 1 - \lambda \end{pmatrix} = (2 - \lambda)[(2 - \lambda)(1 - \lambda) - 0]$$
+
+$$= (2 - \lambda)^2(1 - \lambda)$$
+
+**Step 2: Find eigenvalues**
+
+From $(2 - \lambda)^2(1 - \lambda) = 0$:
+$$\lambda_1 = 2 \text{ (multiplicity 2)}, \quad \lambda_2 = 1 \text{ (multiplicity 1)}$$
+
+**Step 3: Find eigenspace for $\lambda = 2$**
+
+Solve $(C - 2I)\mathbf{v} = \mathbf{0}$:
+
+$$\begin{pmatrix} 0 & 0 & 0 \\ 1 & 0 & 1 \\ -1 & 0 & -1 \end{pmatrix} \begin{pmatrix} x \\ y \\ z \end{pmatrix} = \begin{pmatrix} 0 \\ 0 \\ 0 \end{pmatrix}$$
+
+From the second row: $x + z = 0 \Rightarrow z = -x$. The variable $y$ is free.
+
+$$\begin{pmatrix} x \\ y \\ z \end{pmatrix} = x\begin{pmatrix} 1 \\ 0 \\ -1 \end{pmatrix} + y\begin{pmatrix} 0 \\ 1 \\ 0 \end{pmatrix}$$
+
+**Basis for eigenspace:** $\left\{ \begin{pmatrix} 1 \\ 0 \\ -1 \end{pmatrix}, \begin{pmatrix} 0 \\ 1 \\ 0 \end{pmatrix} \right\}$ (geometric multiplicity = 2)
+
+**Step 4: Find eigenspace for $\lambda = 1$**
+
+Solve $(C - I)\mathbf{v} = \mathbf{0}$:
+
+$$\begin{pmatrix} 1 & 0 & 0 \\ 1 & 1 & 1 \\ -1 & 0 & 0 \end{pmatrix} \begin{pmatrix} x \\ y \\ z \end{pmatrix} = \begin{pmatrix} 0 \\ 0 \\ 0 \end{pmatrix}$$
+
+From the first row: $x = 0$. From the second: $y + z = 0 \Rightarrow z = -y$.
+
+$$\begin{pmatrix} x \\ y \\ z \end{pmatrix} = y\begin{pmatrix} 0 \\ 1 \\ -1 \end{pmatrix}$$
+
+**Basis for eigenspace:** $\left\{ \begin{pmatrix} 0 \\ 1 \\ -1 \end{pmatrix} \right\}$ (geometric multiplicity = 1)
+
+**Answer:**
+(a) Characteristic polynomial: $(2 - \lambda)^2(1 - \lambda)$
+(b) Eigenvalues: $\lambda = 2$ (multiplicity 2) and $\lambda = 1$ (multiplicity 1)
+(c) Eigenspace bases:
+
+   - For $\lambda = 2$: $\text{span}\left\{ \begin{pmatrix} 1 \\ 0 \\ -1 \end{pmatrix}, \begin{pmatrix} 0 \\ 1 \\ 0 \end{pmatrix} \right\}$
+   - For $\lambda = 1$: $\text{span}\left\{ \begin{pmatrix} 0 \\ 1 \\ -1 \end{pmatrix} \right\}$
+
+</details>
+
+##### **4.14. Determine Diagonalizability** (Assignment, Problem 7a)
+
+Describe all matrices $S$ that diagonalize the matrix:
+$$A = \begin{bmatrix} 4 & 0 \\ 1 & 2 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A diagonalizing matrix $S$ has columns that are eigenvectors of $A$. Different choices of eigenvectors (and their ordering) give different matrices $S$, all valid diagonalizers.
+
+**Step 1: Find eigenvalues**
+
+Since $A$ is upper triangular, the eigenvalues are the diagonal entries: $\lambda_1 = 4$ and $\lambda_2 = 2$.
+
+**Step 2: Find eigenvector for $\lambda_1 = 4$**
+
+Solve $(A - 4I)\mathbf{v} = \mathbf{0}$:
+
+$$\begin{bmatrix} 0 & 0 \\ 1 & -2 \end{bmatrix} \begin{bmatrix} x \\ y \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}$$
+
+From the second row: $x - 2y = 0 \Rightarrow x = 2y$
+
+$$\mathbf{v}_1 = \begin{bmatrix} 2 \\ 1 \end{bmatrix}$$
+
+**Step 3: Find eigenvector for $\lambda_2 = 2$**
+
+Solve $(A - 2I)\mathbf{v} = \mathbf{0}$:
+
+$$\begin{bmatrix} 2 & 0 \\ 1 & 0 \end{bmatrix} \begin{bmatrix} x \\ y \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}$$
+
+From the first row: $2x = 0 \Rightarrow x = 0$. The variable $y$ is free.
+
+$$\mathbf{v}_2 = \begin{bmatrix} 0 \\ 1 \end{bmatrix}$$
+
+**Step 4: Characterize all diagonalizing matrices**
+
+Since any nonzero scalar multiple of an eigenvector is still an eigenvector (for the same eigenvalue), the diagonalizing matrices are:
+
+$$S = \begin{bmatrix} 2a & 0 \\ a & b \end{bmatrix} \quad \text{where } a \neq 0 \text{ and } b \neq 0$$
+
+The first column is $a$ times $\mathbf{v}_1$, and the second column is $b$ times $\mathbf{v}_2$.
+
+**Answer:** All matrices of the form $S = \begin{bmatrix} 2a & 0 \\ a & b \end{bmatrix}$ with $a \neq 0, b \neq 0$ diagonalize $A$.
+
+</details>
+
+##### **4.15. Identify Non-Diagonalizable Matrix** (Assignment, Problem 8)
+
+Which of these matrices cannot be diagonalized?
+
+$$A_1 = \begin{bmatrix} 2 & -2 \\ 2 & -2 \end{bmatrix}, \quad A_2 = \begin{bmatrix} 2 & 0 \\ 2 & -2 \end{bmatrix}, \quad A_3 = \begin{bmatrix} 2 & 0 \\ 2 & 2 \end{bmatrix}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A matrix is diagonalizable if it has $n$ linearly independent eigenvectors. If it has repeated eigenvalues, we must check the dimension of the eigenspace.
+
+**Analysis of $A_1 = \begin{bmatrix} 2 & -2 \\ 2 & -2 \end{bmatrix}$:**
+
+Find eigenvalues:
+$$\det(A_1 - \lambda I) = (2 - \lambda)^2 - (-4) = \lambda^2 - 4\lambda + 4 - 4 = \lambda^2 - 4\lambda = \lambda(\lambda - 4)$$
+
+Wait, let me recalculate:
+$$\det(A_1 - \lambda I) = \det\begin{bmatrix} 2 - \lambda & -2 \\ 2 & -2 - \lambda \end{bmatrix} = (2-\lambda)(-2-\lambda) + 4$$
+$$= -4 - 2\lambda + 2\lambda + \lambda^2 + 4 = \lambda^2$$
+
+So $\lambda = 0$ with multiplicity 2.
+
+Find eigenvectors: Solve $A_1\mathbf{v} = \mathbf{0}$:
+$$\begin{bmatrix} 2 & -2 \\ 2 & -2 \end{bmatrix} \begin{bmatrix} x \\ y \end{bmatrix} = \mathbf{0} \Rightarrow 2x - 2y = 0 \Rightarrow x = y$$
+
+$$\mathbf{v} = \begin{bmatrix} 1 \\ 1 \end{bmatrix}$$
+
+There is only **one** linearly independent eigenvector, but we need two. Thus $A_1$ is **NOT diagonalizable**.
+
+**Analysis of $A_2 = \begin{bmatrix} 2 & 0 \\ 2 & -2 \end{bmatrix}$:**
+
+Eigenvalues (diagonal entries, since upper triangular): $\lambda_1 = 2, \lambda_2 = -2$ (distinct).
+
+Since eigenvalues are distinct, the corresponding eigenvectors are automatically linearly independent. Thus $A_2$ **IS diagonalizable**.
+
+**Analysis of $A_3 = \begin{bmatrix} 2 & 0 \\ 2 & 2 \end{bmatrix}$:**
+
+Eigenvalues (diagonal entries, since upper triangular): $\lambda = 2$ with multiplicity 2.
+
+Find eigenvectors: Solve $(A_3 - 2I)\mathbf{v} = \mathbf{0}$:
+$$\begin{bmatrix} 0 & 0 \\ 2 & 0 \end{bmatrix} \begin{bmatrix} x \\ y \end{bmatrix} = \mathbf{0}$$
+
+From the second row: $2x = 0 \Rightarrow x = 0$. The variable $y$ is free.
+
+$$\mathbf{v} = \begin{bmatrix} 0 \\ 1 \end{bmatrix}$$
+
+There is only **one** linearly independent eigenvector for the repeated eigenvalue. Thus $A_3$ is **NOT diagonalizable**.
+
+**Answer:** $A_1$ and $A_3$ cannot be diagonalized. Only $A_2$ is diagonalizable.
+
+</details>
+
