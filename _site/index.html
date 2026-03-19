@@ -240,6 +240,12 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
  <span class="menu-text">W7. Eigenvalues, Eigenvectors, Diagonalization of Matrices</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./semester-2/Analytical Geometry and Linear Algebra II/7.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">W8. Similar Matrices, Complex Vectors and Matrices, Hermitian and Unitary Matrices</span></a>
+  </div>
+</li>
       </ul>
   </li>
           <li class="sidebar-item sidebar-item-section">
@@ -1035,7 +1041,7 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 <section id="news" class="level5">
 <h5 class="anchored" data-anchor-id="news"><strong>News</strong></h5>
 <ul>
-<li><strong>March 19, 2026</strong> – Added Academic Writing and Argumentation II with 14 new articles. Restructured the sidebar into Semester I and Semester II for easier navigation. Added “Mark as Solved” buttons on all exercise headings — your progress is saved automatically. Sidebar sections are now collapsed by default and remember their state between visits. 🚀 Performance improvements: optimized fonts (109 MB → 4.6 MB), enabled build caching, set up GitHub Actions for automatic deployment with gzip compression. Fixed horizontal scroll on mobile: long formulas and tables now scroll inside their own block without affecting the page.</li>
+<li><strong>March 19, 2026</strong> – Added Academic Writing and Argumentation II with 14 new articles. Restructured the sidebar into Semester I and Semester II for easier navigation. Added “Mark as Solved” buttons on all exercise headings — your progress is saved automatically. Sidebar sections are now collapsed by default and remember their state between visits. 🚀 Performance improvements. Fixed horizontal scroll on mobile: long formulas and tables now scroll inside their own block without affecting the page.</li>
 <li><strong>January 27, 2026</strong> – Second semester is here! 📚 Launched new course materials for 5 courses. Added content for Data Structures and Algorithms, Analytical Geometry and Linear Algebra II, Mathematical Analysis II, Software Systems Analysis and Design, and Theoretical Computer Science.</li>
 <li><strong>December 14, 2025</strong> – First semester is finished! 🎉 There are now 80 articles, 1330 examples, and 389 formulas. Have a great New Year — hope you get good grades and plenty of rest! 🚀</li>
 <li><strong>October 29, 2025</strong> – Added all 603 examples and 189 formulas from lectures, tutorials, and labs across AGLA, DM, ITP, MA. Improved navigation. Added images to CA articles. Included paragraph examples in AWA. Removed Mistakes sections from all articles; dropped Essence of Calculus and Essence of Linear Algebra.</li>
@@ -1224,7 +1230,6 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 				btn.className = 'mark-solved';
 				btn.textContent = '✓ Solved';
 
-				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
 				let textSpan = h5.querySelector('.problem-title-text');
 				if (!textSpan) {
 					textSpan = document.createElement('span');
@@ -1263,31 +1268,39 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			const target = targetId ? document.querySelector(targetId) : null;
 			if (!toggle || !target) return;
 
+			const textLink = section.querySelector('.sidebar-item-text[data-bs-toggle="collapse"]');
 			const storageKey = `sidebar_section_${targetId}`;
-
 			const saved = localStorage.getItem(storageKey);
+
 			if (saved === 'open') {
 				target.classList.add('show');
-				toggle.setAttribute('aria-expanded', 'true');
+				[toggle, textLink].forEach(el => {
+					if (!el) return;
+					el.setAttribute('aria-expanded', 'true');
+					el.classList.remove('collapsed');
+				});
 				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
-			} else {
-				// collapse by default if not explicitly opened
+			} else if (saved === 'closed') {
 				target.classList.remove('show');
-				toggle.setAttribute('aria-expanded', 'false');
+				[toggle, textLink].forEach(el => {
+					if (!el) return;
+					el.setAttribute('aria-expanded', 'false');
+					el.classList.add('collapsed');
+				});
 				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
 			}
 
-			target.addEventListener('show.bs.collapse', () => {
-				localStorage.setItem(storageKey, 'open');
-				toggle.setAttribute('aria-expanded', 'true');
-				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
-			});
+			// Пересоздаём Bootstrap Collapse instance, чтобы _isShown совпадал с DOM
+			if (window.bootstrap?.Collapse) {
+				bootstrap.Collapse.getInstance(target)?.dispose();
+				bootstrap.Collapse.getOrCreateInstance(target, { toggle: false });
+			}
 
-			target.addEventListener('hide.bs.collapse', () => {
-				localStorage.setItem(storageKey, 'closed');
-				toggle.setAttribute('aria-expanded', 'false');
-				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
-			});
+			// MutationObserver надёжнее Bootstrap-событий: следит за реальным изменением
+			// класса show на DOM-элементе, добавленный после манипуляций — не ловит их
+			new MutationObserver(() => {
+				localStorage.setItem(storageKey, target.classList.contains('show') ? 'open' : 'closed');
+			}).observe(target, { attributes: true, attributeFilter: ['class'] });
 		});
 
 		const scrollKey = 'sidebar_scroll_top';

@@ -242,6 +242,12 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
  <span class="menu-text">W7. Eigenvalues, Eigenvectors, Diagonalization of Matrices</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../semester-2/Analytical Geometry and Linear Algebra II/7.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">W8. Similar Matrices, Complex Vectors and Matrices, Hermitian and Unitary Matrices</span></a>
+  </div>
+</li>
       </ul>
   </li>
           <li class="sidebar-item sidebar-item-section">
@@ -1107,8 +1113,22 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 <section id="what-to-evaluate-in-a-results-section" class="level6">
 <h6 class="anchored" data-anchor-id="what-to-evaluate-in-a-results-section"><strong>1.2.1 What to Evaluate in a Results Section</strong></h6>
 <p>When reviewing a peer’s Results section, evaluate both its <em>content</em> and its <em>language and style</em>:</p>
-<p><strong>Content criteria</strong>: - Does the section cite all sources that were included in the search? - Does it clearly answer the research question? - Are sources synthesized (compared, contrasted, combined), or merely listed one by one? - Is the ordering strategy clear and consistent? - Is the Risk of Bias assessment present, with both a table and a concluding text?</p>
-<p><strong>Language and style criteria</strong>: - Is the writing formal, objective, and precise? - Are transitions used effectively between sources and paragraphs? - Are in-text citations formatted correctly in IEEE style? - Are hedging devices used appropriately when interpreting or generalizing? - Are there grammatical errors, unclear sentences, or structural problems?</p>
+<p><strong>Content criteria</strong>:</p>
+<ul>
+<li>Does the section cite all sources that were included in the search?</li>
+<li>Does it clearly answer the research question?</li>
+<li>Are sources synthesized (compared, contrasted, combined), or merely listed one by one?</li>
+<li>Is the ordering strategy clear and consistent?</li>
+<li>Is the Risk of Bias assessment present, with both a table and a concluding text?</li>
+</ul>
+<p><strong>Language and style criteria</strong>:</p>
+<ul>
+<li>Is the writing formal, objective, and precise?</li>
+<li>Are transitions used effectively between sources and paragraphs?</li>
+<li>Are in-text citations formatted correctly in IEEE style?</li>
+<li>Are hedging devices used appropriately when interpreting or generalizing?</li>
+<li>Are there grammatical errors, unclear sentences, or structural problems?</li>
+</ul>
 </section>
 <section id="giving-constructive-feedback" class="level6">
 <h6 class="anchored" data-anchor-id="giving-constructive-feedback"><strong>1.2.2 Giving Constructive Feedback</strong></h6>
@@ -1258,7 +1278,6 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 				btn.className = 'mark-solved';
 				btn.textContent = '✓ Solved';
 
-				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
 				let textSpan = h5.querySelector('.problem-title-text');
 				if (!textSpan) {
 					textSpan = document.createElement('span');
@@ -1297,31 +1316,36 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			const target = targetId ? document.querySelector(targetId) : null;
 			if (!toggle || !target) return;
 
+			const textLink = section.querySelector('.sidebar-item-text[data-bs-toggle="collapse"]');
 			const storageKey = `sidebar_section_${targetId}`;
-
 			const saved = localStorage.getItem(storageKey);
+
 			if (saved === 'open') {
 				target.classList.add('show');
-				toggle.setAttribute('aria-expanded', 'true');
+				[toggle, textLink].forEach(el => {
+					if (!el) return;
+					el.setAttribute('aria-expanded', 'true');
+					el.classList.remove('collapsed');
+				});
 				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
-			} else {
-				// collapse by default if not explicitly opened
+			} else if (saved === 'closed') {
 				target.classList.remove('show');
-				toggle.setAttribute('aria-expanded', 'false');
+				[toggle, textLink].forEach(el => {
+					if (!el) return;
+					el.setAttribute('aria-expanded', 'false');
+					el.classList.add('collapsed');
+				});
 				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
 			}
 
-			target.addEventListener('show.bs.collapse', () => {
-				localStorage.setItem(storageKey, 'open');
-				toggle.setAttribute('aria-expanded', 'true');
-				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
-			});
+			if (window.bootstrap?.Collapse) {
+				bootstrap.Collapse.getInstance(target)?.dispose();
+				bootstrap.Collapse.getOrCreateInstance(target, { toggle: false });
+			}
 
-			target.addEventListener('hide.bs.collapse', () => {
-				localStorage.setItem(storageKey, 'closed');
-				toggle.setAttribute('aria-expanded', 'false');
-				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
-			});
+			new MutationObserver(() => {
+				localStorage.setItem(storageKey, target.classList.contains('show') ? 'open' : 'closed');
+			}).observe(target, { attributes: true, attributeFilter: ['class'] });
 		});
 
 		const scrollKey = 'sidebar_scroll_top';
