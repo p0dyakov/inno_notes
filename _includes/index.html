@@ -46,42 +46,44 @@
 	document.addEventListener('DOMContentLoaded', () => {
 		const basePath = '/inno_notes/';
 		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
-		if (curPath === '/' || curPath === '' || curPath.includes('index')) {
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
 			document.querySelector('.article-buttons')?.remove();
-			return;
 		}
 
-		const currentUrl = window.location.href;
-		const btn = document.querySelector('.mark-read');
-		const title = document.querySelector('h1');
-		const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
 
-		const getRead = () => localStorage.getItem(`read_${currentUrl}`);
-		const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
-			: localStorage.removeItem(`read_${currentUrl}`);
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
 
-		const updateUI = (isRead) => {
-			btn.classList.toggle('active', isRead);
-			btn.textContent = isRead ? 'Read' : 'Mark as Read';
-			title?.classList.toggle('read-title', isRead);
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
 			sidebarLinks.forEach(l => {
 				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
-				if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
 			});
-		};
-
-		updateUI(!!getRead());
-
-		btn?.addEventListener('click', () => {
-			const was = !!getRead();
-			setRead(!was);
-			updateUI(!was);
-		});
-
-		sidebarLinks.forEach(l => {
-			const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
-			if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
-		});
+		}
 
 		const sidebar = document.querySelector('#quarto-sidebar');
 		if (!sidebar) return;
