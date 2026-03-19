@@ -36,6 +36,37 @@
 		text-decoration: line-through;
 		opacity: .7;
 	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
 </style>
 
 <div class="article-buttons">
@@ -82,6 +113,47 @@
 			sidebarLinks.forEach(l => {
 				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
 				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
 			});
 		}
 
