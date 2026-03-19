@@ -1,0 +1,1484 @@
+---
+title: "W7-W8. C++ STL Iterators, SOLID Principles"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "March 5, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Generic Programming and STL**
+
+###### **1.1.1 What is Generic Programming?**
+
+**Generic programming (GP)** is a programming paradigm that focuses on writing algorithms and data structures in the most general form possible — independent of any specific type. The two fundamental principles behind GP are **generality** (algorithms work for any type) and **efficiency** (no runtime overhead compared to hand-written type-specific code).
+
+The **Standard Template Library (STL)** is the most successful implementation of generic programming. It was developed by Alexander Stepanov, Meng Lee, and David Musser in the early 1990s and became part of the C++ Standard in **1994**. By **1998**, it was formally standardized in Chapters 20, 22, 23, and 25 of the ISO C++ Standard.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.1.2 GP vs. OOP — An Important Distinction**
+
+STL does *not* use object-oriented programming (OOP). These are *orthogonal* paradigms — they solve different problems:
+
+*   **OOP** bundles data and the algorithms that operate on that data inside a single **class**. The class is simultaneously a container *and* a collection of algorithms.
+*   **GP** separates containers from algorithms completely:
+    *   **Generic Containers** — data structures that know nothing about any specific algorithm.
+    *   **Generic Algorithms** — functions that know nothing about any specific container.
+
+The key insight is that GP requires no encapsulation or inheritance between containers and algorithms. The two halves are decoupled and communicate only through a thin interface: **iterators**.
+
+###### **1.1.3 STL Components**
+
+STL provides seven kinds of components, split into two groups:
+
+**First-order components** (the core):
+
+*   **Containers** — generic data structures: `vector`, `list`, `deque`, `set`, `map`, `multiset`, `multimap`, and their variants.
+*   **Algorithms** — generic operations on containers: searching, sorting, copying, transforming, merging, and more.
+*   **Iterators** — the glue between containers and algorithms (explained in detail below).
+
+**Second-order components** (support infrastructure):
+
+*   **Functional Objects** (functors) — callable objects that algorithms use as customization points.
+*   **Adaptors** — wrappers that adapt containers, iterators, or functors to a different interface.
+*   **Allocators** — policy objects controlling memory allocation.
+*   **Traits** — compile-time information about types.
+
+##### **1.2 Iterators: The Bridge Between Containers and Algorithms**
+
+###### **1.2.1 The Motivation: Deriving Iterators from First Principles**
+
+The best way to understand *why* iterators exist is to derive them from scratch. Consider the following concrete function that searches an array of integers for a given value:
+
+```cpp
+const int* find0(const int* array, int n, int x)
+{
+    const int* p = array;
+    for (int i = 0; i < n; i++)
+    {
+        if (*p == x) return p;  // success
+        p++;
+    }
+    return 0;  // fail
+}
+```
+
+This works, but it has four hard-coded limitations:
+
+1.  It searches only `int` values.
+2.  It searches only in an *array* (a contiguous memory block).
+3.  It requires the *address* of the first element.
+4.  It requires the array *size*.
+
+Let's remove each limitation one step at a time.
+
+**Step 1 — Generalize the element type:**
+
+```cpp
+template <typename T>
+T* find1(T* array, int n, const T& x)
+{
+    T* p = array;
+    for (int i = 0; i < n; i++)
+    {
+        if (*p == x) return p;
+        p++;
+    }
+    return 0;
+}
+```
+
+Now the function works for any type `T`, as long as `T` supports `operator==`. (We pass `x` by reference to avoid expensive copies.)
+
+**Step 2 — Replace size with a "past-the-end" pointer:**
+
+Instead of passing the size `n`, we pass a pointer `beyond` that points to the memory location *one past* the last element. This removes the array-size dependency:
+
+```cpp
+template <typename T>
+T* find2(T* array, T* beyond, const T& x)
+{
+    T* p = array;
+    while (p != beyond)
+    {
+        if (*p == x) return p;
+        p++;
+    }
+    return 0;
+}
+```
+
+<!-- DIAGRAM HERE -->
+
+The ISO C++ Standard explicitly guarantees this is safe: a pointer one past the last element of an array is a valid pointer for comparison purposes, even though you may not dereference it.
+
+**Step 3 — Return `beyond` instead of `0` on failure:**
+
+Returning a null pointer (`0`) ties us to pointers specifically. We generalize by returning `beyond` to signal "not found" — this makes the failure signal expressible in terms of *any* iterator type, not just pointers:
+
+```cpp
+template <typename T>
+T* find3(T* array, T* beyond, const T& x)
+{
+    T* p = array;
+    while (p != beyond)
+    {
+        if (*p == x) return p;
+        p++;
+    }
+    return beyond;  // "not found" — valid for any iterator type
+}
+```
+
+**Step 4 — Simplify and optimize:**
+
+We merge the two loop conditions into one and rename `array` to `first` (since the algorithm no longer assumes a specific data structure):
+
+```cpp
+template <typename T>
+T* find4(T* first, T* beyond, const T& x)
+{
+    T* p = first;
+    while (p != beyond && *p != x)
+        p++;
+    return p;
+}
+```
+
+**Step 5 — Remove pointers entirely (the final algorithm):**
+
+The final leap: replace the pointer type `T*` with a new abstract type parameter `P`. This `P` can be *any* type that behaves like a pointer — including user-defined classes for non-array containers:
+
+```cpp
+template <typename T, typename P>
+P find5(P first, P beyond, const T& x)
+{
+    P p = first;
+    while (p != beyond && *p != x)
+        p++;
+    return p;
+}
+```
+
+Type `P` is now the **iterator type**. Type `T` is the **value type** (the type of elements stored in the container). The algorithm requires only three operations from `P`: dereferencing (`operator*`), increment (`operator++`), and inequality comparison (`operator!=`).
+
+###### **1.2.2 Using `find5`: The Half-Open Range Convention**
+
+The pattern `find5(first, beyond, x)` establishes the **half-open range** convention: `[first, beyond)`. This means:
+
+*   `first` points to the first element.
+*   `beyond` points *one past* the last element (it is *not* dereferenceable).
+*   The range contains all elements from `first` up to but *not including* `beyond`.
+
+<!-- DIAGRAM HERE -->
+
+For a plain C++ array this looks like:
+
+```cpp
+int A[100];
+// ... initialize A ...
+int* result = find5(A, &A[100], 7);
+// T = int, P = int* (deduced by the compiler)
+```
+
+`&A[100]` is the canonical "past-the-end" pointer for an array of 100 elements.
+
+###### **1.2.3 Iterators as a Formal Concept**
+
+The derivation establishes two fundamental concepts:
+
+*   **Value type** (`T`): the type of the elements stored in the container. Requirements: must support `operator!=`.
+*   **Iterator type** (`P`): a type that provides access to a sequence of elements. Requirements: must support `operator*` (returning a value of the value type), `operator++` (advancing to the next element), and `operator!=`.
+
+An **iterator** is any object whose type satisfies these requirements. Raw C++ pointers (`T*`) automatically satisfy all of them — which is why they work as iterators for arrays.
+
+##### **1.3 Building a Custom Iterator: From Array to Linked List**
+
+The power of iterators becomes clear when we apply `find5` to a *non-array* container — a singly-linked list.
+
+###### **1.3.1 A Simple Linked List Node**
+
+Here is a minimal `NODE` class for a singly-linked list of integers:
+
+```cpp
+class NODE {
+    int value;   // the node's data
+    NODE* next;  // pointer to the next node
+public:
+    NODE(int v) : value(v), next(0) { }
+    void add(NODE* n) {
+        n->next = this->next;
+        this->next = n;
+    }
+};
+```
+
+<!-- DIAGRAM HERE -->
+
+To use `find5` with this list, we need:
+
+1.  `NODE` to satisfy the **value type** requirements (i.e., support `operator!=`).
+2.  A separate **iterator class** that satisfies the iterator type requirements.
+
+###### **1.3.2 Adding Value-Type Requirements to NODE**
+
+The `find5` algorithm compares elements with `operator!=`. We add it to `NODE`:
+
+```cpp
+class NODE {
+    int value;
+    NODE* next;
+public:
+    NODE(int v) : value(v), next(0) { }
+    void add(NODE* n) {
+        n->next = this->next;
+        this->next = n;
+    }
+
+    // Value type requirement: compare by value
+    bool operator!=(NODE& n) { return this->value != n.value; }
+    // Conversion to int for convenient value access
+    operator int() { return value; }
+};
+```
+
+###### **1.3.3 Writing the Iterator Class**
+
+The iterator for `NODE`s must support `operator*`, `operator++`, and `operator!=`. It can be written as either a standalone class or as a **nested (inner) class** inside `NODE`. Using an inner class is usually better because it gives the iterator direct access to `NODE`'s private members.
+
+```cpp
+class NODE {
+    int value;
+    NODE* next;
+public:
+    NODE(int v)  : value(v), next(0) { }
+    void add(NODE* n) { n->next = this->next; this->next = n; }
+    bool operator!=(NODE& n) { return this->value != n.value; }
+    operator int() { return value; }
+
+    class iterator;
+    friend class iterator;   // give iterator access to private members
+
+    class iterator {
+        NODE* p;             // current position
+    public:
+        iterator(NODE* node) : p(node) { }
+
+        int operator*()  { return p->value; }   // dereference: get value
+        void operator++() { p = p->next; }      // advance to next node
+        bool operator!=(const iterator& other) const {
+            return p != other.p;
+        }
+        operator NODE*() { return p; }          // conversion to raw pointer
+    };
+};
+```
+
+Now we can use `find5` on a linked list:
+
+```cpp
+NODE* list = new NODE(1);
+// ... add more nodes ...
+NODE::iterator it = find5(NODE::iterator(list), NODE::iterator(0), 7);
+```
+
+<!-- DIAGRAM HERE -->
+
+###### **1.3.4 The Big Picture: Separation of Concerns**
+
+The following illustrates what makes this design powerful:
+
+*   The **array container** and the **list container** know *nothing* about the `find5` algorithm.
+*   The **`find5` algorithm** knows *nothing* about arrays or lists.
+*   The two sides simply agree on a common interface — the iterator requirements — and both fulfill it independently.
+
+This means you can add new algorithms without touching containers, and add new containers without touching algorithms. The number of combinations grows *linearly* (containers + algorithms), not *quadratically* (containers × algorithms).
+
+<!-- DIAGRAM HERE -->
+
+##### **1.4 The `reverse` Algorithm: Introducing New Iterator Requirements**
+
+Consider a `reverse` algorithm that reverses the order of elements in a container:
+
+```cpp
+template <typename P, typename T>
+void reverse(P start, P beyond)
+{
+    while (start != beyond)
+    {
+        --beyond;
+        if (start != beyond)
+        {
+            T t = *start;
+            *start = *beyond;
+            *beyond = t;
+            ++start;
+        }
+    }
+}
+```
+
+<!-- DIAGRAM HERE -->
+
+This algorithm requires *more* from the iterator than `find5` did:
+
+*   `operator++` — same as before.
+*   `operator!=` — same as before.
+*   `operator--` — **new**: the iterator must be able to move *backward*.
+*   `operator*` returning a **reference** (not just a value) — **new**: we need to *write* through the iterator, not just read.
+
+This observation leads to the formal classification of iterator categories.
+
+##### **1.5 Iterator Categories**
+
+Different algorithms require different capabilities from their iterators. The STL formalizes this as a **hierarchy of iterator categories**, where each level adds new operations on top of the previous:
+
+<!-- DIAGRAM HERE -->
+
+```{r, echo=FALSE, fig.cap="Iterator Category Hierarchy"}
+#| fig-align: center
+library(DiagrammeR)
+grViz("
+  digraph iterator_hierarchy {
+    graph [rankdir=TB, bgcolor='#FAFAFA', fontname='Helvetica']
+    node [shape=box, style='rounded,filled', fontname='Helvetica', fontsize=11]
+    edge [fontname='Helvetica', fontsize=9]
+
+    Input [label='Input Iterator\\n(x = *i; ++i; i++)', fillcolor='#D6EAF8']
+    Output [label='Output Iterator\\n(*i = x; ++i; i++)', fillcolor='#D6EAF8']
+    Forward [label='Forward Iterator\\n(Input + Output)', fillcolor='#D5F5E3']
+    Bidir [label='Bidirectional Iterator\\n(Forward + --i; i--)', fillcolor='#FDEBD0']
+    Random [label='Random Access Iterator\\n(Bidir + i+n, i-n, i[n], i<j, ...)', fillcolor='#FADBD8']
+    Pointer [label='C++ Raw Pointer (T*)', fillcolor='#F9E79F', shape=ellipse]
+
+    Input -> Forward
+    Output -> Forward
+    Forward -> Bidir
+    Bidir -> Random
+    Random -> Pointer [label=' is-a / subsumes']
+  }
+", width=600, height=380)
+```
+
+*   **Input Iterator** — can only be read and moved forward, one step at a time. Useful for single-pass algorithms like `find`. Operations: `x = *i`, `++i`, `i++`, `i == j`, `i != j`.
+*   **Output Iterator** — can only be written to and moved forward. Operations: `*i = x`, `++i`, `i++`.
+*   **Forward Iterator** — combines Input and Output. Supports multiple passes over the same range. Used by `forward_list`.
+*   **Bidirectional Iterator** — Forward + backward movement (`--i`, `i--`). Used by `list`, `set`, `map`. Required by `reverse`.
+*   **Random Access Iterator** — Bidirectional + arbitrary jumps (`i + n`, `i - n`, `i += n`, `i[n]`) and comparison (`i < j`, `i <= j`, etc.). Used by `vector`, `deque`, raw arrays. Required by `sort`.
+
+All iterator categories support `operator==`, `operator!=`, and assignment (`=`).
+
+**Key insight:** C++ raw pointers (`T*`) satisfy all Random Access Iterator requirements — they are the "perfect" iterator. Every STL algorithm that works on iterators also works on raw pointers.
+
+##### **1.6 Iterator Behavior Across Containers**
+
+Different containers provide different iterator categories, and their traversal order depends on the container's internal structure:
+
+```cpp
+int main() {
+    std::map<int, std::string> orderedMap;
+    std::unordered_map<int, std::string> unorderedMap;
+
+    orderedMap.insert({3, "Three"}); unorderedMap.insert({3, "Three"});
+    orderedMap.insert({1, "One"});   unorderedMap.insert({1, "One"});
+    orderedMap.insert({2, "Two"});   unorderedMap.insert({2, "Two"});
+
+    // std::map iterates in sorted key order: 1, 2, 3
+    for (auto it = orderedMap.begin(); it != orderedMap.end(); ++it)
+        std::cout << it->first << ": " << it->second << "\n";
+
+    // std::unordered_map iterates in hash-bucket order (unpredictable)
+    for (auto it = unorderedMap.begin(); it != unorderedMap.end(); ++it)
+        std::cout << it->first << ": " << it->second << "\n";
+}
+```
+
+*   `std::map` provides **Bidirectional Iterators** and always traverses in *sorted key order*.
+*   `std::unordered_map` provides **Forward Iterators** and traverses in an *implementation-defined* order.
+
+##### **1.7 Iterator Use-Case: Converting Between Containers**
+
+A powerful use of iterators is constructing one container from another. Many STL containers accept a pair of iterators in their constructor, creating a copy of the given range:
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <set>
+
+int main() {
+    std::vector<int> nums = {1, 2, 2, 3, 4, 4, 5, 6, 7, 8, 9, 9};
+
+    // std::multiset: sorted, duplicates allowed
+    std::multiset<int> multiSetNums(nums.begin(), nums.end());
+
+    // std::set: sorted, duplicates removed automatically
+    std::set<int> uniqueNums(nums.begin(), nums.end());
+
+    for (int num : uniqueNums)
+        std::cout << num << " ";   // 1 2 3 4 5 6 7 8 9
+    std::cout << std::endl;
+
+    for (int num : multiSetNums)
+        std::cout << num << " ";   // 1 2 2 3 4 4 5 6 7 8 9 9
+}
+```
+
+Here, `nums.begin()` and `nums.end()` are `vector` iterators, but the `set` and `multiset` constructors accept *any* Input Iterator. This is GP in action: the constructor algorithm is decoupled from the source container type.
+
+##### **1.8 Defining a Custom Iterator Inside a Container Class**
+
+The recommended pattern for providing iterators in your own container is to define the iterator as an **inner class** with access to the container's internals via `friend`:
+
+```cpp
+template<typename T, typename K /*, ... */>
+class MyContainer {
+    /* ... internal storage ... */
+public:
+    /* constructors, destructors, member functions */
+
+    class iterator;
+    friend class iterator;
+
+    class iterator {
+        /* ... */
+    public:
+        using pointer   = T*;
+        using reference = T&;
+
+        iterator& operator++();   // advance
+        reference operator*();    // dereference
+        bool operator!=(const iterator&) const;
+
+    private:
+        pointer ptr_;    // current position
+        pointer end_;    // one past end
+        pointer begin_;  // start of storage
+        bool last_;      // sentinel flag
+    };
+
+    iterator begin();
+    iterator end();
+    /* ... */
+};
+```
+
+The `friend class iterator` declaration gives the inner `iterator` class full access to `MyContainer`'s private members, which is necessary for efficient implementation.
+
+##### **1.9 SOLID Principles**
+
+Before diving into SOLID, it helps to know a few other common programming abbreviations you will encounter in the industry:
+
+*   **KISS** — *Keep It Simple Stupid*: prefer simple solutions over complex ones.
+*   **DRY** — *Don't Repeat Yourself*: avoid duplicating logic.
+*   **RAII** — *Resource Acquisition Is Initialization*: tie resource lifetimes to object lifetimes (a core C++ idiom).
+*   **SFINAE** — *Substitution Failure Is Not An Error*: a C++ template mechanism.
+
+**SOLID** is a set of five design principles for building *flexible*, *maintainable*, and *extensible* object-oriented software. They were formalized by **Robert C. Martin** ("Uncle Bob") and are widely used across all OOP languages.
+
+The five letters stand for:
+
+```{r, echo=FALSE, fig.cap="SOLID Principles Overview"}
+#| fig-align: center
+library(DiagrammeR)
+grViz("
+  digraph solid {
+    graph [bgcolor='#FAFAFA', fontname='Helvetica']
+    node [shape=box, style='rounded,filled', fontname='Helvetica', fontsize=11, fillcolor='#D5F5E3']
+    edge [style=invis]
+    S [label='S — Single Responsibility\\nOne class, one reason to change']
+    O [label='O — Open/Closed\\nOpen for extension, closed for modification']
+    L [label='L — Liskov Substitution\\nSubtypes must be substitutable for supertypes']
+    I [label='I — Interface Segregation\\nClients should not depend on unused methods']
+    D [label='D — Dependency Inversion\\nDepend on abstractions, not concretions']
+    S -> O -> L -> I -> D
+  }
+", width=600, height=320)
+```
+
+###### **1.9.1 S — Single Responsibility Principle (SRP)**
+
+**A class should have only one reason to change.**
+
+In practice, this means a class should perform only *one kind of task* — it should have only *one responsibility*. If a class handles both navigation *and* printing, then any change to the printing logic forces a change to the class, even if the navigation logic is untouched (and vice versa).
+
+**Problem — SRP violated:**
+
+```csharp
+class Report
+{
+    public string text;
+
+    public void GoToFirstPage() { ... }  // Navigation responsibility
+    public void GoToLastPage()  { ... }
+    public void GoToPage(int n) { ... }
+
+    public void Print() { /* print text */ }  // Printing responsibility — wrong!
+}
+```
+
+`Report` has two distinct reasons to change: if we change how navigation works, or if we add a new output format (XML, RTF, printer, console). This makes the class fragile and hard to reuse.
+
+**Solution — extract the printing responsibility:**
+
+```csharp
+interface IOut {
+    void print(string text);
+}
+
+class ToConsole : IOut {
+    public void print(string text) { /* print to console */ }
+}
+
+class ToPrinter : IOut {
+    public void print(string text) { /* send to printer */ }
+}
+
+// Report now has ONE responsibility: navigation
+class Report
+{
+    public string text;
+
+    public void GoToFirstPage() { ... }
+    public void GoToLastPage()  { ... }
+    public void GoToPage(int n) { ... }
+
+    // Delegates printing to the injected IOut object
+    public void Print(IOut p) {
+        p.print(this.text);
+    }
+}
+```
+
+Now `Report` has a single reason to change: navigation. The `IOut` hierarchy can evolve independently.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.9.2 O — Open/Closed Principle (OCP)**
+
+**Software components should be open for extension but closed for modification.**
+
+This means you should be able to add new behaviour to a system *without editing existing, tested code*. The classic violation is a class that must be *modified* every time a new variant is required.
+
+**Problem — OCP violated:**
+
+```csharp
+class Cook
+{
+    public string name;
+
+    public void MakeSoup()   { ... }
+    // Need a salad? Must modify this class → VIOLATION
+    // Need a dessert? Must modify this class → VIOLATION
+}
+```
+
+Every new dish requires modifying `Cook`. This risks breaking existing behaviour and forces retesting of already-working code.
+
+**Solution 1 — Use inheritance:**
+
+```csharp
+class Cook
+{
+    public string name;
+    public void MakeSoup() { ... }  // closed for modification
+}
+
+class SmarterCook : Cook
+{
+    public void MakeSalad() { ... }  // extension without modification
+}
+```
+
+**Solution 2 — Separate the algorithm from the entity (Strategy pattern):**
+
+```csharp
+interface IMeal
+{
+    void Make();
+}
+
+class Soup   : IMeal { void Make() { /* making soup */   } }
+class Salad  : IMeal { void Make() { /* making salad */  } }
+class Dessert: IMeal { void Make() { /* making dessert */} }
+
+class Cook
+{
+    public string name;
+
+    // Cook is CLOSED for modification: this method never changes
+    public void Make(IMeal meal) {
+        meal.Make();
+    }
+}
+```
+
+Adding a new dish is done by creating a new class that implements `IMeal` — `Cook` is never touched.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.9.3 L — Liskov Substitution Principle (LSP)**
+
+**A variable of a given type may be assigned a value of any subtype of that type, and a method with a parameter of a given type may be invoked with an argument of any subtype, without altering the correctness of the program.**
+
+This principle, formulated by **Barbara Liskov**, is essentially a correctness condition on inheritance. It is *stronger* than simply having the right method signatures — it requires that a subtype *behave* as expected when used in place of its supertype.
+
+**Formal statement:** If `S` is a subtype of `T`, then objects of type `S` may be substituted for objects of type `T` without altering the desirable properties of the program.
+
+**Example of LSP holding:**
+
+```java
+Number n = new Integer(5);   // Integer is a subtype of Number — OK
+Number m = new Double(3.14); // Double is a subtype of Number — OK
+```
+
+Any code that works on `Number` will work correctly when given an `Integer` or `Double`.
+
+**Problem — LSP violated:**
+
+```java
+// Base class
+public class Document {
+    private String title;
+    private int pages;
+
+    public void setData(String title) {
+        this.title = title;   // Only changes the title
+    }
+}
+
+// Subclass that VIOLATES LSP
+public class SpecialDocument extends Document {
+    @Override
+    public void setData(String title) {
+        super.setData(title);
+        setPages(20);   // Secretly changes pages too! Unexpected side effect.
+    }
+}
+```
+
+A caller that uses `Document doc = new SpecialDocument(...)` and calls `doc.setData("NewTitle")` will be *surprised* to find that the page count changed. The subclass silently breaks the contract of the parent class.
+
+**Correct usage:**
+
+```java
+Document doc1 = new Document("MyDoc", 10);
+Document doc2 = new SpecialDocument("MySpecialDoc", 10);
+
+doc2.setData("MyDoc");
+// doc1: pages = 10 (expected)
+// doc2: pages = 20 (SURPRISE — LSP violation!)
+```
+
+The fix is to ensure `SpecialDocument.setData` has the *same observable effect* as `Document.setData` — or to reconsider whether `SpecialDocument` should inherit from `Document` at all.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.9.4 I — Interface Segregation Principle (ISP)**
+
+**Clients should not be forced to depend on methods they do not use.**
+
+A large, monolithic interface forces every implementing class to provide implementations for methods it may not need, leading to either empty/stub implementations or artificially constrained designs.
+
+**Problem — ISP violated:**
+
+```csharp
+interface IMessage
+{
+    void Send();
+    string Text    { get; set; }
+    string Subject { get; set; }
+    string ToAddress   { get; set; }
+    string FromAddress { get; set; }
+    // byte[] Voice { get; set; }  ← may also be needed for voice messages
+}
+
+class SmsMessage : IMessage
+{
+    public void Send() { ... }
+    public string Text    { get { ... } set { ... } }
+    public string Subject { ... }  // SMS has no Subject — forced to implement it anyway!
+    public string ToAddress   { get { ... } set { ... } }
+    public string FromAddress { get { ... } set { ... } }
+}
+
+class VoiceMessage : IMessage
+{
+    public void Send() { ... }
+    public string Text    { ... }  // Voice has no text — forced to implement it anyway!
+    public string Subject { ... }  // Voice has no subject — forced to implement it anyway!
+    public string ToAddress   { get { ... } set { ... } }
+    public string FromAddress { get { ... } set { ... } }
+}
+```
+
+**Solution — split the fat interface into focused ones:**
+
+```csharp
+interface IMessage
+{
+    void Send();
+    string ToAddress   { get; set; }
+    string FromAddress { get; set; }
+}
+
+interface IVoiceMessage : IMessage
+{
+    byte[] Voice { get; set; }
+}
+
+interface ITextMessage : IMessage
+{
+    string Text { get; set; }
+}
+
+interface IEmailMessage : ITextMessage
+{
+    string Subject { get; set; }
+}
+```
+
+Now each implementing class only depends on the interface(s) it actually needs:
+
+*   `VoiceMessage implements IVoiceMessage` — gets `Send`, `ToAddress`, `FromAddress`, `Voice`.
+*   `SmsMessage implements ITextMessage` — gets `Send`, `ToAddress`, `FromAddress`, `Text`.
+*   `EmailMessage implements IEmailMessage` — gets everything including `Subject`.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.9.5 D — Dependency Inversion Principle (DIP)**
+
+**High-level modules should not depend on low-level modules. Both should depend on abstractions. Abstractions should not depend on details; details should depend on abstractions.**
+
+In practice, this means that a class should not directly instantiate the specific implementations it uses (e.g., `new SaveDocumentToPdf()`). Instead, it should work with *abstractions* (interfaces), and the concrete implementations are *injected* from the outside.
+
+The OCP's Solution 2 above (the `Cook`/`IMeal` example) is also an instance of DIP: `Cook` depends on the `IMeal` *abstraction*, not on any concrete `Soup` or `Salad` class.
+
+A common technique for DIP is **Dependency Injection (DI)**: the dependencies of a class are passed in (via constructor, method parameter, or a DI framework) rather than being created inside the class:
+
+```java
+// Without DI — high-level depends on low-level concrete class
+public class DocumentProcessor {
+    private SaveDocumentToPdf saver = new SaveDocumentToPdf(); // tightly coupled!
+    public void process(Document doc) { saver.save("output", doc); }
+}
+
+// With DI — depends on abstraction (Saver interface)
+public class DocumentProcessor {
+    private final Saver saver;
+    public DocumentProcessor(Saver saver) { this.saver = saver; } // injected!
+    public void process(Document doc) { saver.save("output", doc); }
+}
+```
+
+The second version can be tested with a mock `Saver`, can switch from PDF to DOCX without code changes, and follows both OCP and DIP.
+
+#### **2. Definitions**
+
+*   **Generic Programming (GP)**: A programming paradigm focused on writing algorithms and data structures in the most general form, parameterized over types, to achieve both generality and efficiency without runtime overhead.
+*   **STL (Standard Template Library)**: The C++ implementation of generic programming, providing containers, algorithms, and iterators as decoupled, reusable components. Part of the C++ Standard since 1994.
+*   **Container**: An STL data structure (e.g., `vector`, `list`, `set`, `map`) that stores elements but knows nothing about the algorithms that operate on it.
+*   **Algorithm**: An STL function template (e.g., `find`, `sort`, `reverse`) that operates on element sequences but knows nothing about the specific container type.
+*   **Iterator**: An object (or pointer) that provides a uniform interface for accessing and traversing the elements of a container. The bridge between containers and algorithms.
+*   **Value type**: The type of elements stored in a container. In `find5<T, P>`, `T` is the value type.
+*   **Iterator type**: The type of the iterator object itself. In `find5<T, P>`, `P` is the iterator type.
+*   **Half-open range**: The convention `[first, beyond)` used by STL: `first` points to the first element; `beyond` points one past the last. `beyond` is valid to hold and compare against but must not be dereferenced.
+*   **Input Iterator**: An iterator that supports one-pass forward traversal and reading only (`x = *i; ++i`). Used by algorithms like `find`.
+*   **Output Iterator**: An iterator that supports one-pass forward traversal and writing only (`*i = x; ++i`). Used as output by algorithms like `copy`.
+*   **Forward Iterator**: Combines Input and Output iterators; supports multiple passes. Used by `forward_list`.
+*   **Bidirectional Iterator**: A Forward Iterator that also supports backward movement (`--i`). Used by `list`, `set`, `map`. Required by `reverse`.
+*   **Random Access Iterator**: A Bidirectional Iterator that also supports arbitrary jumps (`i + n`, `i[n]`, `i < j`). Used by `vector`, arrays. Required by `sort`.
+*   **Inner (nested) class**: A class declared inside another class. An iterator defined as an inner class of a container can access the container's private members via the `friend` declaration.
+*   **SOLID**: An acronym for five object-oriented design principles: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, and Dependency Inversion.
+*   **Single Responsibility Principle (SRP)**: A class should have only one reason to change — it should perform only one kind of task.
+*   **Open/Closed Principle (OCP)**: Software components should be open for extension (new behaviour can be added) but closed for modification (existing code is not changed).
+*   **Liskov Substitution Principle (LSP)**: Objects of a subtype can be substituted for objects of the supertype without altering the correctness of the program.
+*   **Interface Segregation Principle (ISP)**: Clients should not be forced to depend on interfaces they do not use. Large interfaces should be split into smaller, focused ones.
+*   **Dependency Inversion Principle (DIP)**: High-level modules should depend on abstractions (interfaces), not on concrete low-level modules. Concrete implementations are injected rather than instantiated directly.
+*   **Dependency Injection (DI)**: A technique implementing DIP by passing (injecting) dependencies into a class from the outside, rather than creating them inside the class.
+
+#### **3. Examples**
+
+##### **3.1. Trace the `find5` Derivation Steps** (Lecture 7, Example 1)
+
+Starting from the concrete `find0` function below, explain each of the five generalization steps that lead to the generic `find5` algorithm. For each step, state what was changed and why.
+
+```cpp
+const int* find0(const int* array, int n, int x) {
+    const int* p = array;
+    for (int i = 0; i < n; i++) {
+        if (*p == x) return p;
+        p++;
+    }
+    return 0;
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each step removes one hard-coded dependency, making the algorithm progressively more general.
+
+1.  **Step 1 — Generalize element type:** Replace `int` with a type parameter `T`. Now the function works for any type that supports `operator==`. The size `n` is still an `int`. Result: `find1<T>(T* array, int n, const T& x)`.
+2.  **Step 2 — Replace size with past-the-end pointer:** Instead of `int n`, accept a second pointer `T* beyond` pointing one past the last element. The loop condition becomes `p != beyond`. Result: `find2<T>(T* array, T* beyond, const T& x)`. The dependency on "knowing the size" is removed.
+3.  **Step 3 — Replace null pointer return with `beyond`:** Return `beyond` (not `0`) to signal "not found." This removes the dependency on null pointers being meaningful — any iterator type can express "not found" this way. Result: `find3` returns `beyond` on failure.
+4.  **Step 4 — Simplify and rename:** Merge the two loop conditions (`p != beyond && *p != x`), eliminating one `return`. Rename `array` to `first` because the algorithm no longer assumes an array. Result: `find4<T>(T* first, T* beyond, const T& x)`.
+5.  **Step 5 — Remove pointers:** Replace `T*` with a new abstract type parameter `P`. The function no longer mentions pointers anywhere. `P` can be a raw pointer *or* any user-defined class. Result: `find5<T, P>(P first, P beyond, const T& x)`. Now `P` is the **iterator type** and `T` is the **value type**.
+
+**Answer:** The five steps systematically remove the dependencies on: (1) element type, (2) array size, (3) pointer arithmetic for "not found", (4) redundant code, (5) raw pointers. The final `find5` works on any container that provides an iterator satisfying three requirements: `operator*`, `operator++`, `operator!=`.
+
+</details>
+
+##### **3.2. Iterator Requirements for `find5` and `reverse`** (Lecture 7, Example 2)
+
+For the two algorithms below, list all the requirements imposed on the iterator type `P` and identify which STL iterator category each algorithm requires as a minimum.
+
+**Algorithm A** (`find5`):
+```cpp
+template <typename T, typename P>
+P find5(P first, P beyond, const T& x) {
+    P p = first;
+    while (p != beyond && *p != x)
+        p++;
+    return p;
+}
+```
+
+**Algorithm B** (`reverse`):
+```cpp
+template <typename P, typename T>
+void reverse(P start, P beyond) {
+    while (start != beyond) {
+        --beyond;
+        if (start != beyond) {
+            T t = *start;
+            *start = *beyond;
+            *beyond = t;
+            ++start;
+        }
+    }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Algorithm A — `find5` requirements:**
+
+*   `operator!=` — to compare `p != beyond` and `*p != x`.
+*   `operator*` — to dereference `*p` and read the value (read-only, returns a value).
+*   `operator++` — to advance to the next element (`p++`).
+
+**Minimum category:** **Input Iterator** (read-only, forward-only traversal).
+
+**Algorithm B — `reverse` requirements:**
+
+*   `operator!=` — to compare `start != beyond`.
+*   `operator++` — to advance `start` forward (`++start`).
+*   `operator--` — to move `beyond` backward (`--beyond`). **New requirement!**
+*   `operator*` returning a **reference** — to assign through the iterator (`*start = *beyond`). **New requirement!**
+
+**Minimum category:** **Bidirectional Iterator** (forward + backward movement, read-write access).
+
+**Answer:**
+
+*   `find5` requires an **Input Iterator**.
+*   `reverse` requires a **Bidirectional Iterator** (adds `--` and write-through dereference to the requirements of `find5`).
+
+</details>
+
+##### **3.3. Write the `NODE` Iterator** (Lecture 7, Example 3)
+
+Given the `NODE` class below, complete the nested `iterator` class so that `find5` can search a singly-linked list.
+
+```cpp
+class NODE {
+    int value;
+    NODE* next;
+public:
+    NODE(int v) : value(v), next(0) { }
+    void add(NODE* n) { n->next = this->next; this->next = n; }
+    bool operator!=(NODE& n) { return this->value != n.value; }
+    operator int() { return value; }
+
+    class iterator;
+    friend class iterator;
+
+    class iterator {
+        NODE* p;
+    public:
+        // TODO: implement iterator(NODE*), operator*(), operator++(), operator!=()
+    };
+};
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The iterator wraps a `NODE*` pointer and implements the three required operations in terms of the linked list's pointer structure.
+
+```cpp
+class iterator {
+    NODE* p;   // current node (nullptr = "past the end")
+public:
+    // Constructor: point to the given node
+    iterator(NODE* node) : p(node) { }
+
+    // operator*: return the value of the current node
+    int operator*() { return p->value; }
+
+    // operator++: advance to the next node in the list
+    void operator++() { p = p->next; }
+
+    // operator!=: compare by pointer identity (address of current node)
+    bool operator!=(const iterator& other) const {
+        return p != other.p;
+    }
+
+    // Conversion to NODE* (used when passing to find5 as the "beyond" sentinel)
+    operator NODE*() { return p; }
+};
+```
+
+**Usage:**
+
+```cpp
+NODE* list = new NODE(1);
+NODE* n7 = new NODE(7); list->add(n7);
+NODE* n3 = new NODE(3); list->add(n3);
+
+// Search for value 7 in the list
+NODE::iterator result = find5<int>(
+    NODE::iterator(list),  // first: head of the list
+    NODE::iterator(0),     // beyond: past-the-end sentinel (nullptr)
+    7
+);
+```
+
+**Answer:** The key insight is that `operator++` follows the `next` pointer, and `nullptr` (passed as `NODE*(0)`) serves as the "past-the-end" sentinel — equivalent to `&A[100]` for an array.
+
+</details>
+
+##### **3.4. Identify Iterator Categories for STL Containers** (Lab 7, Exercise 1)
+
+For each STL container listed below, state the category of iterator it provides and give one algorithm that can be used with it but *not* with a weaker iterator category.
+
+**(a)** `std::vector<int>`
+**(b)** `std::list<int>`
+**(c)** `std::forward_list<int>`
+**(d)** `std::istream_iterator<int>`
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) `std::vector<int>`:**
+
+*   Iterator category: **Random Access Iterator**
+*   Algorithm requiring this: `std::sort` (requires random access for efficient partitioning: `i + n`, `i[n]`, `i < j`).
+
+**(b) `std::list<int>`:**
+
+*   Iterator category: **Bidirectional Iterator**
+*   Algorithm requiring this: `std::reverse` (requires `--i` to move backward).
+
+**(c) `std::forward_list<int>`:**
+
+*   Iterator category: **Forward Iterator**
+*   Algorithm requiring this: `std::find` (requires only `++i` and `*i`); `std::sort` cannot be used directly on `forward_list`.
+
+**(d) `std::istream_iterator<int>`:**
+
+*   Iterator category: **Input Iterator**
+*   Algorithm: `std::find` (read-only, single-pass). Cannot be used with `std::reverse` (needs bidirectional) or `std::sort` (needs random access).
+
+**Answer:**
+
+| Container | Iterator Category | Exclusive Algorithm |
+|-----------|------------------|---------------------|
+| `vector` | Random Access | `sort` |
+| `list` | Bidirectional | `reverse` |
+| `forward_list` | Forward | `find` |
+| `istream_iterator` | Input | `find` (read-only pass) |
+
+</details>
+
+##### **3.5. Circular Buffer with Custom Forward Iterator** (Lab 7, Exercise 2)
+
+Build a **circular buffer** as a template class with a custom forward iterator.
+
+**Requirements:**
+
+*   The class must support: `push(value)`, `pop()` (returns the value), `empty()`, `size()`.
+*   Use `std::vector` for internal storage.
+*   The iterator must iterate over the buffer elements in **circular fashion**: after reaching the last element, it wraps around and continues from the first.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A circular buffer uses modular arithmetic (`%`) to wrap indices. The forward iterator tracks how many elements it has visited so that it knows when a full circle is complete.
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <stdexcept>
+
+template <typename T>
+class CircularBuffer {
+    std::vector<T> data_;   // underlying storage
+    size_t head_;           // index of the oldest element (front)
+    size_t tail_;           // index where the next push will go
+    size_t count_;          // number of elements currently stored
+    size_t capacity_;       // total capacity
+
+public:
+    CircularBuffer(size_t capacity)
+        : data_(capacity), head_(0), tail_(0),
+          count_(0), capacity_(capacity) { }
+
+    // Add an element at the back
+    void push(const T& value) {
+        if (count_ == capacity_)
+            throw std::overflow_error("Buffer is full");
+        data_[tail_] = value;
+        tail_ = (tail_ + 1) % capacity_;
+        ++count_;
+    }
+
+    // Remove and return the front element
+    T pop() {
+        if (count_ == 0)
+            throw std::underflow_error("Buffer is empty");
+        T value = data_[head_];
+        head_ = (head_ + 1) % capacity_;
+        --count_;
+        return value;
+    }
+
+    bool   empty()    const { return count_ == 0; }
+    size_t size()     const { return count_; }
+    size_t capacity() const { return capacity_; }
+
+    // ---- Forward Iterator ----
+    class iterator {
+        const CircularBuffer* buf_;   // the buffer being iterated
+        size_t index_;                // physical index in data_
+        size_t visited_;              // how many elements we have visited
+
+    public:
+        iterator(const CircularBuffer* buf, size_t start, size_t visited)
+            : buf_(buf), index_(start), visited_(visited) { }
+
+        T operator*() const {
+            return buf_->data_[index_];
+        }
+
+        iterator& operator++() {
+            index_ = (index_ + 1) % buf_->capacity_;
+            ++visited_;
+            return *this;
+        }
+
+        bool operator!=(const iterator& other) const {
+            return visited_ != other.visited_;
+        }
+    };
+
+    // begin(): start at head, 0 elements visited
+    iterator begin() const {
+        return iterator(this, head_, 0);
+    }
+
+    // end(): same position, count_ elements visited (signals "done")
+    iterator end() const {
+        return iterator(this, head_, count_);
+    }
+};
+
+int main() {
+    CircularBuffer<int> buf(5);
+    buf.push(10);
+    buf.push(20);
+    buf.push(30);
+    buf.push(40);
+    buf.push(50);
+
+    std::cout << "Forward pass: ";
+    for (auto it = buf.begin(); it != buf.end(); ++it)
+        std::cout << *it << " ";   // 10 20 30 40 50
+    std::cout << std::endl;
+
+    buf.pop();  // removes 10
+    buf.push(60);
+
+    std::cout << "After pop + push: ";
+    for (int val : buf)
+        std::cout << val << " ";   // 20 30 40 50 60
+    std::cout << std::endl;
+
+    return 0;
+}
+```
+
+**How the circular wrapping works:**
+
+*   `push` stores at `tail_` and advances `tail_ = (tail_ + 1) % capacity_`.
+*   `pop` reads from `head_` and advances `head_ = (head_ + 1) % capacity_`.
+*   The iterator advances via `index_ = (index_ + 1) % capacity_` and compares using `visited_` count rather than a physical index, because the "end" and "begin" physical positions coincide in a full buffer.
+
+**Answer:** The iterator counts visited elements (0 to `count_`) to determine termination, using modular arithmetic to wrap around the physical storage.
+
+</details>
+
+##### **3.6. SRP Violation — Identify and Fix** (Tutorial 7, Problem 1)
+
+The Java code below violates the Single Responsibility Principle. Identify the violation and refactor the code to comply with SRP.
+
+```java
+// ssad.srp.problem.Document
+public class Document {
+    private String title;
+    private int pages;
+
+    public Document(String title, int pages) {
+        this.title = title;
+        this.pages = pages;
+    }
+
+    public void save() {
+        System.out.println("The document is saved to .docx file");
+    }
+
+    public void load() {
+        System.out.println("The document is loaded from .docx file");
+    }
+}
+```
+
+```java
+// ssad.srp.problem.Main
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new Document("MyDoc", 10);
+        doc.save();
+        doc.load();
+    }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `Document` mixes two concerns: (1) storing document data, and (2) performing I/O (save/load). SRP demands these be separate classes.
+
+**Violation:** `Document` has at least two reasons to change — if the document's data model changes (title, pages), *and* if the file formats change (e.g., adding PDF support). These are distinct responsibilities.
+
+**Refactored solution:**
+
+```java
+// Document: only stores data
+public class Document {
+    private String title;
+    private int pages;
+
+    public Document(String title, int pages) {
+        this.title = title;
+        this.pages = pages;
+    }
+
+    @Override
+    public String toString() {
+        return "Document{title='" + title + "', pages=" + pages + "}";
+    }
+}
+```
+
+```java
+// SaveDocument: responsible only for saving
+public class SaveDocument {
+    public void saveToDocx(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".docx file");
+        System.out.println(doc);
+    }
+
+    public void saveToPdf(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".pdf file");
+        System.out.println(doc);
+    }
+}
+```
+
+```java
+// LoadDocument: responsible only for loading
+public class LoadDocument {
+    public Document loadFromDocx(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".docx file");
+        return new Document(path + ".docx", 10);
+    }
+
+    public Document loadFromPdf(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".pdf file");
+        return new Document(path + ".pdf", 10);
+    }
+}
+```
+
+```java
+// Main: uses the separated classes
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new Document("MyDoc", 10);
+
+        SaveDocument docSaver = new SaveDocument();
+        docSaver.saveToPdf("MyDoc", doc);
+
+        System.out.println();
+
+        LoadDocument docLoader = new LoadDocument();
+        Document anotherDoc = docLoader.loadFromPdf("AnotherDoc", doc);
+    }
+}
+```
+
+**Answer:** Extract `save()` and `load()` into dedicated classes `SaveDocument` and `LoadDocument`. `Document` now has a single responsibility: storing document state. Each new file format only requires adding a method to `SaveDocument`/`LoadDocument`, not modifying `Document`.
+
+</details>
+
+##### **3.7. OCP Violation — Identify and Fix** (Tutorial 7, Problem 2)
+
+The Java code below violates the Open/Closed Principle. Identify the violation and refactor it to comply with OCP.
+
+```java
+// ssad.ocp.problem.SaveDocument
+// TODO: OCP is violated — adding new types will require changes here
+public class SaveDocument {
+    public void saveToDocx(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".docx file");
+        System.out.println(doc);
+    }
+
+    public void saveToPdf(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".pdf file");
+        System.out.println(doc);
+    }
+}
+```
+
+```java
+// ssad.ocp.problem.LoadDocument
+public class LoadDocument {
+    public Document loadFromDocx(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".docx file");
+        return new Document(path + ".docx", 10);
+    }
+
+    public Document loadFromPdf(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".pdf file");
+        return new Document(path + ".pdf", 10);
+    }
+}
+```
+
+```java
+// ssad.ocp.problem.Main
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new Document("MyDoc", 10);
+        SaveDocument docSaver = new SaveDocument();
+        docSaver.saveToPdf("MyDoc", doc);
+
+        LoadDocument docLoader = new LoadDocument();
+        Document anotherDoc = docLoader.loadFromPdf("AnotherDoc", doc);
+    }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Every time a new file format (e.g., `.txt`, `.xml`) is needed, `SaveDocument` and `LoadDocument` must be *modified*. According to OCP, they should instead be *extended* via new implementations of an abstract interface.
+
+**Violation:** Adding a new save format requires opening `SaveDocument.java` and modifying it — this is a textbook OCP violation. Similarly for `LoadDocument`.
+
+**Refactored solution — introduce `Saver` and `Loader` interfaces:**
+
+```java
+// Saver interface: closed for modification, open for extension
+public interface Saver {
+    void save(String path, Document doc);
+}
+```
+
+```java
+// Loader interface
+public interface Loader {
+    Document load(String path, Document doc);
+}
+```
+
+```java
+// Concrete saver for DOCX
+public class SaveDocumentToDocx implements Saver {
+    @Override
+    public void save(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".docx file");
+        System.out.println(doc);
+    }
+}
+```
+
+```java
+// Concrete saver for PDF
+public class SaveDocumentToPdf implements Saver {
+    @Override
+    public void save(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".pdf file");
+        System.out.println(doc);
+    }
+}
+```
+
+```java
+// Concrete loader from DOCX
+public class LoadDocumentFromDocx implements Loader {
+    public Document load(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".docx file");
+        return new Document(path + ".docx", 10);
+    }
+}
+```
+
+```java
+// Concrete loader from PDF
+public class LoadDocumentFromPdf implements Loader {
+    public Document load(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".pdf file");
+        return new Document(path + ".pdf", 10);
+    }
+}
+```
+
+```java
+// Main: depends on abstractions (Saver, Loader)
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new Document("MyDoc", 10);
+
+        Saver docSaver = new SaveDocumentToDocx();
+        docSaver.save("MyDoc", doc);
+
+        System.out.println();
+
+        Loader docLoader = new LoadDocumentFromDocx();
+        Document anotherDoc = docLoader.load("AnotherDoc", doc);
+    }
+}
+```
+
+**Answer:** Introduce `Saver` and `Loader` interfaces. Each concrete format is a separate class implementing the interface. Adding `.txt` format now means creating `SaveDocumentToTxt implements Saver` — no existing class is modified.
+
+</details>
+
+##### **3.8. LSP Violation — Identify and Fix** (Tutorial 7, Problem 3)
+
+The Java code below violates the Liskov Substitution Principle. Identify the violation and explain its impact.
+
+```java
+// ssad.lsp.problem.Document
+public class Document {
+    private String title;
+    private int pages;
+
+    public Document(String title, int pages) {
+        this.title = title;
+        this.pages = pages;
+    }
+
+    public void setData(String title) {
+        this.title = title;  // sets only the title
+    }
+
+    public String getTitle() { return title; }
+    public int getPages()    { return pages; }
+    public void setPages(int pages) { this.pages = pages; }
+
+    @Override
+    public String toString() {
+        return "Document{title='" + title + "', pages=" + pages + "}";
+    }
+}
+
+// ssad.lsp.problem.SpecialDocument
+// TODO: LSP is violated — setData() has changed behaviour
+public class SpecialDocument extends Document {
+    public SpecialDocument(String title, int pages) {
+        super(title, pages);
+    }
+
+    @Override
+    public void setData(String title) {
+        super.setData(title);
+        setPages(20);  // unexpected side effect!
+    }
+}
+
+// ssad.lsp.problem.Main
+public class Main {
+    public static void main(String[] args) {
+        Document doc1 = new Document("MyDoc", 10);
+        Document doc2 = new SpecialDocument("MySpecialDoc", 10);
+
+        doc2.setData("MyDoc");
+
+        System.out.println("doc1: " + doc1);
+        System.out.println("doc2: " + doc2);
+    }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** LSP requires that a subclass can be used wherever the superclass is used *without surprising the caller*. The override must preserve the observable contract of the overridden method.
+
+**Violation:** `Document.setData(title)` has the well-defined contract: *"change the title, leave everything else unchanged."* `SpecialDocument.setData(title)` breaks this contract by *also* changing `pages` to 20. A caller using `Document doc2 = new SpecialDocument(...)` would call `doc2.setData("MyDoc")` expecting only the title to change, and would be surprised when `pages` becomes 20.
+
+**Demonstration of the violation:**
+
+```java
+Document doc1 = new Document("MyDoc", 10);
+Document doc2 = new SpecialDocument("MySpecialDoc", 10);
+
+doc2.setData("MyDoc");
+
+System.out.println("doc1: " + doc1);
+// Output: Document{title='MyDoc', pages=10}   ← expected
+
+System.out.println("doc2: " + doc2);
+// Output: Document{title='MyDoc', pages=20}   ← SURPRISE! Pages changed!
+```
+
+**Fix — make `SpecialDocument` honour the parent's contract:**
+
+```java
+public class SpecialDocument extends Document {
+    public SpecialDocument(String title, int pages) {
+        super(title, pages);
+    }
+
+    // Additional behaviour is added as a NEW method, not by overriding setData
+    public void method() {
+        System.out.println("Special document method");
+    }
+
+    // If setData MUST do something extra, it should not change observable state
+    // that callers of Document.setData don't expect.
+    // Best practice: do NOT override setData if you cannot preserve its contract.
+}
+```
+
+Alternatively, reconsider the hierarchy: if `SpecialDocument` *must* change `pages` on every title update, it may not be a proper subtype of `Document` at all, and composition should be used instead of inheritance.
+
+**Answer:** The violation is in `SpecialDocument.setData` calling `setPages(20)` as an unexpected side effect. The fix is to either preserve the parent's contract in the override, or redesign the hierarchy so that `SpecialDocument` is not forced to inherit `setData` with a different meaning.
+
+</details>

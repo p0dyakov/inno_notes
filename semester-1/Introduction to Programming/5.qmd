@@ -1,0 +1,517 @@
+---
+title: "W5. Expressions in C, Structures, Bit-fields, Alignment, Unions, Enumerations"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "September 30, 2025"
+format: html
+engine: knitr
+---
+
+{{< video 5.mp4 >}}
+
+[Quiz](https://notebooklm.google.com/notebook/82b9a81e-a4bf-4193-bce0-308c19736324?artifactId=14552f0a-6c9f-4032-bd15-55b2959fec34) | [Flashcards](https://notebooklm.google.com/notebook/82b9a81e-a4bf-4193-bce0-308c19736324?artifactId=d0cefa32-9db0-4623-a359-5c2863e7811b)
+
+#### **1. Summary**
+##### **1.1 Expressions in C**
+An **expression** in C is a combination of variables, constants, operators, and function calls that the compiler evaluates to produce a single value. Almost every expression returns a value, which distinguishes it from a **statement**, which performs an action but does not necessarily return a value.
+
+Expressions are constructed from building blocks arranged in a hierarchy of complexity.
+
+###### **1.1.1 Primary Expressions**
+These are the most fundamental building blocks of expressions.
+
+-   **Identifiers**: Names that refer to variables, functions, or constants (e.g., `myVariable`, `calculateSum`, `PI`).
+-   **Literals**: Constant values written directly in the code, such as integers (`123`, `0xFE`), floating-point numbers (`0.01E-2`), or strings (`"string"`).
+-   **Parenthesized Expressions**: Any expression enclosed in parentheses, like `(a + b)`, is itself a primary expression. Parentheses are used to control the order of evaluation.
+
+###### **1.1.2 Secondary (Postfix) Expressions**
+These expressions are built upon primary expressions and involve an operator that appears *after* the operand.
+
+-   **Array Subscripting**: Accessing an element of an array, e.g., `myArray[i + 1]`.
+-   **Function Call**: Invoking a function with arguments, e.g., `printf("Hello")`.
+-   **Member Access**: Accessing a member of a `struct` or `union` using the dot (`.`) operator for objects (e.g., `student.id`) or the arrow (`->`) operator for pointers to objects (e.g., `studentPtr->id`).
+-   **Postfix Increment/Decrement**: Increasing or decreasing a variable's value by one after its current value is used in the expression, e.g., `x++`, `y--`.
+
+###### **1.1.3 Unary Expressions**
+These expressions involve a single operand with an operator that appears *before* it.
+
+-   **Prefix Increment/Decrement**: Increasing or decreasing a variable's value by one before its value is used in the expression, e.g., `++x`, `--y`.
+-   **Address-of (`&`)**: Returns the memory address of a variable, e.g., `&myVar`.
+-   **Indirection (`*`)**: Accesses the value stored at a memory address held by a pointer, e.g., `*ptr`.
+-   **Unary Plus/Minus**: Indicates the sign of a numeric value, e.g., `+10`, `-x`.
+-   **Logical NOT (`!`)**: Inverts the boolean value of its operand, e.g., `!isComplete`.
+-   **Bitwise NOT (`~`)**: Flips all the bits of its integer operand.
+-   **`sizeof`**: Returns the size of a data type or a variable in bytes, e.g., `sizeof(int)`.
+
+###### **1.1.4 Binary Expressions**
+These expressions combine two operands with an operator in between and form the highest level of expression building blocks.
+
+-   **Multiplicative**: `*` (multiplication), `/` (division), `%` (modulo).
+-   **Additive**: `+` (addition), `-` (subtraction).
+-   **Bitwise Shift**: `<<` (left shift), `>>` (right shift).
+-   **Relational and Equality**: `<`, `<=`, `>`, `>=`, `==` (equal to), `!=` (not equal to).
+-   **Bitwise Logical**: `&` (AND), `|` (OR), `^` (XOR).
+-   **Logical**: `&&` (AND), `||` (OR).
+
+##### **1.2 Structures (`struct`)**
+A **structure** is a user-defined data type that groups together variables of different data types under a single name. This allows you to create complex data records. For instance, a `struct` for a `Person` could contain their name (a string), age (an integer), and height (a float).
+
+###### **1.2.1 Declaration and Usage**
+Structures can be created statically (on the stack) or dynamically (on the heap).
+
+-   **Static Declaration**: `struct Person p1;` creates a `Person` object on the stack.
+-   **Dynamic Declaration**: `struct Person *p2 = (struct Person*)malloc(sizeof(struct Person));` allocates memory for a `Person` object on the heap and returns a pointer to it.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.2 Member Access**
+To access the members (the variables inside the `struct`), you use:
+
+-   **Dot Operator (`.`)**: For `struct` objects. Example: `p1.age = 30;`.
+-   **Arrow Operator (`->`)**: For pointers to `struct` objects. Example: `p2->age = 30;`.
+
+###### **1.2.3 Initialization**
+You can initialize a structure's members when declaring it. C99 introduced *designated initializers*, which allow you to initialize specific members by name, making the code more readable.
+
+-   **Standard Initialization**: `struct Point p = {10, 20};`
+-   **Designated Initializer**: `struct Point p = {.x = 10, .y = 20};`
+
+##### **1.3 Bit-fields**
+A **bit-field** is a special feature within a structure that allows you to specify the exact number of bits a member should occupy. This is extremely useful for memory conservation when you know a variable will only hold a small range of values.
+
+For example, if a variable only needs to store values from 0 to 7, you only need 3 bits ($2^3=8$), whereas a standard `unsigned int` would use 32 bits.
+
+###### **1.3.1 Syntax and Use Cases**
+The syntax is `type member_name : width;`.
+
+```c
+struct Flags {
+    unsigned int isActive : 1;  // 1 bit: can be 0 or 1
+    unsigned int level    : 3;  // 3 bits: can hold values 0-7
+    unsigned int category : 4;  // 4 bits: can hold values 0-15
+};
+```
+
+Common uses for bit-fields include:
+
+-   Packing data to fit into a specific memory size (e.g., for network packets).
+-   Representing hardware registers where specific bits have specific meanings.
+-   Storing multiple boolean flags compactly in a single byte or integer.
+
+###### **1.3.2 Limitations**
+-   You cannot take the address (`&`) of a bit-field member because it may not align to a byte boundary.
+-   Arrays of bit-fields are not allowed.
+-   The exact memory layout can be *implementation-defined*, meaning it can vary between compilers.
+
+##### **1.4 Alignment**
+**Alignment** is the way data is arranged and accessed in computer memory. Modern processors read memory in chunks (e.g., 4 or 8 bytes at a time) and perform best when a data type of size *N* is located at a memory address that is a multiple of *N*.
+
+To enforce this, compilers often insert unused bytes, called **padding**, between members of a structure. Because of padding, the size of a structure is not always the sum of the sizes of its members.
+
+<!-- DIAGRAM HERE -->
+
+For example, in a `struct` with a `char` (1 byte) followed by an `int` (4 bytes), the compiler might insert 3 padding bytes after the `char` so the `int` starts on a 4-byte boundary.
+
+##### **1.5 Unions (`union`)**
+A **union** is a user-defined data type, similar to a `struct`, but with a key difference: all its members share the *same memory location*. A `union` is only large enough to hold its largest member.
+
+This means you can only use one member of the union at a time. Unions are useful for:
+
+-   Saving memory when you know you will only need one of several potential members at any given time.
+-   Interpreting the same block of memory in different ways, a technique known as **type punning**. For example, you can store a 32-bit integer and then read its individual bytes by accessing a `char[4]` member of the same union.
+
+##### **1.6 Enumerations (`enum`)**
+An **enumeration** provides a way to create a user-defined integer type with a set of named constant values called **enumerators**. This makes code more readable and self-documenting by replacing "magic numbers" (e.g., 0, 1, 2) with descriptive names (e.g., `RED`, `YELLOW`, `GREEN`).
+
+By default, the first enumerator has a value of 0, and each subsequent enumerator is one greater than the previous one. You can also assign explicit integer values.
+
+```c
+enum TrafficLight {
+    RED,         // Value is 0
+    YELLOW,      // Value is 1
+    GREEN        // Value is 2
+};
+
+enum Status {
+    SUCCESS = 0,
+    ERROR_FILE_NOT_FOUND = 101,
+    ERROR_ACCESS_DENIED  = 102
+};
+```
+
+#### **2. Definitions**
+*   **Expression**: A combination of variables, constants, operators, and function calls that evaluates to a single value.
+*   **Structure (`struct`)**: A composite data type that groups variables of potentially different types into a single unit.
+*   **Bit-field**: A structure member that is defined with a specific number of bits, allowing for memory optimization.
+*   **Alignment**: The constraint on how data is positioned in memory, typically requiring data of size N to be at an address that is a multiple of N.
+*   **Padding**: Unused bytes inserted by a compiler between structure members to ensure proper alignment.
+*   **Union (`union`)**: A composite data type where all members share the same memory location. Its size is determined by its largest member.
+*   **Enumeration (`enum`)**: A user-defined integer type that consists of a set of named constants (enumerators).
+
+#### **3. Examples**
+##### **3.1. Pack a Date into 2 Bytes using Bit Fields** (Lab 5, Exercise 1)
+Using a structure with bit fields, pack your day, month, and year of birth into 2 bytes, considering that all fields consist of numbers. Initialize numbers inside the code, print structure fields' values in the console. Print the size of the structure in the console.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// 2 bytes = 16 bits. We need to allocate these 16 bits among day, month, and year.
+// To represent day (1-31), we need 5 bits (2^5 = 32).
+// To represent month (1-12), we need 4 bits (2^4 = 16).
+// This leaves 16 - 5 - 4 = 7 bits for the year.
+// 7 bits can represent numbers up to 2^7 - 1 = 127. We can store the year relative to a base year, e.g., 1980.
+struct Date {
+    // Allocate 5 bits for the day.
+    unsigned int day : 5;
+    // Allocate 4 bits for the month.
+    unsigned int month : 4;
+    // Allocate 7 bits for the year (e.g., year - 1980).
+    unsigned int year : 7;
+};
+
+int main() {
+    // Declare a variable of the Date structure type.
+    struct Date birthDate;
+    
+    // Define the birth date components.
+    int d = 22;
+    int m = 10;
+    int y = 1995;
+    
+    // Assign values to the bit fields.
+    // The C compiler will handle packing the values into the specified bit allocations.
+    birthDate.day = d;
+    birthDate.month = m;
+    birthDate.year = y - 1980; // Store the year as an offset
+
+    // --- Print the stored values ---
+    printf("--- Stored Date ---\n");
+    // The values are retrieved from the bit fields.
+    printf("Day: %u\n", birthDate.day);
+    printf("Month: %u\n", birthDate.month);
+    // Add the offset back to display the correct year.
+    printf("Year: %u\n", birthDate.year + 1980);
+    
+    // --- Print the size of the structure ---
+    // The sizeof operator returns the size of a variable or data type in bytes.
+    // Due to memory alignment/padding, the compiler might make the struct larger than
+    // the minimum 2 bytes. However, for a simple case like this, it's often 2.
+    printf("\nSize of the Date structure: %zu bytes\n", sizeof(struct Date));
+
+    return 0;
+}
+```
+</details>
+
+##### **3.2. Parse an IPv4 Header using a Union and Bit Fields** (Lab 5, Exercise 2)
+Using a `union packet` and a `structure` with 5 corresponding bit fields, write a program that will prompt the user for an integer value, parse it, and print the values for all the IPv4 header fields (Version, IHL, DSCP, ECN, Total Length).
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// A structure to represent the first 32 bits of an IPv4 header using bit fields.
+// The order of fields might depend on the system's endianness (most are little-endian).
+// We declare them from least significant to most significant bit position for portability.
+struct IPv4_Header {
+    unsigned int total_length : 16;
+    unsigned int ecn : 2;
+    unsigned int dscp : 6;
+    unsigned int ihl : 4;
+    unsigned int version : 4;
+};
+
+// A union to access the same 32 bits of memory as either a single unsigned integer
+// or as the structured bit fields of the IPv4 header.
+typedef union {
+    unsigned int raw_value;
+    struct IPv4_Header fields;
+} Packet;
+
+int main() {
+    // Declare a union variable.
+    Packet packet;
+
+    // Prompt the user for a 32-bit integer value.
+    printf("Enter a 32-bit integer value for the IPv4 header (e.g., 1162913537): ");
+    scanf("%u", &packet.raw_value);
+
+    // --- Print the parsed fields ---
+    // By writing to `raw_value`, we have simultaneously set all the bit fields
+    // within the `fields` structure, as they share the same memory.
+    printf("\n--- Parsed IPv4 Header Fields ---\n");
+    printf("Version: %u\n", packet.fields.version);
+    printf("IHL (Header Length): %u (words)\n", packet.fields.ihl);
+    printf("DSCP (Differentiated Services Code Point): %u\n", packet.fields.dscp);
+    printf("ECN (Explicit Congestion Notification): %u\n", packet.fields.ecn);
+    printf("Total Length: %u (bytes)\n", packet.fields.total_length);
+    
+    // Example: If input is 1162913537 (which is 0x45500501 in hex), the bits are:
+    // 0100 0101 0101 0000 0000 0101 0000 0001
+    // Version: 0100 -> 4
+    // IHL: 0101 -> 5
+    // DSCP: 010100 -> 20
+    // ECN: 00 -> 0
+    // Total Length: 0000 0101 0000 0001 -> 1281
+
+    return 0;
+}
+```
+</details>
+
+##### **3.3. Convert Integer to Weekday using Enum and Switch** (Lab 5, Exercise 3)
+Using an `enum` for weekdays, implement a function that will use a `switch` statement to convert the weekday from an integer value to its string representation. Write a program that asks the user for a number and prints the name of the corresponding weekday (1 is "Monday", 7 is "Sunday").
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+
+// An enumeration (enum) to define named integer constants for the days of the week.
+// By default, MONDAY is 1, TUESDAY is 2, and so on.
+typedef enum {
+    MONDAY = 1,
+    TUESDAY,
+    WEDNESDAY,
+    THURSDAY,
+    FRIDAY,
+    SATURDAY,
+    SUNDAY
+} Weekday;
+
+// A function that takes a Weekday enum value and returns its string representation.
+const char* getWeekdayName(Weekday day) {
+    // The switch statement checks the value of the 'day' variable.
+    switch (day) {
+        case MONDAY:
+            return "Monday";
+        case TUESDAY:
+            return "Tuesday";
+        case WEDNESDAY:
+            return "Wednesday";
+        case THURSDAY:
+            return "Thursday";
+        case FRIDAY:
+            return "Friday";
+        case SATURDAY:
+            return "Saturday";
+        case SUNDAY:
+            return "Sunday";
+        default:
+            // The default case handles any value that doesn't match the cases above.
+            return "Invalid day";
+    }
+}
+
+int main() {
+    int dayNumber;
+
+    // Prompt the user to enter a number.
+    printf("Enter a number for the day of the week (1-7): ");
+    scanf("%d", &dayNumber);
+
+    // Check if the entered number is within the valid range.
+    if (dayNumber >= MONDAY && dayNumber <= SUNDAY) {
+        // Cast the integer to our Weekday enum type and call the function.
+        const char* dayName = getWeekdayName((Weekday)dayNumber);
+        printf("The corresponding weekday is: %s\n", dayName);
+    } else {
+        // If the number is out of range, print an error message.
+        printf("Error: Please enter a number between 1 and 7.\n");
+    }
+
+    return 0;
+}
+```
+</details>
+
+##### **3.4. Create a Cookbook with an Array of Structures** (Lab 5, Exercise 4)
+Write a program with an array of structures for a cookbook with recipes. Each recipe should contain its name, and between 2 and 10 ingredients with their names and amounts. In the output, all the cookbook with recipes should be printed.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+// Define a maximum number of ingredients per recipe and a max number of recipes.
+#define MAX_INGREDIENTS 10
+#define MAX_RECIPES 5
+
+// Structure for a single ingredient.
+struct Ingredient {
+    char name[50];
+    char amount[20]; // e.g., "2 cups", "100g", "1 tsp"
+};
+
+// Structure for a single recipe.
+struct Recipe {
+    char name[100];
+    int ingredient_count; // To know how many ingredients are actually used.
+    struct Ingredient ingredients[MAX_INGREDIENTS];
+};
+
+// --- Function to print a single recipe ---
+void printRecipe(struct Recipe r) {
+    printf("--- Recipe: %s ---\n", r.name);
+    printf("Ingredients:\n");
+    for (int i = 0; i < r.ingredient_count; i++) {
+        printf("- %s (%s)\n", r.ingredients[i].name, r.ingredients[i].amount);
+    }
+    printf("\n");
+}
+
+
+int main() {
+    // Create an array of Recipe structures to act as our cookbook.
+    struct Recipe cookbook[MAX_RECIPES];
+    int recipe_count = 0; // Keep track of how many recipes we have.
+    
+    // --- Manually defining a few recipes for demonstration ---
+    
+    // Recipe 1: Scrambled Eggs
+    strcpy(cookbook[recipe_count].name, "Scrambled Eggs");
+    cookbook[recipe_count].ingredient_count = 3;
+    strcpy(cookbook[recipe_count].ingredients[0].name, "Eggs");
+    strcpy(cookbook[recipe_count].ingredients[0].amount, "2");
+    strcpy(cookbook[recipe_count].ingredients[1].name, "Milk");
+    strcpy(cookbook[recipe_count].ingredients[1].amount, "2 tbsp");
+    strcpy(cookbook[recipe_count].ingredients[2].name, "Butter");
+    strcpy(cookbook[recipe_count].ingredients[2].amount, "1 tsp");
+    recipe_count++;
+    
+    // Recipe 2: Simple Pasta
+    strcpy(cookbook[recipe_count].name, "Simple Pasta");
+    cookbook[recipe_count].ingredient_count = 2;
+    strcpy(cookbook[recipe_count].ingredients[0].name, "Pasta");
+    strcpy(cookbook[recipe_count].ingredients[0].amount, "200g");
+    strcpy(cookbook[recipe_count].ingredients[1].name, "Tomato Sauce");
+    strcpy(cookbook[recipe_count].ingredients[1].amount, "1 cup");
+    recipe_count++;
+    
+    // --- Print all the recipes in the cookbook ---
+    printf("========= MY COOKBOOK =========\n\n");
+    for (int i = 0; i < recipe_count; i++) {
+        printRecipe(cookbook[i]);
+    }
+
+    return 0;
+}
+```
+</details>
+
+##### **3.5. Sort Structures using Enums** (Lab 5, Exercise 5)
+Write a program that will contain two `enum`s: Moodle `role` (Student, TA, Professor) and `degree` (Secondary, Bachelor, Master, PhD), and a `structure` `moodle_member` with fields for `name`, `degree` and `position` (role). The program should prompt the user for an amount of moodle members and then read their names, roles, and degrees. After that, the code should sort members by their role, and if equal, by degree, and then print everything.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Define the enumeration for roles. Lower integer value means lower priority.
+typedef enum {
+    STUDENT,
+    TA,
+    PROFESSOR
+} MoodleRole;
+
+// Define the enumeration for degrees. Lower integer value means lower priority.
+typedef enum {
+    SECONDARY,
+    BACHELOR,
+    MASTER,
+    PHD
+} Degree;
+
+// Structure to hold a Moodle member's information.
+typedef struct {
+    char name[100];
+    Degree degree;
+    MoodleRole role;
+} MoodleMember;
+
+// --- Helper functions to convert enums to strings for printing ---
+const char* getRoleName(MoodleRole r) {
+    switch(r) {
+        case STUDENT: return "Student";
+        case TA: return "TA";
+        case PROFESSOR: return "Professor";
+        default: return "Unknown";
+    }
+}
+const char* getDegreeName(Degree d) {
+    switch(d) {
+        case SECONDARY: return "Secondary";
+        case BACHELOR: return "Bachelor";
+        case MASTER: return "Master";
+        case PHD: return "PhD";
+        default: return "Unknown";
+    }
+}
+
+// Comparison function for qsort().
+// This function defines the sorting logic.
+int compareMembers(const void *a, const void *b) {
+    MoodleMember *memberA = (MoodleMember *)a;
+    MoodleMember *memberB = (MoodleMember *)b;
+
+    // First, compare by role.
+    if (memberA->role < memberB->role) return -1;
+    if (memberA->role > memberB->role) return 1;
+
+    // If roles are equal, then compare by degree.
+    if (memberA->degree < memberB->degree) return -1;
+    if (memberA->degree > memberB->degree) return 1;
+
+    // If both role and degree are equal, they are considered equal in sorting order.
+    return 0;
+}
+
+int main() {
+    int count;
+    printf("Enter the number of Moodle members: ");
+    scanf("%d", &count);
+    
+    // Dynamically allocate memory for the array of members.
+    MoodleMember *members = malloc(count * sizeof(MoodleMember));
+    
+    // Get details for each member.
+    for (int i = 0; i < count; i++) {
+        printf("\n--- Member %d ---\n", i + 1);
+        printf("Name: ");
+        scanf("%s", members[i].name);
+        printf("Role (0=Student, 1=TA, 2=Professor): ");
+        scanf("%u", &members[i].role);
+        printf("Degree (0=Secondary, 1=Bachelor, 2=Master, 3=PhD): ");
+        scanf("%u", &members[i].degree);
+    }
+    
+    // Sort the array using the standard library's qsort function.
+    // qsort(array_to_sort, number_of_elements, size_of_each_element, comparison_function);
+    qsort(members, count, sizeof(MoodleMember), compareMembers);
+
+    // Print the sorted list of members.
+    printf("\n--- Sorted Moodle Members ---\n");
+    for (int i = 0; i < count; i++) {
+        printf("Name: %-15s | Role: %-10s | Degree: %-10s\n", 
+               members[i].name, 
+               getRoleName(members[i].role), 
+               getDegreeName(members[i].degree));
+    }
+    
+    // Free the dynamically allocated memory.
+    free(members);
+    
+    return 0;
+}
+```
+</details>

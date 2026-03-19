@@ -1,0 +1,1002 @@
+---
+title: "W2. C++ Classes Without OOP, Constructors and Destructors, Declarations and Initialization, Type Conversions, Operator and Conversion Functions"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "January 29, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+##### **1.1 Introduction to C++ Classes**
+
+A **class** in C++ is a user-defined compound type that allows grouping data (variables) and functions that operate on that data together. While classes form the foundation of object-oriented programming, they can be used effectively without OOP principles.
+
+There are three main perspectives on C++ classes:
+
+1. **As a compound type:** A class groups multiple variables of different types together
+2. **As a user-defined type:** A class can behave similarly to predefined types like `int` or `double`
+3. **As a basis for OOP:** Classes support encapsulation, inheritance, and polymorphism (discussed in later lectures)
+
+###### **1.1.1 Basic Class Structure**
+
+A class definition specifies both the structure (data members) and operations (member functions) for objects of that type:
+
+```cpp
+class Point {
+    double x;
+    double y;
+};
+```
+
+This simple class defines a `Point` type with two data members: `x` and `y` coordinates.
+
+##### **1.2 Access Control: Public and Private**
+
+C++ provides **access specifiers** to control which parts of a class are accessible from outside the class:
+
+*   **`private`:** Members marked as private are only accessible from within the class itself. This is the default access level for class members.
+*   **`public`:** Members marked as public can be accessed by any code that has access to an object of that class.
+
+This distinction supports **encapsulation** - hiding implementation details while exposing a controlled interface:
+
+```cpp
+class Point {
+private:
+    double x, y;  // Implementation (hidden)
+public:
+    void Move(double dx, double dy) {  // Interface (visible)
+        x += dx;
+        y += dy;
+    }
+};
+```
+
+**The usual pattern** is to make data members private and provide controlled access through public member functions. This allows:
+
+*   Validation of data before it's stored
+*   Flexibility to change internal representation without affecting users
+*   Read-only access to data (getters without setters)
+
+###### **1.2.1 Accessing Class Members**
+
+For objects declared directly, use the **dot notation**:
+```cpp
+Point p1;
+p1.Move(0.5, 0.5);  // Call member function
+```
+
+For pointers to objects, use the **arrow notation**:
+```cpp
+Point* p = new Point();
+p->Move(0.5, 0.5);  // Call member function via pointer
+```
+
+##### **1.3 Scope and Lifetime**
+
+Before diving deeper into classes, it's crucial to understand two fundamental concepts: **scope** and **lifetime**.
+
+**Scope** determines *where* in your code a variable name is visible and can be used:
+
+```cpp
+void function1() {
+    int x = 5;      // x's scope: inside function1 only
+    // Can use x here
+}  // End of x's scope
+
+void function2() {
+    // Cannot use x here - it's out of scope
+    int y = 10;     // y's scope: inside function2 only
+}
+```
+
+**Lifetime** determines *when* an object exists in memory (from creation to destruction):
+
+```cpp
+void example() {
+    int x = 5;      // x's lifetime begins here
+    {
+        int y = 10; // y's lifetime begins here
+        // Both x and y exist
+    }               // y's lifetime ends - y is destroyed
+    // Only x exists here
+}                   // x's lifetime ends - x is destroyed
+```
+
+**Key insight:** Scope is a compile-time concept (where names are visible), while lifetime is a runtime concept (when objects actually exist in memory).
+
+##### **1.4 The `this` Pointer**
+
+Inside member functions, there's a special hidden pointer called **`this`** that points to the object on which the member function was called.
+
+```cpp
+class Point {
+    double x, y;
+public:
+    void setX(double x) {
+        this->x = x;  // this->x is the member, x is the parameter
+    }
+    
+    Point& getReference() {
+        return *this;  // Returns reference to the current object
+    }
+};
+
+Point p;
+p.setX(5.0);  // Inside setX, 'this' points to p
+```
+
+**Why `this` is useful:**
+
+1.  **Disambiguate names:** When parameter names match member names
+2.  **Return the object itself:** For method chaining (`obj.method1().method2()`)
+3.  **Pass object to other functions:** `someFunction(this)` or `someFunction(*this)`
+4.  **Check for self-assignment:** `if (this != &other) { ... }`
+
+**Type of `this`:** For a class `C`, inside a member function, `this` has type `C*` (pointer to C). For `const` member functions, it has type `const C*`.
+
+##### **1.5 Entity Declarations in C/C++**
+
+A C++ program consists of a sequence of **declarations**, each introducing an **entity**. Entities include:
+
+*   **Value:** A literal constant (e.g., `42`, `3.14`)
+*   **Object:** A named or unnamed region of memory containing a value
+*   **Reference:** A synonym (alias) for another object
+*   **Function:** A sequence of statements performing operations
+*   **Type:** A predefined or user-defined type (class)
+
+###### **1.5.1 References: Aliases for Objects**
+
+A **reference** is an alias (alternative name) for an existing object. Once initialized, a reference always refers to the same object and behaves exactly like that object:
+
+```cpp
+int x = 10;
+int& ref = x;    // ref is an alias for x
+
+ref = 20;        // Changes x to 20
+cout << x;       // Prints 20
+
+int* ptr = &x;   // Pointer: stores the address of x
+*ptr = 30;       // Changes x to 30 (dereference ptr to access x)
+```
+
+**Key differences between references and pointers:**
+
+| Feature | Reference | Pointer |
+|---------|-----------|---------|
+| Syntax | `int& ref = x;` | `int* ptr = &x;` |
+| Must be initialized | Yes, immediately | No, can be `nullptr` |
+| Can be reassigned | No, always refers to same object | Yes, can point to different objects |
+| Can be null | No | Yes (`nullptr`) |
+| Dereferencing | Automatic (transparent) | Manual (`*ptr`) |
+| Memory address | `&ref` gives address of object | `ptr` is the address |
+
+**Why references are used in constructors:**
+
+```cpp
+C(C& other) { }      // Copy constructor with reference
+```
+
+If we used pass-by-value instead:
+```cpp
+C(C other) { }       // WRONG! Infinite recursion
+```
+
+This would require copying `other` to pass it, which calls the copy constructor, which needs to copy, which calls the copy constructor, etc. - infinite recursion!
+
+###### **1.5.2 Variable Declaration Syntax**
+
+The general form of a variable declaration is:
+```
+S T name initializer;
+```
+
+Where:
+
+*   **S:** Storage class specifier (optional, e.g., `static`, `extern`)
+*   **T:** Type specifier (required, e.g., `int`, `double`, `Point`)
+*   **name:** The identifier for the variable (required)
+*   **initializer:** Specifies the initial value (optional)
+*   **;** Delimiter (required)
+
+**Static semantics** (compile-time): The declaration adds the name to the current scope, making it available to subsequent code.
+
+**Dynamic semantics** (run-time): Memory is allocated, the initializer expression is evaluated (with type conversion if needed), and the value is stored.
+
+##### **1.6 Initialization Forms in C++**
+
+C++ provides multiple ways to initialize variables, which can be confusing but offers flexibility:
+
+###### **1.6.1 Traditional Initialization**
+
+```cpp
+int y = 0;      // Assignment-style initialization
+int x(0);       // Functional-style initialization
+```
+
+###### **1.6.2 Uniform Initialization (C++11)**
+
+C++11 introduced **braced initialization** (also called uniform initialization) using curly braces `{}`:
+
+```cpp
+int z{0};       // Braced initialization
+int t = {0};    // Braced initialization with =
+```
+
+This syntax was designed to work uniformly across all types and contexts. Key advantages:
+
+1. **Prevents narrowing conversions** - catches potential data loss at compile time:
+   ```cpp
+   double x = 3.14, y = 2.71, z = 1.41;
+   int sum2(x+y+z);    // OK, but data loss (implicit narrowing)
+   int sum3 = x+y+z;   // OK, but data loss (implicit narrowing)
+   int sum1{x+y+z};    // Error: narrowing conversion not allowed
+   ```
+2. **Distinguishes objects from function declarations** (Most Vexing Parse problem):
+   ```cpp
+   class C { ... };
+   C c1();    // Function declaration (not an object!)
+   C c2{};    // Object declaration with default initialization
+   ```
+
+**Note on complexity:** While the idea is uniform initialization, C++ actually has nineteen different initialization forms with subtle differences. For practical purposes, prefer braced initialization for its safety features.
+
+##### **1.7 Understanding Memory: Stack vs Heap**
+
+Before discussing object creation, you need to understand the two main memory regions in a C++ program:
+
+###### **1.7.1 Stack Memory**
+
+The **stack** is a region of memory that automatically grows and shrinks as functions are called and return:
+
+```cpp
+void function() {
+    int x = 5;        // Allocated on stack
+    double y = 3.14;  // Allocated on stack
+    Point p;          // Allocated on stack
+}  // All automatically deallocated here
+```
+
+**Stack characteristics:**
+
+*   **Fast:** Very efficient allocation/deallocation
+*   **Automatic management:** No need to manually free memory
+*   **Limited size:** Typically a few megabytes (varies by system)
+*   **LIFO (Last-In-First-Out):** Objects destroyed in reverse creation order
+*   **Scope-based lifetime:** Objects live until end of their scope
+
+**Visual representation:**
+```
+Function calls    Stack memory
+--------------    ------------
+main()            |          |  <- Top of stack
+  calls foo()     | foo's x  |
+    calls bar()   | foo's y  |
+                  | bar's z  |  <- Current stack frame
+                  |__________|
+```
+
+###### **1.7.2 Heap Memory**
+
+The **heap** (also called **free store**) is a region for manually managed memory:
+
+```cpp
+void function() {
+    int* ptr = new int(5);     // Allocated on heap
+    Point* p = new Point();     // Allocated on heap
+    // Objects still exist here
+    delete ptr;                 // Manual deallocation
+    delete p;                   // Manual deallocation
+}  // Pointers destroyed, but if you forget 'delete', memory leaks!
+```
+
+**Heap characteristics:**
+
+*   **Slower:** More complex allocation/deallocation
+*   **Manual management:** Must explicitly `delete` what you `new`
+*   **Large size:** Limited mainly by system RAM
+*   **Flexible lifetime:** Objects live until you explicitly destroy them
+*   **Fragmentation risk:** Can become fragmented over time
+
+**Memory leak example:**
+```cpp
+void badFunction() {
+    int* ptr = new int(5);  // Allocates on heap
+    return;                  // Forgets to delete - MEMORY LEAK!
+}  // ptr variable destroyed, but the integer on heap remains forever
+```
+
+###### **1.7.3 Static vs Dynamic Object Creation**
+
+C++ offers two fundamentally different ways to create objects:
+
+**Static (Automatic) Declaration:**
+
+```cpp
+void foo() {
+    Test staticTest;  // Created on stack
+}
+```
+
+**Characteristics:**
+
+*   Object is created **by its declaration**
+*   Memory allocated on the **stack**
+*   Accessed **by its name**
+*   Exists **until end of scope** (statically determined lifetime)
+*   Constructor called at declaration point
+*   Destructor called automatically when leaving scope
+*   **Use when:** Object lifetime matches scope, not too large
+
+**Dynamic Declaration:**
+
+```cpp
+void foo() {
+    Test* dynamicTest = new Test();  // Created on heap
+    delete dynamicTest;               // Don't forget!
+}
+```
+
+**Characteristics:**
+
+*   Object created by **explicit `new` operator**
+*   Memory allocated on the **heap**
+*   Object is **unnamed**; accessed via pointer
+*   Exists until **explicit `delete`** operator (dynamically determined lifetime)
+*   Constructor called by `new`
+*   Must manually call `delete` to invoke destructor and free memory
+*   **Use when:** Object needs to outlive scope, size unknown at compile-time, or very large
+
+**Memory leakage** occurs when dynamically allocated memory is never freed (no `delete` called). This is associated with heap memory only.
+
+**Complete lifecycle comparison:**
+
+```cpp
+void example() {
+    // STACK OBJECT
+    Test stack;              // 1. Memory allocated
+                             // 2. Constructor called
+    // Use stack...
+}                            // 3. Destructor called
+                             // 4. Memory automatically freed
+
+void example2() {
+    // HEAP OBJECT
+    Test* heap = new Test(); // 1. Memory allocated
+                             // 2. Constructor called
+    // Use heap...
+    delete heap;             // 3. Destructor called
+                             // 4. Memory manually freed
+}
+```
+
+##### **1.8 Constructors**
+
+**Constructors** are special member functions that initialize objects when they are created. They have the same name as the class and no return type.
+
+###### **1.8.1 Types of Constructors**
+
+C++ recognizes four main types of constructors:
+
+1. **Default Constructor:** Takes no arguments
+   ```cpp
+   class C {
+   public:
+       int a;
+       C() : a{0} {}  // Default constructor
+   };
+   ```
+2. **Conversion Constructor:** Takes a single argument of a different type
+   ```cpp
+   C(int i) : a(i) {}  // Converts int to C
+   ```
+3. **Copy Constructor:** Takes a reference to another object of the same class
+   ```cpp
+   C(C& other) { 
+       this->a = other.a; 
+   }
+   ```
+4. **Other Constructors:** Multiple arguments or specific parameter combinations
+   ```cpp
+   C(int i, int j) { 
+       a = i + j; 
+   }
+   ```
+
+###### **1.8.2 Member Initialization List**
+
+The preferred way to initialize member variables is using the **member initialization list** (after the colon):
+
+```cpp
+Point() : x(0.0), y(0.0) { }  // Preferred: initialization list
+Point() { x = 0.0; y = 0.0; } // Works but less efficient: assignment in body
+```
+
+**Why initialization lists are preferred:**
+
+*   **More efficient:** Members are initialized directly, not default-constructed then assigned
+*   **Required for:** Const members, reference members, members without default constructors
+*   **Clearer intent:** Separates initialization from other constructor logic
+
+###### **1.8.3 Constructor Invocation**
+
+Different declaration syntaxes invoke different constructors:
+
+```cpp
+class C { 
+    C() { }           // Default
+    C(int i) { }      // Conversion
+    C(C& c) { }       // Copy
+    C(int i, int j) { } // Other
+};
+
+C c1;              // Default constructor
+C c2(1);           // Conversion constructor
+C c3 = 1;          // Conversion constructor (+ copy, often optimized away)
+C c4 = C(1);       // Conversion constructor (+ copy, often optimized away)
+C c5(c2);          // Copy constructor
+C c6 = c2;         // Copy constructor
+C c7{1, 2};        // Constructor with 2 parameters
+C c8();            // FUNCTION DECLARATION (not object!)
+```
+
+**Important:** `C c8();` is not an object declaration - it's a function declaration returning `C`. This is called the **Most Vexing Parse** problem. Use `C c8{};` for default construction.
+
+###### **1.8.4 Copy Elision and Compiler Optimization**
+
+Conceptually, statements like `C c3 = 1;` should:
+
+1. Call conversion constructor to create temporary `C` object
+2. Call copy constructor to initialize `c3` from temporary
+
+In practice, **compilers are required to optimize this** in many cases (since C++17, this is mandatory). The object is created directly without calling the copy constructor.
+
+**However:** Even when the copy constructor isn't called, it must still be **accessible** (not private). If it's private, you'll get a compile error even though it wouldn't actually be used.
+
+##### **1.9 Destructors**
+
+A **destructor** is a special member function that cleans up when an object is destroyed. It has the class name preceded by a tilde (`~`) and takes no parameters.
+
+```cpp
+class Test {
+public:
+    int x;
+    Test() : x(0) {
+        cout << "Constructor called" << endl;
+    }
+    ~Test() {
+        cout << "Destructor called" << endl;
+    }
+};
+```
+
+**Purpose of destructors:**
+
+*   Release resources the object has acquired (files, network connections, locks)
+*   Free dynamically allocated memory
+*   Perform cleanup operations
+
+**Automatic invocation:**
+
+*   For stack objects: destructor called automatically at end of scope
+*   For heap objects: destructor called when `delete` is executed
+
+**Explicit destructor calls** (rarely needed):
+```cpp
+c.Test::~Test();  // Explicit call - object still exists after!
+delete pc;         // Correct way for heap objects - calls destructor and frees memory
+```
+
+⚠️ **Warning:** Explicit destructor calls are rarely appropriate. For stack objects, the destructor will be called again automatically, leading to errors (double-deletion, etc.).
+
+##### **1.10 Function Overloading and Overload Resolution**
+
+Before discussing type conversions in depth, it's important to understand **function overloading** - having multiple functions with the same name but different parameters.
+
+**Function Overloading Example:**
+
+```cpp
+void print(int x) {
+    cout << "Integer: " << x << endl;
+}
+
+void print(double x) {
+    cout << "Double: " << x << endl;
+}
+
+void print(const char* s) {
+    cout << "String: " << s << endl;
+}
+
+print(42);      // Calls print(int)
+print(3.14);    // Calls print(double)
+print("hello"); // Calls print(const char*)
+```
+
+**Overload Resolution** is the process the compiler uses to determine which overloaded function to call:
+
+1. **Find candidate functions:** All functions with the matching name
+2. **Find viable functions:** Those that can be called with the given arguments (with or without conversions)
+3. **Find the best match:** Prefer exact matches over conversions, better conversions over worse ones
+
+**Example of Overload Resolution:**
+
+```cpp
+void foo(int x) { }       // #1
+void foo(double x) { }    // #2
+
+foo(5);      // Calls #1: exact match for int
+foo(5.0);    // Calls #2: exact match for double
+foo(5.5f);   // Calls #2: float→double is better than float→int
+```
+
+**Why This Matters:**
+
+Understanding overload resolution is crucial for:
+
+*   Using `delete` to prevent specific overloads
+*   Understanding which constructor gets called
+*   Avoiding ambiguous function calls
+*   Writing efficient code (avoiding unnecessary copies)
+
+##### **1.11 Type Conversions**
+
+C++ supports both **standard conversions** (built into the language) and **user-defined conversions** (for classes).
+
+###### **1.11.1 Standard Conversions**
+
+Examples include:
+
+*   Array to pointer
+*   Integer to boolean
+*   Double to long integer
+*   Pointer to derived class to pointer to base class
+
+These happen implicitly when needed:
+```cpp
+void foo(double x) { ... }
+foo(3.14);   // OK: double literal
+foo(3);      // OK: int converted to double
+foo(true);   // OK: boolean converted to double (true → 1.0)
+```
+
+###### **1.11.2 Restricting Conversions with `delete`**
+
+To explicitly forbid unwanted conversions, declare overloads as deleted:
+
+```cpp
+void foo(double x) { ... }
+void foo(int) = delete;
+void foo(bool) = delete;
+
+foo(3.14);   // OK
+foo(3);      // Error: deleted function
+foo(true);   // Error: deleted function
+```
+
+For more comprehensive restriction, use a deleted template:
+
+```cpp
+template<typename T>
+void foo(T) = delete;
+
+void foo(double x) { ... }  // Only this overload allowed
+
+foo(3.14);   // OK: calls the double version
+foo(3);      // Error: would instantiate deleted template
+foo(true);   // Error: would instantiate deleted template
+```
+
+##### **1.12 Constant Expressions: `const` vs `constexpr`**
+
+###### **1.12.1 `const` Qualifier**
+
+The `const` qualifier indicates a variable's value shouldn't change after initialization:
+
+```cpp
+const int x = expression;  // Value fixed after initialization
+```
+
+However, `const` doesn't guarantee compile-time evaluation - the expression can involve runtime computations.
+
+###### **1.12.2 `constexpr` Specifier (C++11)**
+
+The `constexpr` specifier **guarantees** a value can be computed at compile time:
+
+```cpp
+constexpr int y = 42;  // Must be evaluable at compile-time
+```
+
+**Key points:**
+
+*   `constexpr` implies `const` for objects
+*   The value can be used in contexts requiring compile-time constants (array sizes, template arguments)
+*   Provides performance benefits - computation done once at compile time
+
+**Informal definition:** A constant expression is an expression whose value can be calculated at compile time.
+
+###### **1.12.3 `constexpr` Functions**
+
+Functions can also be declared `constexpr`, allowing them to be used in constant expressions:
+
+```cpp
+constexpr int Sqr(int arg) { return arg * arg; }
+
+constexpr int s1 = Sqr(5);  // OK: computes 25 at compile time
+```
+
+**Requirements for `constexpr` functions:**
+
+*   Must be non-virtual
+*   Body should contain a single return statement (C++11; relaxed in C++14)
+*   Arguments and return type must be literal types (scalar types or aggregates)
+*   For constructors, only initialization lists are allowed
+
+**Use case - template arguments:**
+```cpp
+template<int N>
+class list { }
+
+constexpr int sqr1(int arg) { return arg * arg; }
+int sqr2(int arg) { return arg * arg; }
+
+const int X = 2;
+list<sqr1(X)> mylist1;  // OK: sqr1 is constexpr
+list<sqr2(X)> mylist2;  // Error: sqr2 is not constexpr
+```
+
+###### **1.12.4 `const` and `constexpr` Together**
+
+Using both is redundant for simple objects since `constexpr` implies `const`:
+
+```cpp
+constexpr const int N = 5;  // Same as below
+constexpr int N = 5;         // const is implicit
+```
+
+However, they can apply to **different parts** of a declaration:
+
+```cpp
+static constexpr int N = 3;
+constexpr const int* NP = &N;  
+// constexpr applies to pointer (NP is a constant pointer)
+// const applies to pointee (*NP is constant data)
+```
+
+##### **1.13 Type Specification Simplification**
+
+Complex type specifications can be difficult to read and write:
+
+```cpp
+int (*(a4[10]))(int);
+// "a4 is an array of 10 pointers to functions taking int and returning int"
+```
+
+###### **1.13.1 `typedef` (C-style)**
+
+The `typedef` keyword creates a type alias:
+
+```cpp
+typedef int (*PtrFun)(int);
+PtrFun a4[10];  // Much clearer!
+```
+
+###### **1.13.2 `using` Declaration (Modern C++)**
+
+The `using` syntax is more readable and consistent:
+
+```cpp
+using PtrFun = int (*)(int);
+PtrFun a4[10];
+```
+
+The `using` syntax is preferred in modern C++ because:
+
+*   More intuitive order (alias name on left)
+*   Works better with templates
+*   Consistent with other `using` statements
+
+##### **1.14 Operator Functions**
+
+**Operator functions** allow defining how standard operators (`+`, `-`, `*`, `[]`, etc.) work with user-defined types. This makes classes behave more like built-in types.
+
+###### **1.14.1 Basic Syntax**
+
+```cpp
+class Point {
+    double x, y;
+public:
+    void operator+=(double v) {
+        x += v;
+        y += v;
+    }
+};
+
+Point p(1.5, 3.5);
+p += 0.5;  // Equivalent to: p.operator+=(0.5)
+```
+
+The operator function is called when the corresponding operator is used with an object of that class.
+
+###### **1.14.2 Common Operators**
+
+```cpp
+class C {
+    int member;
+public:
+    C operator+(const C& c1) {      // Binary +
+        return C(member + c1.member);
+    }
+    
+    int operator[](int p) {          // Subscript
+        return member - p;
+    }
+    
+    int operator()(int p) {          // Function call
+        return member + p;
+    }
+    
+    C& operator=(const C& other) {   // Assignment
+        member = other.member;
+        return *this;
+    }
+};
+
+C c1, c2;
+C sum = c1 + c2;     // Calls operator+
+int value = sum[1];  // Calls operator[]
+int result = sum(3); // Calls operator()
+c1 = c2;             // Calls operator=
+```
+
+###### **1.14.3 Rules for Operator Overloading**
+
+*   **Arity** (number of operands) cannot change: `+` must stay binary, `!` must stay unary
+*   **Precedence** cannot change: `*` will always bind tighter than `+`
+*   **Cannot create new operators:** Can only overload existing ones
+*   **Most operators can be overloaded:** Including `+`, `-`, `*`, `/`, `[]`, `()`, `new`, `delete`
+*   **Some operators cannot be overloaded:** `.`, `::`, `.*`, `?:`, `sizeof`
+
+##### **1.15 Conversion Functions**
+
+**Conversion functions** define how to convert a class object to another type. They enable user-defined types to behave like built-in types in contexts requiring type conversion.
+
+###### **1.15.1 Basic Syntax**
+
+```cpp
+class C {
+    int member;
+public:
+    operator bool() {  // Conversion to bool
+        return member != 0;
+    }
+};
+
+C c1(1);
+if (c1) {  // Equivalent to: if (c1.operator bool())
+    // Do something
+}
+```
+
+**Syntax rules:**
+
+*   Name is `operator TargetType()`
+*   No return type specified (it's implicit - must return `TargetType`)
+*   No parameters
+*   Empty parentheses still required
+
+###### **1.15.2 Conversion Constructors vs Conversion Functions**
+
+These provide opposite conversion directions:
+
+```cpp
+class C {
+    int value;
+public:
+    // Conversion constructor: int → C
+    C(int i) : value(i) { }
+    
+    // Conversion function: C → bool
+    operator bool() { return value != 0; }
+};
+
+C c = 5;      // Uses conversion constructor (int → C)
+if (c) { }    // Uses conversion function (C → bool)
+```
+
+###### **1.15.3 Conversion Ambiguity**
+
+Ambiguity arises when multiple conversion paths exist:
+
+```cpp
+class B;
+class A {
+public:
+    A(B& b) { }  // Conversion constructor: B → A
+};
+class B {
+public:
+    operator A() { }  // Conversion function: B → A
+};
+
+B b;
+A a = b;  // Error: Ambiguous! Use A(b) or b.operator A()?
+```
+
+**Resolution:** Be careful when defining conversions. Consider making constructors `explicit` to prevent implicit conversions.
+
+##### **1.16 Making Classes Behave Like Fundamental Types**
+
+One of C++'s design goals is enabling user-defined types to behave like built-in types. Through the mechanisms covered above, we can achieve this:
+
+**1. Initialization:** Both support similar syntax
+```cpp
+int i(1);     // Built-in type
+C c(1);       // User-defined type (conversion constructor)
+C c1(c);      // Copy initialization
+```
+
+**2. Assignment:** Can define assignment semantics
+```cpp
+i = 7;        // Built-in assignment
+c = 7;        // User-defined assignment (via conversion + assignment operator)
+c1 = c2;      // User-defined copy assignment
+```
+
+**3. Expressions:** Can participate in arithmetic and other operations
+```cpp
+i = k + m;    // Built-in operator
+c = c1 + c2;  // User-defined operator+
+```
+
+**4. Type Conversions:** Can convert to other types in expressions
+```cpp
+if (i) { }    // Standard conversion int → bool
+if (c) { }    // User-defined conversion C → bool
+```
+
+By providing appropriate constructors, operator functions, and conversion functions, a class can integrate seamlessly with C++'s type system and behave consistently with fundamental types.
+
+##### **1.17 Code Style**
+
+Following consistent coding standards improves readability and maintainability. For this course:
+
+*   **Use Qt's coding style** for C++ code
+*   **CLion setup:** Settings → Editor → Code Style → C/C++ → Set from... → Choose "Qt"
+*   **Format code regularly:** Learn the keyboard shortcut for your OS
+*   Use the auto-format feature before submitting assignments
+
+Consistent style makes code easier to review and collaborate on.
+
+#### **2. Definitions**
+
+*   **Class**: A user-defined compound type that groups data members and member functions together.
+*   **Object**: An instance of a class; a region of memory with a specific type and value.
+*   **Member Variable (Data Member)**: A variable declared inside a class that represents part of the object's state.
+*   **Member Function (Method)**: A function declared inside a class that operates on the object's data.
+*   **Constructor**: A special member function that initializes an object when it is created. Has the same name as the class and no return type.
+*   **Default Constructor**: A constructor that takes no parameters and provides default initialization.
+*   **Conversion Constructor**: A constructor that takes a single parameter of a different type, enabling implicit or explicit conversion to the class type.
+*   **Copy Constructor**: A constructor that takes a reference to another object of the same class and creates a copy.
+*   **Destructor**: A special member function (named `~ClassName`) that performs cleanup when an object is destroyed.
+*   **Access Specifier**: Keywords (`public`, `private`, `protected`) that control the visibility and accessibility of class members.
+*   **Private Members**: Class members accessible only from within the class itself.
+*   **Public Members**: Class members accessible from any code that has access to an object of the class.
+*   **Encapsulation**: The practice of hiding implementation details (private data) while exposing a controlled interface (public functions).
+*   **Static Declaration**: Creating an object on the stack with automatic lifetime (exists until end of scope).
+*   **Dynamic Declaration**: Creating an object on the heap using `new`, with manual lifetime management requiring `delete`.
+*   **Stack Memory**: Memory used for static (automatic) objects; automatically managed, fast, limited size.
+*   **Heap Memory**: Memory used for dynamic objects; manually managed, slower, larger size.
+*   **Memory Leakage**: Failure to free dynamically allocated memory, causing the program to consume increasing memory over time.
+*   **Scope**: The region of code where a name is visible and can be used (compile-time concept).
+*   **Lifetime**: The period during program execution when an object exists in memory (runtime concept).
+*   **Entity**: A fundamental program element in C++ (value, object, reference, function, type, template, etc.).
+*   **Declaration**: A statement that introduces an entity and makes its name available in the current scope.
+*   **Initialization**: The process of giving an object its initial value when it is created.
+*   **Assignment**: Giving an already-existing object a new value, replacing its previous value.
+*   **Reference**: An alias (alternative name) for an existing object; must be initialized and cannot be rebound.
+*   **Pointer**: A variable that stores the memory address of another object; can be null, reassigned, and requires explicit dereferencing.
+*   **Uniform Initialization**: Braced initialization syntax (`{}`) introduced in C++11 that works consistently across types.
+*   **Narrowing Conversion**: A type conversion that may lose information (e.g., double to int), prevented by braced initialization.
+*   **Most Vexing Parse**: A C++ ambiguity where `T obj();` is parsed as a function declaration, not an object declaration.
+*   **Member Initialization List**: The syntax after a constructor's parameter list (`:`) for initializing members before the constructor body executes.
+*   **Copy Elision**: Compiler optimization that eliminates unnecessary copy operations, required by C++ standard in many cases.
+*   **`this` Pointer**: An implicit pointer available in member functions that points to the object on which the member function is called.
+*   **Function Overloading**: Having multiple functions with the same name but different parameter lists.
+*   **Overload Resolution**: The compiler process of determining which overloaded function to call based on argument types.
+*   **Type Conversion**: Transforming a value from one type to another, either implicitly or explicitly.
+*   **Standard Conversion**: Built-in type conversions defined by the C++ language (int to double, array to pointer, etc.).
+*   **User-Defined Conversion**: Conversions for class types defined through conversion constructors or conversion functions.
+*   **`const` Qualifier**: Specifies that a variable's value cannot be modified after initialization.
+*   **`constexpr` Specifier**: Specifies that a value or function can be evaluated at compile time, guaranteeing compile-time constant behavior.
+*   **Constant Expression**: An expression whose value can be computed at compile time.
+*   **Literal Type**: A type that can be used in `constexpr` contexts (scalar types, simple aggregates).
+*   **`typedef`**: C-style keyword for creating type aliases.
+*   **`using` Declaration**: Modern C++ syntax for creating type aliases (preferred over `typedef`).
+*   **Operator Function**: A special member function that defines behavior for a standard operator when applied to class objects.
+*   **Operator Overloading**: Defining custom behavior for operators when used with user-defined types.
+*   **Conversion Function**: A special member function (named `operator TargetType()`) that defines how to convert a class object to another type.
+*   **`delete` Specifier**: Keyword used to explicitly prohibit a function from being called (e.g., to prevent unwanted conversions or copying).
+*   **Template**: A blueprint for creating generic functions or classes that work with multiple types.
+
+#### **3. Examples**
+##### **3.1. Create a Box Class with Basic Constructors** (Lab 2, Task 1)
+
+Write a program that contains a class `Box`.
+
+*   Box should have the length, width, and height as member variables. The variables should be of type `unsigned int`.
+*   Box should have three constructors: default, copy, conversion.
+*   Box should have the assignment operator.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Implement essential constructors and operators to make the class behave like a fundamental type.
+
+```cpp
+#include <iostream>
+
+class Box
+{
+private:
+    unsigned int length;
+    unsigned int width;
+    unsigned int height;
+
+public:
+    // Default constructor - initializes with zeros
+    Box() : length(0), width(0), height(0) {
+        std::cout << "Default constructor called" << std::endl;
+    }
+
+    // Conversion constructor - creates a cube from one dimension
+    Box(unsigned int side) : length(side), width(side), height(side) {
+        std::cout << "Conversion constructor called" << std::endl;
+    }
+
+    // Copy constructor - creates a copy of another box
+    Box(const Box& other) 
+        : length(other.length), width(other.width), height(other.height) {
+        std::cout << "Copy constructor called" << std::endl;
+    }
+
+    // Assignment operator - assigns values from one box to another
+    Box& operator=(const Box& other) {
+        if (this != &other) {  // Check for self-assignment
+            length = other.length;
+            width = other.width;
+            height = other.height;
+        }
+        std::cout << "Assignment operator called" << std::endl;
+        return *this;
+    }
+
+    // Getters for testing
+    unsigned int getLength() const { return length; }
+    unsigned int getWidth() const { return width; }
+    unsigned int getHeight() const { return height; }
+};
+
+int main() {
+    Box b1;              // Default constructor
+    Box b2(5);           // Conversion constructor (5x5x5 cube)
+    Box b3(b2);          // Copy constructor
+    Box b4;
+    b4 = b2;             // Assignment operator
+    
+    return 0;
+}
+```
+
+**Implementation Notes:**
+
+1.  **Default Constructor:** Uses member initialization list to set all dimensions to 0
+2.  **Conversion Constructor:** Takes a single `unsigned int` to create a cube
+3.  **Copy Constructor:** Takes a const reference to avoid infinite recursion and unnecessary copying
+4.  **Assignment Operator:** 
+    *   Returns a reference to allow chaining (`b1 = b2 = b3`)
+    *   Checks for self-assignment to avoid unnecessary work
+    *   Returns `*this` (the current object)
+
+**Answer:** Complete `Box` class implementation with default, conversion, copy constructors and assignment operator.
+
+</details>

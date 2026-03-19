@@ -1,0 +1,1483 @@
+---
+title: "W3. Introduction to Classes, Inheritance, Polymorphism, Virtual Functions, Abstract Classes"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "February 3, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Classes as User-Defined Types: Continuing from Basics**
+
+In the previous lecture, we explored classes as compound types with data members and member functions. Now we extend that understanding by examining how classes behave when they interact with each other through **inheritance** and **polymorphism**. These mechanisms are the core of object-oriented programming.
+
+**Key Questions About Object Types:**
+
+A well-designed C++ class must address several fundamental operations:
+
+*   How to **declare** objects of a given type?
+*   How to **create** objects of a given type?
+*   How to **remove** objects of a given type?
+*   How to **copy** objects of a given type?
+*   How to **assign** objects values of a given type?
+*   How to **move** values of objects of a given type?
+*   How to **convert** objects of a given type to values of objects of some other type?
+*   How to **work** with objects of a given type?
+
+###### **1.1.1 The Three Core Principles of Object-Oriented Programming**
+
+C++ achieves true object-oriented design through three fundamental mechanisms:
+
+1.  **Encapsulation** - Hiding implementation details while exposing a controlled interface (private data, public methods)
+2.  **Inheritance** - Creating new types based on existing types, extending or modifying their behavior
+3.  **Polymorphism** - Allowing objects of different derived types to be treated uniformly through a base type interface
+
+##### **1.2 Instance Members vs. Class Members (Static Members)**
+
+When we declare a class, there's an important distinction between two types of members:
+
+###### **1.2.1 Instance Members (Non-Static)**
+
+**Instance members** are the "normal" class members - each object has its own independent copy of these members.
+
+```cpp
+class C {
+    int m1;      // Instance member
+    float m2;    // Instance member
+};
+```
+
+When you create two objects of class `C`:
+
+```cpp
+C obj1, obj2;
+obj1.m1 = 5;   // Sets m1 in obj1
+obj2.m1 = 10;  // Sets m1 in obj2 (different from obj1.m1)
+```
+
+Each object maintains its own `m1` and `m2` with separate memory locations. This is the expected behavior for most data.
+
+###### **1.2.2 Class Members (Static Members)**
+
+**Class members** (declared with the `static` keyword) are fundamentally different - there is **only one copy** of the member for the entire class, shared by all instances.
+
+```cpp
+class C {
+    int m1;           // Instance member (each object has its own)
+    static int m3;    // Class member (shared by all objects)
+};
+```
+
+**Key insight:** Class members belong to the *type itself*, not to individual objects. This is like a shared resource.
+
+###### **1.2.3 Accessing Class Members**
+
+Instance members are accessed through objects or object pointers:
+
+```cpp
+C c1;
+c1.m1 = 5;     // Using dot notation
+
+C* c2 = new C();
+c2->m1 = 10;   // Using arrow notation
+```
+
+Class members are accessed using the **scope resolution operator** `::` with the class name:
+
+```cpp
+int x = C::m3;       // Access class member by class name
+c1.m1 = 5;
+int y = c1.m3;       // Also valid, but less clear (accesses C::m3 through object)
+```
+
+**Best practice:** Always use the class name `C::m3` when accessing class members, as this makes it clear you're accessing a shared resource.
+
+###### **1.2.4 Practical Example: Using Static Members**
+
+Consider tracking how many instances of a class have been created:
+
+```cpp
+class Node {
+public:
+    int ownNumber;
+private:
+    static int count;  // Shared by all instances
+
+public:
+    Node() {
+        ownNumber = ++count;  // Increment shared counter, assign unique number
+    }
+};
+
+int Node::count = 0;  // Definition and initialization (required for static members)
+
+int main() {
+    Node n1;  // n1.ownNumber = 1
+    Node n2;  // n2.ownNumber = 2
+    Node n3;  // n3.ownNumber = 3
+
+    // Node::count is now 3 (shared across all instances)
+}
+```
+
+###### **1.2.5 Another Use Case: Math Libraries**
+
+Static members are useful for creating utility classes that don't need instances:
+
+```cpp
+class Math {
+public:
+    static double sin(double v) { /* ... */ }
+    static double cos(double v) { /* ... */ }
+    static double tan(double v) { /* ... */ }
+    static double sqrt(double v) { /* ... */ }
+};
+
+// Usage - no need to create Math objects
+double result = Math::sin(3.14159);
+```
+
+This pattern is sometimes seen in older C++ code, though modern C++ offers better alternatives like namespace-level functions.
+
+##### **1.3 Inheritance: Creating Types from Types**
+
+**Inheritance** is a mechanism for defining new types based on existing types. The new type **inherits** all the data members and functionality from the existing type, and can add its own unique features.
+
+###### **1.3.1 The "is a" Relationship**
+
+Inheritance expresses an **"is a"** relationship:
+
+- "A `Circle` **is a** `Shape`"
+- "A `Rectangle` **is a** `Shape`"
+- "A `Truck` **is a** `Vehicle`"
+
+```cpp
+class Shape {
+    // Common features of all shapes
+    Coords coords;
+    void Move() { }
+    void Rotate() { }
+    void Draw() { }
+};
+
+class Circle : public Shape {
+    // Inherits all features from Shape
+    double radius;
+    // Can override or add new features
+};
+```
+
+###### **1.3.2 The Subobject Notion**
+
+When a derived class object is created, it contains a **subobject** - the complete contents of the base class as a nested component:
+
+```cpp
+class Base {
+    int m1, m2;
+};
+
+class Derived : public Base {
+    float m3;
+};
+
+// A Derived object's layout in memory:
+// [Base part (m1, m2) | Derived part (m3)]
+```
+
+This is not inheritance through reference - it's actual composition. A `Derived` object **contains** a `Base` subobject.
+
+###### **1.3.3 The Problem with Members Having the Same Name**
+
+If a derived class declares a member with the same name as a base class member, the derived member **hides** the base member:
+
+```cpp
+class Base {
+    int m1, m2;
+};
+
+class Derived : public Base {
+    float m1;  // This hides Base::m1
+};
+
+Derived d;
+d.m1 = 5.5;  // Which m1? Derived::m1 (the float)
+```
+
+**Solution in C++:** Use explicit qualification to access the hidden base member:
+
+```cpp
+d.Base::m1 = 5;     // Access the hidden int m1 from Base
+d.m1 = 3.14;        // Access Derived's float m1
+```
+
+**Other languages handle this differently:** C# recommends using the `new` keyword to explicitly indicate hiding. Oberon prohibits same-named members entirely.
+
+###### **1.3.4 Access Control in Inheritance**
+
+Before inheritance, we had `public` and `private`. Now we add **`protected`**:
+
+*   **`public` members:** Accessible everywhere (within the class, derived classes, and outside)
+*   **`protected` members:** Accessible only within the class itself and in derived classes
+*   **`private` members:** Accessible only within the class itself (not in derived classes)
+
+```cpp
+class Base {
+private:    int m1;      // Not accessible in Derived
+protected:  int m2;      // Accessible in Derived
+public:     int m3;      // Accessible everywhere
+};
+
+class Derived : public Base {
+    void f() {
+        // m1 is not accessible here - private
+        m2 = 5;   // OK - protected, accessible in derived class
+        m3 = 10;  // OK - public
+    }
+};
+```
+
+**Important rule:** Derived classes can access protected members of their base class, but cannot access private members.
+
+###### **1.3.5 Access Specifiers in Inheritance Declaration**
+
+C++ allows specifying how inherited members should be treated in the derived class:
+
+```cpp
+class D1 : public Base { };      // public inheritance
+class D2 : protected Base { };   // protected inheritance
+class D3 : private Base { };     // private inheritance
+```
+
+This affects the accessibility of inherited members:
+
+*   **`public` inheritance:** Inherited members keep their access level
+    - Base's `public` → Derived's `public`
+    - Base's `protected` → Derived's `protected`
+    - Base's `private` → (not accessible)
+*   **`protected` inheritance:** Public base members become protected in derived
+    - Base's `public` → Derived's `protected`
+    - Base's `protected` → Derived's `protected`
+    - Base's `private` → (not accessible)
+*   **`private` inheritance:** All accessible base members become private in derived
+    - Base's `public` → Derived's `private`
+    - Base's `protected` → Derived's `private`
+    - Base's `private` → (not accessible)
+
+**Most common:** Use **`public` inheritance** unless you have a specific reason otherwise. It best expresses the "is a" relationship.
+
+##### **1.4 Single Inheritance vs. Multiple Inheritance**
+
+###### **1.4.1 Single Inheritance**
+
+**Single inheritance** means a derived class has exactly one base class. This is simpler and less error-prone.
+
+Languages supporting single inheritance: **C#, Java, Scala**
+
+**Advantages:**
+
+*   Simple and easy to understand
+*   More efficient implementation
+*   Clearer class hierarchies
+
+**Disadvantages:**
+
+*   Less powerful (some designs need multiple inheritance)
+
+```cpp
+class Car { /* base features */ };
+class Truck : public Car { /* truck-specific features */ };
+```
+
+###### **1.4.2 Multiple Inheritance**
+
+**Multiple inheritance** allows a derived class to inherit from multiple base classes. This is more powerful but can introduce complexity.
+
+Languages supporting multiple inheritance: **C++, Eiffel**
+
+```cpp
+class Building {
+    int floors;
+    void Maintain();
+};
+
+class Home {
+    int rooms;
+    void Live();
+};
+
+class Villa : public Building, public Home {
+    // Inherits features from both Building and Home
+};
+```
+
+A `Villa` **is a** `Building` and **is a** `Home` simultaneously. The object contains subobjects of both base classes.
+
+**Memory layout:**
+```
+Villa object:
+[Building subobject (floors, methods)]
+[Home subobject (rooms, methods)]
+[Villa's own members]
+```
+
+###### **1.4.3 Accessing Multiple Base Classes**
+
+When multiple base classes have members with the same name, ambiguity arises:
+
+```cpp
+class Base1 {
+public:
+    int m1;
+};
+
+class Base2 {
+public:
+    int m1;
+};
+
+class Derived : public Base1, public Base2 {
+    void f() {
+        m1 = 5;  // ERROR: ambiguous! Which m1?
+    }
+};
+```
+
+**Solution:** Use explicit qualification:
+
+```cpp
+Base1::m1 = 5;
+Base2::m1 = 10;
+```
+
+Or in member functions of derived class:
+
+```cpp
+void f() {
+    this->Base1::m1 = 5;
+    this->Base2::m1 = 10;
+}
+```
+
+##### **1.5 Virtual Inheritance: Solving the Diamond Problem**
+
+Multiple inheritance can create an inheritance diamond, where the same base class appears through multiple inheritance paths:
+
+###### **1.5.1 The Diamond Problem**
+
+Consider this inheritance structure:
+
+```cpp
+class Vehicle { /* engine, wheels */ };
+class Car : public Vehicle { /* doors */ };
+class Plane : public Vehicle { /* wings */ };
+class SuperCar : public Car, public Plane { /* ... */ };
+```
+
+**The problem:** A `SuperCar` object contains **two copies** of `Vehicle`:
+
+- One through the `Car` path
+- One through the `Plane` path
+
+This means:
+```cpp
+SuperCar sc;
+// sc contains TWO Vehicle subobjects!
+// Two separate engines, two sets of wheels!
+```
+
+This is usually not what we want.
+
+###### **1.5.2 Virtual Inheritance Solution**
+
+**Virtual inheritance** ensures there is only one copy of the base class, shared through all inheritance paths:
+
+```cpp
+class Car : virtual public Vehicle { };
+class Plane : virtual public Vehicle { };
+class SuperCar : public Car, public Plane { };
+```
+
+Now `SuperCar` contains **only one** `Vehicle` subobject, shared by both `Car` and `Plane` parts.
+
+**Memory layout with virtual inheritance:**
+```
+SuperCar object:
+[Car part]
+[Plane part]
+[Vehicle part - shared!]
+```
+
+**Key difference from multiple inheritance:**
+
+- **Normal MI:** Each inheritance path brings its own copy of the base
+- **Virtual inheritance:** All paths share a single copy of the base
+
+**Rule of thumb:** Use virtual inheritance when you have multiple inheritance paths leading to the same base class.
+
+##### **1.6 Method Overriding**
+
+**Method overriding** occurs when a derived class defines a method with the same signature as a base class method. This allows customizing behavior in derived classes.
+
+###### **1.6.1 Non-Virtual Method Overriding (Hiding)**
+
+Without the `virtual` keyword, the derived method simply **hides** the base method:
+
+```cpp
+class Base {
+public:
+    void f(int x) { cout << "Base::f" << endl; }
+};
+
+class Derived : public Base {
+public:
+    void f(int x) { cout << "Derived::f" << endl; }  // Hides Base::f
+};
+
+Base b;
+b.f(7);      // Calls Base::f
+
+Derived d;
+d.f(7);      // Calls Derived::f
+             // Base::f is inaccessible through d
+```
+
+The issue: If you have a **Base pointer** pointing to a **Derived object**, calling a non-virtual method still calls the **Base version**:
+
+```cpp
+Base* bp = new Derived();
+bp->f(7);  // Calls Base::f, NOT Derived::f!
+```
+
+This is because the method call is resolved based on the **static type** (`Base*`), not the **dynamic type** (actually a `Derived`).
+
+###### **1.6.2 Virtual Method Overriding**
+
+With the `virtual` keyword, the derived method truly **overrides** the base method:
+
+```cpp
+class Base {
+public:
+    virtual void f(int x) { cout << "Base::f" << endl; }
+};
+
+class Derived : public Base {
+public:
+    void f(int x) override { cout << "Derived::f" << endl; }
+};
+
+Base* bp = new Derived();
+bp->f(7);  // Calls Derived::f (correct!)
+```
+
+The method call is now resolved based on the **dynamic type** (what the object actually is), not the static type (what the pointer is).
+
+**The `override` specifier:** In modern C++, use `override` to explicitly indicate you're overriding a virtual method:
+
+```cpp
+class Derived : public Base {
+public:
+    void f(int x) override { /* ... */ }  // Explicitly marks this as an override
+};
+```
+
+This helps the compiler catch mistakes - if you misspell the method name or get the signature wrong, the compiler will error instead of silently creating a new method.
+
+##### **1.7 Static and Dynamic Types**
+
+This is a crucial concept for understanding polymorphism.
+
+###### **1.7.1 Type Definitions**
+
+*   **Static type:** The type declared in the source code. Determined at **compile time**.
+*   **Dynamic type:** The actual type of the object at runtime. Determined at **runtime**.
+
+```cpp
+class Shape { };
+class Circle : public Shape { };
+
+Shape* shape = new Circle();  // Static type: Shape*
+                              // Dynamic type: Circle*
+```
+
+The pointer `shape` has a **static type** of `Shape*` (that's what we wrote), but it actually points to a `Circle` object (the **dynamic type**).
+
+###### **1.7.2 Standard Conversion**
+
+When a derived type is assigned to a base type pointer or reference, C++ performs a **standard conversion**:
+
+```cpp
+Circle circle;
+Shape* s1 = &circle;       // Standard conversion: Circle* → Shape*
+Shape& s2 = circle;        // Standard conversion: Circle& → Shape&
+
+Shape* s3 = new Circle();  // Standard conversion: Derived to Base
+```
+
+This conversion is always safe and implicit - a `Circle` truly **is a** `Shape`.
+
+##### **1.8 Polymorphism: The Main Rule**
+
+**Polymorphism** is the third cornerstone of OOP (after encapsulation and inheritance). It allows code to work with objects of different types in a uniform way.
+
+**The central rule** (from the ISO C++ Standard, Section 10.3, paragraph 9):
+
+> The interpretation of the call of a virtual function depends on the type of the object for which it is called (**the dynamic type**), whereas the interpretation of a call of a non-virtual member function depends only on the type of the pointer or reference denoting that object (**the static type**).
+
+**In simple terms:**
+
+- **Virtual methods:** Called based on what the object *actually is* (dynamic type)
+- **Non-virtual methods:** Called based on what the pointer/reference *says it is* (static type)
+
+###### **1.8.1 Polymorphic Design Example**
+
+Consider managing a collection of geometric shapes:
+
+**Without polymorphism** (procedural approach):
+
+```cpp
+void* shapes[20];
+// Array contains pointers to Circle, Rectangle, Triangle, etc.
+
+void DrawAllShapes() {
+    for (int i = 0; i < 20; i++) {
+        void* shape = shapes[i];
+        if ("shape is Circle")
+            ((Circle*)shape)->Draw();
+        else if ("shape is Rectangle")
+            ((Rectangle*)shape)->Draw();
+        else if ("shape is Triangle")
+            ((Triangle*)shape)->Draw();
+        // ...
+    }
+}
+```
+
+**Problems:**
+
+- Error-prone: lots of type checking and casting
+- Hard to maintain: adding a new shape type requires modifying every function
+- The code depends too tightly on knowing all possible shape types
+
+**With polymorphism** (OOP approach):
+
+```cpp
+class Shape {
+public:
+    virtual void Draw() = 0;  // Pure virtual - no implementation
+};
+
+class Circle : public Shape {
+public:
+    void Draw() override { /* Circle drawing code */ }
+};
+
+class Rectangle : public Shape {
+public:
+    void Draw() override { /* Rectangle drawing code */ }
+};
+
+void DrawAllShapes(Shape* shapes[], int count) {
+    for (int i = 0; i < count; i++) {
+        shapes[i]->Draw();  // Each calls the correct Draw() for its type!
+    }
+}
+```
+
+**Benefits:**
+
+- Clean and simple: single line in the loop
+- Easy to extend: add new shape types without changing DrawAllShapes()
+- Library independence: DrawAllShapes() doesn't depend on knowing about Circle, Rectangle, etc.
+
+**The key insight:** The `Draw()` call is polymorphic - which `Draw()` gets called depends on the actual type of object at runtime.
+
+###### **1.8.2 How Polymorphism Works Internally**
+
+When a class has virtual functions, the compiler creates a **virtual function table (vtable)** for each class:
+
+```cpp
+class Base {
+    virtual void vf1();
+    virtual void vf2();
+};
+
+class Derived : public Base {
+    void vf1() override;  // Overrides vf1
+    void vf2();           // Overrides vf2
+};
+```
+
+Each object contains a hidden pointer to its class's vtable. When a virtual function is called through a pointer:
+
+1. The compiler reads the vtable pointer from the object
+2. Looks up the function in the vtable
+3. Calls the function corresponding to the object's actual type
+
+This allows correct function selection at runtime.
+
+##### **1.9 Abstract Classes**
+
+An **abstract class** is a class that cannot be instantiated directly. It serves as a blueprint for derived classes.
+
+###### **1.9.1 Pure Virtual Functions**
+
+A **pure virtual function** is a virtual function with no implementation - just a declaration:
+
+```cpp
+class Shape {
+public:
+    virtual void Draw() = 0;  // Pure virtual function
+};
+```
+
+The `= 0` syntax means "this function has no body in this class; derived classes must provide an implementation."
+
+If a derived class doesn't override a pure virtual function, it remains abstract and cannot be instantiated.
+
+###### **1.9.2 What Makes a Class Abstract?**
+
+A class is **abstract** if it has at least one **pure virtual function**:
+
+```cpp
+class Shape {
+public:
+    virtual void Move() = 0;      // Pure virtual
+    virtual void Rotate() = 0;    // Pure virtual
+    virtual void Draw() = 0;      // Pure virtual
+};
+
+// Shape is abstract - cannot create instances
+Shape s;              // ERROR
+Shape* sp = new Shape();  // ERROR
+```
+
+A **concrete class** implements all pure virtual functions:
+
+```cpp
+class Circle : public Shape {
+public:
+    void Move() override { /* ... */ }
+    void Rotate() override { /* ... */ }
+    void Draw() override { /* ... */ }
+};
+
+Circle c;              // OK - all pure virtuals implemented
+Shape* s = new Circle();  // OK
+```
+
+###### **1.9.3 Using Abstract Classes**
+
+Abstract classes define a contract that derived classes must follow:
+
+```cpp
+class Shape {
+public:
+    virtual ~Shape() { }  // Virtual destructor for base classes with virtual functions
+    virtual void Draw() = 0;
+    virtual void Move() = 0;
+};
+
+// Array of pointers to abstract base class
+Shape* shapes[10];
+shapes[0] = new Circle();
+shapes[1] = new Rectangle();
+// ...
+
+for (int i = 0; i < 10; i++) {
+    shapes[i]->Draw();  // Calls the correct Draw() for each shape
+}
+```
+
+**Benefits:**
+
+- Enforces consistency: all Shape subclasses must implement Draw() and Move()
+- Provides a common interface: code can work with any Shape without knowing specifics
+- Prevents instantiating incomplete classes: you can't accidentally create a bare Shape
+
+###### **1.9.4 Virtual Destructors**
+
+When a class has virtual functions, it should also have a **virtual destructor**:
+
+```cpp
+class Shape {
+public:
+    virtual void Draw() = 0;
+    virtual ~Shape() { }  // Virtual destructor
+};
+```
+
+This ensures that when you delete through a base class pointer, the correct derived class destructor is called:
+
+```cpp
+Shape* shape = new Circle();
+delete shape;  // Calls Circle::~Circle() then Shape::~Shape()
+```
+
+Without the virtual destructor, only the base class destructor would be called, potentially leaking resources.
+
+##### **1.10 Terminology: Polymorphism, Late Binding, Dynamic Dispatch**
+
+These terms are often used interchangeably:
+
+*   **Polymorphism** - "many forms"; the ability of derived types to customize base type behavior
+*   **Late binding** - method selection happens at runtime (late = runtime, vs. compile time)
+*   **Dynamic dispatch** - the runtime mechanism for selecting which method to call based on dynamic type
+
+All three describe the same fundamental mechanism that makes virtual functions work.
+
+#### **2. Definitions**
+
+*   **Inheritance**: A mechanism for defining new types based on existing types, where derived classes inherit members and functionality from base classes.
+*   **Derived class**: A class that inherits from another class (the base class).
+*   **Base class**: A class from which other classes inherit.
+*   **Instance member**: A data member of a class that exists separately for each object instance.
+*   **Class member (Static member)**: A member declared with `static` that belongs to the class itself, not to individual instances; all instances share a single copy.
+*   **Subobject**: The complete contents of a base class nested within a derived class object's memory layout.
+*   **Method overriding**: Defining a method in a derived class with the same signature as a method in the base class.
+*   **Method hiding**: When a derived class method has the same name but different signature from a base method, or when a non-virtual method is redefined; the base method becomes inaccessible.
+*   **Access specifier**: Keywords (`public`, `private`, `protected`) that control visibility of class members.
+*   **Protected members**: Class members accessible within the class itself and in derived classes, but not from outside.
+*   **Public inheritance**: Inheritance mode where base class public and protected members retain their access levels in derived class.
+*   **Protected inheritance**: Inheritance mode where base class public members become protected in derived class.
+*   **Private inheritance**: Inheritance mode where all accessible base class members become private in derived class.
+*   **Single inheritance**: A derived class has exactly one base class.
+*   **Multiple inheritance**: A derived class has two or more base classes.
+*   **Virtual inheritance**: A special form of inheritance used in multiple inheritance to ensure only one copy of a base class subobject exists when that base is reached through multiple inheritance paths.
+*   **Diamond problem**: The situation in multiple inheritance where a base class is inherited through multiple paths, causing ambiguity about which path's version to use.
+*   **Virtual function (Virtual method)**: A member function declared with `virtual` keyword that can be overridden in derived classes, with the correct version called based on dynamic type.
+*   **Pure virtual function**: A virtual function with no implementation (`= 0`), intended to be overridden by derived classes.
+*   **Static type**: The type declared in the source code, determined at compile time.
+*   **Dynamic type**: The actual type of an object at runtime.
+*   **Standard conversion**: Implicit conversion from a derived type to a base type (e.g., `Circle*` to `Shape*`).
+*   **Polymorphism**: The ability of derived types to modify the behavior of the base type; methods called based on dynamic type rather than static type.
+*   **Late binding**: Resolution of method calls at runtime rather than compile time, based on the actual object type.
+*   **Dynamic dispatch**: The runtime mechanism of selecting which method implementation to execute based on the dynamic type of an object.
+*   **Abstract class**: A class that cannot be instantiated directly because it contains at least one pure virtual function; serves as a blueprint for derived classes.
+*   **Concrete class**: A class that implements all pure virtual functions and can be instantiated.
+*   **Virtual table (vtable)**: An internal data structure the compiler creates for classes with virtual functions, containing pointers to the actual method implementations for each class.
+*   **Virtual destructor**: A destructor declared with `virtual` keyword to ensure proper cleanup when deleting through a base class pointer.
+*   **Override specifier**: The `override` keyword (C++11) used to explicitly mark a method as overriding a virtual method, enabling compiler error checking.
+*   **Scope resolution operator (`::`)**: The operator used to access class members and names within namespaces.
+
+#### **3. Examples**
+##### **3.1. Inheritance Access Rules - Public, Protected, Private** (Tutorial 3, Example 1)
+
+Write a program demonstrating the accessibility of base class members under different inheritance modes.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Understand how inheritance specifiers (`public`, `protected`, `private`) affect member accessibility in derived classes.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    int m1;           // Public member
+protected:
+    int m2;           // Protected member
+private:
+    int m3;           // Private member
+};
+
+class DerivedPublic : public Base {
+public:
+    void f() {
+        Base::m1 = 1;      // OK: m1 is public
+        Base::m2 = 1;      // OK: m2 is protected, accessible in derived
+        // Base::m3 = 1;    // ERROR: m3 is private
+        cout << "DerivedPublic: " << m1 << " " << Base::m2 << endl;
+    }
+};
+
+class DerivedProtected : protected Base {
+public:
+    void f() {
+        Base::m1 = 1;      // OK: m1 is public in Base
+        Base::m2 = 1;      // OK: m2 is protected in Base
+        // Base::m3 = 1;    // ERROR: m3 is private
+        cout << "DerivedProtected: " << Base::m1 << " " << Base::m2 << endl;
+    }
+};
+
+class DerivedPrivate : private Base {
+public:
+    void f() {
+        Base::m1 = 1;      // OK: m1 is public in Base, accessible internally
+        Base::m2 = 1;      // OK: m2 is protected in Base, accessible internally
+        // Base::m3 = 1;    // ERROR: m3 is private
+        cout << "DerivedPrivate: " << Base::m1 << " " << Base::m2 << endl;
+    }
+};
+
+int main() {
+    DerivedPublic dPublic;
+    DerivedProtected dProtected;
+    DerivedPrivate dPrivate;
+
+    dPublic.f();
+    dPublic.m1 = 0;        // OK: m1 is public in DerivedPublic (public inheritance)
+    // dPublic.m2 = 0;      // ERROR: m2 is protected
+    // dPublic.m3 = 0;      // ERROR: m3 is private
+
+    dProtected.f();
+    // dProtected.m1 = 0;   // ERROR: m1 is protected in DerivedProtected (protected inheritance)
+    // dProtected.m2 = 0;   // ERROR: m2 is protected
+    // dProtected.m3 = 0;   // ERROR: m3 is private
+
+    dPrivate.f();
+    // dPrivate.m1 = 0;     // ERROR: m1 is private in DerivedPrivate (private inheritance)
+    // dPrivate.m2 = 0;     // ERROR: m2 is private
+    // dPrivate.m3 = 0;     // ERROR: m3 is private
+
+    return 0;
+}
+```
+
+**Explanation:**
+
+1.  **Base class:** Declares three members with different access levels
+    *   `m1`: public (accessible everywhere)
+    *   `m2`: protected (accessible in derived classes)
+    *   `m3`: private (not accessible in derived classes)
+2.  **DerivedPublic (public inheritance):**
+    *   Can access `m1` and `m2` internally
+    *   From outside: `m1` remains public, `m2` becomes protected
+    *   `m3` is always inaccessible (private in base)
+3.  **DerivedProtected (protected inheritance):**
+    *   Can access `m1` and `m2` internally
+    *   From outside: both `m1` and `m2` are protected (cannot access)
+    *   `m3` is always inaccessible
+4.  **DerivedPrivate (private inheritance):**
+    *   Can access `m1` and `m2` internally
+    *   From outside: both `m1` and `m2` are private (cannot access)
+    *   `m3` is always inaccessible
+
+**Key Rule:** Private base members are **never** accessible in derived classes, regardless of inheritance mode.
+
+**Answer:** See code above demonstrating which access rules apply to each inheritance mode.
+
+</details>
+
+##### **3.2. Virtual Inheritance - Solving the Diamond Problem** (Tutorial 3, Example 2)
+
+Write a program demonstrating virtual inheritance to ensure a shared base class in diamond inheritance.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Virtual inheritance ensures that when a base class is inherited through multiple paths, there is only one instance of that base class.
+
+```cpp
+#include<iostream>
+using namespace std;
+
+class Person {
+public:
+    Person(int x) {
+        cout << "Person::Person(int) called" << endl;
+    }
+
+    Person() {
+        cout << "Person::Person() called" << endl;
+    }
+};
+
+class Faculty : virtual public Person {
+public:
+    Faculty(int x) : Person(x) {
+        cout << "Faculty::Faculty(int) called" << endl;
+    }
+};
+
+class Student : virtual public Person {
+public:
+    Student(int x) : Person(x) {
+        cout << "Student::Student(int) called" << endl;
+    }
+};
+
+class TA : public Faculty, public Student {
+public:
+    TA(int x) : Student(x), Faculty(x) {
+        cout << "TA::TA(int) called" << endl;
+    }
+};
+
+int main() {
+    TA ta(80);
+    return 0;
+}
+```
+
+**Output:**
+```
+Person::Person(int) called
+Faculty::Faculty(int) called
+Student::Student(int) called
+TA::TA(int) called
+```
+
+**Explanation:**
+
+1.  **Diamond inheritance structure:**
+    ```
+         Person
+        /      \
+    Faculty   Student
+        \      /
+          TA
+    ```
+2.  **Without virtual inheritance:** Creating a TA would call Person's constructor twice (once through Faculty, once through Student), resulting in two Person subobjects.
+3.  **With virtual inheritance:** `Faculty` and `Student` both use `virtual public Person`, ensuring only one `Person` subobject exists in the final TA object.
+4.  **Constructor call order:**
+    *   Person's constructor is called first (the shared virtual base)
+    *   Faculty's constructor is called
+    *   Student's constructor is called
+    *   TA's constructor is called
+
+**Why virtual inheritance is needed:**
+
+```cpp
+// Without virtual inheritance:
+class Faculty : public Person { };    // Each has own Person
+class Student : public Person { };    // Each has own Person
+class TA : public Faculty, public Student { };  // TA has TWO Person subobjects!
+
+// With virtual inheritance:
+class Faculty : virtual public Person { };
+class Student : virtual public Person { };
+class TA : public Faculty, public Student { };  // TA has ONE shared Person
+```
+
+**Answer:** Virtual inheritance creates a single shared instance of the base class through the diamond hierarchy.
+
+</details>
+
+##### **3.3. Method Overriding vs. Hiding** (Tutorial 3, Example 3)
+
+Write a program demonstrating the difference between method overriding with virtual functions and method hiding without them.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Non-virtual methods are selected based on static type (the declared type), while virtual methods are selected based on dynamic type (the actual object type).
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    void f(int x) {
+        cout << "Base::f called with x = " << x << endl;
+    }
+};
+
+class Derived : public Base {
+public:
+    void f(int x) {
+        x++;
+        cout << "Derived::f called with x = " << x << endl;
+        // Base::f(x);  // Could call base version if needed
+    }
+};
+
+int main() {
+    Base b;
+    b.f(7);  // Calls Base::f(7), outputs: "Base::f called with x = 7"
+
+    Derived d;
+    d.f(7);  // Calls Derived::f(7), outputs: "Derived::f called with x = 8"
+
+    // The critical difference:
+    Base* bp = &d;  // Base pointer to Derived object
+    bp->f(7);       // Calls Base::f (static type is Base*)
+                    // Outputs: "Base::f called with x = 7"
+                    // NOT "Derived::f called..."
+
+    return 0;
+}
+```
+
+**Output:**
+```
+Base::f called with x = 7
+Derived::f called with x = 8
+Base::f called with x = 7
+```
+
+**Explanation:**
+
+1.  **Non-virtual methods:** Selected at compile-time based on static type
+    *   `b.f(7)` calls Base's version (b is Base)
+    *   `d.f(7)` calls Derived's version (d is Derived)
+    *   `bp->f(7)` calls Base's version (bp's type is Base*, even though it points to Derived)
+2.  **The problem:** Method hiding makes polymorphic behavior impossible with non-virtual methods.
+3.  **Compare with virtual methods:**
+    ```cpp
+    class Base {
+    public:
+        virtual void f(int x) { /* ... */ }  // Virtual!
+    };
+
+    // With virtual, bp->f(7) would call Derived::f
+    ```
+
+**Why this matters:** Without virtual functions, you cannot achieve true polymorphism. Code that works with base type pointers won't properly adapt to derived type objects.
+
+**Answer:** Non-virtual methods use static type for selection, resulting in method hiding. Virtual methods use dynamic type for selection, enabling true polymorphism.
+
+</details>
+
+##### **3.4. Polymorphism with Virtual Functions and Destructors** (Tutorial 3, Example 4)
+
+Write a program demonstrating polymorphic behavior with virtual functions and the importance of virtual destructors.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Virtual functions enable polymorphic behavior where the correct method is called based on the object's actual type. Virtual destructors ensure proper cleanup.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Shape {
+public:
+    // Virtual function - can be overridden
+    virtual void calculateArea() {
+        cout << "Area of your Shape: " << endl;
+    }
+
+    // Virtual destructor recommended when virtual functions present
+    virtual ~Shape() {
+        cout << "Shape Destructor called\n";
+    }
+};
+
+// Derived class: Rectangle
+class Rectangle : public Shape {
+public:
+    void calculateArea() override {  // Override the virtual function
+        width = 5;
+        height = 10;
+        area = height * width;
+        cout << "Area of Rectangle: " << area << endl;
+    }
+
+    ~Rectangle() {
+        cout << "Rectangle Destructor called\n";
+    }
+private:
+    int width, height, area;
+};
+
+// Derived class: Square
+class Square : public Shape {
+public:
+    void calculateArea() override {  // Override the virtual function
+        side = 7;
+        area = side * side;
+        cout << "Area of Square: " << area << endl;
+    }
+
+    ~Square() {
+        cout << "Square Destructor called\n";
+    }
+private:
+    int side, area;
+};
+
+int main() {
+    Shape* S;
+
+    Rectangle r;
+    S = &r;
+    S->calculateArea();  // Calls Rectangle::calculateArea (polymorphic!)
+
+    Square sq;
+    S = &sq;
+    S->calculateArea();  // Calls Square::calculateArea (polymorphic!)
+    S->Shape::calculateArea();  // Can explicitly call base version if needed
+
+    return 0;
+    // Destructors called in order: ~Square, ~Shape, ~Rectangle, ~Shape
+}
+```
+
+**Output:**
+```
+Area of Rectangle: 50
+Area of Square: 49
+Area of your Shape:
+Rectangle Destructor called
+Shape Destructor called
+Square Destructor called
+Shape Destructor called
+```
+
+**Explanation:**
+
+1.  **Polymorphic behavior:**
+    *   `S` is a `Shape*` pointer (static type)
+    *   When S points to a Rectangle, `S->calculateArea()` calls Rectangle's version
+    *   When S points to a Square, `S->calculateArea()` calls Square's version
+    *   The correct method is selected based on dynamic type
+2.  **Virtual destructors:**
+    *   Shape has `virtual ~Shape()` - this is crucial!
+    *   When `delete S` is called with a Shape pointer pointing to Rectangle, both destructors are called in the correct order
+    *   Without virtual destructors, only Shape's destructor would be called, potentially leaking resources
+3.  **The `override` keyword:**
+    *   Makes it explicit that we're overriding a virtual function
+    *   The compiler will error if the signature doesn't match
+4.  **Explicit base call:**
+    *   `S->Shape::calculateArea()` explicitly calls the base version
+    *   Useful sometimes for debugging or special cases
+
+**Key rule:** Always make destructors virtual in classes with virtual functions!
+
+**Answer:** Virtual functions enable polymorphic behavior where the correct implementation is called based on the object's actual type at runtime.
+
+</details>
+
+##### **3.5. Abstract Classes with Pure Virtual Functions** (Tutorial 3, Example 5)
+
+Write a program demonstrating abstract classes and the requirement that derived classes must implement pure virtual functions.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** An abstract class defines a contract (interface) that all derived classes must fulfill. Pure virtual functions (`= 0`) force derived classes to provide implementations.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Animal {
+public:
+    // Pure virtual function - no implementation
+    virtual void makeSound() = 0;
+    virtual ~Animal() { }  // Virtual destructor
+};
+
+class Cat : public Animal {
+public:
+    void makeSound() override {
+        cout << "Meow" << endl;
+    }
+};
+
+class Dog : public Animal {
+public:
+    void makeSound() override {
+        cout << "Woof" << endl;
+    }
+};
+
+class Cow : public Animal {
+public:
+    void makeSound() override {
+        cout << "Moo" << endl;
+    }
+};
+
+int main() {
+    // Animal a;  // ERROR: Cannot instantiate abstract class
+    // Animal* ap = new Animal();  // ERROR: Cannot instantiate abstract class
+
+    const int animalAmount = 6;
+    Animal* animals[animalAmount];
+
+    // Create instances of concrete derived classes
+    animals[0] = new Cow();
+    animals[1] = new Cat();
+    animals[2] = new Dog();
+    animals[3] = new Cow();
+    animals[4] = new Cat();
+    animals[5] = new Dog();
+
+    // Polymorphic calls - each animal makes its own sound
+    for (int i = 0; i < animalAmount; i++) {
+        animals[i]->makeSound();
+    }
+
+    // Cleanup
+    for (int i = 0; i < animalAmount; i++) {
+        delete animals[i];  // Calls correct destructor via virtual
+    }
+
+    return 0;
+}
+```
+
+**Output:**
+```
+Moo
+Meow
+Woof
+Moo
+Meow
+Woof
+```
+
+**Explanation:**
+
+1.  **Abstract class:** `Animal` cannot be instantiated because it has pure virtual function `makeSound() = 0`
+2.  **Concrete classes:** `Cat`, `Dog`, and `Cow` all implement `makeSound()`, making them concrete and instantiable
+3.  **Polymorphic container:** An array of `Animal*` pointers can hold pointers to any derived class
+4.  **Dynamic dispatch:** When `animals[i]->makeSound()` is called:
+    *   The correct `makeSound()` for each specific animal type is called
+    *   No type checking or casting needed
+    *   The correct behavior happens automatically based on object type
+5.  **Benefits of abstract classes:**
+    *   Enforces interface: all animals must implement `makeSound()`
+    *   Prevents incomplete implementations: can't accidentally create a bare Animal
+    *   Provides polymorphic interface: code works with Animal* regardless of actual type
+
+**Why abstract classes matter:**
+
+Without the abstract class pattern, you would need to use type checking and casting:
+
+```cpp
+// BAD: Without abstract classes
+for (int i = 0; i < animalAmount; i++) {
+    if (animals[i] is Cat)
+        ((Cat*)animals[i])->makeSound();
+    else if (animals[i] is Dog)
+        ((Dog*)animals[i])->makeSound();
+    else if (animals[i] is Cow)
+        ((Cow*)animals[i])->makeSound();
+}
+```
+
+The abstract class approach is cleaner, safer, and more maintainable.
+
+**Answer:** Abstract classes define contracts through pure virtual functions, ensuring all derived classes provide required implementations. This enables clean polymorphic design patterns.
+
+</details>
+
+##### **3.6. Complete Object-Oriented Zoo Example** (Lab 3, Task)
+
+Build a complete zoo animal hierarchy demonstrating inheritance, virtual functions, multiple inheritance, and polymorphism.
+
+**Requirements:**
+
+1.  Define a base class `Animal` with common attributes and virtual functions
+2.  Create intermediate classes `LandAnimal` and `WaterAnimal`
+3.  Implement derived classes `Lion` and `Dolphin`
+4.  Create class `Frog` that inherits from both `LandAnimal` and `WaterAnimal` (multiple inheritance)
+5.  Use a collection to demonstrate polymorphism
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Building a complete OOP system with inheritance hierarchy, virtual functions, and polymorphic collections.
+
+```cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+
+// Base class: Animal
+class Animal {
+protected:
+    string name;
+    int age;
+public:
+    Animal(string n, int a) : name(n), age(a) { }
+
+    // Pure virtual function - all animals must make sounds
+    virtual void makeSound() const = 0;
+
+    // Virtual destructor
+    virtual ~Animal() {
+        cout << "Animal destructor for " << name << endl;
+    }
+
+    virtual void describe() const {
+        cout << "Animal: " << name << ", Age: " << age << endl;
+    }
+};
+
+// Intermediate class: LandAnimal
+class LandAnimal : virtual public Animal {
+public:
+    LandAnimal(string n, int a) : Animal(n, a) { }
+
+    virtual void walk() const {
+        cout << name << " is walking on land." << endl;
+    }
+
+    virtual ~LandAnimal() {
+        cout << "LandAnimal destructor for " << name << endl;
+    }
+};
+
+// Intermediate class: WaterAnimal
+class WaterAnimal : virtual public Animal {
+public:
+    WaterAnimal(string n, int a) : Animal(n, a) { }
+
+    virtual void swim() const {
+        cout << name << " is swimming in water." << endl;
+    }
+
+    virtual ~WaterAnimal() {
+        cout << "WaterAnimal destructor for " << name << endl;
+    }
+};
+
+// Derived class: Lion (land animal only)
+class Lion : public LandAnimal {
+public:
+    Lion(string n, int a) : Animal(n, a), LandAnimal(n, a) { }
+
+    void makeSound() const override {
+        cout << name << " roars: ROARRRR!" << endl;
+    }
+
+    void walk() const override {
+        cout << name << " walks majestically on the savanna." << endl;
+    }
+
+    ~Lion() {
+        cout << "Lion destructor for " << name << endl;
+    }
+};
+
+// Derived class: Dolphin (water animal only)
+class Dolphin : public WaterAnimal {
+public:
+    Dolphin(string n, int a) : Animal(n, a), WaterAnimal(n, a) { }
+
+    void makeSound() const override {
+        cout << name << " clicks: Click-click-click!" << endl;
+    }
+
+    void swim() const override {
+        cout << name << " swims gracefully through the ocean." << endl;
+    }
+
+    ~Dolphin() {
+        cout << "Dolphin destructor for " << name << endl;
+    }
+};
+
+// Derived class: Frog (multiple inheritance - both land and water)
+class Frog : public LandAnimal, public WaterAnimal {
+public:
+    Frog(string n, int a)
+        : Animal(n, a), LandAnimal(n, a), WaterAnimal(n, a) { }
+
+    void makeSound() const override {
+        cout << name << " croaks: Ribbit ribbit!" << endl;
+    }
+
+    void walk() const override {
+        cout << name << " hops on the ground." << endl;
+    }
+
+    void swim() const override {
+        cout << name << " swims in the pond." << endl;
+    }
+
+    ~Frog() {
+        cout << "Frog destructor for " << name << endl;
+    }
+};
+
+int main() {
+    cout << "=== Creating Zoo Animals ===" << endl;
+
+    // Create a vector of Animal pointers (polymorphic container)
+    vector<Animal*> zoo;
+
+    // Add various animals
+    zoo.push_back(new Lion("Leo", 5));
+    zoo.push_back(new Dolphin("Flipper", 3));
+    zoo.push_back(new Frog("Kermit", 1));
+    zoo.push_back(new Lion("Simba", 2));
+    zoo.push_back(new Dolphin("Moby", 8));
+    zoo.push_back(new Frog("Fredrick", 2));
+
+    cout << "\n=== All Animals Make Sounds ===" << endl;
+    for (Animal* animal : zoo) {
+        animal->makeSound();
+    }
+
+    cout << "\n=== Land Animals Walking ===" << endl;
+    Lion* lion = dynamic_cast<Lion*>(zoo[0]);
+    if (lion) lion->walk();
+
+    Frog* frog = dynamic_cast<Frog*>(zoo[2]);
+    if (frog) frog->walk();
+
+    cout << "\n=== Water Animals Swimming ===" << endl;
+    Dolphin* dolphin = dynamic_cast<Dolphin*>(zoo[1]);
+    if (dolphin) dolphin->swim();
+
+    if (frog) frog->swim();  // Frog can also swim!
+
+    cout << "\n=== Cleanup ===" << endl;
+    for (Animal* animal : zoo) {
+        delete animal;
+    }
+    zoo.clear();
+
+    cout << "Zoo cleaned up!" << endl;
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Creating Zoo Animals ===
+
+=== All Animals Make Sounds ===
+Leo roars: ROARRRR!
+Flipper clicks: Click-click-click!
+Kermit croaks: Ribbit ribbit!
+Simba roars: ROARRRR!
+Moby clicks: Click-click-click!
+Fredrick croaks: Ribbit ribbit!
+
+=== Land Animals Walking ===
+Leo walks majestically on the savanna.
+Kermit hops on the ground.
+
+=== Water Animals Swimming ===
+Flipper swims gracefully through the ocean.
+Fredrick swims in the pond.
+
+=== Cleanup ===
+Lion destructor for Leo
+LandAnimal destructor for Leo
+Animal destructor for Leo
+... (similar for other animals)
+Zoo cleaned up!
+```
+
+**Explanation:**
+
+1.  **Base class:** `Animal` has pure virtual `makeSound()` ensuring all animals implement it
+2.  **Single inheritance:** `Lion` inherits from `LandAnimal`; `Dolphin` inherits from `WaterAnimal`
+3.  **Multiple inheritance:** `Frog` inherits from both `LandAnimal` and `WaterAnimal`, demonstrating it can both walk and swim
+4.  **Polymorphic collection:** The `vector<Animal*>` can hold any derived type; polymorphic calls work correctly
+5.  **Virtual destructors:** Ensure proper cleanup order when deleting through base pointers
+6.  **Dynamic casting:** `dynamic_cast` allows checking if an animal is a specific type before calling type-specific methods
+
+**Design discussion:**
+
+*   **Abstraction layer:** The `Animal` interface defines the contract
+*   **Extensibility:** Adding new animal types requires no changes to existing code
+*   **Reusability:** `LandAnimal` and `WaterAnimal` can be used independently
+*   **Flexibility:** `Frog` demonstrates that a single class can inherit from multiple intermediate classes
+
+**Answer:** Complete zoo hierarchy demonstrating all major OOP concepts: inheritance, virtual functions, multiple inheritance, polymorphism, and proper resource cleanup.
+
+</details>
