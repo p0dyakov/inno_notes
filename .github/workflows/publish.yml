@@ -1,0 +1,57 @@
+name: Publish to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Restore freeze cache
+        uses: actions/cache@v4
+        with:
+          path: _freeze
+          key: freeze-${{ hashFiles('**/*.qmd') }}
+          restore-keys: freeze-
+
+      - name: Render Quarto project
+        run: quarto render
+
+      - name: Compress HTML, CSS, JS
+        run: |
+          cd _site
+          find . -type f \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.json" -o -name "*.xml" -o -name "*.svg" \) | while read f; do
+            gzip -9 -k "$f"
+            echo "Compressed: $f"
+          done
+
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Deploy to gh-pages branch
+        run: |
+          git checkout --orphan gh-pages
+          git rm -rf .
+          cp -r _site/* .
+          git add -A
+          git commit -m "Build and deploy from GitHub Actions"
+          git push -f origin gh-pages

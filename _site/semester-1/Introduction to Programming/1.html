@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.24">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Eugene Zouev, Munir Makhmutov">
+<meta name="dcterms.date" content="2025-09-18">
+
+<title>W1. Compilation and Memory Management in C – InnoNotes</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<link href="../../logo.svg" rel="icon" type="image/svg+xml">
+<link href="../../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
+<script src="../../site_libs/quarto-contrib/videojs/video.min.js"></script>
+<link href="../../site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-H1WYLNDN76"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../styles/sf-pro.css">
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">W1. Compilation and Memory Management in C</h1>
+<p class="author">Eugene Zouev, Munir Makhmutov</p>
+
+<p class="date">2025-09-18</p>
+</header>
+
+
+<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="1.mp4"></video></div>
+<p><a href="https://notebooklm.google.com/notebook/168a8dda-e2ff-4bfb-9947-57c339c340e5?artifactId=9081f42f-33e4-4eb0-bb4b-8a8af700a46e">Quiz</a> | <a href="https://notebooklm.google.com/notebook/168a8dda-e2ff-4bfb-9947-57c339c340e5?artifactId=573ee8f1-6cf7-4f91-b0c3-92995f4ba383">Flashcards</a></p>
+<h4 id="summary"><strong>1. Summary</strong></h4>
+<h5 id="the-c-programming-language"><strong>1.1 The C Programming Language</strong></h5>
+<p>The <strong>C programming language</strong>, developed by Dennis Ritchie and Brian Kernighan, is a foundational, general-purpose language celebrated for its efficiency and low-level control over system hardware. It is considered a <em>middle-level language</em>, bridging the gap between high-level languages that provide significant abstraction and low-level assembly languages that map directly to machine instructions. This unique position has earned it the nickname “universal assembly language.”</p>
+<p>A crucial concept in learning any language is the difference between <em>syntax</em> and <em>semantics</em>.</p>
+<ul>
+<li><strong>Syntax</strong> refers to the set of rules that govern the structure and spelling of statements. For example, the rule that a statement must end with a semicolon is syntax.</li>
+<li><strong>Semantics</strong> refers to the <em>meaning</em> of those statements—what the computer is instructed to do. While correct syntax is necessary for a program to compile, a deep understanding of semantics is essential for writing correct and efficient programs.</li>
+</ul>
+<p>Key characteristics of C include:</p>
+<ul>
+<li><strong>Compiled Language</strong>: C source code must be translated by a <strong>compiler</strong> into machine code before it can be run.</li>
+<li><strong>Statically Typed</strong>: Every variable has a specific data type (e.g., <code>int</code>, <code>float</code>) that is determined at compile time. However, C is not <em>strongly</em> typed, as it permits many kinds of type conversions.</li>
+<li><strong>Procedural</strong>: Programs in C are built from procedures, also known as <strong>functions</strong>, which are blocks of code that perform specific tasks.</li>
+<li><strong>System-Level Access</strong>: C allows for direct memory manipulation, giving the programmer the power to “exploit underlying features of the architecture.”</li>
+<li><strong>Unsafe by Design</strong>: C trusts the programmer. It does not have built-in protections against common errors like accessing invalid memory locations. This “absence of restrictions” provides great power but also requires careful programming to avoid bugs and security flaws. It’s a best practice to always test code on your own machine to see how it behaves in a real environment.</li>
+</ul>
+<h5 id="essential-tools-the-compiler"><strong>1.2 Essential Tools &amp; The Compiler</strong></h5>
+<p>To program in C, you only need two core tools: a <strong>text editor</strong> to write source code (e.g., VS Code, Notepad++) and a <strong>C compiler</strong>. An Integrated Development Environment (IDE) is a convenient package that bundles these tools with a debugger and other features, but it is not a requirement.</p>
+<p>The most widely used C compiler is <strong>GCC</strong> (GNU Compiler Collection). Other common compilers include Clang and Microsoft Visual C++ (MSVC). To compile a program from a source file named <code>program.c</code> into an executable named <code>program</code>, you would use the following command in a terminal: <code>gcc -Wall -o program program.c</code></p>
+<ul>
+<li><code>gcc</code>: Invokes the compiler.</li>
+<li><code>-Wall</code>: A critical flag that enables <em>all</em> compiler warnings. Heeding these warnings helps catch potential bugs.</li>
+<li><code>-o program</code>: Specifies the name of the output (executable) file.</li>
+<li><code>program.c</code>: The input source file.</li>
+</ul>
+<h5 id="the-compilation-and-linking-process"><strong>1.3 The Compilation and Linking Process</strong></h5>
+<p>A C program can be made of multiple source files (<code>.c</code> files), each known as a <strong>translation unit</strong> after being processed. Creating an executable from these files involves a multi-stage process:</p>
+<ol type="1">
+<li><strong>Preprocessing</strong>: The preprocessor scans the source code for directives (lines beginning with <code>#</code>). For instance, <code>#include &lt;stdio.h&gt;</code> copies the entire contents of the standard input/output header file into your source file.</li>
+<li><strong>Compilation</strong>: The compiler translates the preprocessed code into assembly language, a human-readable representation of machine instructions.</li>
+<li><strong>Assembly</strong>: The assembler converts the assembly code into pure machine code, creating an <strong>object file</strong> (with a <code>.o</code> or <code>.obj</code> extension). This file contains the code for its translation unit but is not yet runnable.</li>
+<li><strong>Linking</strong>: The <strong>linker</strong> combines all object files into a single <strong>executable file</strong>. It resolves references between files (e.g., a function call in <code>main.c</code> to a function defined in <code>utils.c</code>) and incorporates necessary code from system libraries.</li>
+</ol>
+<!-- DIAGRAM HERE -->
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-compilation-process" class="quarto-float quarto-figure quarto-figure-center">
+<figure class="quarto-float quarto-float-fig">
+<div aria-describedby="fig-compilation-process-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="1_files/figure-html/fig-compilation-process-1.png" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-compilation-process-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: The C compilation and linking process for multiple source files.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<h5 id="program-structure-and-memory-model"><strong>1.4 Program Structure and Memory Model</strong></h5>
+<p>A running C program’s memory is organized into several distinct segments:</p>
+<ul>
+<li><strong>Code Segment</strong>: Contains the program’s machine instructions. This area is typically read-only.</li>
+<li><strong>Static/Global Data Segment</strong>: Stores global and static variables, which exist for the program’s entire duration.</li>
+<li><strong>Heap</strong>: A region for <em>dynamic memory allocation</em>. Data can be allocated on the heap at runtime (e.g., using <code>malloc()</code>) and must be manually deallocated (using <code>free()</code>). The heap grows upwards toward higher memory addresses.</li>
+<li><strong>Stack</strong>: Manages function calls using a <strong>Last-In, First-Out (LIFO)</strong> structure. When a function is called, a <strong>stack frame</strong> is pushed onto the stack. This frame holds the function’s parameters, return address, and local variables. When the function finishes, its frame is popped off. The stack grows downwards toward lower memory addresses.</li>
+</ul>
+<!-- DIAGRAM HERE -->
+<div class="cell">
+<div class="cell-output-display">
+<div id="fig-memory-model" class="quarto-float quarto-figure quarto-figure-center">
+<figure class="quarto-float quarto-float-fig">
+<div aria-describedby="fig-memory-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="1_files/figure-html/fig-memory-model-1.png" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-memory-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Program Memory Model showing the four main memory segments: Code, Static/Global Data, Heap, and Stack
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<h5 id="variables-types-scope-and-storage-classes"><strong>1.5 Variables, Types, Scope, and Storage Classes</strong></h5>
+<p>A <strong>variable</strong> is a named location in memory. More formally, a <strong>type</strong> defines a set of possible <em>values</em> a variable can hold, a set of <em>operators</em> that can be applied to it, and its <em>relationships</em> with other types.</p>
+<p>The <strong>scope</strong> of a variable determines where in the code it is visible. C uses lexical scope, primarily defined by <strong>blocks</strong> (code enclosed in <code>{}</code>). A variable declared in an inner block can <em>hide</em> or <em>shadow</em> a variable with the same name from an outer block.</p>
+<p><strong>Storage classes</strong> are keywords that define a variable’s <strong>lifetime</strong> (how long it exists) and <strong>linkage</strong> (its visibility across different files).</p>
+<ul>
+<li><code>auto</code>: The default for local variables. They have a <em>local lifetime</em> (created and destroyed with their block) and are stored on the stack.</li>
+<li><code>static</code>:
+<ul>
+<li><strong>Local Static Variable</strong>: Has a <em>static lifetime</em> (exists for the whole program) but <em>local scope</em> (only visible inside its function). It is initialized only once and retains its value between function calls.</li>
+<li><strong>Global Static Variable</strong>: Has a <em>static lifetime</em> and <em>internal linkage</em>, meaning it is only visible within the single file where it is declared.</li>
+</ul></li>
+<li><code>extern</code>: A declaration that tells the compiler a global variable exists but is defined in another file. It is used to share variables across translation units. A standard global variable (without <code>static</code>) has <em>external linkage</em> by default.</li>
+</ul>
+<h5 id="debugging"><strong>1.6 Debugging</strong></h5>
+<p>A <strong>debugger</strong> is a tool that allows you to run a program in a controlled manner to find and fix errors (bugs). It lets you pause execution, inspect the values of variables, and step through the code line by line. <strong>GDB</strong> (the GNU Debugger) is a powerful, command-line debugger for C.</p>
+<p>To prepare a program for debugging, you must compile it with the <code>-g</code> flag, which includes debugging information in the executable: <code>gcc -g -Wall -o program program.c</code></p>
+<p>Common GDB commands include:</p>
+<ul>
+<li><code>run</code> (or <code>r</code>): Starts running your program.</li>
+<li><code>break &lt;line_number&gt;</code> (or <code>b</code>): Sets a <strong>breakpoint</strong>, which pauses execution when it reaches that line.</li>
+<li><code>next</code> (or <code>n</code>): Executes the current line and moves to the next line in the same function. It <em>steps over</em> function calls.</li>
+<li><code>step</code> (or <code>s</code>): Executes the current line. If the line contains a function call, it <em>steps into</em> that function.</li>
+<li><code>print &lt;variable&gt;</code> (or <code>p</code>): Displays the current value of a variable.</li>
+<li><code>continue</code> (or <code>c</code>): Resumes execution until the next breakpoint or the end of the program.</li>
+<li><code>quit</code> (or <code>q</code>): Exits GDB.</li>
+</ul>
+<h4 id="definitions"><strong>2. Definitions</strong></h4>
+<ul>
+<li><strong>Compiler</strong>: A program that translates source code from a high-level language into low-level machine code.</li>
+<li><strong>Linker</strong>: A program that combines object files and libraries into a single executable file.</li>
+<li><strong>Debugger</strong>: A tool used to execute a program in a controlled way to find and diagnose errors.</li>
+<li><strong>Source File</strong>: A text file (<code>.c</code>) containing human-readable programming instructions.</li>
+<li><strong>Object File</strong>: A file (<code>.o</code>) containing machine code from a single source file; it is an intermediate step before linking.</li>
+<li><strong>Executable File</strong>: A file containing a complete machine code program that can be run by the operating system.</li>
+<li><strong>Translation Unit</strong>: A source file after the preprocessor has processed it; the basic unit of compilation.</li>
+<li><strong>Stack</strong>: A LIFO memory region for function calls, storing local variables, parameters, and return addresses.</li>
+<li><strong>Stack Frame</strong>: A block of memory on the stack created for a single function call.</li>
+<li><strong>Heap</strong>: A memory region for dynamic allocation, managed manually by the programmer.</li>
+<li><strong>Syntax vs.&nbsp;Semantics</strong>: Syntax is the grammatical structure of code; Semantics is its meaning and behavior.</li>
+<li><strong>Scope</strong>: The region of code where a variable is visible and accessible.</li>
+<li><strong>Lifetime</strong>: The duration for which a variable exists in memory.</li>
+<li><strong>Linkage</strong>: The extent to which a variable or function can be shared across different files (translation units).</li>
+</ul>
+<h4 id="examples"><strong>3. Examples</strong></h4>
+<h5 id="hello-world-program-lab-1-task-1"><strong>3.1. Hello World Program</strong> (Lab 1, Task 1)</h5>
+<p>Write a C program to print “Hello, World!”.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Include the Standard Input/Output library, which is necessary for functions like printf.</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">// The main function is the entry point of every C program.</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>   <span class="co">/* my first program in C */</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>   <span class="co">// printf is a function that prints formatted output to the screen.</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>   <span class="co">// "Hello, World!" is the string to be printed.</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>   <span class="co">// "\n" is a special character that represents a new line.</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>   printf<span class="op">(</span><span class="st">"Hello, World! </span><span class="sc">\n</span><span class="st">"</span><span class="op">);</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>   <span class="co">// The return 0 statement indicates that the program has executed successfully.</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>   <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+</details>
+<h5 id="integer-arithmetic-lab-1-task-2"><strong>3.2. Integer Arithmetic</strong> (Lab 1, Task 2)</h5>
+<p>Write a program which declares/initializes 2 integer variables and prints the result of their addition, subtraction, multiplication and division.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Include the Standard Input/Output library for using the printf function.</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">// The main function where the program execution begins.</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Declare and initialize two integer variables.</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">// You can change these values to see different results.</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> x <span class="op">=</span> <span class="dv">20</span><span class="op">;</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> y <span class="op">=</span> <span class="dv">5</span><span class="op">;</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">// --- Perform Arithmetic Operations ---</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">// 1. Addition</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Calculate the sum of x and y and store it in a new integer variable 'sum'.</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> sum <span class="op">=</span> x <span class="op">+</span> y<span class="op">;</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Print the result of the addition. The '%d' is a format specifier for integers.</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Addition: </span><span class="sc">%d</span><span class="st"> + </span><span class="sc">%d</span><span class="st"> = </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> x<span class="op">,</span> y<span class="op">,</span> sum<span class="op">);</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="co">// 2. Subtraction</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Calculate the difference between x and y and store it in 'difference'.</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> difference <span class="op">=</span> x <span class="op">-</span> y<span class="op">;</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Print the result of the subtraction.</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Subtraction: </span><span class="sc">%d</span><span class="st"> - </span><span class="sc">%d</span><span class="st"> = </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> x<span class="op">,</span> y<span class="op">,</span> difference<span class="op">);</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="co">// 3. Multiplication</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Calculate the product of x and y and store it in 'product'.</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> product <span class="op">=</span> x <span class="op">*</span> y<span class="op">;</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Print the result of the multiplication.</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Multiplication: </span><span class="sc">%d</span><span class="st"> * </span><span class="sc">%d</span><span class="st"> = </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> x<span class="op">,</span> y<span class="op">,</span> product<span class="op">);</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="co">// 4. Division</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Note: If both operands are integers, C performs integer division (the fractional part is discarded).</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> integer_division <span class="op">=</span> x <span class="op">/</span> y<span class="op">;</span></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Print the result of the integer division.</span></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Integer Division: </span><span class="sc">%d</span><span class="st"> / </span><span class="sc">%d</span><span class="st"> = </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> x<span class="op">,</span> y<span class="op">,</span> integer_division<span class="op">);</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="co">// To get a precise result for division, we can convert the integers to floating-point numbers.</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>    <span class="co">// (float)x is a 'cast' that temporarily treats the integer x as a float for this calculation.</span></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>    <span class="dt">float</span> float_division <span class="op">=</span> <span class="op">(</span><span class="dt">float</span><span class="op">)</span>x <span class="op">/</span> <span class="op">(</span><span class="dt">float</span><span class="op">)</span>y<span class="op">;</span></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Print the result of the floating-point division. The '%f' is a format specifier for floats.</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Floating-Point Division: </span><span class="sc">%d</span><span class="st"> / </span><span class="sc">%d</span><span class="st"> = </span><span class="sc">%f\n</span><span class="st">"</span><span class="op">,</span> x<span class="op">,</span> y<span class="op">,</span> float_division<span class="op">);</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Indicate that the program finished successfully.</span></span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+</details>
+
+
+<style>
+	.article-buttons {
+		margin-top: 1rem;
+	}
+
+	.mark-read {
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .9rem;
+		line-height: 1.5;
+	}
+
+	.mark-read:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-read.active {
+		background: #4285F4;
+		color: #fff;
+		border-color: #4285F4;
+	}
+
+	.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.sidebar-link.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
+</style>
+
+<div class="article-buttons">
+	<button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const basePath = '/inno_notes/';
+		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
+			document.querySelector('.article-buttons')?.remove();
+		}
+
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
+
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
+			sidebarLinks.forEach(l => {
+				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
+			});
+		}
+
+		const sidebar = document.querySelector('#quarto-sidebar');
+		if (!sidebar) return;
+
+		const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+		sections.forEach(section => {
+			const toggle = section.querySelector('.sidebar-item-toggle');
+			const targetId = toggle?.getAttribute('data-bs-target');
+			const target = targetId ? document.querySelector(targetId) : null;
+			if (!toggle || !target) return;
+
+			const storageKey = `sidebar_section_${targetId}`;
+
+			const saved = localStorage.getItem(storageKey);
+			if (saved === 'open') {
+				target.classList.add('show');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			} else {
+				// collapse by default if not explicitly opened
+				target.classList.remove('show');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			}
+
+			target.addEventListener('show.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'open');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			});
+
+			target.addEventListener('hide.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'closed');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			});
+		});
+
+		const scrollKey = 'sidebar_scroll_top';
+		const savedScroll = localStorage.getItem(scrollKey);
+		if (savedScroll && !isNaN(parseInt(savedScroll, 10))) {
+			sidebar.scrollTop = parseInt(savedScroll, 10);
+		}
+		sidebar.addEventListener('scroll', () => {
+			localStorage.setItem(scrollKey, sidebar.scrollTop);
+		});
+	});
+</script>
+<script>videojs(video_shortcode_videojs_video1);</script>
+
+
+
+
+</body></html>

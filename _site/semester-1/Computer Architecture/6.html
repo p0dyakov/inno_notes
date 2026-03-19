@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.24">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Artem Burmyakov">
+<meta name="dcterms.date" content="2025-10-10">
+
+<title>W6. Arithmetic-Logic Unit Construction, Latch Circuits, Finite State Machines – InnoNotes</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<link href="../../logo.svg" rel="icon" type="image/svg+xml">
+<link href="../../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
+<script src="../../site_libs/quarto-contrib/videojs/video.min.js"></script>
+<link href="../../site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-H1WYLNDN76"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
+</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles/sf-pro.css">
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">W6. Arithmetic-Logic Unit Construction, Latch Circuits, Finite State Machines</h1>
+<p class="author">Artem Burmyakov</p>
+
+<p class="date">2025-10-10</p>
+</header>
+
+
+<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="6.mp4"></video></div>
+<p><a href="https://notebooklm.google.com/notebook/d51634a3-f628-4457-b164-3db55b88b876?artifactId=ac3f5be4-776d-4d93-92f8-30765f183470">Quiz</a> | <a href="https://notebooklm.google.com/notebook/d51634a3-f628-4457-b164-3db55b88b876?artifactId=2990c64f-5412-4ef9-8256-8da04602fd3e">Flashcards</a></p>
+<h4 id="summary"><strong>1. Summary</strong></h4>
+<h5 id="arithmetic-logic-unit-alu-construction"><strong>1.1 Arithmetic-Logic Unit (ALU) Construction</strong></h5>
+<p>An <strong>Arithmetic-Logic Unit (ALU)</strong> is a fundamental digital circuit within a computer’s central processing unit (CPU) that performs arithmetic and bitwise logic operations on integer binary numbers. It is the computational core of the processor.</p>
+<h6 id="basic-alu-organization"><strong>1.1.1 Basic ALU Organization</strong></h6>
+<p>A simple ALU can be designed to handle a specific set of instructions. The core idea is to have separate circuits for each operation and use a <strong>multiplexer (MUX)</strong> to select the correct output based on a control signal called an <strong>opcode</strong> (operation code).</p>
+<p>For an ALU that performs addition (+), subtraction (-), multiplication (*), and equality comparison (==), the organization would be as follows:</p>
+<ul>
+<li>Two input arguments (<code>Arg. 1</code>, <code>Arg. 2</code>) are fed in parallel to four distinct circuits.</li>
+<li>Each circuit computes its specific function: one for addition, one for subtraction, etc.</li>
+<li>The results from all four circuits are sent to the inputs of a multiplexer.</li>
+<li>The opcode is used as the select signal for the MUX. It determines which of the four results is passed to the final output, <code>Q</code>.</li>
+</ul>
+<p><img src="6_1.png" style="width:80.0%"></p>
+<h6 id="bit-adder-circuit"><strong>1.1.2 4-Bit Adder Circuit</strong></h6>
+<p>A binary adder is a circuit that performs the addition of binary numbers. A <strong>4-bit adder</strong> adds two 4-bit numbers. A common implementation is the <strong>ripple-carry adder</strong>, which is constructed by cascading <strong>full adders</strong>.</p>
+<ul>
+<li><strong>Full Adder</strong>: A combinational circuit that adds three bits: two input bits (<span class="math inline">\(A\)</span> and <span class="math inline">\(B\)</span>) and a carry-in bit (<span class="math inline">\(C_{in}\)</span>). It produces two outputs: a sum bit (<span class="math inline">\(S\)</span>) and a carry-out bit (<span class="math inline">\(C_{out}\)</span>). The logic involves XOR gates for the sum and AND/OR gates for the carry.</li>
+<li><strong>Ripple-Carry Adder</strong>: For a 4-bit adder (e.g., adding <span class="math inline">\(A_4A_3A_2A_1\)</span> and <span class="math inline">\(B_4B_3B_2B_1\)</span>), four full adders are connected in series.
+<ol type="1">
+<li>The first full adder adds the least significant bits (<span class="math inline">\(A_1, B_1\)</span>) with a <span class="math inline">\(C_{in}\)</span> of 0. It produces the first sum bit (<span class="math inline">\(q_1\)</span>) and a carry-out (<span class="math inline">\(c_{out1}\)</span>).</li>
+<li>This carry-out (<span class="math inline">\(c_{out1}\)</span>) is “rippled” to become the carry-in for the second full adder, which adds <span class="math inline">\(A_2, B_2,\)</span> and <span class="math inline">\(c_{out1}\)</span> to produce <span class="math inline">\(q_2\)</span> and <span class="math inline">\(c_{out2}\)</span>.</li>
+<li>This process continues for all bits, with the carry-out of one stage feeding the carry-in of the next. The final carry-out from the last full adder can be used to detect an overflow.</li>
+</ol></li>
+</ul>
+<p><img src="6_2.png" style="width:80.0%"></p>
+<h6 id="bit-subtractor-circuit"><strong>1.1.3 4-Bit Subtractor Circuit</strong></h6>
+<p>Subtraction in binary can be performed by adding the two’s complement of the subtrahend. A <strong>4-bit subtractor</strong> can be built using a 4-bit adder with a slight modification. To calculate <span class="math inline">\(A - B\)</span>, we compute <span class="math inline">\(A + (\text{two's complement of } B)\)</span>.</p>
+<p>The <em>two’s complement</em> of a number is found by inverting all its bits (one’s complement) and then adding 1. The circuit for <span class="math inline">\(A - B\)</span> can be implemented as:</p>
+<ol type="1">
+<li>Invert each bit of the second number, <span class="math inline">\(B\)</span>, using NOT gates.</li>
+<li>Feed the inverted bits of <span class="math inline">\(B\)</span> and the bits of <span class="math inline">\(A\)</span> into a 4-bit adder.</li>
+<li>Set the initial carry-in (<span class="math inline">\(C_{in}\)</span>) to the first full adder to 1. This handles the “+1” part of the two’s complement operation.</li>
+</ol>
+<p><img src="6_3.png" style="width:80.0%"></p>
+<h6 id="binary-multipliers"><strong>1.1.4 Binary Multipliers</strong></h6>
+<p>Binary multiplication is similar to decimal multiplication and involves generating and then summing <strong>partial products</strong>.</p>
+<p><img src="6_4.png" style="width:80.0%"></p>
+<ul>
+<li><strong>Single-Bit Case</strong>: Multiplying two single bits, <span class="math inline">\(a \times b\)</span>, is equivalent to the logical AND operation. The result is 1 only if both <span class="math inline">\(a\)</span> and <span class="math inline">\(b\)</span> are 1. The circuit for this is a single <strong>AND gate</strong>.</li>
+<li><strong>2-by-2 Bit Case</strong>: To multiply two 2-bit numbers, <span class="math inline">\(A = a_1a_0\)</span> and <span class="math inline">\(B = b_1b_0\)</span>:
+<ol type="1">
+<li>Generate partial products by ANDing each bit of <span class="math inline">\(A\)</span> with each bit of <span class="math inline">\(B\)</span>. This results in four partial products: <span class="math inline">\(a_0b_0\)</span>, <span class="math inline">\(a_1b_0\)</span>, <span class="math inline">\(a_0b_1\)</span>, and <span class="math inline">\(a_1b_1\)</span>.</li>
+<li>Arrange the partial products according to their bit positions (place value) and sum them using adders (half-adders and full-adders). The result can be up to 4 bits long. <img src="6_5.png" style="width:80.0%"></li>
+</ol></li>
+<li><strong>4-by-4 Bit Multiplier</strong>: This extends the same principle. A 4-by-4 multiplier takes two 4-bit numbers and produces an 8-bit result.
+<ol type="1">
+<li><strong>Partial Product Generation</strong>: An array of 16 AND gates is used to compute all the partial products (<span class="math inline">\(a_ib_j\)</span> for <span class="math inline">\(i,j \in \{0,1,2,3\}\)</span>).</li>
+<li><strong>Summation</strong>: A complex structure of half-adders and full-adders is used to sum the partial products. This is often done in a tree-like structure to reduce propagation delay. <img src="6_6.png" style="width:80.0%"></li>
+</ol></li>
+</ul>
+<h6 id="by-4-bit-equality-checker"><strong>1.1.5 4-by-4 Bit Equality Checker</strong></h6>
+<p>An <strong>equality checker</strong> determines if two binary numbers are identical. For two 4-bit numbers, <span class="math inline">\(A = A_3A_2A_1A_0\)</span> and <span class="math inline">\(B = B_3B_2B_1B_0\)</span>, they are equal if and only if each corresponding pair of bits is equal (<span class="math inline">\(A_i = B_i\)</span> for all <span class="math inline">\(i\)</span>).</p>
+<p>This can be implemented using <strong>XNOR gates</strong>.</p>
+<ul>
+<li>An XNOR gate outputs 1 only if its two inputs are the same.</li>
+<li>Each pair of bits (<span class="math inline">\(A_0, B_0\)</span>), (<span class="math inline">\(A_1, B_1\)</span>), etc., is fed into a separate XNOR gate.</li>
+<li>The outputs of all four XNOR gates are then fed into a 4-input AND gate.</li>
+<li>The final output of the AND gate will be 1 only if all four XNOR gates output 1, which means all bit pairs are identical.</li>
+</ul>
+<p><img src="6_7.png" style="width:80.0%"></p>
+<h5 id="latch-circuits-and-memory"><strong>1.2 Latch Circuits and Memory</strong></h5>
+<p>Unlike combinational logic circuits (like adders) whose outputs depend solely on their current inputs, <strong>sequential logic circuits</strong> have outputs that depend on both current inputs and previous states. They have a <em>memory</em> property. The fundamental building block of this memory is the <strong>latch</strong>.</p>
+<h6 id="universal-logic-gates"><strong>1.2.1 Universal Logic Gates</strong></h6>
+<p>While there are many basic logic gates (AND, OR, XOR, etc.), all of them can be constructed from only <strong>NAND</strong> gates or only <strong>NOR</strong> gates. Because of this property, NAND and NOR gates are called <strong>universal gates</strong>. They are crucial for building sequential circuits like latches.</p>
+<p><img src="6_8.png" style="width:80.0%"></p>
+<h6 id="sr-latch-from-nor-gates"><strong>1.2.2 SR Latch from NOR Gates</strong></h6>
+<p>An <strong>SR Latch</strong> (Set-Reset Latch) is one of the simplest sequential circuits. It can be constructed using two cross-coupled NOR gates.</p>
+<ul>
+<li>The output of the top NOR gate is fed back as an input to the bottom NOR gate.</li>
+<li>The output of the bottom NOR gate is fed back as an input to the top NOR gate.</li>
+<li>This feedback loop is what allows the circuit to store a state.</li>
+<li>The circuit has two inputs, S (Set) and R (Reset), and two outputs, Q and <span class="math inline">\(\bar{Q}\)</span> (which is typically the inverse of Q).</li>
+</ul>
+<p><img src="6_9.png" style="width:80.0%"> <img src="6_10.png" style="width:80.0%"></p>
+<h6 id="sr-latch-behavior-analysis"><strong>1.2.3 SR Latch Behavior Analysis</strong></h6>
+<p>The state of the SR latch is determined by the inputs S and R.</p>
+<ul>
+<li><strong>Set (S=1, R=0)</strong>: This input combination forces the output Q to 1 (and <span class="math inline">\(\bar{Q}\)</span> to 0). This is called the <em>set</em> state.</li>
+<li><strong>Reset (S=0, R=1)</strong>: This forces the output Q to 0 (and <span class="math inline">\(\bar{Q}\)</span> to 1). This is the <em>reset</em> state.</li>
+<li><strong>Hold/Store (S=0, R=0)</strong>: When both inputs are 0, the latch maintains its previous state. The feedback loop keeps the outputs stable. If Q was 1, it remains 1; if it was 0, it remains 0. This is the <em>memory</em> property.</li>
+<li><strong>Illegal/Forbidden State (S=1, R=1)</strong>: This combination forces both Q and <span class="math inline">\(\bar{Q}\)</span> to 0. This violates the logical condition that <span class="math inline">\(\bar{Q}\)</span> should be the inverse of Q. More importantly, if S and R then change to 0 simultaneously, the next state is unpredictable (a race condition), making this input combination invalid.</li>
+</ul>
+<p>The SR latch is also known as a <strong>bistable multivibrator</strong> because it has two stable states (Q=0 and Q=1). It can store one bit of data.</p>
+<h6 id="d-latch-enable-latch"><strong>1.2.4 D Latch (Enable Latch)</strong></h6>
+<p>To solve the illegal input problem of the SR latch, the <strong>D Latch</strong> (Data Latch or Enable Latch) was developed. It has two inputs: D (Data) and E (Enable).</p>
+<ul>
+<li>When the Enable (E) input is high (1), the latch is <em>transparent</em>. The output Q simply follows the input D. If D is 1, Q becomes 1; if D is 0, Q becomes 0.</li>
+<li>When the Enable (E) input is low (0), the latch is <em>closed</em>. It ignores the D input and holds (stores) its last value.</li>
+<li>The D latch ensures that the illegal S=1, R=1 condition can never occur internally, making it safer to use.</li>
+</ul>
+<p><img src="6_11.png" style="width:80.0%"></p>
+<h5 id="finite-state-machines-fsm"><strong>1.3 Finite State Machines (FSM)</strong></h5>
+<p>A <strong>Finite State Machine (FSM)</strong>, or Finite Automaton, is an abstract model of computation used to design digital logic circuits and computer programs. An FSM is defined by a finite number of states and the transitions between those states. The SR latch is a perfect simple example of an FSM.</p>
+<h6 id="fsm-definitions"><strong>1.3.1 FSM Definitions</strong></h6>
+<p>An FSM is an abstract machine that can be in exactly one of a finite number of <strong>states</strong> at any given time. Its behavior is defined by:</p>
+<ol type="1">
+<li><strong>States (<span class="math inline">\(S\)</span>)</strong>: A finite set of possible conditions the machine can be in (e.g., for the SR latch: <code>Q=0</code>, <code>Q=1</code>, <code>uninitialized</code>, <code>invalid</code>).</li>
+<li><strong>Initial State (<span class="math inline">\(s_0\)</span>)</strong>: The state the machine starts in (e.g., <code>uninitialized</code>).</li>
+<li><strong>Inputs (<span class="math inline">\(I\)</span>)</strong>: A finite set of input signals the machine can receive (e.g., the four possible combinations of S and R).</li>
+<li><strong>Outputs (<span class="math inline">\(O\)</span>)</strong>: A finite set of output signals the machine can produce (e.g., the value of Q).</li>
+<li><strong>Transition Function</strong>: A rule that determines the next state based on the current state and the current input.</li>
+</ol>
+<p>This FSM is <strong>deterministic</strong>: for any given state and input, there is only one possible next state.</p>
+<h6 id="visualizing-fsms"><strong>1.3.2 Visualizing FSMs</strong></h6>
+<p>There are two common ways to represent an FSM:</p>
+<ul>
+<li><strong>State Transition Diagram</strong>: A directed graph where nodes represent states and arrows represent transitions. Each arrow is labeled with the input that causes the transition.</li>
+<li><strong>State Transition Table</strong>: A table that lists the next state and output for every possible combination of current state and input.</li>
+</ul>
+<p>For the SR latch, the state diagram would show transitions from the <code>Q=0</code> state to the <code>Q=1</code> state on an <code>S=1, R=0</code> input, and a loop back to itself on an <code>S=0, R=0</code> input.</p>
+<p><img src="6_12.png" style="width:80.0%"></p>
+<h4 id="definitions"><strong>2. Definitions</strong></h4>
+<ul>
+<li><strong>Arithmetic-Logic Unit (ALU)</strong>: A digital circuit that performs arithmetic (addition, subtraction) and logic (AND, OR, NOT) operations.</li>
+<li><strong>Multiplexer (MUX)</strong>: A device that selects one of several analog or digital input signals and forwards the selected input into a single line.</li>
+<li><strong>Opcode</strong>: An operation code; a control signal that specifies the operation to be performed by a component like an ALU.</li>
+<li><strong>Full Adder</strong>: A combinational logic circuit that adds three input bits (A, B, Carry-in) and produces a two-bit output (Sum, Carry-out).</li>
+<li><strong>Ripple-Carry Adder</strong>: A type of binary adder constructed by cascading full adders, where the carry-out of each stage is connected to the carry-in of the next.</li>
+<li><strong>Partial Products</strong>: The intermediate results obtained in binary multiplication by ANDing the multiplicand with each bit of the multiplier.</li>
+<li><strong>Latch</strong>: A sequential logic circuit that can store one bit of information. It has two stable states and is the basic building block of memory.</li>
+<li><strong>Universal Gate</strong>: A logic gate (either NAND or NOR) from which any other logic function can be constructed.</li>
+<li><strong>SR Latch</strong>: A Set-Reset latch, a simple bistable multivibrator that can be set (to 1), reset (to 0), or hold its current state.</li>
+<li><strong>D Latch</strong>: A Data or “transparent” latch that passes its input to the output when enabled and holds its state when disabled, avoiding the illegal state of an SR latch.</li>
+<li><strong>Finite State Machine (FSM)</strong>: A computational model consisting of a finite number of states, transitions between those states triggered by inputs, and actions or outputs.</li>
+</ul>
+
+
+<style>
+	.article-buttons {
+		margin-top: 1rem;
+	}
+
+	.mark-read {
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .9rem;
+		line-height: 1.5;
+	}
+
+	.mark-read:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-read.active {
+		background: #4285F4;
+		color: #fff;
+		border-color: #4285F4;
+	}
+
+	.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.sidebar-link.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
+</style>
+
+<div class="article-buttons">
+	<button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const basePath = '/inno_notes/';
+		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
+			document.querySelector('.article-buttons')?.remove();
+		}
+
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
+
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
+			sidebarLinks.forEach(l => {
+				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
+			});
+		}
+
+		const sidebar = document.querySelector('#quarto-sidebar');
+		if (!sidebar) return;
+
+		const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+		sections.forEach(section => {
+			const toggle = section.querySelector('.sidebar-item-toggle');
+			const targetId = toggle?.getAttribute('data-bs-target');
+			const target = targetId ? document.querySelector(targetId) : null;
+			if (!toggle || !target) return;
+
+			const storageKey = `sidebar_section_${targetId}`;
+
+			const saved = localStorage.getItem(storageKey);
+			if (saved === 'open') {
+				target.classList.add('show');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			} else {
+				// collapse by default if not explicitly opened
+				target.classList.remove('show');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			}
+
+			target.addEventListener('show.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'open');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			});
+
+			target.addEventListener('hide.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'closed');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			});
+		});
+
+		const scrollKey = 'sidebar_scroll_top';
+		const savedScroll = localStorage.getItem(scrollKey);
+		if (savedScroll && !isNaN(parseInt(savedScroll, 10))) {
+			sidebar.scrollTop = parseInt(savedScroll, 10);
+		}
+		sidebar.addEventListener('scroll', () => {
+			localStorage.setItem(scrollKey, sidebar.scrollTop);
+		});
+	});
+</script>
+<script>videojs(video_shortcode_videojs_video1);</script>
+
+
+
+
+</body></html>

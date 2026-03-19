@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.24">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Artem Burmyakov">
+<meta name="dcterms.date" content="2025-11-02">
+
+<title>W9. SystemVerilog, Hardware Description Language, Static and Dynamic RAM (SRAM and DRAM) – InnoNotes</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<link href="../../logo.svg" rel="icon" type="image/svg+xml">
+<link href="../../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
+<script src="../../site_libs/quarto-contrib/videojs/video.min.js"></script>
+<link href="../../site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-H1WYLNDN76"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../styles/sf-pro.css">
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">W9. SystemVerilog, Hardware Description Language, Static and Dynamic RAM (SRAM and DRAM)</h1>
+<p class="author">Artem Burmyakov</p>
+
+<p class="date">2025-11-02</p>
+</header>
+
+
+<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="8.mp4"></video></div>
+<p><a href="https://notebooklm.google.com/notebook/10ea61f7-7eb6-46b2-9183-d13f960171e9?artifactId=b24c1665-498a-4a90-9a61-b8ffc92c5b59">Quiz</a> | <a href="https://notebooklm.google.com/notebook/10ea61f7-7eb6-46b2-9183-d13f960171e9?artifactId=9b7f69ab-b0ba-4ebd-82aa-8690316ed710">Flashcards</a></p>
+<h4 id="summary"><strong>1. Summary</strong></h4>
+<h5 id="systemverilog-a-hardware-description-language-hdl"><strong>1.1 SystemVerilog: A Hardware Description Language (HDL)</strong></h5>
+<p>A <strong>Hardware Description Language (HDL)</strong> is a specialized computer language used to describe the structure and behavior of electronic circuits, particularly digital logic circuits. Instead of writing software that runs on a processor, with an HDL you are describing the physical hardware itself—how logic gates are connected and how they should behave. SystemVerilog is a modern and powerful HDL used in the design and verification of digital chips.</p>
+<h5 id="designing-a-2-to-1-multiplexer"><strong>1.2 Designing a 2-to-1 Multiplexer</strong></h5>
+<h6 id="the-logic-circuit"><strong>1.2.1 The Logic Circuit</strong></h6>
+<p>A <strong>Multiplexer (Mux)</strong> is a fundamental digital circuit that selects one of several input signals and forwards the selected input to a single output line. The selection is directed by a separate set of digital inputs known as select lines.</p>
+<p>A 2-to-1 multiplexer has:</p>
+<ul>
+<li>Two data inputs, let’s call them <code>i1</code> and <code>i2</code>.</li>
+<li>One select line, <code>s</code>.</li>
+<li>One output, <code>q</code>.</li>
+</ul>
+<p>The behavior is simple:</p>
+<ul>
+<li>If the select line <code>s</code> is 0, the output <code>q</code> is equal to the input <code>i1</code>.</li>
+<li>If the select line <code>s</code> is 1, the output <code>q</code> is equal to the input <code>i2</code>.</li>
+</ul>
+<p>This logic can be built using basic logic gates: two AND gates, one OR gate, and one NOT gate.</p>
+<p><img src="8_1.png" style="width:80.0%"></p>
+<h6 id="implementation-in-verilog"><strong>1.2.2 Implementation in Verilog</strong></h6>
+<p>We can describe this hardware module using SystemVerilog. The code below defines the structure and connections of the multiplexer.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 1. Module Definition: Declares a new hardware module named 'mux'.</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">//    The parentheses list all external connection points (pins):</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">//    three inputs (i1, i2, s) and one output (q).</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> mux <span class="op">(</span>i1<span class="op">,</span> i2<span class="op">,</span> s<span class="op">,</span> q<span class="op">);</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 2. Pin Direction Declaration: Specifies which pins are inputs</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">//    and which are outputs.</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">input</span>  i1<span class="op">,</span> i2<span class="op">,</span> s<span class="op">;</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">output</span> q<span class="op">;</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 3. Internal Wires: Declares internal wires to connect the</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">//    logic gates. These are not visible from outside the module.</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">wire</span> q0<span class="op">,</span> q1<span class="op">,</span> q2<span class="op">;</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 4. Gate Instantiation: Describes the logic gates and their</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">//    connections. For Verilog primitives, the output pin is</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">//    always listed first.</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">// A NOT gate to invert the select signal 's'. Output is 'q0'.</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  <span class="dt">not</span><span class="op">(</span>q0<span class="op">,</span> s<span class="op">);</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>  <span class="co">// An AND gate combining input 'i1' and the inverted select 'q0'.</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Output is 'q1'.</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>  <span class="dt">and</span><span class="op">(</span>q1<span class="op">,</span> i1<span class="op">,</span> q0<span class="op">);</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>  <span class="co">// An AND gate combining input 'i2' and the original select 's'.</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Output is 'q2'.</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>  <span class="dt">and</span><span class="op">(</span>q2<span class="op">,</span> i2<span class="op">,</span> s<span class="op">);</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>  <span class="co">// An OR gate to combine the outputs of the two AND gates.</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The final result is the module's output 'q'.</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>  <span class="dt">or</span><span class="op">(</span>q<span class="op">,</span> q1<span class="op">,</span> q2<span class="op">);</span></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="co">// 5. End of Module Definition</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span></code></pre></div>
+<h6 id="syntax-variations-for-pin-declaration"><strong>1.2.3 Syntax Variations for Pin Declaration</strong></h6>
+<p>SystemVerilog allows a more modern and compact syntax for declaring module pins, where the direction is specified directly in the port list. The following declaration is equivalent to the one above.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> mux <span class="op">(</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">input</span>  i1<span class="op">,</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">input</span>  i2<span class="op">,</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">input</span>  s<span class="op">,</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">output</span> q</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">// ... module logic ...</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span></code></pre></div>
+<h5 id="verilog-operators-and-continuous-assignment"><strong>1.3 Verilog Operators and Continuous Assignment</strong></h5>
+<h6 id="verilog-operators"><strong>1.3.1 Verilog Operators</strong></h6>
+<p>Instead of instantiating primitive gates, we can describe logic using operators, similar to programming languages. Some common bitwise operators include:</p>
+<ul>
+<li><code>~</code>: Bitwise NOT (negation)</li>
+<li><code>&amp;</code>: Bitwise AND</li>
+<li><code>|</code>: Bitwise OR</li>
+<li><code>^</code>: Bitwise XOR</li>
+<li><code>?:</code>: Conditional (ternary) operator</li>
+</ul>
+<h6 id="continuous-assignment-with-assign"><strong>1.3.2 Continuous Assignment with <code>assign</code></strong></h6>
+<p>The <strong><code>assign</code></strong> keyword is used for <em>continuous assignment</em>. It creates a direct combinatorial link between the inputs on the right side and the output on the left. Whenever any input value on the right side changes, the expression is immediately re-evaluated, and the output is updated. This is a powerful way to describe stateless, combinational logic.</p>
+<p>For example, <code>and(q1, i1, q0);</code> can be rewritten as:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">assign</span> q1 <span class="op">=</span> i1 <span class="op">&amp;</span> q0<span class="op">;</span></span></code></pre></div>
+<p>This directly describes the hardware’s behavior without explicitly naming the gate.</p>
+<h5 id="alternative-multiplexer-implementations"><strong>1.4 Alternative Multiplexer Implementations</strong></h5>
+<p>Using <code>assign</code> statements, the multiplexer can be implemented more concisely.</p>
+<ul>
+<li><strong>Implementation with intermediate wires:</strong></li>
+</ul>
+<div class="sourceCode" id="cb4"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> mux <span class="op">(</span>i1<span class="op">,</span> i2<span class="op">,</span> s<span class="op">,</span> q<span class="op">);</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">input</span>  i1<span class="op">,</span> i2<span class="op">,</span> s<span class="op">;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">output</span> q<span class="op">;</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">wire</span>   q0<span class="op">,</span> q1<span class="op">,</span> q2<span class="op">;</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">assign</span> q0 <span class="op">=</span> <span class="op">~</span>s<span class="op">;</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">assign</span> q1 <span class="op">=</span> i1 <span class="op">&amp;</span> q0<span class="op">;</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">assign</span> q2 <span class="op">=</span> i2 <span class="op">&amp;</span> s<span class="op">;</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="kw">assign</span> q  <span class="op">=</span> q1 <span class="op">|</span> q2<span class="op">;</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span></code></pre></div>
+<ul>
+<li><strong>Compact implementation:</strong> The logic can be combined into a single line.</li>
+</ul>
+<div class="sourceCode" id="cb5"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> mux <span class="op">(</span>i1<span class="op">,</span> i2<span class="op">,</span> s<span class="op">,</span> q<span class="op">);</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">input</span>  i1<span class="op">,</span> i2<span class="op">,</span> s<span class="op">;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">output</span> q<span class="op">;</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">assign</span> q <span class="op">=</span> <span class="op">(</span>i1 <span class="op">&amp;</span> <span class="op">~</span>s<span class="op">)</span> <span class="op">|</span> <span class="op">(</span>i2 <span class="op">&amp;</span> s<span class="op">);</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span></code></pre></div>
+<h5 id="procedural-blocks-with-always_comb"><strong>1.5 Procedural Blocks with <code>always_comb</code></strong></h5>
+<h6 id="the-always_comb-block"><strong>1.5.1 The <code>always_comb</code> Block</strong></h6>
+<p>A <strong>procedural block</strong> is another way to describe hardware behavior. The <code>always_comb</code> block is specifically designed for describing combinational logic. The synthesis tool understands that the code inside this block should execute whenever any of the input signals change.</p>
+<ul>
+<li>Variables assigned inside an <code>always</code> block must be of a variable type, like <code>logic</code>. The <code>output</code> pin <code>q</code> is declared as <code>output logic q;</code>.</li>
+<li>The logic is placed between <code>begin</code> and <code>end</code>.</li>
+</ul>
+<div class="sourceCode" id="cb6"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> mux <span class="op">(</span>i1<span class="op">,</span> i2<span class="op">,</span> s<span class="op">,</span> q<span class="op">);</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">input</span>  i1<span class="op">,</span> i2<span class="op">,</span> s<span class="op">;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">output</span> logic q<span class="op">;</span> <span class="co">// 'q' must be a variable type</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  always_comb</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">begin</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    q <span class="op">=</span> <span class="op">(</span>i1 <span class="op">&amp;</span> <span class="op">~</span>s<span class="op">)</span> <span class="op">|</span> <span class="op">(</span>i2 <span class="op">&amp;</span> s<span class="op">);</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">end</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span></code></pre></div>
+<h6 id="blocking-assignments"><strong>1.5.2 Blocking Assignments</strong></h6>
+<p>Inside an <code>always_comb</code> block, we use <strong>blocking assignments</strong>, indicated by the <code>=</code> operator. This means statements are executed sequentially, one after the other. The execution of the next line is “blocked” until the current one is complete. This is the standard practice for modeling combinational logic.</p>
+<h5 id="conditional-logic-in-always_comb-blocks"><strong>1.6 Conditional Logic in <code>always_comb</code> Blocks</strong></h5>
+<p>Procedural blocks allow for more abstract, higher-level descriptions using conditional statements.</p>
+<h6 id="the-if-else-statement"><strong>1.6.1 The <code>if-else</code> Statement</strong></h6>
+<p>The multiplexer’s behavior is naturally described by an <code>if-else</code> statement.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>always_comb</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">begin</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">if</span> <span class="op">(</span>s <span class="op">==</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    q <span class="op">=</span> i1<span class="op">;</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">else</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    q <span class="op">=</span> i2<span class="op">;</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre></div>
+<h6 id="the-case-statement"><strong>1.6.2 The <code>case</code> Statement</strong></h6>
+<p>A <code>case</code> statement is another way to express the same logic, which is often cleaner when there are multiple conditions.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>always_comb</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="kw">begin</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">case</span> <span class="op">(</span>s<span class="op">)</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="dv">0</span><span class="op">:</span> q <span class="op">=</span> i1<span class="op">;</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1</span><span class="op">:</span> q <span class="op">=</span> i2<span class="op">;</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">endcase</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre></div>
+<h6 id="important-note-on-completeness"><strong>1.6.3 Important Note on Completeness</strong></h6>
+<p>When modeling combinational logic inside an <code>always_comb</code> block, you must specify an output for <strong>all possible input conditions</strong>. If a condition is left out (e.g., an <code>if</code> without an <code>else</code>), the synthesis tool will infer that the output should hold its previous value. To achieve this, it creates a <strong>latch</strong>, which is a memory element. This is usually an error when designing purely combinational logic, so always ensure your <code>if-else</code> or <code>case</code> statements are complete.</p>
+<h5 id="visualizing-hardware-with-rtl-viewer"><strong>1.7 Visualizing Hardware with RTL Viewer</strong></h5>
+<p>Tools like Intel Quartus Prime include an <strong>RTL (Register-Transfer Level) Viewer</strong>. After writing SystemVerilog code, this tool can be used to generate and display a schematic of the hardware you have described. This is extremely useful for verifying that the synthesized circuit matches your design intent. Regardless of whether you used gate primitives, <code>assign</code> statements, or <code>always_comb</code> with <code>if</code>/<code>case</code>, the final synthesized circuit for the 2-to-1 multiplexer will be logically identical.</p>
+<p><img src="8_2.png" style="width:80.0%"></p>
+<h5 id="memory-hierarchy-and-types"><strong>1.8 Memory Hierarchy and Types</strong></h5>
+<h6 id="memory-hierarchy-overview"><strong>1.8.1 Memory Hierarchy Overview</strong></h6>
+<p>A computer system uses a hierarchy of memory types to balance speed, cost, and capacity. The closer memory is to the CPU, the faster and more expensive (per byte) it is, but the smaller its capacity.</p>
+<p><img src="8_14.png" style="width:40.0%"></p>
+<p>The typical hierarchy is:</p>
+<ol type="1">
+<li><strong>CPU Registers:</strong> Fastest, smallest, inside the CPU.</li>
+<li><strong>CPU Cache (L1, L2, L3):</strong> Very fast, sits between CPU and main memory.</li>
+<li><strong>System Memory (Main Memory/RAM):</strong> Slower than cache, larger capacity.</li>
+<li><strong>Permanent Storage Devices:</strong> Slowest, largest capacity (e.g., SSD, HDD).</li>
+</ol>
+<p><img src="8_4.png" style="width:80.0%"></p>
+<h6 id="volatile-vs.-non-volatile-memory"><strong>1.8.2 Volatile vs.&nbsp;Non-Volatile Memory</strong></h6>
+<ul>
+<li><strong>Volatile Memory</strong> loses its stored information when the power is turned off. It is temporary storage. Examples include CPU registers, cache (SRAM), and main system memory (DRAM).</li>
+<li><strong>Non-Volatile Memory</strong> retains its data even without power. It is used for permanent storage. Examples include Solid-State Drives (SSD), Hard-Disk Drives (HDD), and USB drives.</li>
+</ul>
+<h6 id="primary-vs.-secondary-memory"><strong>1.8.3 Primary vs.&nbsp;Secondary Memory</strong></h6>
+<ul>
+<li><strong>Primary Memory</strong> is memory that the CPU can access directly. It is almost always volatile. This includes CPU cache, system memory (RAM), and the ROM that holds the BIOS.</li>
+<li><strong>Secondary Memory</strong> refers to storage devices that are not directly accessible by the CPU. Data must first be loaded into primary memory. It is non-volatile and includes SSDs, HDDs, and USB storage.</li>
+</ul>
+<h6 id="ram-sam-and-rom"><strong>1.8.4 RAM, SAM, and ROM</strong></h6>
+<ul>
+<li><strong>RAM (Random Access Memory)</strong>: Allows data to be accessed in any order (randomly) at nearly the same speed. Both SRAM and DRAM are types of RAM.</li>
+<li><strong>SAM (Sequential Access Memory)</strong>: Data must be accessed in a linear sequence. A classic example is a magnetic tape drive.</li>
+<li><strong>ROM (Read-Only Memory)</strong>: Non-volatile memory that, in its purest form, can only be read from. It is used to store firmware like the computer’s BIOS.</li>
+</ul>
+<h5 id="memory-locality-principles"><strong>1.9 Memory Locality Principles</strong></h5>
+<p>The memory hierarchy is effective because programs tend to exhibit predictable access patterns, known as the principle of locality.</p>
+<ul>
+<li><strong>Temporal Locality</strong>: The tendency to access the same memory location again soon. If a piece of data is used, it’s likely to be used again in the near future. Caches exploit this by keeping recently used data close to the CPU.</li>
+<li><strong>Spatial Locality</strong>: The tendency to access memory locations that are physically near each other. If a program accesses one address, it is likely to access nearby addresses soon after (e.g., iterating through an array). Caches exploit this by fetching entire blocks of data at once.</li>
+</ul>
+<h5 id="dram-dynamic-ram"><strong>1.10 DRAM (Dynamic RAM)</strong></h5>
+<p>DRAM is the technology used for the main system memory in most modern computers. It is called “dynamic” because it needs to be constantly refreshed to maintain its data.</p>
+<p><img src="8_11.png" style="width:80.0%"></p>
+<h6 id="the-dram-memory-cell"><strong>1.10.1 The DRAM Memory Cell</strong></h6>
+<p>The fundamental building block of DRAM is the memory cell, which stores a single bit of data. It is constructed from two simple components:</p>
+<ul>
+<li>One <strong>Transistor</strong>: Acts as a tiny, fast electronic switch.</li>
+<li>One <strong>Capacitor</strong>: A device that stores an electrical charge.</li>
+</ul>
+<p>The state of the bit is represented by the capacitor’s charge:</p>
+<ul>
+<li><strong>Charged</strong> = 1 <img src="8_7.png" style="width:80.0%"></li>
+<li><strong>Discharged</strong> = 0 <img src="8_8.png" style="width:80.0%"></li>
+</ul>
+<h6 id="dram-operation-readwrite"><strong>1.10.2 DRAM Operation (Read/Write)</strong></h6>
+<p>DRAM cells are arranged in a grid.</p>
+<ul>
+<li><strong>Wordlines</strong> run horizontally, connecting to the gate of each transistor in a row.</li>
+<li><strong>Bitlines</strong> run vertically, connecting to the source/drain of each transistor in a column.</li>
+<li><strong>To Write Data</strong>: The memory controller activates the appropriate wordline, which turns “ON” all the transistors in that row. It then sends a voltage down the specific bitline to either charge (for a ‘1’) or discharge (for a ‘0’) the capacitor in the target cell. <img src="8_9.png" style="width:80.0%"></li>
+<li><strong>To Read Data</strong>: The wordline is activated, turning the transistor “ON”. If the attached capacitor is charged, a small amount of current flows onto the bitline. A sense amplifier detects this tiny current to determine if a ‘1’ was stored. The reading process is <em>destructive</em> because it discharges the capacitor, so the controller must immediately write the value back. <img src="8_10.png" style="width:80.0%"></li>
+</ul>
+<h6 id="crucial-problems-with-dram"><strong>1.10.3 Crucial Problems with DRAM</strong></h6>
+<ul>
+<li><strong>Capacitor Leakage</strong>: The charge in the tiny capacitor gradually leaks away in a matter of milliseconds. To prevent data loss, the <strong>memory controller</strong> must periodically perform a <strong>refresh cycle</strong>, where it reads the value from every cell and writes it back. This is why it is called <em>dynamic</em>.</li>
+<li><strong>Charge/Discharge Time</strong>: Charging and discharging the capacitor is not instantaneous, which contributes to DRAM’s access latency.</li>
+</ul>
+<h5 id="sram-static-ram"><strong>1.11 SRAM (Static RAM)</strong></h5>
+<p>SRAM is the technology used for CPU caches and registers. It is called “static” because it holds its data without needing to be refreshed.</p>
+<h6 id="the-sram-memory-cell"><strong>1.11.1 The SRAM Memory Cell</strong></h6>
+<p>An SRAM cell does not use a capacitor. Instead, it uses a <strong>latch</strong> or <strong>flip-flop</strong> circuit, typically composed of 4 to 6 transistors. This circuit has two stable states (representing 0 and 1). As long as power is applied, the feedback mechanism within the latch holds the state indefinitely.</p>
+<p><img src="8_12.png" style="width:80.0%"> <img src="8_13.png" style="width:80.0%"></p>
+<h5 id="sram-vs.-dram-comparison"><strong>1.12 SRAM vs.&nbsp;DRAM Comparison</strong></h5>
+<p><img src="8_5.png" style="width:40.0%"></p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 40%">
+<col style="width: 41%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Characteristic</th>
+<th>SRAM (Static RAM)</th>
+<th>DRAM (Dynamic RAM)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Storage Element</strong></td>
+<td>Flip-flop (4-6 transistors)</td>
+<td>Capacitor and Transistor (1 of each)</td>
+</tr>
+<tr class="even">
+<td><strong>Access Speed</strong></td>
+<td><strong>Much Faster</strong> (1-10 nanoseconds)</td>
+<td>Slower (50-100 nanoseconds)</td>
+</tr>
+<tr class="odd">
+<td><strong>Cost (per byte)</strong></td>
+<td><strong>Expensive</strong></td>
+<td><strong>Cheaper</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Storage Capacity</strong></td>
+<td>Lower density, smaller capacity</td>
+<td><strong>Higher density</strong>, larger capacity</td>
+</tr>
+<tr class="odd">
+<td><strong>Organisation</strong></td>
+<td>More complex cell structure</td>
+<td>Simpler cell structure</td>
+</tr>
+<tr class="even">
+<td><strong>Power Leakage</strong></td>
+<td>Negligible; no refresh needed</td>
+<td><strong>Significant</strong>; requires constant refresh cycles</td>
+</tr>
+<tr class="odd">
+<td><strong>Power Consumption</strong></td>
+<td>Lower when idle</td>
+<td>Higher due to refresh cycles</td>
+</tr>
+<tr class="even">
+<td><strong>Chip Reliability</strong></td>
+<td>More reliable</td>
+<td>Less reliable (susceptible to soft errors)</td>
+</tr>
+<tr class="odd">
+<td><strong>Volatility</strong></td>
+<td><strong>Volatile</strong> (loses data without power)</td>
+<td><strong>Volatile</strong> (loses data without power)</td>
+</tr>
+<tr class="even">
+<td><strong>Typical Usage</strong></td>
+<td><strong>CPU caches</strong>, registers</td>
+<td><strong>Main system memory</strong></td>
+</tr>
+</tbody>
+</table>
+<h4 id="definitions"><strong>2. Definitions</strong></h4>
+<ul>
+<li><strong>Hardware Description Language (HDL)</strong>: A specialized computer language used to program the structure, design, and operation of electronic circuits.</li>
+<li><strong>Multiplexer (Mux)</strong>: A digital circuit that selects one of several input signals and forwards it to a single output, based on a control signal.</li>
+<li><strong>Continuous Assignment</strong>: A feature in Verilog (<code>assign</code>) that models combinational logic by creating a direct, persistent connection from inputs to an output.</li>
+<li><strong>Procedural Block</strong>: A block of code in Verilog (e.g., <code>always_comb</code>) that describes hardware behavior and executes based on specified conditions or signal changes.</li>
+<li><strong>Blocking Assignment (<code>=</code>)</strong>: An assignment in a procedural block that completes before the next statement begins execution.</li>
+<li><strong>Volatile Memory</strong>: Memory that requires constant power to maintain stored information.</li>
+<li><strong>Non-Volatile Memory</strong>: Memory that can retain stored information even after power is removed.</li>
+<li><strong>Primary Memory</strong>: The main working memory of a computer, directly accessible by the CPU (e.g., RAM).</li>
+<li><strong>Secondary Memory</strong>: Long-term, non-volatile storage that is not directly accessible by the CPU (e.g., SSD, HDD).</li>
+<li><strong>RAM (Random Access Memory)</strong>: A type of memory where any location can be accessed in a “random” order at nearly the same speed.</li>
+<li><strong>DRAM (Dynamic RAM)</strong>: A type of RAM that stores each bit of data in a separate capacitor within an integrated circuit. It must be periodically refreshed.</li>
+<li><strong>SRAM (Static RAM)</strong>: A type of RAM that uses latching circuitry (flip-flops) to store each bit. It is faster but more expensive than DRAM and does not need to be refreshed.</li>
+<li><strong>ROM (Read-Only Memory)</strong>: A type of non-volatile memory used to store firmware that is rarely or never changed, such as the BIOS.</li>
+<li><strong>Transistor</strong>: A semiconductor device used to amplify or switch electronic signals and electrical power. It is a fundamental building block of modern electronics.</li>
+<li><strong>Capacitor</strong>: A passive electronic component that stores electrical energy in an electric field.</li>
+<li><strong>Latch/Flip-Flop</strong>: A circuit that has two stable states and can be used to store state information (a single bit). It is the fundamental storage element in sequential logic.</li>
+<li><strong>Temporal Locality</strong>: The principle that if a particular memory location is referenced, it is likely to be referenced again in the near future.</li>
+<li><strong>Spatial Locality</strong>: The principle that if a particular memory location is referenced, memory locations with nearby addresses are likely to be referenced soon.</li>
+</ul>
+<h4 id="examples"><strong>3. Examples</strong></h4>
+<h4 id="assignment-1-1-to-4-demultiplexer-lab-8-exercise-1"><strong>3.1 Assignment 1: 1-to-4 Demultiplexer</strong> (Lab 8, Exercise 1)</h4>
+<p>This section covers the design of a 1-to-4 demultiplexer using a procedural <code>always</code> block, along with a testbench to verify its functionality.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<div class="sourceCode" id="cb9"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Module: demux_1_to_4</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co">// Description: Implements a 1-to-4 demultiplexer.</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co">// It takes one data input (din), two select lines (sel),</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co">// and routes the input to one of the four output lines (dout).</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> demux_1_to_4<span class="op">(</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">input</span> din<span class="op">,</span>          <span class="co">// Data input</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">input</span> <span class="op">[</span><span class="dv">1</span><span class="op">:</span><span class="dv">0</span><span class="op">]</span> sel<span class="op">,</span>    <span class="co">// 2-bit select line</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">output</span> <span class="dt">reg</span> <span class="op">[</span><span class="dv">3</span><span class="op">:</span><span class="dv">0</span><span class="op">]</span> dout <span class="co">// 4-bit data output</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">// The 'always' block is sensitive to any changes in the inputs (din or sel).</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">// This is a combinatorial circuit, so any input change should immediately</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">// affect the output.</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">always</span> <span class="op">@(</span>din <span class="dt">or</span> sel<span class="op">)</span> <span class="kw">begin</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>        <span class="co">// A case statement is used to check the value of the 'sel' input.</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>        <span class="kw">case</span><span class="op">(</span>sel<span class="op">)</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>            <span class="bn">2'b00</span><span class="op">:</span> dout <span class="op">=</span> <span class="op">{</span><span class="bn">3'b000</span><span class="op">,</span> din<span class="op">};</span> <span class="co">// If sel is 00, route din to dout[0].</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>            <span class="bn">2'b01</span><span class="op">:</span> dout <span class="op">=</span> <span class="op">{</span><span class="bn">2'b00</span><span class="op">,</span> din<span class="op">,</span> <span class="bn">1'b0</span><span class="op">};</span>  <span class="co">// If sel is 01, route din to dout[1].</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>            <span class="bn">2'b10</span><span class="op">:</span> dout <span class="op">=</span> <span class="op">{</span><span class="bn">1'b0</span><span class="op">,</span> din<span class="op">,</span> <span class="bn">2'b00</span><span class="op">};</span>   <span class="co">// If sel is 10, route din to dout[2].</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>            <span class="bn">2'b11</span><span class="op">:</span> dout <span class="op">=</span> <span class="op">{</span>din<span class="op">,</span> <span class="bn">3'b000</span><span class="op">};</span> <span class="co">// If sel is 11, route din to dout[3].</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>            <span class="kw">default</span><span class="op">:</span> dout <span class="op">=</span> <span class="bn">4'b0000</span><span class="op">;</span>      <span class="co">// Default case to avoid latches.</span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>        <span class="kw">endcase</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end</span></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a><span class="co">// Testbench for the 1-to-4 Demultiplexer</span></span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a><span class="co">// Description: This module is for simulation purposes to test the</span></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="co">// correctness of the demux_1_to_4 design. It is not synthesizable.</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="co">// Part c) of the assignment requires testing on an FPGA, but a simulation</span></span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="co">// like this is the first step to verify the logic.</span></span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> demux_1_to_4_tb<span class="op">;</span></span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Declare variables to connect to the demultiplexer module.</span></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>    <span class="dt">reg</span> din_tb<span class="op">;</span>         <span class="co">// Testbench register for data input</span></span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>    <span class="dt">reg</span> <span class="op">[</span><span class="dv">1</span><span class="op">:</span><span class="dv">0</span><span class="op">]</span> sel_tb<span class="op">;</span>   <span class="co">// Testbench register for select lines</span></span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>    <span class="dt">wire</span> <span class="op">[</span><span class="dv">3</span><span class="op">:</span><span class="dv">0</span><span class="op">]</span> dout_tb<span class="op">;</span> <span class="co">// Testbench wire for data output</span></span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Instantiate the module under test (UUT).</span></span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a>    demux_1_to_4 uut <span class="op">(</span></span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a>        .din<span class="op">(</span>din_tb<span class="op">),</span></span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>        .sel<span class="op">(</span>sel_tb<span class="op">),</span></span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>        .dout<span class="op">(</span>dout_tb<span class="op">)</span></span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Initial block to define the sequence of test inputs.</span></span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a>    <span class="kw">initial</span> <span class="kw">begin</span></span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Display a header for the simulation output.</span></span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"Time</span><span class="ch">\t</span><span class="st"> sel</span><span class="ch">\t</span><span class="st"> din</span><span class="ch">\t</span><span class="st"> dout"</span><span class="op">);</span></span>
+<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-53"><a href="#cb9-53" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Test case 1: sel = 00, din = 1</span></span>
+<span id="cb9-54"><a href="#cb9-54" aria-hidden="true" tabindex="-1"></a>        sel_tb <span class="op">=</span> <span class="bn">2'b00</span><span class="op">;</span> din_tb <span class="op">=</span> <span class="dv">1</span><span class="op">;</span> <span class="bn">#10</span><span class="op">;</span></span>
+<span id="cb9-55"><a href="#cb9-55" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"%g</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b"</span><span class="op">,</span> <span class="dt">$time</span><span class="op">,</span> sel_tb<span class="op">,</span> din_tb<span class="op">,</span> dout_tb<span class="op">);</span></span>
+<span id="cb9-56"><a href="#cb9-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-57"><a href="#cb9-57" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Test case 2: sel = 01, din = 1</span></span>
+<span id="cb9-58"><a href="#cb9-58" aria-hidden="true" tabindex="-1"></a>        sel_tb <span class="op">=</span> <span class="bn">2'b01</span><span class="op">;</span> din_tb <span class="op">=</span> <span class="dv">1</span><span class="op">;</span> <span class="bn">#10</span><span class="op">;</span></span>
+<span id="cb9-59"><a href="#cb9-59" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"%g</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b"</span><span class="op">,</span> <span class="dt">$time</span><span class="op">,</span> sel_tb<span class="op">,</span> din_tb<span class="op">,</span> dout_tb<span class="op">);</span></span>
+<span id="cb9-60"><a href="#cb9-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-61"><a href="#cb9-61" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Test case 3: sel = 10, din = 1</span></span>
+<span id="cb9-62"><a href="#cb9-62" aria-hidden="true" tabindex="-1"></a>        sel_tb <span class="op">=</span> <span class="bn">2'b10</span><span class="op">;</span> din_tb <span class="op">=</span> <span class="dv">1</span><span class="op">;</span> <span class="bn">#10</span><span class="op">;</span></span>
+<span id="cb9-63"><a href="#cb9-63" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"%g</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b"</span><span class="op">,</span> <span class="dt">$time</span><span class="op">,</span> sel_tb<span class="op">,</span> din_tb<span class="op">,</span> dout_tb<span class="op">);</span></span>
+<span id="cb9-64"><a href="#cb9-64" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb9-65"><a href="#cb9-65" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Test case 4: sel = 11, din = 1</span></span>
+<span id="cb9-66"><a href="#cb9-66" aria-hidden="true" tabindex="-1"></a>        sel_tb <span class="op">=</span> <span class="bn">2'b11</span><span class="op">;</span> din_tb <span class="op">=</span> <span class="dv">1</span><span class="op">;</span> <span class="bn">#10</span><span class="op">;</span></span>
+<span id="cb9-67"><a href="#cb9-67" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"%g</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b"</span><span class="op">,</span> <span class="dt">$time</span><span class="op">,</span> sel_tb<span class="op">,</span> din_tb<span class="op">,</span> dout_tb<span class="op">);</span></span>
+<span id="cb9-68"><a href="#cb9-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-69"><a href="#cb9-69" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Test case 5: sel = 01, din = 0 (to show din is passed correctly)</span></span>
+<span id="cb9-70"><a href="#cb9-70" aria-hidden="true" tabindex="-1"></a>        sel_tb <span class="op">=</span> <span class="bn">2'b01</span><span class="op">;</span> din_tb <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> <span class="bn">#10</span><span class="op">;</span></span>
+<span id="cb9-71"><a href="#cb9-71" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"%g</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %b"</span><span class="op">,</span> <span class="dt">$time</span><span class="op">,</span> sel_tb<span class="op">,</span> din_tb<span class="op">,</span> dout_tb<span class="op">);</span></span>
+<span id="cb9-72"><a href="#cb9-72" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb9-73"><a href="#cb9-73" aria-hidden="true" tabindex="-1"></a>        <span class="co">// End the simulation.</span></span>
+<span id="cb9-74"><a href="#cb9-74" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$finish</span><span class="op">;</span></span>
+<span id="cb9-75"><a href="#cb9-75" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end</span></span>
+<span id="cb9-76"><a href="#cb9-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-77"><a href="#cb9-77" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span>
+<span id="cb9-78"><a href="#cb9-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-79"><a href="#cb9-79" aria-hidden="true" tabindex="-1"></a><span class="co">// Part b) of the assignment, "Make necessary pin assignments in Pin Planner of Quartus Prime",</span></span>
+<span id="cb9-80"><a href="#cb9-80" aria-hidden="true" tabindex="-1"></a><span class="co">// is a step performed within the Quartus software GUI. It involves mapping the Verilog</span></span>
+<span id="cb9-81"><a href="#cb9-81" aria-hidden="true" tabindex="-1"></a><span class="co">// ports (din, sel, dout) to the physical pins of the FPGA chip. This cannot be done in code.</span></span>
+<span id="cb9-82"><a href="#cb9-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-83"><a href="#cb9-83" aria-hidden="true" tabindex="-1"></a><span class="co">// Part c), "Upload the design into FPGA and test program correctness", is the physical</span></span>
+<span id="cb9-84"><a href="#cb9-84" aria-hidden="true" tabindex="-1"></a><span class="co">// process of programming the FPGA and verifying its operation with hardware,</span></span>
+<span id="cb9-85"><a href="#cb9-85" aria-hidden="true" tabindex="-1"></a><span class="co">// for example, by connecting LEDs to the output pins and switches to the input pins.</span></span></code></pre></div>
+</details>
+<h4 id="assignment-2-4-bit-adder-circuit-lab-8-exercise-2"><strong>3.2 Assignment 2: 4-Bit Adder Circuit</strong> (Lab 8, Exercise 2)</h4>
+<p>This section provides the Verilog code for a <code>halfadder</code>, a <code>fulladder</code>, and a 4-bit top-level adder (<code>adder4bit</code>) constructed from them. A testbench is also included to verify the 4-bit adder.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<div class="sourceCode" id="cb10"><pre class="sourceCode verilog"><code class="sourceCode verilog"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co">// Part a) Design halfadder module</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co">// Description: A half adder adds two single bits (a and b)</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co">// and produces a sum and a carry output.</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> halfadder<span class="op">(</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">input</span> a<span class="op">,</span> b<span class="op">,</span>         <span class="co">// 1-bit inputs</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">output</span> sum<span class="op">,</span> carry   <span class="co">// 1-bit outputs</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Assign sum using XOR operation.</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">assign</span> sum <span class="op">=</span> a <span class="op">^</span> b<span class="op">;</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Assign carry using AND operation.</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">assign</span> carry <span class="op">=</span> a <span class="op">&amp;</span> b<span class="op">;</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a><span class="co">// Part b) Design fulladder module</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a><span class="co">// Description: A full adder adds three single bits (a, b, and cin)</span></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a><span class="co">// and produces a sum and a carry output (cout).</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a><span class="co">// It can be built from two half adders and an OR gate.</span></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> fulladder<span class="op">(</span></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>    <span class="dt">input</span> a<span class="op">,</span> b<span class="op">,</span> cin<span class="op">,</span>      <span class="co">// 1-bit inputs (cin is carry-in)</span></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>    <span class="dt">output</span> sum<span class="op">,</span> cout      <span class="co">// 1-bit outputs (cout is carry-out)</span></span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Intermediate wires to connect the half adders.</span></span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>    <span class="dt">wire</span> ha1_sum<span class="op">,</span> ha1_carry<span class="op">,</span> ha2_carry<span class="op">;</span></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>    <span class="co">// First half adder to add input 'a' and 'b'.</span></span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>    halfadder ha1 <span class="op">(</span></span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>        .a<span class="op">(</span>a<span class="op">),</span></span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>        .b<span class="op">(</span>b<span class="op">),</span></span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>        .sum<span class="op">(</span>ha1_sum<span class="op">),</span></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>        .carry<span class="op">(</span>ha1_carry<span class="op">)</span></span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Second half adder to add the sum from the first half adder and the carry-in.</span></span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>    halfadder ha2 <span class="op">(</span></span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>        .a<span class="op">(</span>ha1_sum<span class="op">),</span></span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>        .b<span class="op">(</span>cin<span class="op">),</span></span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a>        .sum<span class="op">(</span>sum<span class="op">),</span> <span class="co">// Final sum output</span></span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>        .carry<span class="op">(</span>ha2_carry<span class="op">)</span></span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>    <span class="co">// The final carry-out is the OR of the carries from both half adders.</span></span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>    <span class="kw">assign</span> cout <span class="op">=</span> ha1_carry <span class="op">|</span> ha2_carry<span class="op">;</span></span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a><span class="co">// Part c) Design Top-Level-Entity adder4bit</span></span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a><span class="co">// Description: This module implements a 4-bit ripple-carry adder.</span></span>
+<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a><span class="co">// It uses one halfadder for the least significant bit (LSB) and</span></span>
+<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a><span class="co">// three fulladders for the remaining bits.</span></span>
+<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> adder4bit<span class="op">(</span></span>
+<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a>    <span class="dt">input</span> <span class="op">[</span><span class="dv">3</span><span class="op">:</span><span class="dv">0</span><span class="op">]</span> a<span class="op">,</span> b<span class="op">,</span>  <span class="co">// 4-bit input values</span></span>
+<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a>    <span class="dt">output</span> <span class="op">[</span><span class="dv">3</span><span class="op">:</span><span class="dv">0</span><span class="op">]</span> sum<span class="op">,</span>  <span class="co">// 4-bit sum output</span></span>
+<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>    <span class="dt">output</span> cout        <span class="co">// 1-bit final carry-out</span></span>
+<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Intermediate wires for the carry between the adders.</span></span>
+<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a>    <span class="dt">wire</span> c0<span class="op">,</span> c1<span class="op">,</span> c2<span class="op">;</span></span>
+<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>    <span class="co">// LSB Adder (Bit 0): Use a halfadder since there is no initial carry-in.</span></span>
+<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a>    halfadder ha <span class="op">(</span></span>
+<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>        .a<span class="op">(</span>a<span class="op">[</span><span class="dv">0</span><span class="op">]),</span></span>
+<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>        .b<span class="op">(</span>b<span class="op">[</span><span class="dv">0</span><span class="op">]),</span></span>
+<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>        .sum<span class="op">(</span>sum<span class="op">[</span><span class="dv">0</span><span class="op">]),</span></span>
+<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a>        .carry<span class="op">(</span>c0<span class="op">)</span></span>
+<span id="cb10-69"><a href="#cb10-69" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb10-70"><a href="#cb10-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-71"><a href="#cb10-71" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Bit 1 Adder: Use a fulladder with the carry from the previous stage.</span></span>
+<span id="cb10-72"><a href="#cb10-72" aria-hidden="true" tabindex="-1"></a>    fulladder fa1 <span class="op">(</span></span>
+<span id="cb10-73"><a href="#cb10-73" aria-hidden="true" tabindex="-1"></a>        .a<span class="op">(</span>a<span class="op">[</span><span class="dv">1</span><span class="op">]),</span></span>
+<span id="cb10-74"><a href="#cb10-74" aria-hidden="true" tabindex="-1"></a>        .b<span class="op">(</span>b<span class="op">[</span><span class="dv">1</span><span class="op">]),</span></span>
+<span id="cb10-75"><a href="#cb10-75" aria-hidden="true" tabindex="-1"></a>        .cin<span class="op">(</span>c0<span class="op">),</span></span>
+<span id="cb10-76"><a href="#cb10-76" aria-hidden="true" tabindex="-1"></a>        .sum<span class="op">(</span>sum<span class="op">[</span><span class="dv">1</span><span class="op">]),</span></span>
+<span id="cb10-77"><a href="#cb10-77" aria-hidden="true" tabindex="-1"></a>        .cout<span class="op">(</span>c1<span class="op">)</span></span>
+<span id="cb10-78"><a href="#cb10-78" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb10-79"><a href="#cb10-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-80"><a href="#cb10-80" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Bit 2 Adder: Use a fulladder.</span></span>
+<span id="cb10-81"><a href="#cb10-81" aria-hidden="true" tabindex="-1"></a>    fulladder fa2 <span class="op">(</span></span>
+<span id="cb10-82"><a href="#cb10-82" aria-hidden="true" tabindex="-1"></a>        .a<span class="op">(</span>a<span class="op">[</span><span class="dv">2</span><span class="op">]),</span></span>
+<span id="cb10-83"><a href="#cb10-83" aria-hidden="true" tabindex="-1"></a>        .b<span class="op">(</span>b<span class="op">[</span><span class="dv">2</span><span class="op">]),</span></span>
+<span id="cb10-84"><a href="#cb10-84" aria-hidden="true" tabindex="-1"></a>        .cin<span class="op">(</span>c1<span class="op">),</span></span>
+<span id="cb10-85"><a href="#cb10-85" aria-hidden="true" tabindex="-1"></a>        .sum<span class="op">(</span>sum<span class="op">[</span><span class="dv">2</span><span class="op">]),</span></span>
+<span id="cb10-86"><a href="#cb10-86" aria-hidden="true" tabindex="-1"></a>        .cout<span class="op">(</span>c2<span class="op">)</span></span>
+<span id="cb10-87"><a href="#cb10-87" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb10-88"><a href="#cb10-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-89"><a href="#cb10-89" aria-hidden="true" tabindex="-1"></a>    <span class="co">// MSB Adder (Bit 3): Use a fulladder. The cout from this is the final carry.</span></span>
+<span id="cb10-90"><a href="#cb10-90" aria-hidden="true" tabindex="-1"></a>    fulladder fa3 <span class="op">(</span></span>
+<span id="cb10-91"><a href="#cb10-91" aria-hidden="true" tabindex="-1"></a>        .a<span class="op">(</span>a<span class="op">[</span><span class="dv">3</span><span class="op">]),</span></span>
+<span id="cb10-92"><a href="#cb10-92" aria-hidden="true" tabindex="-1"></a>        .b<span class="op">(</span>b<span class="op">[</span><span class="dv">3</span><span class="op">]),</span></span>
+<span id="cb10-93"><a href="#cb10-93" aria-hidden="true" tabindex="-1"></a>        .cin<span class="op">(</span>c2<span class="op">),</span></span>
+<span id="cb10-94"><a href="#cb10-94" aria-hidden="true" tabindex="-1"></a>        .sum<span class="op">(</span>sum<span class="op">[</span><span class="dv">3</span><span class="op">]),</span></span>
+<span id="cb10-95"><a href="#cb10-95" aria-hidden="true" tabindex="-1"></a>        .cout<span class="op">(</span>cout<span class="op">)</span> <span class="co">// Final carry-out of the 4-bit addition</span></span>
+<span id="cb10-96"><a href="#cb10-96" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb10-97"><a href="#cb10-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-98"><a href="#cb10-98" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span>
+<span id="cb10-99"><a href="#cb10-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-100"><a href="#cb10-100" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb10-101"><a href="#cb10-101" aria-hidden="true" tabindex="-1"></a><span class="co">// Testbench for the 4-bit Adder</span></span>
+<span id="cb10-102"><a href="#cb10-102" aria-hidden="true" tabindex="-1"></a><span class="co">//</span></span>
+<span id="cb10-103"><a href="#cb10-103" aria-hidden="true" tabindex="-1"></a><span class="co">// Description: This module tests the adder4bit module by providing</span></span>
+<span id="cb10-104"><a href="#cb10-104" aria-hidden="true" tabindex="-1"></a><span class="co">// various input values and displaying the results.</span></span>
+<span id="cb10-105"><a href="#cb10-105" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> adder4bit_tb<span class="op">;</span></span>
+<span id="cb10-106"><a href="#cb10-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-107"><a href="#cb10-107" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Declare variables to connect to the 4-bit adder module.</span></span>
+<span id="cb10-108"><a href="#cb10-108" aria-hidden="true" tabindex="-1"></a>    <span class="dt">reg</span> <span class="op">[</span><span class="dv">3</span><span class="op">:</span><span class="dv">0</span><span class="op">]</span> a_tb<span class="op">,</span> b_tb<span class="op">;</span></span>
+<span id="cb10-109"><a href="#cb10-109" aria-hidden="true" tabindex="-1"></a>    <span class="dt">wire</span> <span class="op">[</span><span class="dv">3</span><span class="op">:</span><span class="dv">0</span><span class="op">]</span> sum_tb<span class="op">;</span></span>
+<span id="cb10-110"><a href="#cb10-110" aria-hidden="true" tabindex="-1"></a>    <span class="dt">wire</span> cout_tb<span class="op">;</span></span>
+<span id="cb10-111"><a href="#cb10-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-112"><a href="#cb10-112" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Instantiate the module under test (UUT).</span></span>
+<span id="cb10-113"><a href="#cb10-113" aria-hidden="true" tabindex="-1"></a>    adder4bit uut <span class="op">(</span></span>
+<span id="cb10-114"><a href="#cb10-114" aria-hidden="true" tabindex="-1"></a>        .a<span class="op">(</span>a_tb<span class="op">),</span></span>
+<span id="cb10-115"><a href="#cb10-115" aria-hidden="true" tabindex="-1"></a>        .b<span class="op">(</span>b_tb<span class="op">),</span></span>
+<span id="cb10-116"><a href="#cb10-116" aria-hidden="true" tabindex="-1"></a>        .sum<span class="op">(</span>sum_tb<span class="op">),</span></span>
+<span id="cb10-117"><a href="#cb10-117" aria-hidden="true" tabindex="-1"></a>        .cout<span class="op">(</span>cout_tb<span class="op">)</span></span>
+<span id="cb10-118"><a href="#cb10-118" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb10-119"><a href="#cb10-119" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-120"><a href="#cb10-120" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Initial block to define the sequence of test inputs.</span></span>
+<span id="cb10-121"><a href="#cb10-121" aria-hidden="true" tabindex="-1"></a>    <span class="kw">initial</span> <span class="kw">begin</span></span>
+<span id="cb10-122"><a href="#cb10-122" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Display a header for the simulation output.</span></span>
+<span id="cb10-123"><a href="#cb10-123" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"Time</span><span class="ch">\t</span><span class="st"> a</span><span class="ch">\t</span><span class="st"> b</span><span class="ch">\t</span><span class="st"> cout</span><span class="ch">\t</span><span class="st"> sum"</span><span class="op">);</span></span>
+<span id="cb10-124"><a href="#cb10-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-125"><a href="#cb10-125" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Test case 1: 3 + 2 = 5</span></span>
+<span id="cb10-126"><a href="#cb10-126" aria-hidden="true" tabindex="-1"></a>        a_tb <span class="op">=</span> <span class="bn">4'd3</span><span class="op">;</span> b_tb <span class="op">=</span> <span class="bn">4'd2</span><span class="op">;</span> <span class="bn">#10</span><span class="op">;</span></span>
+<span id="cb10-127"><a href="#cb10-127" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"%g</span><span class="ch">\t</span><span class="st"> %d</span><span class="ch">\t</span><span class="st"> %d</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %d"</span><span class="op">,</span> <span class="dt">$time</span><span class="op">,</span> a_tb<span class="op">,</span> b_tb<span class="op">,</span> cout_tb<span class="op">,</span> sum_tb<span class="op">);</span></span>
+<span id="cb10-128"><a href="#cb10-128" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-129"><a href="#cb10-129" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Test case 2: 7 + 1 = 8</span></span>
+<span id="cb10-130"><a href="#cb10-130" aria-hidden="true" tabindex="-1"></a>        a_tb <span class="op">=</span> <span class="bn">4'd7</span><span class="op">;</span> b_tb <span class="op">=</span> <span class="bn">4'd1</span><span class="op">;</span> <span class="bn">#10</span><span class="op">;</span></span>
+<span id="cb10-131"><a href="#cb10-131" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"%g</span><span class="ch">\t</span><span class="st"> %d</span><span class="ch">\t</span><span class="st"> %d</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %d"</span><span class="op">,</span> <span class="dt">$time</span><span class="op">,</span> a_tb<span class="op">,</span> b_tb<span class="op">,</span> cout_tb<span class="op">,</span> sum_tb<span class="op">);</span></span>
+<span id="cb10-132"><a href="#cb10-132" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-133"><a href="#cb10-133" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Test case 3: 9 + 8 = 17 (results in a carry-out)</span></span>
+<span id="cb10-134"><a href="#cb10-134" aria-hidden="true" tabindex="-1"></a>        a_tb <span class="op">=</span> <span class="bn">4'd9</span><span class="op">;</span> b_tb <span class="op">=</span> <span class="bn">4'd8</span><span class="op">;</span> <span class="bn">#10</span><span class="op">;</span></span>
+<span id="cb10-135"><a href="#cb10-135" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"%g</span><span class="ch">\t</span><span class="st"> %d</span><span class="ch">\t</span><span class="st"> %d</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %d"</span><span class="op">,</span> <span class="dt">$time</span><span class="op">,</span> a_tb<span class="op">,</span> b_tb<span class="op">,</span> cout_tb<span class="op">,</span> sum_tb<span class="op">);</span></span>
+<span id="cb10-136"><a href="#cb10-136" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb10-137"><a href="#cb10-137" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Test case 4: 15 + 15 = 30 (maximum values with carry)</span></span>
+<span id="cb10-138"><a href="#cb10-138" aria-hidden="true" tabindex="-1"></a>        a_tb <span class="op">=</span> <span class="bn">4'b1111</span><span class="op">;</span> b_tb <span class="op">=</span> <span class="bn">4'b1111</span><span class="op">;</span> <span class="bn">#10</span><span class="op">;</span></span>
+<span id="cb10-139"><a href="#cb10-139" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$display</span><span class="op">(</span><span class="st">"%g</span><span class="ch">\t</span><span class="st"> %d</span><span class="ch">\t</span><span class="st"> %d</span><span class="ch">\t</span><span class="st"> %b</span><span class="ch">\t</span><span class="st"> %d"</span><span class="op">,</span> <span class="dt">$time</span><span class="op">,</span> a_tb<span class="op">,</span> b_tb<span class="op">,</span> cout_tb<span class="op">,</span> sum_tb<span class="op">);</span></span>
+<span id="cb10-140"><a href="#cb10-140" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-141"><a href="#cb10-141" aria-hidden="true" tabindex="-1"></a>        <span class="co">// End the simulation.</span></span>
+<span id="cb10-142"><a href="#cb10-142" aria-hidden="true" tabindex="-1"></a>        <span class="dt">$finish</span><span class="op">;</span></span>
+<span id="cb10-143"><a href="#cb10-143" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end</span></span>
+<span id="cb10-144"><a href="#cb10-144" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-145"><a href="#cb10-145" aria-hidden="true" tabindex="-1"></a><span class="kw">endmodule</span></span></code></pre></div>
+</details>
+
+
+<style>
+	.article-buttons {
+		margin-top: 1rem;
+	}
+
+	.mark-read {
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .9rem;
+		line-height: 1.5;
+	}
+
+	.mark-read:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-read.active {
+		background: #4285F4;
+		color: #fff;
+		border-color: #4285F4;
+	}
+
+	.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.sidebar-link.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
+</style>
+
+<div class="article-buttons">
+	<button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const basePath = '/inno_notes/';
+		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
+			document.querySelector('.article-buttons')?.remove();
+		}
+
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
+
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
+			sidebarLinks.forEach(l => {
+				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
+			});
+		}
+
+		const sidebar = document.querySelector('#quarto-sidebar');
+		if (!sidebar) return;
+
+		const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+		sections.forEach(section => {
+			const toggle = section.querySelector('.sidebar-item-toggle');
+			const targetId = toggle?.getAttribute('data-bs-target');
+			const target = targetId ? document.querySelector(targetId) : null;
+			if (!toggle || !target) return;
+
+			const storageKey = `sidebar_section_${targetId}`;
+
+			const saved = localStorage.getItem(storageKey);
+			if (saved === 'open') {
+				target.classList.add('show');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			} else {
+				// collapse by default if not explicitly opened
+				target.classList.remove('show');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			}
+
+			target.addEventListener('show.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'open');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			});
+
+			target.addEventListener('hide.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'closed');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			});
+		});
+
+		const scrollKey = 'sidebar_scroll_top';
+		const savedScroll = localStorage.getItem(scrollKey);
+		if (savedScroll && !isNaN(parseInt(savedScroll, 10))) {
+			sidebar.scrollTop = parseInt(savedScroll, 10);
+		}
+		sidebar.addEventListener('scroll', () => {
+			localStorage.setItem(scrollKey, sidebar.scrollTop);
+		});
+	});
+</script>
+<script>videojs(video_shortcode_videojs_video1);</script>
+
+
+
+
+</body></html>

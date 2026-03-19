@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.24">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Manuel Mazzara">
+<meta name="dcterms.date" content="2026-02-19">
+
+<title>W5. Pumping Lemma for Regular Languages, Pushdown Automata – InnoNotes</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<link href="../../logo.svg" rel="icon" type="image/svg+xml">
+<link href="../../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-H1WYLNDN76"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
+</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles/sf-pro.css">
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">W5. Pumping Lemma for Regular Languages, Pushdown Automata</h1>
+<p class="author">Manuel Mazzara</p>
+
+<p class="date">2026-02-19</p>
+</header>
+
+
+<h4 id="summary"><strong>1. Summary</strong></h4>
+<h5 id="why-some-languages-are-not-regular"><strong>1.1 Why Some Languages Are Not Regular</strong></h5>
+<p>Recall that a <strong>regular language</strong> is any language that can be recognized by a finite state automaton (FSA). FSAs are powerful tools, but they have a fundamental limitation: they have only a <em>fixed, finite</em> amount of memory—precisely the current state. An FSA with <span class="math inline">\(n\)</span> states can “remember” only which of those <span class="math inline">\(n\)</span> states it is in, nothing more.</p>
+<p>This limitation means FSAs cannot handle patterns that require <em>counting to an arbitrary depth</em>. For example:</p>
+<ul>
+<li><span class="math inline">\(L = \{a^n b^n \mid n \geq 1\}\)</span>: To recognize this, the machine must count <span class="math inline">\(n\)</span> a’s and then verify exactly <span class="math inline">\(n\)</span> b’s. No matter how many states the FSA has, a sufficiently large <span class="math inline">\(n\)</span> will overflow its memory.</li>
+<li><span class="math inline">\(L = \{ww^R \mid w \in \{a,b\}^*\}\)</span>: Even-length palindromes. To recognize these, the machine must remember the entire first half of the string, which can be arbitrarily long.</li>
+</ul>
+<p><strong>To prove that a language is regular</strong>, we just exhibit a working FSA. <strong>To prove that a language is not regular</strong>, however, we face a harder task: we must show that <em>no possible FSA</em> can recognize it. Checking every finite automaton is clearly impossible. Instead, we use a powerful theoretical tool: the <strong>Pumping Lemma</strong>.</p>
+<h5 id="the-pigeonhole-principle"><strong>1.2 The Pigeonhole Principle</strong></h5>
+<p>Before stating the Pumping Lemma, we need the classic <strong>Pigeonhole Principle</strong>:</p>
+<blockquote>
+<p><em>If <span class="math inline">\(n\)</span> pigeons are placed into <span class="math inline">\(m\)</span> pigeonholes and <span class="math inline">\(n &gt; m\)</span>, then at least one pigeonhole must contain at least two pigeons.</em></p>
+</blockquote>
+<!-- DIAGRAM HERE -->
+<p><strong>Application to FSAs:</strong> Think of the <em>states</em> of an FSA as pigeonholes and the <em>transitions</em> traversed while reading a string as pigeons. If a string has length greater than the number of states <span class="math inline">\(|Q|\)</span>, then while processing the string, the automaton visits more than <span class="math inline">\(|Q|\)</span> states (counting repetitions). Since there are only <span class="math inline">\(|Q|\)</span> distinct states, <em>at least one state must be visited twice</em>. That repeated state corresponds to a <strong>cycle</strong> in the automaton.</p>
+<h5 id="infinite-regular-languages-must-have-cycles"><strong>1.3 Infinite Regular Languages Must Have Cycles</strong></h5>
+<p>Consider an infinite regular language <span class="math inline">\(L\)</span> recognized by an FSA with <span class="math inline">\(m\)</span> states. Since <span class="math inline">\(L\)</span> is infinite, there must be strings in <span class="math inline">\(L\)</span> of arbitrarily large length. When the FSA processes a sufficiently long string (one with more than <span class="math inline">\(m\)</span> symbols), it visits more than <span class="math inline">\(m\)</span> transitions. By the Pigeonhole Principle, some state <span class="math inline">\(q\)</span> must be revisited.</p>
+<!-- DIAGRAM HERE -->
+<p>This means the automaton’s path looks like: <span class="math display">\[\text{start} \xrightarrow{\text{read } x} q \xrightarrow{\text{read } y} q \xrightarrow{\text{read } z} \text{accept}\]</span> where <span class="math inline">\(y\)</span> is the string that “loops” back to <span class="math inline">\(q\)</span>. The crucial observation: <em>since the machine is deterministic and <span class="math inline">\(y\)</span> returns to <span class="math inline">\(q\)</span></em>, you can go around the loop any number of times: <span class="math display">\[x y^0 z, \quad x y^1 z, \quad x y^2 z, \quad x y^3 z, \quad \ldots\]</span> all lead to the same accepting state. Therefore, <strong>all these strings belong to <span class="math inline">\(L\)</span></strong>.</p>
+<h5 id="the-pumping-lemma-for-regular-languages"><strong>1.4 The Pumping Lemma for Regular Languages</strong></h5>
+<h6 id="formal-statement"><strong>1.4.1 Formal Statement</strong></h6>
+<p><strong>Pumping Lemma:</strong> If <span class="math inline">\(L \subseteq \Sigma^*\)</span> is a regular language, then there exists an integer <span class="math inline">\(m \geq 1\)</span> (called the <strong>pumping length</strong> or <strong>critical length</strong>) such that for every string <span class="math inline">\(w \in L\)</span> with <span class="math inline">\(|w| \geq m\)</span>, there exists a decomposition <span class="math inline">\(w = xyz\)</span> satisfying:</p>
+<ol type="1">
+<li><span class="math inline">\(|y| \geq 1\)</span> (the “pump” <span class="math inline">\(y\)</span> is non-empty)</li>
+<li><span class="math inline">\(|xy| \leq m\)</span> (the pump occurs early in the string)</li>
+<li><span class="math inline">\(xy^i z \in L\)</span> for all <span class="math inline">\(i \geq 0\)</span> (pumping any number of times stays in <span class="math inline">\(L\)</span>)</li>
+</ol>
+<p>The pumping length <span class="math inline">\(m\)</span> can be taken to be the number of states in the FSA recognizing <span class="math inline">\(L\)</span>.</p>
+<p><strong>Proof sketch:</strong> Let <span class="math inline">\(M = (Q, \Sigma, \delta, q_0, F)\)</span> be an FSA with <span class="math inline">\(|Q| = m\)</span> states recognizing <span class="math inline">\(L\)</span>. Take any <span class="math inline">\(w \in L\)</span> with <span class="math inline">\(|w| \geq m\)</span>. While reading <span class="math inline">\(w\)</span>, the machine passes through at least <span class="math inline">\(m+1\)</span> states (including the start). By the Pigeonhole Principle, some state <span class="math inline">\(q\)</span> is repeated. Let the path be:</p>
+<p><span class="math display">\[q_0 \xrightarrow{x} q \xrightarrow{y} q \xrightarrow{z} q_f \in F\]</span></p>
+<p>Since the first repetition must occur within the first <span class="math inline">\(m+1\)</span> states visited (i.e., after reading at most <span class="math inline">\(m\)</span> symbols), we have <span class="math inline">\(|xy| \leq m\)</span>. Since <span class="math inline">\(y\)</span> is the string taking us from <span class="math inline">\(q\)</span> back to <span class="math inline">\(q\)</span>, we have <span class="math inline">\(|y| \geq 1\)</span>. And since <span class="math inline">\(\delta^*(q, y) = q\)</span>, pumping <span class="math inline">\(y\)</span> any number of times still returns to <span class="math inline">\(q\)</span>, after which <span class="math inline">\(z\)</span> takes us to the accepting state. <span class="math inline">\(\square\)</span></p>
+<h6 id="necessary-but-not-sufficient"><strong>1.4.2 Necessary but Not Sufficient</strong></h6>
+<p>The Pumping Lemma gives only a <strong>necessary condition</strong> for regularity, not a sufficient one. This means:</p>
+<ul>
+<li>If <span class="math inline">\(L\)</span> is regular <span class="math inline">\(\Rightarrow\)</span> <span class="math inline">\(L\)</span> satisfies the Pumping Lemma (guaranteed)</li>
+<li>If <span class="math inline">\(L\)</span> satisfies the Pumping Lemma <span class="math inline">\(\not\Rightarrow\)</span> <span class="math inline">\(L\)</span> is regular (some non-regular languages also satisfy it!)</li>
+</ul>
+<p>Therefore:</p>
+<ul>
+<li><strong>Cannot use it to prove</strong> a language is regular</li>
+<li><strong>Can use it to prove</strong> a language is not regular (via the contrapositive)</li>
+</ul>
+<h6 id="the-contrapositive-proving-non-regularity"><strong>1.4.3 The Contrapositive: Proving Non-Regularity</strong></h6>
+<p>The <strong>contrapositive</strong> of the Pumping Lemma is:</p>
+<blockquote>
+<p>If for <strong>every</strong> integer <span class="math inline">\(m \geq 1\)</span> there <strong>exists</strong> a string <span class="math inline">\(w \in L\)</span> with <span class="math inline">\(|w| \geq m\)</span> such that for <strong>every</strong> decomposition <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|y| \geq 1\)</span> and <span class="math inline">\(|xy| \leq m\)</span>, there <strong>exists</strong> some <span class="math inline">\(i \geq 0\)</span> with <span class="math inline">\(xy^i z \notin L\)</span>, then <span class="math inline">\(L\)</span> is <strong>not regular</strong>.</p>
+</blockquote>
+<p>This is the tool we actually use. Think of it as a two-player game:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><strong>Player 1 (Adversary)</strong></th>
+<th style="text-align: left;"><strong>Player 2 (You)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Picks any <span class="math inline">\(m \geq 1\)</span></td>
+<td style="text-align: left;">You choose <span class="math inline">\(w \in L\)</span> with <span class="math inline">\(\|w\| \geq m\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Picks any split <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(\|y\| \geq 1\)</span> and <span class="math inline">\(\|xy\| \leq m\)</span></td>
+<td style="text-align: left;">You find <span class="math inline">\(i \geq 0\)</span> such that <span class="math inline">\(xy^iz \notin L\)</span></td>
+</tr>
+</tbody>
+</table>
+<p><strong>You win</strong> (language is not regular) if you can always respond successfully, regardless of the adversary’s choices.</p>
+<h6 id="standard-proof-template"><strong>1.4.4 Standard Proof Template</strong></h6>
+<p>Here is the standard structure for a Pumping Lemma proof:</p>
+<ol type="1">
+<li><strong>Assume for contradiction</strong> that <span class="math inline">\(L\)</span> is regular.</li>
+<li><strong>Let <span class="math inline">\(m \geq 1\)</span></strong> be the pumping length given by the Pumping Lemma.</li>
+<li><strong>Choose a specific word</strong> <span class="math inline">\(w \in L\)</span> with <span class="math inline">\(|w| \geq m\)</span> (pick it cleverly so that any valid split must pump outside <span class="math inline">\(L\)</span>).</li>
+<li><strong>Consider an arbitrary valid split</strong> <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|y| \geq 1\)</span> and <span class="math inline">\(|xy| \leq m\)</span>.</li>
+<li><strong>Use the constraint <span class="math inline">\(|xy| \leq m\)</span></strong> to restrict where <span class="math inline">\(y\)</span> can appear.</li>
+<li><strong>Find a specific <span class="math inline">\(i \geq 0\)</span></strong> such that <span class="math inline">\(xy^i z \notin L\)</span>.</li>
+<li><strong>Conclude</strong> that the Pumping Lemma is violated, so <span class="math inline">\(L\)</span> is not regular.</li>
+</ol>
+<p><strong>Choosing the right word</strong> is the most creative step. A good choice forces <span class="math inline">\(y\)</span> to consist of a single type of symbol, making it easy to show that pumping breaks the language’s structure.</p>
+<h6 id="classic-example-l-an-bn-mid-n-0"><strong>1.4.5 Classic Example: <span class="math inline">\(L = \{a^n b^n \mid n &gt; 0\}\)</span></strong></h6>
+<p><strong>Claim:</strong> <span class="math inline">\(L = \{a^n b^n \mid n &gt; 0\}\)</span> is not regular.</p>
+<p><strong>Proof:</strong></p>
+<ol type="1">
+<li>Suppose <span class="math inline">\(L\)</span> is regular. Let <span class="math inline">\(m\)</span> be the pumping length.</li>
+<li>Choose <span class="math inline">\(w = a^m b^m \in L\)</span>. Note <span class="math inline">\(|w| = 2m \geq m\)</span>.</li>
+<li>Consider any split <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|xy| \leq m\)</span> and <span class="math inline">\(|y| \geq 1\)</span>.</li>
+<li>Since <span class="math inline">\(|xy| \leq m\)</span> and the first <span class="math inline">\(m\)</span> characters of <span class="math inline">\(w\)</span> are all <span class="math inline">\(a\)</span>’s, the substring <span class="math inline">\(xy\)</span> lies entirely within the <span class="math inline">\(a\)</span>-block. Therefore <span class="math inline">\(x = a^p\)</span> and <span class="math inline">\(y = a^q\)</span> for some <span class="math inline">\(p \geq 0\)</span>, <span class="math inline">\(q \geq 1\)</span> with <span class="math inline">\(p + q \leq m\)</span>.</li>
+<li>So <span class="math inline">\(z = a^{m-p-q} b^m\)</span>.</li>
+<li>Consider <span class="math inline">\(i = 2\)</span>: <span class="math inline">\(xy^2 z = a^p \cdot a^{2q} \cdot a^{m-p-q} b^m = a^{m+q} b^m\)</span>.</li>
+<li>Since <span class="math inline">\(q \geq 1\)</span>, the pumped string has <span class="math inline">\(m + q &gt; m\)</span> a’s and only <span class="math inline">\(m\)</span> b’s. Therefore <span class="math inline">\(xy^2 z \notin L\)</span>.</li>
+</ol>
+<p>This contradicts the Pumping Lemma. Therefore <span class="math inline">\(L\)</span> is not regular. <span class="math inline">\(\square\)</span></p>
+<p><strong>Three cases of the lecture analysis:</strong> The lecture also directly analyzed all possible splits without relying on <span class="math inline">\(|xy| \leq m\)</span>, to show every possible split breaks:</p>
+<ul>
+<li><strong>Case 1:</strong> <span class="math inline">\(y = a^k\)</span> (only a’s) — pumping gives <span class="math inline">\(a^{m+k} b^m \notin L\)</span> (more a’s than b’s)</li>
+<li><strong>Case 2:</strong> <span class="math inline">\(y = b^k\)</span> (only b’s) — pumping gives <span class="math inline">\(a^m b^{m+k} \notin L\)</span> (more b’s than a’s)</li>
+<li><strong>Case 3:</strong> <span class="math inline">\(y = a^k b^s\)</span> (mixed) — pumping gives <span class="math inline">\(a^{m-k}(a^k b^s)^2 b^{m-s} \notin L\)</span> (b’s appear in the middle)</li>
+</ul>
+<p>In all cases, some pumped string is not of the form <span class="math inline">\(a^n b^n\)</span>.</p>
+<h5 id="pushdown-automata"><strong>1.5 Pushdown Automata</strong></h5>
+<h6 id="motivation-going-beyond-regular-languages"><strong>1.5.1 Motivation: Going Beyond Regular Languages</strong></h6>
+<p>The Pumping Lemma shows that FSAs are insufficient for languages like <span class="math inline">\(\{a^n b^n\}\)</span> because they lack memory for counting. To recognize such languages, we need a model with <em>more</em> memory. The natural extension is to add a <strong>stack</strong> to the FSA, yielding a <strong>Pushdown Automaton (PDA)</strong>.</p>
+<p>The hierarchy of computational models (from weakest to strongest) looks like:</p>
+<ul>
+<li><strong>Combinational logic</strong> (no memory, just Boolean circuits)</li>
+<li><strong>Finite State Automata</strong> (fixed, finite memory: only the current state)</li>
+<li><strong>Pushdown Automata</strong> (unbounded stack memory: can recognize context-free languages)</li>
+<li><strong>Turing Machines</strong> (unlimited tape memory: can compute anything computable)</li>
+</ul>
+<p>PDAs sit precisely in the layer above FSAs and are capable of recognizing <strong>context-free languages</strong> (CFLs), which include most programming language constructs (nested brackets, balanced parentheses, etc.).</p>
+<h6 id="what-is-a-stack"><strong>1.5.2 What is a Stack?</strong></h6>
+<p>A <strong>stack</strong> is a last-in, first-out (LIFO) data structure. Think of a stack of plates: you can only add or remove from the top.</p>
+<!-- DIAGRAM HERE -->
+<p>Operations:</p>
+<ul>
+<li><strong>Push:</strong> Insert a new symbol on top of the stack.</li>
+<li><strong>Pop:</strong> Remove the top symbol from the stack (also “reading” it).</li>
+</ul>
+<p>The stack always has a special <strong>bottom-of-stack symbol</strong> <span class="math inline">\(Z_0\)</span> that marks the bottom. You can check whether the stack is “empty” (contains only <span class="math inline">\(Z_0\)</span>).</p>
+<p><strong>Example — push <span class="math inline">\(a\)</span>, then <span class="math inline">\(b\)</span>, then <span class="math inline">\(c\)</span>:</strong></p>
+<p>Starting from an empty stack (containing only <span class="math inline">\(Z_0\)</span>):</p>
+<ol type="1">
+<li>After pushing <span class="math inline">\(a\)</span>: stack (top to bottom) <span class="math inline">\(= a, Z_0\)</span></li>
+<li>After pushing <span class="math inline">\(b\)</span>: stack <span class="math inline">\(= b, a, Z_0\)</span></li>
+<li>After pushing <span class="math inline">\(c\)</span>: stack <span class="math inline">\(= c, b, a, Z_0\)</span></li>
+<li>After popping: <span class="math inline">\(c\)</span> is removed; stack <span class="math inline">\(= b, a, Z_0\)</span></li>
+</ol>
+<p>The last symbol pushed (<span class="math inline">\(c\)</span>) is the first to be popped. This is the LIFO property.</p>
+<p><strong>Historical note:</strong> The concept of a stack was introduced by Alan Turing in his 1946 paper on the Automatic Computing Engine (ACE). He called the operations BURY and UNBURY, and used them in the theory of subroutines.</p>
+<h6 id="informal-description"><strong>1.5.3 Informal Description</strong></h6>
+<p>An FSA has a read head on an input tape and a finite control unit that remembers the current state.</p>
+<p>A <strong>Pushdown Automaton</strong> is identical, but adds a stack as external memory:</p>
+<ul>
+<li>The <strong>finite control</strong> reads the next input symbol and the <strong>top of the stack</strong>.</li>
+<li>Based on these (and the current state), it transitions to a new state and <em>replaces</em> the top of the stack with a string of symbols.</li>
+</ul>
+<!-- DIAGRAM HERE -->
+<p>The PDA can:</p>
+<ul>
+<li><strong>Push</strong> symbols onto the stack (by replacing the top with a longer string)</li>
+<li><strong>Pop</strong> the top symbol (by replacing it with <span class="math inline">\(\varepsilon\)</span>)</li>
+<li><strong>Leave the stack unchanged</strong> (by replacing the top with itself)</li>
+<li>Make <strong><span class="math inline">\(\varepsilon\)</span>-moves</strong> (read nothing from input, only modify the stack)</li>
+</ul>
+<h6 id="formal-definition"><strong>1.5.4 Formal Definition</strong></h6>
+<p>A <strong>Pushdown Automaton</strong> is a 7-tuple:</p>
+<p><span class="math display">\[P = (Q,\, \Sigma,\, \Gamma,\, \delta,\, q_0,\, Z_0,\, F)\]</span></p>
+<p>where:</p>
+<ul>
+<li><span class="math inline">\(Q\)</span>: finite set of <strong>states</strong></li>
+<li><span class="math inline">\(\Sigma\)</span>: finite <strong>input alphabet</strong></li>
+<li><span class="math inline">\(\Gamma\)</span>: finite <strong>stack alphabet</strong> (symbols that can appear on the stack)</li>
+<li><span class="math inline">\(\delta: Q \times (\Sigma \cup \{\varepsilon\}) \times \Gamma \rightarrow \mathcal{P}(Q \times \Gamma^*)\)</span>: the <strong>transition function</strong></li>
+<li><span class="math inline">\(q_0 \in Q\)</span>: the <strong>initial state</strong></li>
+<li><span class="math inline">\(Z_0 \in \Gamma\)</span>: the <strong>initial stack symbol</strong> (bottom-of-stack marker)</li>
+<li><span class="math inline">\(F \subseteq Q\)</span>: the set of <strong>accepting (final) states</strong></li>
+</ul>
+<p><strong>Reading the transition function:</strong> A transition <span class="math inline">\(\delta(q, a, A) \ni (q', \alpha)\)</span> means: &gt; In state <span class="math inline">\(q\)</span>, reading input symbol <span class="math inline">\(a\)</span> (or <span class="math inline">\(\varepsilon\)</span>), with <span class="math inline">\(A\)</span> on top of the stack: move to state <span class="math inline">\(q'\)</span> and replace <span class="math inline">\(A\)</span> with the string <span class="math inline">\(\alpha\)</span>.</p>
+<p>Transitions are written on arrows as: <span class="math inline">\(a,\, A / \alpha\)</span> meaning “read <span class="math inline">\(a\)</span> from input, pop <span class="math inline">\(A\)</span> from stack, push <span class="math inline">\(\alpha\)</span>.”</p>
+<ul>
+<li>To <strong>push</strong> <span class="math inline">\(B\)</span> below <span class="math inline">\(A\)</span>: write <span class="math inline">\(A / BA\)</span> (replace <span class="math inline">\(A\)</span> with <span class="math inline">\(BA\)</span>; <span class="math inline">\(B\)</span> is now on top)</li>
+<li>To <strong>pop</strong> <span class="math inline">\(A\)</span>: write <span class="math inline">\(A / \varepsilon\)</span> (replace <span class="math inline">\(A\)</span> with nothing)</li>
+<li>To <strong>leave stack unchanged</strong>: write <span class="math inline">\(A / A\)</span></li>
+</ul>
+<h6 id="moves-of-a-pda"><strong>1.5.5 Moves of a PDA</strong></h6>
+<p>Each step of a PDA depends on three things:</p>
+<ol type="1">
+<li>The <strong>current state</strong> <span class="math inline">\(q\)</span></li>
+<li>The <strong>current input symbol</strong> (or <span class="math inline">\(\varepsilon\)</span> for a silent move)</li>
+<li>The <strong>top of the stack</strong></li>
+</ol>
+<p>In one move, the PDA simultaneously:</p>
+<ul>
+<li><strong>Changes state</strong> to some <span class="math inline">\(q' \in Q\)</span></li>
+<li><strong>Advances</strong> the input head (or stays put for <span class="math inline">\(\varepsilon\)</span>-moves)</li>
+<li><strong>Replaces</strong> the top-of-stack symbol <span class="math inline">\(A\)</span> with a string <span class="math inline">\(\alpha \in \Gamma^*\)</span></li>
+</ul>
+<p>Since <span class="math inline">\(\delta\)</span> maps to a <em>set</em> of possible next configurations, PDAs are inherently <strong>nondeterministic</strong> in their general form. (A PDA is deterministic if <span class="math inline">\(|\delta(q, a, A)| \leq 1\)</span> for all <span class="math inline">\(q, a, A\)</span> and if <span class="math inline">\(\delta(q, a, A) \neq \emptyset\)</span> implies <span class="math inline">\(\delta(q, \varepsilon, A) = \emptyset\)</span>.)</p>
+<h6 id="acceptance-conditions"><strong>1.5.6 Acceptance Conditions</strong></h6>
+<p>A PDA can accept input in two different ways:</p>
+<ul>
+<li><strong>Acceptance by final state:</strong> The input is fully consumed and the PDA is in an accepting state <span class="math inline">\(q \in F\)</span>. The stack content does not matter.</li>
+<li><strong>Acceptance by empty stack:</strong> The input is fully consumed and the stack is empty (contains only <span class="math inline">\(Z_0\)</span> or nothing). The state does not matter.</li>
+</ul>
+<p>For <strong>nondeterministic</strong> PDAs, these two acceptance modes are equivalent: any language accepted by one mode can be accepted by the other with an appropriate PDA. For <strong>deterministic</strong> PDAs, however, the two modes are <strong>not equivalent</strong>.</p>
+<p><em>Note:</em> Acceptance by empty stack has a subtle restriction: the language accepted by an empty-stack PDA must be prefix-free (no string in the language is a proper prefix of another string in the language). This is because once the stack empties on reading <span class="math inline">\(w\)</span>, processing any extension <span class="math inline">\(wz\)</span> becomes impossible.</p>
+<h6 id="step-by-step-example-pda-for-an-bn-mid-n-geq-1"><strong>1.5.7 Step-by-Step Example: PDA for <span class="math inline">\(\{a^n b^n \mid n \geq 1\}\)</span></strong></h6>
+<p>The key idea: <strong>push one <span class="math inline">\(A\)</span> for each <span class="math inline">\(a\)</span>, then pop one <span class="math inline">\(A\)</span> for each <span class="math inline">\(b\)</span></strong>. If the stack is exactly empty when all <span class="math inline">\(b\)</span>’s are consumed, the counts matched.</p>
+<p><strong>PDA construction:</strong></p>
+<p>States: <span class="math inline">\(p_0\)</span> (start), <span class="math inline">\(p_1\)</span> (reading <span class="math inline">\(a\)</span>’s), <span class="math inline">\(p_2\)</span> (reading <span class="math inline">\(b\)</span>’s), <span class="math inline">\(p_3\)</span> (accepting)</p>
+<p>Stack alphabet: <span class="math inline">\(\Gamma = \{Z_0, A\}\)</span>, with <span class="math inline">\(Z_0\)</span> as the bottom marker.</p>
+<p>Transitions:</p>
+<ul>
+<li><span class="math inline">\(p_0 \to p_1\)</span>: <span class="math inline">\(a,\, Z_0 / AZ_0\)</span> — read first <span class="math inline">\(a\)</span>; push <span class="math inline">\(A\)</span> on top of <span class="math inline">\(Z_0\)</span></li>
+<li><span class="math inline">\(p_1 \circlearrowleft\)</span>: <span class="math inline">\(a,\, A / AA\)</span> — read subsequent <span class="math inline">\(a\)</span>’s; push another <span class="math inline">\(A\)</span></li>
+<li><span class="math inline">\(p_1 \to p_2\)</span>: <span class="math inline">\(b,\, A / \varepsilon\)</span> — first <span class="math inline">\(b\)</span>; pop one <span class="math inline">\(A\)</span></li>
+<li><span class="math inline">\(p_2 \circlearrowleft\)</span>: <span class="math inline">\(b,\, A / \varepsilon\)</span> — subsequent <span class="math inline">\(b\)</span>’s; pop one <span class="math inline">\(A\)</span> each time</li>
+<li><span class="math inline">\(p_2 \to p_3\)</span>: <span class="math inline">\(\varepsilon,\, Z_0 / Z_0\)</span> — end of input; if <span class="math inline">\(Z_0\)</span> is on top (all <span class="math inline">\(A\)</span>’s were popped), accept</li>
+</ul>
+<p><strong>Trace for input “aabb”:</strong></p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">Step</th>
+<th style="text-align: center;">State</th>
+<th style="text-align: center;">Remaining Input</th>
+<th style="text-align: center;">Stack (top first)</th>
+<th style="text-align: left;">Transition</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">1</td>
+<td style="text-align: center;"><span class="math inline">\(p_0\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(\mathbf{a}abb\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(Z_0\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(p_0 \to p_1\)</span>: <span class="math inline">\(a, Z_0/AZ_0\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">2</td>
+<td style="text-align: center;"><span class="math inline">\(p_1\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(\mathbf{a}bb\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(A, Z_0\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(p_1 \circlearrowleft\)</span>: <span class="math inline">\(a, A/AA\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">3</td>
+<td style="text-align: center;"><span class="math inline">\(p_1\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(\mathbf{b}b\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(A, A, Z_0\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(p_1 \to p_2\)</span>: <span class="math inline">\(b, A/\varepsilon\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">4</td>
+<td style="text-align: center;"><span class="math inline">\(p_2\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(\mathbf{b}\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(A, Z_0\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(p_2 \circlearrowleft\)</span>: <span class="math inline">\(b, A/\varepsilon\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">5</td>
+<td style="text-align: center;"><span class="math inline">\(p_2\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(\varepsilon\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(Z_0\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(p_2 \to p_3\)</span>: <span class="math inline">\(\varepsilon, Z_0/Z_0\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">6</td>
+<td style="text-align: center;"><span class="math inline">\(p_3\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(\varepsilon\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(Z_0\)</span></td>
+<td style="text-align: left;"><strong>ACCEPT</strong></td>
+</tr>
+</tbody>
+</table>
+<h4 id="definitions"><strong>2. Definitions</strong></h4>
+<ul>
+<li><strong>Regular Language</strong>: A language <span class="math inline">\(L \subseteq \Sigma^*\)</span> that can be recognized by some finite state automaton. Equivalently, a language for which there exists an FSA <span class="math inline">\(M\)</span> with <span class="math inline">\(L = L(M)\)</span>.</li>
+<li><strong>Pumping Lemma</strong>: A theorem stating that every regular language <span class="math inline">\(L\)</span> has a pumping length <span class="math inline">\(m \geq 1\)</span> such that any word <span class="math inline">\(w \in L\)</span> with <span class="math inline">\(|w| \geq m\)</span> can be split as <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|y| \geq 1\)</span>, <span class="math inline">\(|xy| \leq m\)</span>, and <span class="math inline">\(xy^i z \in L\)</span> for all <span class="math inline">\(i \geq 0\)</span>.</li>
+<li><strong>Pumping Length (<span class="math inline">\(m\)</span>)</strong>: The critical length in the Pumping Lemma; can be taken as the number of states in the FSA recognizing the language. Any string in the language of length <span class="math inline">\(\geq m\)</span> must be “pumpable.”</li>
+<li><strong>Pumping (of a string)</strong>: Repeating the middle portion <span class="math inline">\(y\)</span> of a decomposition <span class="math inline">\(w = xyz\)</span> any number of times. Pumping <span class="math inline">\(i\)</span> times gives <span class="math inline">\(xy^iz\)</span>.</li>
+<li><strong>Contrapositive of the Pumping Lemma</strong>: If for every <span class="math inline">\(m \geq 1\)</span> there exists <span class="math inline">\(w \in L\)</span> with <span class="math inline">\(|w| \geq m\)</span> such that every valid split <span class="math inline">\(w = xyz\)</span> (with <span class="math inline">\(|y| \geq 1\)</span>, <span class="math inline">\(|xy| \leq m\)</span>) has some <span class="math inline">\(i \geq 0\)</span> with <span class="math inline">\(xy^iz \notin L\)</span>, then <span class="math inline">\(L\)</span> is not regular.</li>
+<li><strong>Pigeonhole Principle</strong>: If <span class="math inline">\(n\)</span> objects are placed into <span class="math inline">\(k &lt; n\)</span> containers, at least one container must hold more than one object.</li>
+<li><strong>Cycle (in an FSA)</strong>: A path in the state diagram that starts and ends at the same state. In infinite regular languages, cycles are necessary for generating infinitely many strings.</li>
+<li><strong>Pushdown Automaton (PDA)</strong>: A computational model consisting of a finite control unit, an input tape, and a stack. Formally a 7-tuple <span class="math inline">\((Q, \Sigma, \Gamma, \delta, q_0, Z_0, F)\)</span>. PDAs recognize exactly the class of context-free languages.</li>
+<li><strong>Stack</strong>: A last-in, first-out (LIFO) data structure used by a PDA as its memory. Supports two operations: push (add to top) and pop (remove from top).</li>
+<li><strong>Stack Alphabet (<span class="math inline">\(\Gamma\)</span>)</strong>: The finite set of symbols that may appear on the PDA’s stack. Typically includes a special bottom-of-stack marker <span class="math inline">\(Z_0\)</span>.</li>
+<li><strong>Bottom-of-Stack Symbol (<span class="math inline">\(Z_0\)</span>)</strong>: A special symbol at the bottom of the PDA’s stack, used to detect when the stack is empty.</li>
+<li><strong>PDA Transition Function (<span class="math inline">\(\delta\)</span>)</strong>: A function <span class="math inline">\(\delta: Q \times (\Sigma \cup \{\varepsilon\}) \times \Gamma \to \mathcal{P}(Q \times \Gamma^*)\)</span> specifying the PDA’s moves. A transition <span class="math inline">\(\delta(q, a, A) \ni (q', \alpha)\)</span> means: in state <span class="math inline">\(q\)</span>, reading <span class="math inline">\(a\)</span> from input and <span class="math inline">\(A\)</span> from the stack top, move to state <span class="math inline">\(q'\)</span> and replace <span class="math inline">\(A\)</span> with string <span class="math inline">\(\alpha\)</span>.</li>
+<li><strong><span class="math inline">\(\varepsilon\)</span>-move</strong>: A transition in a PDA that reads no input symbol. The PDA changes state and modifies the stack without consuming any input character.</li>
+<li><strong>Acceptance by Final State</strong>: A PDA accepts a string if, after consuming all input, it is in a state <span class="math inline">\(q \in F\)</span>.</li>
+<li><strong>Acceptance by Empty Stack</strong>: A PDA accepts a string if, after consuming all input, the stack is empty (contains only <span class="math inline">\(Z_0\)</span>). Equivalent to acceptance by final state for nondeterministic PDAs.</li>
+<li><strong>Context-Free Language (CFL)</strong>: A language recognized by a pushdown automaton, or equivalently, generated by a context-free grammar. Every regular language is context-free, but not vice versa.</li>
+<li><strong>Nondeterministic PDA</strong>: A PDA where <span class="math inline">\(\delta(q, a, A)\)</span> may contain multiple possible transitions (a set of size <span class="math inline">\(&gt; 1\)</span>). The PDA accepts if <em>some</em> sequence of choices leads to acceptance.</li>
+<li><strong>Deterministic PDA (DPDA)</strong>: A PDA with at most one possible transition at each step: <span class="math inline">\(|\delta(q, a, A)| \leq 1\)</span> for all <span class="math inline">\(q, a, A\)</span>, and <span class="math inline">\(\delta(q, a, A) \neq \emptyset\)</span> implies <span class="math inline">\(\delta(q, \varepsilon, A) = \emptyset\)</span>.</li>
+</ul>
+<h4 id="formulas"><strong>3. Formulas</strong></h4>
+<ul>
+<li><strong>Pumping Lemma (Regular Languages)</strong>: For regular <span class="math inline">\(L\)</span>, <span class="math inline">\(\exists m \geq 1\)</span> such that <span class="math inline">\(\forall w \in L\)</span> with <span class="math inline">\(|w| \geq m\)</span>, <span class="math inline">\(\exists\)</span> split <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|y| \geq 1\)</span>, <span class="math inline">\(|xy| \leq m\)</span>, and <span class="math inline">\(\forall i \geq 0: xy^iz \in L\)</span></li>
+<li><strong>Contrapositive (for proofs)</strong>: <span class="math inline">\(L\)</span> is not regular if <span class="math inline">\(\forall m \geq 1\)</span>, <span class="math inline">\(\exists w \in L\)</span> with <span class="math inline">\(|w| \geq m\)</span> such that <span class="math inline">\(\forall\)</span> splits <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|y| \geq 1\)</span> and <span class="math inline">\(|xy| \leq m\)</span>, <span class="math inline">\(\exists i \geq 0: xy^iz \notin L\)</span></li>
+<li><strong>Length after pumping</strong>: <span class="math inline">\(|xy^iz| = |w| + (i-1)|y|\)</span></li>
+<li><strong>Constraint on split location</strong>: <span class="math inline">\(|xy| \leq m\)</span> forces <span class="math inline">\(y\)</span> to lie within the first <span class="math inline">\(m\)</span> symbols of <span class="math inline">\(w\)</span></li>
+<li><strong>PDA transition notation</strong>: <span class="math inline">\(a,\, A / \alpha\)</span> — read <span class="math inline">\(a\)</span> from input, pop <span class="math inline">\(A\)</span> from stack, push <span class="math inline">\(\alpha\)</span>; write <span class="math inline">\(\varepsilon, A / \alpha\)</span> for a silent (<span class="math inline">\(\varepsilon\)</span>-)move</li>
+<li><strong>PDA formal definition</strong>: <span class="math inline">\(P = (Q, \Sigma, \Gamma, \delta, q_0, Z_0, F)\)</span> where <span class="math inline">\(\delta: Q \times (\Sigma \cup \{\varepsilon\}) \times \Gamma \to \mathcal{P}(Q \times \Gamma^*)\)</span></li>
+<li><strong>Acceptance by final state</strong>: <span class="math inline">\(w\)</span> is accepted iff <span class="math inline">\(\delta^*(q_0, w, Z_0) \ni (q_f, \gamma)\)</span> for some <span class="math inline">\(q_f \in F\)</span> and <span class="math inline">\(\gamma \in \Gamma^*\)</span></li>
+</ul>
+<h4 id="examples"><strong>4. Examples</strong></h4>
+<h5 id="prove-l-an-bn-mid-n-0-is-not-regular-lecture-5-example-1"><strong>4.1. Prove <span class="math inline">\(L = \{a^n b^n \mid n &gt; 0\}\)</span> is Not Regular</strong> (Lecture 5, Example 1)</h5>
+<p>Use the Pumping Lemma to prove that <span class="math inline">\(L = \{a^n b^n \mid n &gt; 0\}\)</span> is not a regular language.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Choose the word <span class="math inline">\(a^m b^m\)</span>. The constraint <span class="math inline">\(|xy| \leq m\)</span> forces <span class="math inline">\(y\)</span> to lie entirely in the <span class="math inline">\(a\)</span>-block. Any pumping then unbalances the <span class="math inline">\(a\)</span>-to-<span class="math inline">\(b\)</span> ratio.</p>
+<ol type="1">
+<li><strong>Assume for contradiction</strong> that <span class="math inline">\(L\)</span> is regular. Let <span class="math inline">\(m \geq 1\)</span> be the pumping length.</li>
+<li><strong>Choose the word</strong> <span class="math inline">\(w = a^m b^m \in L\)</span>. Note <span class="math inline">\(|w| = 2m \geq m\)</span>, so the Pumping Lemma applies.</li>
+<li><strong>Consider an arbitrary split</strong> <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|xy| \leq m\)</span> and <span class="math inline">\(|y| \geq 1\)</span>.</li>
+<li><strong>Restrict the position of <span class="math inline">\(y\)</span>:</strong> Since the first <span class="math inline">\(m\)</span> characters of <span class="math inline">\(w = a^m b^m\)</span> are all <span class="math inline">\(a\)</span>’s, and <span class="math inline">\(|xy| \leq m\)</span>, the portion <span class="math inline">\(xy\)</span> consists entirely of <span class="math inline">\(a\)</span>’s. Therefore <span class="math inline">\(x = a^p\)</span> and <span class="math inline">\(y = a^q\)</span> for some <span class="math inline">\(p \geq 0\)</span>, <span class="math inline">\(q \geq 1\)</span> with <span class="math inline">\(p + q \leq m\)</span>, and <span class="math inline">\(z = a^{m-p-q} b^m\)</span>.</li>
+<li><strong>Pump with <span class="math inline">\(i = 2\)</span>:</strong> <span class="math display">\[xy^2 z = a^p \cdot (a^q)^2 \cdot a^{m-p-q} b^m = a^{m+q} b^m\]</span></li>
+<li><strong>Verify failure:</strong> Since <span class="math inline">\(q \geq 1\)</span>, we have <span class="math inline">\(m + q \neq m\)</span>, so <span class="math inline">\(xy^2 z = a^{m+q} b^m \notin L\)</span> (unequal counts of <span class="math inline">\(a\)</span>’s and <span class="math inline">\(b\)</span>’s).</li>
+<li><strong>Conclusion:</strong> The Pumping Lemma is violated. Therefore <span class="math inline">\(L\)</span> is not regular. <span class="math inline">\(\square\)</span></li>
+</ol>
+<p><strong>Additional analysis — all three split cases:</strong> The lecture also showed this by exhausting all possible placements of <span class="math inline">\(y\)</span> in <span class="math inline">\(w = a^m b^m\)</span> (without assuming <span class="math inline">\(|xy| \leq m\)</span>):</p>
+<ul>
+<li><strong>(a)</strong> <span class="math inline">\(y = a^k\)</span>: pumping gives <span class="math inline">\(a^{m+k}b^m \notin L\)</span>.</li>
+<li><strong>(b)</strong> <span class="math inline">\(y = b^k\)</span>: pumping gives <span class="math inline">\(a^m b^{m+k} \notin L\)</span>.</li>
+<li><strong>(c)</strong> <span class="math inline">\(y = a^k b^s\)</span> (<span class="math inline">\(k, s \geq 1\)</span>): pumping gives <span class="math inline">\(a^{m-k}(a^k b^s)^2 b^{m-s}\)</span>. The middle contains <span class="math inline">\(b\)</span>’s followed by <span class="math inline">\(a\)</span>’s, so this string is not of the form <span class="math inline">\(a^n b^n\)</span>. Thus not in <span class="math inline">\(L\)</span>.</li>
+</ul>
+<p>In all three cases, pumping fails. <span class="math inline">\(\square\)</span></p>
+<p><strong>Answer:</strong> <span class="math inline">\(L = \{a^n b^n \mid n &gt; 0\}\)</span> is not regular.</p>
+</details>
+<h5 id="prove-l_2-an-b-an-mid-n-in-mathbbn-is-not-regular-tutorial-5-example-2"><strong>4.2. Prove <span class="math inline">\(L_2 = \{a^n b\, a^n \mid n \in \mathbb{N}\}\)</span> is Not Regular</strong> (Tutorial 5, Example 2)</h5>
+<p>Use the Pumping Lemma to prove that <span class="math inline">\(L_2 = \{a^n b\, a^n \mid n \in \mathbb{N}\}\)</span> is not a regular language over <span class="math inline">\(\Sigma = \{a, b\}\)</span>.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Choose <span class="math inline">\(a^m b\, a^m\)</span>. The <span class="math inline">\(b\)</span> in the center is a structural landmark: any valid string in <span class="math inline">\(L_2\)</span> has exactly one <span class="math inline">\(b\)</span> in the middle with equal <span class="math inline">\(a\)</span>-blocks on either side. Pumping the left <span class="math inline">\(a\)</span>-block destroys this symmetry.</p>
+<ol type="1">
+<li><p><strong>Assume for contradiction</strong> that <span class="math inline">\(L_2\)</span> is regular. Let <span class="math inline">\(m \geq 1\)</span> be the pumping length.</p></li>
+<li><p><strong>Choose the word</strong> <span class="math inline">\(w = a^m b\, a^m \in L_2\)</span>. Note <span class="math inline">\(|w| = 2m + 1 \geq m\)</span>.</p></li>
+<li><p><strong>Consider an arbitrary split</strong> <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|xy| \leq m\)</span> and <span class="math inline">\(|y| \geq 1\)</span>.</p></li>
+<li><p><strong>Restrict <span class="math inline">\(y\)</span>:</strong> Since <span class="math inline">\(|xy| \leq m\)</span> and the first <span class="math inline">\(m\)</span> characters are all <span class="math inline">\(a\)</span>’s, <span class="math inline">\(y\)</span> lies entirely in the leading <span class="math inline">\(a\)</span>-block. So <span class="math inline">\(x = a^{m-q_1}\)</span> (for some decomposition), <span class="math inline">\(y = a^q\)</span> with <span class="math inline">\(q \geq 1\)</span>, <span class="math inline">\(z = b\, a^m\)</span>.</p>
+<p>More precisely: <span class="math inline">\(x = a^p\)</span>, <span class="math inline">\(y = a^q\)</span>, <span class="math inline">\(z = a^{m-p-q} b\, a^m\)</span> with <span class="math inline">\(q \geq 1\)</span>, <span class="math inline">\(p + q \leq m\)</span>.</p></li>
+<li><p><strong>Pump with <span class="math inline">\(i = 2\)</span>:</strong> <span class="math display">\[xy^2 z = a^p \cdot a^{2q} \cdot a^{m-p-q} b\, a^m = a^{m+q} b\, a^m\]</span></p></li>
+<li><p><strong>Verify failure:</strong> <span class="math inline">\(xy^2 z = a^{m+q} b\, a^m\)</span>. For this to be in <span class="math inline">\(L_2\)</span>, we’d need <span class="math inline">\(m + q = m\)</span>, but <span class="math inline">\(q \geq 1\)</span> means <span class="math inline">\(m + q &gt; m\)</span>. The left and right <span class="math inline">\(a\)</span>-blocks have different lengths, so <span class="math inline">\(xy^2 z \notin L_2\)</span>.</p></li>
+<li><p><strong>Conclusion:</strong> Pumping Lemma is violated. <span class="math inline">\(L_2\)</span> is not regular. <span class="math inline">\(\square\)</span></p></li>
+</ol>
+<p><strong>Answer:</strong> <span class="math inline">\(L_2 = \{a^n b\, a^n \mid n \in \mathbb{N}\}\)</span> is not regular.</p>
+</details>
+<h5 id="construct-a-pda-for-l_1-an-bn-mid-n-geq-1-tutorial-5-example-3"><strong>4.3. Construct a PDA for <span class="math inline">\(L_1 = \{a^n b^n \mid n \geq 1\}\)</span></strong> (Tutorial 5, Example 3)</h5>
+<p>Show that <span class="math inline">\(L_1 = \{a^n b^n \mid n \geq 1\}\)</span> (which is not regular) is recognized by a pushdown automaton. Describe the PDA construction.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Use the stack to count <span class="math inline">\(a\)</span>’s: push one <span class="math inline">\(A\)</span> per <span class="math inline">\(a\)</span>, then pop one <span class="math inline">\(A\)</span> per <span class="math inline">\(b\)</span>. If the stack holds exactly <span class="math inline">\(Z_0\)</span> after all <span class="math inline">\(b\)</span>’s are consumed, the counts matched.</p>
+<ol type="1">
+<li><p><strong>Design the PDA:</strong></p>
+<ul>
+<li>States: <span class="math inline">\(p_0\)</span> (start), <span class="math inline">\(p_1\)</span> (reading <span class="math inline">\(a\)</span>’s), <span class="math inline">\(p_2\)</span> (reading <span class="math inline">\(b\)</span>’s), <span class="math inline">\(p_3\)</span> (accepting)</li>
+<li>Stack alphabet: <span class="math inline">\(\Gamma = \{Z_0, A\}\)</span></li>
+</ul></li>
+<li><p><strong>Transitions:</strong></p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Transition</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(p_0 \to p_1\)</span>: <span class="math inline">\(a,\, Z_0 / AZ_0\)</span></td>
+<td style="text-align: left;">First <span class="math inline">\(a\)</span>: push <span class="math inline">\(A\)</span> onto the stack</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(p_1 \circlearrowleft\)</span>: <span class="math inline">\(a,\, A / AA\)</span></td>
+<td style="text-align: left;">Each additional <span class="math inline">\(a\)</span>: push <span class="math inline">\(A\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(p_1 \to p_2\)</span>: <span class="math inline">\(b,\, A / \varepsilon\)</span></td>
+<td style="text-align: left;">First <span class="math inline">\(b\)</span>: pop one <span class="math inline">\(A\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(p_2 \circlearrowleft\)</span>: <span class="math inline">\(b,\, A / \varepsilon\)</span></td>
+<td style="text-align: left;">Each additional <span class="math inline">\(b\)</span>: pop one <span class="math inline">\(A\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(p_2 \to p_3\)</span>: <span class="math inline">\(\varepsilon,\, Z_0 / Z_0\)</span></td>
+<td style="text-align: left;">End of input with <span class="math inline">\(Z_0\)</span> on top: accept</td>
+</tr>
+</tbody>
+</table></li>
+<li><p><strong>Trace for <span class="math inline">\(w = "aabb"\)</span>:</strong></p>
+<ul>
+<li><span class="math inline">\(p_0 \xrightarrow{a,Z_0/AZ_0} p_1\)</span>: stack = <span class="math inline">\(A, Z_0\)</span></li>
+<li><span class="math inline">\(p_1 \xrightarrow{a,A/AA} p_1\)</span>: stack = <span class="math inline">\(A, A, Z_0\)</span></li>
+<li><span class="math inline">\(p_1 \xrightarrow{b,A/\varepsilon} p_2\)</span>: stack = <span class="math inline">\(A, Z_0\)</span></li>
+<li><span class="math inline">\(p_2 \xrightarrow{b,A/\varepsilon} p_2\)</span>: stack = <span class="math inline">\(Z_0\)</span></li>
+<li><span class="math inline">\(p_2 \xrightarrow{\varepsilon,Z_0/Z_0} p_3\)</span>: <strong>ACCEPT</strong> <span class="math inline">\(\checkmark\)</span></li>
+</ul></li>
+<li><p><strong>Correctness:</strong></p>
+<ul>
+<li>On input <span class="math inline">\(a^n b^n\)</span>: exactly <span class="math inline">\(n\)</span> <span class="math inline">\(A\)</span>’s are pushed, then <span class="math inline">\(n\)</span> <span class="math inline">\(A\)</span>’s are popped. The stack returns to <span class="math inline">\(Z_0\)</span>, and the PDA accepts.</li>
+<li>On input <span class="math inline">\(a^n b^k\)</span> with <span class="math inline">\(k \neq n\)</span>: either <span class="math inline">\(A\)</span>’s remain on the stack when <span class="math inline">\(b\)</span>’s run out, or <span class="math inline">\(Z_0\)</span> is encountered before all <span class="math inline">\(b\)</span>’s are read. Neither reaches <span class="math inline">\(p_3\)</span> on a valid <span class="math inline">\(\varepsilon\)</span>-transition.</li>
+</ul></li>
+</ol>
+<p><strong>Answer:</strong> The PDA with states <span class="math inline">\(p_0, p_1, p_2, p_3\)</span> (accepting) and the transitions above recognizes <span class="math inline">\(L_1 = \{a^n b^n \mid n \geq 1\}\)</span>.</p>
+</details>
+<h5 id="construct-a-pda-for-l_2-an-b-an-mid-n-geq-1-tutorial-5-example-4"><strong>4.4. Construct a PDA for <span class="math inline">\(L_2 = \{a^n b\, a^n \mid n \geq 1\}\)</span></strong> (Tutorial 5, Example 4)</h5>
+<p>Show that <span class="math inline">\(L_2 = \{a^n b\, a^n \mid n \geq 1\}\)</span> is recognized by a pushdown automaton.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Push one <span class="math inline">\(A\)</span> per <span class="math inline">\(a\)</span> before the <span class="math inline">\(b\)</span>, then use the single <span class="math inline">\(b\)</span> as a pivot, and pop one <span class="math inline">\(A\)</span> per <span class="math inline">\(a\)</span> after the <span class="math inline">\(b\)</span>. The stack being empty at the end confirms equal <span class="math inline">\(a\)</span>-counts.</p>
+<ol type="1">
+<li><p><strong>Design the PDA:</strong></p>
+<ul>
+<li>States: <span class="math inline">\(q_0\)</span> (start, reading left <span class="math inline">\(a\)</span>’s), <span class="math inline">\(q_1\)</span> (pivot: saw <span class="math inline">\(b\)</span>, now reading right <span class="math inline">\(a\)</span>’s), <span class="math inline">\(q_2\)</span> (accepting)</li>
+<li>Stack alphabet: <span class="math inline">\(\Gamma = \{Z_0, A\}\)</span></li>
+</ul></li>
+<li><p><strong>Transitions:</strong></p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Transition</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(q_0 \circlearrowleft\)</span>: <span class="math inline">\(a,\, Z_0 / AZ_0\)</span></td>
+<td style="text-align: left;">First <span class="math inline">\(a\)</span> (left side): push <span class="math inline">\(A\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(q_0 \circlearrowleft\)</span>: <span class="math inline">\(a,\, A / AA\)</span></td>
+<td style="text-align: left;">Each additional <span class="math inline">\(a\)</span> (left side): push <span class="math inline">\(A\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(q_0 \to q_1\)</span>: <span class="math inline">\(b,\, A / A\)</span></td>
+<td style="text-align: left;">See the <span class="math inline">\(b\)</span>: do not pop yet, transition to reading right <span class="math inline">\(a\)</span>’s</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(q_1 \circlearrowleft\)</span>: <span class="math inline">\(a,\, A / \varepsilon\)</span></td>
+<td style="text-align: left;">Each <span class="math inline">\(a\)</span> on the right side: pop one <span class="math inline">\(A\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(q_1 \to q_2\)</span>: <span class="math inline">\(\varepsilon,\, Z_0 / Z_0\)</span></td>
+<td style="text-align: left;">All <span class="math inline">\(A\)</span>’s matched; <span class="math inline">\(Z_0\)</span> on top: accept</td>
+</tr>
+</tbody>
+</table></li>
+<li><p><strong>Trace for <span class="math inline">\(w = "aba"\)</span>:</strong></p>
+<ul>
+<li><span class="math inline">\(q_0 \xrightarrow{a,Z_0/AZ_0} q_0\)</span>: stack = <span class="math inline">\(A, Z_0\)</span></li>
+<li><span class="math inline">\(q_0 \xrightarrow{b,A/A} q_1\)</span>: stack = <span class="math inline">\(A, Z_0\)</span> (stack unchanged, state changes)</li>
+<li><span class="math inline">\(q_1 \xrightarrow{a,A/\varepsilon} q_1\)</span>: stack = <span class="math inline">\(Z_0\)</span></li>
+<li><span class="math inline">\(q_1 \xrightarrow{\varepsilon,Z_0/Z_0} q_2\)</span>: <strong>ACCEPT</strong> <span class="math inline">\(\checkmark\)</span></li>
+</ul></li>
+<li><p><strong>Trace for <span class="math inline">\(w = "aabaa"\)</span>:</strong></p>
+<ul>
+<li><span class="math inline">\(q_0 \xrightarrow{a,Z_0/AZ_0} q_0\)</span>: stack = <span class="math inline">\(A, Z_0\)</span></li>
+<li><span class="math inline">\(q_0 \xrightarrow{a,A/AA} q_0\)</span>: stack = <span class="math inline">\(A, A, Z_0\)</span></li>
+<li><span class="math inline">\(q_0 \xrightarrow{b,A/A} q_1\)</span>: stack = <span class="math inline">\(A, A, Z_0\)</span></li>
+<li><span class="math inline">\(q_1 \xrightarrow{a,A/\varepsilon} q_1\)</span>: stack = <span class="math inline">\(A, Z_0\)</span></li>
+<li><span class="math inline">\(q_1 \xrightarrow{a,A/\varepsilon} q_1\)</span>: stack = <span class="math inline">\(Z_0\)</span></li>
+<li><span class="math inline">\(q_1 \xrightarrow{\varepsilon,Z_0/Z_0} q_2\)</span>: <strong>ACCEPT</strong> <span class="math inline">\(\checkmark\)</span></li>
+</ul></li>
+</ol>
+<p><strong>Answer:</strong> The PDA with states <span class="math inline">\(q_0, q_1, q_2\)</span> (accepting) and the transitions above recognizes <span class="math inline">\(L_2 = \{a^n b\, a^n \mid n \geq 1\}\)</span>.</p>
+</details>
+<h5 id="prove-l_1-vvr-mid-v-in-ab-is-not-regular-lab-4-exercise-1"><strong>4.5. Prove <span class="math inline">\(L_1 = \{vv^R \mid v \in \{a,b\}^*\}\)</span> is Not Regular</strong> (Lab 4, Exercise 1)</h5>
+<p>Use the Pumping Lemma to prove that <span class="math inline">\(L_1 = \{vv^R \mid v \in \Sigma_1^*\}\)</span> over <span class="math inline">\(\Sigma_1 = \{a, b\}\)</span> is not a regular language.</p>
+<p><em>(Note: <span class="math inline">\(v^R\)</span> denotes the reverse of string <span class="math inline">\(v\)</span>. The language <span class="math inline">\(L_1\)</span> consists of all even-length palindromes over <span class="math inline">\(\{a, b\}\)</span>.)</em></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Note that <span class="math inline">\(vv^R\)</span> is always a palindrome (since <span class="math inline">\((vv^R)^R = (v^R)^R v^R = vv^R\)</span>). Choose the word <span class="math inline">\(a^m b^{2m} a^m\)</span>: pumping the left <span class="math inline">\(a\)</span>-block yields a string with unequal <span class="math inline">\(a\)</span>-blocks, which cannot be a palindrome.</p>
+<ol type="1">
+<li><strong>Assume for contradiction</strong> that <span class="math inline">\(L_1\)</span> is regular. Let <span class="math inline">\(m \geq 1\)</span> be the pumping length.</li>
+<li><strong>Choose the word</strong> <span class="math inline">\(w = a^m b^{2m} a^m \in L_1\)</span> (take <span class="math inline">\(v = a^m b^m\)</span>, so <span class="math inline">\(v^R = b^m a^m\)</span> and <span class="math inline">\(vv^R = a^m b^m b^m a^m = a^m b^{2m} a^m\)</span>). Note <span class="math inline">\(|w| = 4m \geq m\)</span>.</li>
+<li><strong>Consider an arbitrary split</strong> <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|xy| \leq m\)</span> and <span class="math inline">\(|y| \geq 1\)</span>.</li>
+<li><strong>Restrict <span class="math inline">\(y\)</span>:</strong> The first <span class="math inline">\(m\)</span> characters of <span class="math inline">\(w\)</span> are all <span class="math inline">\(a\)</span>’s, and <span class="math inline">\(|xy| \leq m\)</span>, so <span class="math inline">\(xy\)</span> lies in the <span class="math inline">\(a\)</span>-prefix. Thus <span class="math inline">\(x = a^p\)</span>, <span class="math inline">\(y = a^k\)</span> with <span class="math inline">\(k \geq 1\)</span>, <span class="math inline">\(p + k \leq m\)</span>, and <span class="math inline">\(z = a^{m-p-k} b^{2m} a^m\)</span>.</li>
+<li><strong>Pump with <span class="math inline">\(i = 0\)</span></strong> (remove one copy of <span class="math inline">\(y\)</span>): <span class="math display">\[xy^0 z = xz = a^p \cdot a^{m-p-k} b^{2m} a^m = a^{m-k} b^{2m} a^m\]</span></li>
+<li><strong>Verify failure:</strong> The string <span class="math inline">\(a^{m-k} b^{2m} a^m\)</span> has <span class="math inline">\(m-k\)</span> leading <span class="math inline">\(a\)</span>’s and <span class="math inline">\(m\)</span> trailing <span class="math inline">\(a\)</span>’s. For it to be in <span class="math inline">\(L_1 = \{vv^R\}\)</span> (an even-length palindrome), the <span class="math inline">\((m-k+1)\)</span>-th character from the left must equal the <span class="math inline">\((m-k+1)\)</span>-th character from the right.
+<ul>
+<li>The <span class="math inline">\((m-k+1)\)</span>-th character from the <em>left</em>: the first <span class="math inline">\(m-k\)</span> characters are <span class="math inline">\(a\)</span>’s, so position <span class="math inline">\(m-k+1\)</span> is the first <span class="math inline">\(b\)</span>. Character = <span class="math inline">\(b\)</span>.</li>
+<li>The <span class="math inline">\((m-k+1)\)</span>-th character from the <em>right</em>: the last <span class="math inline">\(m\)</span> characters are <span class="math inline">\(a\)</span>’s. Since <span class="math inline">\(m &gt; m-k\)</span> (as <span class="math inline">\(k \geq 1\)</span>), position <span class="math inline">\(m-k+1\)</span> from the right is still in the trailing <span class="math inline">\(a\)</span>-block. Character = <span class="math inline">\(a\)</span>.</li>
+<li>Since <span class="math inline">\(b \neq a\)</span>, the string is not a palindrome, so <span class="math inline">\(xy^0 z \notin L_1\)</span>.</li>
+</ul></li>
+<li><strong>Conclusion:</strong> The Pumping Lemma is violated. Therefore <span class="math inline">\(L_1\)</span> is not regular. <span class="math inline">\(\square\)</span></li>
+</ol>
+<p><strong>Answer:</strong> <span class="math inline">\(L_1 = \{vv^R \mid v \in \{a,b\}^*\}\)</span> is not regular.</p>
+</details>
+<h5 id="prove-l_2-v-mid-v-text-has-equal-numbers-of-atexts-and-btexts-is-not-regular-lab-4-exercise-2"><strong>4.6. Prove <span class="math inline">\(L_2 = \{v \mid v \text{ has equal numbers of } a\text{'s and } b\text{'s}\}\)</span> is Not Regular</strong> (Lab 4, Exercise 2)</h5>
+<p>Use the Pumping Lemma to prove that <span class="math inline">\(L_2 = \{v \in \{a,b\}^* \mid \#_a(v) = \#_b(v)\}\)</span> is not a regular language over <span class="math inline">\(\Sigma_2 = \{a, b\}\)</span>.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Any string in <span class="math inline">\(L_2\)</span> has equal counts of <span class="math inline">\(a\)</span>’s and <span class="math inline">\(b\)</span>’s. Choosing <span class="math inline">\(a^m b^m\)</span> forces <span class="math inline">\(y\)</span> into the <span class="math inline">\(a\)</span>-block; pumping down removes <span class="math inline">\(a\)</span>’s without touching <span class="math inline">\(b\)</span>’s, breaking the balance.</p>
+<ol type="1">
+<li><strong>Assume for contradiction</strong> that <span class="math inline">\(L_2\)</span> is regular. Let <span class="math inline">\(m \geq 1\)</span> be the pumping length.</li>
+<li><strong>Choose the word</strong> <span class="math inline">\(w = a^m b^m \in L_2\)</span> (<span class="math inline">\(m\)</span> <span class="math inline">\(a\)</span>’s and <span class="math inline">\(m\)</span> <span class="math inline">\(b\)</span>’s). Note <span class="math inline">\(|w| = 2m \geq m\)</span>.</li>
+<li><strong>Consider an arbitrary split</strong> <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|xy| \leq m\)</span> and <span class="math inline">\(|y| \geq 1\)</span>.</li>
+<li><strong>Restrict <span class="math inline">\(y\)</span>:</strong> Since the first <span class="math inline">\(m\)</span> characters are <span class="math inline">\(a\)</span>’s and <span class="math inline">\(|xy| \leq m\)</span>, <span class="math inline">\(y\)</span> lies in the <span class="math inline">\(a\)</span>-block. So <span class="math inline">\(y = a^k\)</span> with <span class="math inline">\(k \geq 1\)</span> and <span class="math inline">\(z = a^{m-p-k} b^m\)</span>.</li>
+<li><strong>Pump with <span class="math inline">\(i = 0\)</span>:</strong> <span class="math display">\[xy^0 z = xz = a^{m-k} b^m\]</span></li>
+<li><strong>Verify failure:</strong> <span class="math inline">\(\#_a(xy^0 z) = m - k\)</span> and <span class="math inline">\(\#_b(xy^0 z) = m\)</span>. Since <span class="math inline">\(k \geq 1\)</span>, <span class="math inline">\(m - k &lt; m\)</span>, so the counts are unequal. Therefore <span class="math inline">\(xy^0 z \notin L_2\)</span>.</li>
+<li><strong>Conclusion:</strong> The Pumping Lemma is violated. Therefore <span class="math inline">\(L_2\)</span> is not regular. <span class="math inline">\(\square\)</span></li>
+</ol>
+<p><strong>Answer:</strong> <span class="math inline">\(L_2 = \{v \mid \#_a(v) = \#_b(v)\}\)</span> is not regular.</p>
+</details>
+<h5 id="prove-l_3-an-mid-n-geq-0-is-not-regular-lab-4-exercise-3"><strong>4.7. Prove <span class="math inline">\(L_3 = \{a^{n!} \mid n \geq 0\}\)</span> is Not Regular</strong> (Lab 4, Exercise 3)</h5>
+<p>Use the Pumping Lemma to prove that <span class="math inline">\(L_3 = \{a^{n!} \mid n \geq 0\}\)</span> over <span class="math inline">\(\Sigma_3 = \{a\}\)</span> is not a regular language.</p>
+<p><em>(Note: <span class="math inline">\(n! = n \times (n-1) \times \cdots \times 1\)</span> is the factorial of <span class="math inline">\(n\)</span>, with <span class="math inline">\(0! = 1\)</span>. So <span class="math inline">\(L_3 = \{a, aa, a^6, a^{24}, a^{120}, \ldots\}\)</span>.)</em></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Factorials grow faster than any linear function. Consecutive factorials satisfy <span class="math inline">\((m+1)! - m! = m \cdot m!\)</span>, which is far larger than <span class="math inline">\(m\)</span> for large <span class="math inline">\(m\)</span>. Any pump of size <span class="math inline">\(\leq m\)</span> cannot bridge the gap from <span class="math inline">\(m!\)</span> to the next factorial <span class="math inline">\((m+1)!\)</span>, so some pumped word falls strictly between two consecutive factorials and is not in <span class="math inline">\(L_3\)</span>.</p>
+<ol type="1">
+<li><strong>Assume for contradiction</strong> that <span class="math inline">\(L_3\)</span> is regular. Let <span class="math inline">\(m \geq 1\)</span> be the pumping length.</li>
+<li><strong>Choose the word</strong> <span class="math inline">\(w = a^{m!} \in L_3\)</span>. Note <span class="math inline">\(|w| = m! \geq m\)</span> for <span class="math inline">\(m \geq 1\)</span>.</li>
+<li><strong>Consider an arbitrary split</strong> <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|xy| \leq m\)</span> and <span class="math inline">\(|y| \geq 1\)</span>.</li>
+<li><strong>Determine <span class="math inline">\(|y|\)</span>:</strong> Let <span class="math inline">\(|y| = k\)</span>. Since <span class="math inline">\(1 \leq |y| \leq |xy| \leq m\)</span>, we have <span class="math inline">\(1 \leq k \leq m\)</span>.</li>
+<li><strong>Pump with <span class="math inline">\(i = m + 1\)</span>:</strong> <span class="math display">\[|xy^{m+1} z| = |w| + m \cdot k = m! + mk\]</span></li>
+<li><strong>Verify failure:</strong>
+<ul>
+<li><strong>Lower bound:</strong> <span class="math inline">\(m! + mk \geq m! + m \cdot 1 = m! + m &gt; m!\)</span> (since <span class="math inline">\(m \geq 1\)</span>).</li>
+<li><strong>Upper bound:</strong> <span class="math inline">\(m! + mk \leq m! + m \cdot m = m! + m^2\)</span>.</li>
+<li><strong>Gap to next factorial:</strong> <span class="math inline">\((m+1)! = (m+1) \cdot m! = m! + m \cdot m!\)</span>. We need <span class="math inline">\(m! + mk &lt; (m+1)!\)</span>, i.e., <span class="math inline">\(mk &lt; m \cdot m!\)</span>, i.e., <span class="math inline">\(k &lt; m!\)</span>. Since <span class="math inline">\(k \leq m &lt; m!\)</span> for <span class="math inline">\(m \geq 3\)</span>, this holds.</li>
+<li>Therefore <span class="math inline">\(m! &lt; m! + mk &lt; (m+1)!\)</span>, so <span class="math inline">\(m! + mk\)</span> is strictly between two consecutive factorials and equals no factorial.</li>
+<li>Hence <span class="math inline">\(xy^{m+1} z = a^{m! + mk} \notin L_3\)</span>.</li>
+</ul>
+<em>(For <span class="math inline">\(m = 1\)</span>: the only split has <span class="math inline">\(k = 1\)</span>. We use <span class="math inline">\(i = 0\)</span>: <span class="math inline">\(|xy^0 z| = 1 - 1 = 0\)</span>. Since <span class="math inline">\(0 \neq n!\)</span> for any <span class="math inline">\(n \geq 0\)</span> (as <span class="math inline">\(n! \geq 1\)</span> always), <span class="math inline">\(xy^0 z = \varepsilon \notin L_3\)</span>. <span class="math inline">\(\checkmark\)</span>)</em></li>
+<li><strong>Conclusion:</strong> In all cases, some pumped word is not in <span class="math inline">\(L_3\)</span>. The Pumping Lemma is violated. Therefore <span class="math inline">\(L_3\)</span> is not regular. <span class="math inline">\(\square\)</span></li>
+</ol>
+<p><strong>Answer:</strong> <span class="math inline">\(L_3 = \{a^{n!} \mid n \geq 0\}\)</span> is not regular.</p>
+</details>
+<h5 id="prove-l_4-an-bl-cnl-mid-n-l-geq-0-is-not-regular-lab-4-exercise-4"><strong>4.8. Prove <span class="math inline">\(L_4 = \{a^n b^l c^{n+l} \mid n, l \geq 0\}\)</span> is Not Regular</strong> (Lab 4, Exercise 4)</h5>
+<p>Use the Pumping Lemma to prove that <span class="math inline">\(L_4 = \{a^n b^l c^{n+l} \mid n, l \geq 0\}\)</span> over <span class="math inline">\(\Sigma_4 = \{a, b, c\}\)</span> is not a regular language.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> In <span class="math inline">\(L_4\)</span>, the number of <span class="math inline">\(c\)</span>’s equals the total count of <span class="math inline">\(a\)</span>’s and <span class="math inline">\(b\)</span>’s combined. Choose <span class="math inline">\(a^m b^m c^{2m}\)</span>; the constraint forces <span class="math inline">\(y\)</span> into the <span class="math inline">\(a\)</span>-block. Pumping down removes some <span class="math inline">\(a\)</span>’s, breaking the sum constraint.</p>
+<ol type="1">
+<li><strong>Assume for contradiction</strong> that <span class="math inline">\(L_4\)</span> is regular. Let <span class="math inline">\(m \geq 1\)</span> be the pumping length.</li>
+<li><strong>Choose the word</strong> <span class="math inline">\(w = a^m b^m c^{2m} \in L_4\)</span> (take <span class="math inline">\(n = l = m\)</span>, so <span class="math inline">\(n + l = 2m\)</span>). Note <span class="math inline">\(|w| = 4m \geq m\)</span>.</li>
+<li><strong>Consider an arbitrary split</strong> <span class="math inline">\(w = xyz\)</span> with <span class="math inline">\(|xy| \leq m\)</span> and <span class="math inline">\(|y| \geq 1\)</span>.</li>
+<li><strong>Restrict <span class="math inline">\(y\)</span>:</strong> The first <span class="math inline">\(m\)</span> characters of <span class="math inline">\(w\)</span> are all <span class="math inline">\(a\)</span>’s, so <span class="math inline">\(|xy| \leq m\)</span> forces <span class="math inline">\(y\)</span> to lie entirely in the <span class="math inline">\(a\)</span>-block. Thus <span class="math inline">\(y = a^k\)</span> with <span class="math inline">\(k \geq 1\)</span>, and <span class="math inline">\(z = a^{m-p-k} b^m c^{2m}\)</span>.</li>
+<li><strong>Pump with <span class="math inline">\(i = 0\)</span>:</strong> <span class="math display">\[xy^0 z = xz = a^{m-k} b^m c^{2m}\]</span></li>
+<li><strong>Verify failure:</strong> For <span class="math inline">\(xy^0 z \in L_4\)</span>, we’d need <span class="math inline">\(n' = m - k\)</span> a’s, <span class="math inline">\(l' = m\)</span> b’s, and the number of <span class="math inline">\(c\)</span>’s to equal <span class="math inline">\(n' + l' = (m-k) + m = 2m - k\)</span>. But the actual number of <span class="math inline">\(c\)</span>’s is <span class="math inline">\(2m \neq 2m - k\)</span> (since <span class="math inline">\(k \geq 1\)</span>). Therefore <span class="math inline">\(xy^0 z \notin L_4\)</span>.</li>
+<li><strong>Conclusion:</strong> The Pumping Lemma is violated. Therefore <span class="math inline">\(L_4\)</span> is not regular. <span class="math inline">\(\square\)</span></li>
+</ol>
+<p><strong>Answer:</strong> <span class="math inline">\(L_4 = \{a^n b^l c^{n+l} \mid n, l \geq 0\}\)</span> is not regular.</p>
+</details>
+
+
+<style>
+	.article-buttons {
+		margin-top: 1rem;
+	}
+
+	.mark-read {
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .9rem;
+		line-height: 1.5;
+	}
+
+	.mark-read:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-read.active {
+		background: #4285F4;
+		color: #fff;
+		border-color: #4285F4;
+	}
+
+	.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.sidebar-link.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
+</style>
+
+<div class="article-buttons">
+	<button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const basePath = '/inno_notes/';
+		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
+			document.querySelector('.article-buttons')?.remove();
+		}
+
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
+
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
+			sidebarLinks.forEach(l => {
+				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
+			});
+		}
+
+		const sidebar = document.querySelector('#quarto-sidebar');
+		if (!sidebar) return;
+
+		const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+		sections.forEach(section => {
+			const toggle = section.querySelector('.sidebar-item-toggle');
+			const targetId = toggle?.getAttribute('data-bs-target');
+			const target = targetId ? document.querySelector(targetId) : null;
+			if (!toggle || !target) return;
+
+			const storageKey = `sidebar_section_${targetId}`;
+
+			const saved = localStorage.getItem(storageKey);
+			if (saved === 'open') {
+				target.classList.add('show');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			} else {
+				// collapse by default if not explicitly opened
+				target.classList.remove('show');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			}
+
+			target.addEventListener('show.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'open');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			});
+
+			target.addEventListener('hide.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'closed');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			});
+		});
+
+		const scrollKey = 'sidebar_scroll_top';
+		const savedScroll = localStorage.getItem(scrollKey);
+		if (savedScroll && !isNaN(parseInt(savedScroll, 10))) {
+			sidebar.scrollTop = parseInt(savedScroll, 10);
+		}
+		sidebar.addEventListener('scroll', () => {
+			localStorage.setItem(scrollKey, sidebar.scrollTop);
+		});
+	});
+</script>
+
+
+
+
+</body></html>

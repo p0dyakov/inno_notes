@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.24">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Artem Burmyakov">
+<meta name="dcterms.date" content="2025-12-09">
+
+<title>W14. Cache Basics, CPU Pipelining, GPU Architecture – InnoNotes</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<link href="../../logo.svg" rel="icon" type="image/svg+xml">
+<link href="../../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-H1WYLNDN76"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
+</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles/sf-pro.css">
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">W14. Cache Basics, CPU Pipelining, GPU Architecture</h1>
+<p class="author">Artem Burmyakov</p>
+
+<p class="date">2025-12-09</p>
+</header>
+
+
+<h4 id="summary"><strong>1. Summary</strong></h4>
+<h5 id="cache-basics"><strong>1.1 Cache Basics</strong></h5>
+<h6 id="the-memory-wall-problem"><strong>1.1.1 The Memory Wall Problem</strong></h6>
+<p>Modern computer systems face a fundamental performance bottleneck known as the <strong>“Memory Wall”</strong> problem. This issue arises from the growing disparity between CPU processing speed and memory access speed. Since the 1980s, CPU performance has improved exponentially—roughly doubling every 18-24 months according to Moore’s Law. However, system memory (RAM) performance has improved much more slowly, creating an ever-widening <strong>processor-memory performance gap</strong>.</p>
+<p><img src="12_6.png" style="width:70.0%"></p>
+<p>The graph above illustrates this critical problem: by 2010, CPUs had become approximately 10,000 times faster than they were in 1980, while system memory had only improved by a factor of about 7. This gap means that even the fastest CPU must frequently wait for data from relatively slow main memory, creating a severe performance bottleneck.</p>
+<h6 id="the-memory-hierarchy"><strong>1.1.2 The Memory Hierarchy</strong></h6>
+<p>To address the Memory Wall problem, modern computer systems employ a <strong>memory hierarchy</strong>—a tiered structure of different memory technologies, each optimized for specific trade-offs between speed, capacity, and cost.</p>
+<p>The hierarchy, from fastest to slowest, consists of:</p>
+<ol type="1">
+<li><strong>CPU Registers</strong>: The fastest storage, located directly inside the processor</li>
+<li><strong>Cache Memory (L1, L2, L3)</strong>: Small, extremely fast memory built using SRAM technology</li>
+<li><strong>System Memory (RAM)</strong>: Larger but slower memory built using DRAM technology</li>
+<li><strong>Storage Devices (SSD/HDD)</strong>: Very large but much slower persistent storage</li>
+</ol>
+<p><img src="12_7.png" style="width:70.0%"></p>
+<p>The key characteristics of this hierarchy:</p>
+<ul>
+<li><strong>Access speed increases</strong> as you move up the hierarchy (toward the CPU)</li>
+<li><strong>Storage capacity increases</strong> as you move down the hierarchy (toward storage devices)</li>
+</ul>
+<p>Each level of cache has dramatically different performance characteristics:</p>
+<ul>
+<li><strong>L1 Cache</strong>: Operates at CPU speed (~100× faster than RAM), capacity 32-128 KB</li>
+<li><strong>L2 Cache</strong>: ~25× faster than RAM, capacity 256-512 KB</li>
+<li><strong>L3 Cache</strong>: ~2× faster than RAM, capacity 32-64 MB</li>
+<li><strong>System Memory</strong>: 18-36 GB/sec transfer rate, capacity 8-32 GB</li>
+<li><strong>Storage (SSD)</strong>: 0.5-2 GB/sec transfer rate, capacity 250-500 GB</li>
+</ul>
+<h6 id="sram-vs-dram-technologies"><strong>1.1.3 SRAM vs DRAM Technologies</strong></h6>
+<p>The memory hierarchy uses two fundamentally different technologies:</p>
+<p><strong>SRAM (Static Random Access Memory)</strong>:</p>
+<ul>
+<li>Used for: CPU registers and cache (L1, L2, L3)</li>
+<li>Storage element: <strong>Flip-flop (latch)</strong> circuit</li>
+<li>Characteristics: Very fast, expensive, lower capacity, complex organization</li>
+<li>Power: Lower consumption, no leakage</li>
+<li>Reliability: More reliable</li>
+</ul>
+<p><strong>DRAM (Dynamic Random Access Memory)</strong>:</p>
+<ul>
+<li>Used for: System memory (main RAM)</li>
+<li>Storage element: <strong>Capacitor</strong></li>
+<li>Characteristics: Slower, cheaper, higher capacity, simpler organization</li>
+<li>Power: Higher consumption, significant leakage (requires periodic refresh)</li>
+<li>Reliability: Less reliable</li>
+</ul>
+<p><img src="12_8.png" style="width:80.0%"></p>
+<p>Both are <strong>volatile</strong> (lose data when power is removed) and both provide <strong>random access</strong> (can access any memory location directly, unlike sequential access devices like tape drives).</p>
+<p>DRAM’s capacitor-based design requires special circuitry. The <strong>memory controller</strong> continuously refreshes DRAM cells every few milliseconds to compensate for capacitor leakage—charge gradually escapes from the capacitors, so they must be periodically recharged to maintain data.</p>
+<p><img src="12_9.png" style="width:90.0%"></p>
+<p>The diagram above shows how DRAM is organized: a matrix of wordlines and bitlines, where each intersection contains a transistor and capacitor forming a memory cell. The Memory Controller manages read/write operations and periodic refreshes.</p>
+<h6 id="principles-of-locality"><strong>1.1.4 Principles of Locality</strong></h6>
+<p>The memory hierarchy works effectively because of two fundamental principles describing how programs access memory:</p>
+<p><strong>Spatial Locality</strong>: If a program accesses data at address <span class="math inline">\(X\)</span>, it is likely to soon access data at nearby addresses (e.g., <span class="math inline">\(X+1\)</span>, <span class="math inline">\(X+2\)</span>, etc.). This occurs naturally when:</p>
+<ul>
+<li>Iterating through arrays</li>
+<li>Executing sequential instructions (the next instruction is usually at the next memory address)</li>
+</ul>
+<p><strong>Temporal Locality</strong>: If a program accesses data at address <span class="math inline">\(X\)</span>, it is likely to access that same address again in the near future. This occurs naturally when:</p>
+<ul>
+<li>Executing loop iterations (the same instructions run repeatedly)</li>
+<li>Accessing frequently used variables</li>
+<li>Reusing recently computed values</li>
+</ul>
+<p>These principles mean that <strong>programs access a very small portion of their address space at any given time</strong>, not all data simultaneously. This makes caching effective: by keeping recently used data (temporal locality) and nearby data (spatial locality) in fast cache memory, we can satisfy most memory requests without accessing slow main memory.</p>
+<p>Modern <strong>compilers actively facilitate</strong> these principles by:</p>
+<ul>
+<li>Reordering instructions to improve locality</li>
+<li>Arranging data structures for better cache utilization</li>
+<li>Unrolling loops to access consecutive memory locations</li>
+</ul>
+<h6 id="the-goal-of-memory-hierarchy"><strong>1.1.5 The Goal of Memory Hierarchy</strong></h6>
+<p>The fundamental objective of the memory hierarchy is to <strong>create an illusion that there is as much memory as in storage (hundreds of GB), but with access speed as high as CPU cache</strong> (nearly instantaneous). This allows programs to work with large datasets while maintaining high performance—the best of both worlds.</p>
+<p>This illusion works because of the locality principles: since programs only actively use a small subset of their data at any moment, we can keep that “working set” in fast cache while the bulk of data resides in slower, larger memory.</p>
+<h6 id="cache-structure-and-terminology"><strong>1.1.6 Cache Structure and Terminology</strong></h6>
+<p>A <strong>cache</strong> is organized as a collection of <strong>blocks</strong> (also called <strong>cache lines</strong>). Each block contains:</p>
+<ol type="1">
+<li><strong>Block Index</strong>: A unique identifier for the cache location (e.g., 00, 01, 10, 11 for a 4-block cache)</li>
+<li><strong>Validity Flag</strong>: Indicates whether the block contains valid/initialized data (Y/N)</li>
+<li><strong>Address Tag</strong>: The upper portion of the memory address for the data stored in this block</li>
+<li><strong>Data Field</strong>: The actual data words copied from main memory</li>
+</ol>
+<p>When the CPU requests data from memory address <span class="math inline">\(A\)</span>, the address is split into two parts:</p>
+<ul>
+<li><strong>Lower bits</strong> become the <strong>Block Index</strong> (which cache block to check)</li>
+<li><strong>Upper bits</strong> become the <strong>Address Tag</strong> (which memory location the block represents)</li>
+</ul>
+<p>The concatenation of the address tag and block index forms the complete memory address.</p>
+<h6 id="cache-hits-and-misses"><strong>1.1.7 Cache Hits and Misses</strong></h6>
+<p>When the CPU requests data, one of two outcomes occurs:</p>
+<p><strong>Cache Hit</strong>: The requested data is found in the cache</p>
+<ul>
+<li>The cache block index is valid (Validity Flag = Y)</li>
+<li>The address tag matches the requested tag</li>
+<li>The data is immediately loaded into CPU registers</li>
+<li><strong>No penalty</strong>—execution continues at full speed</li>
+</ul>
+<p><strong>Cache Miss</strong>: The requested data is NOT found in the cache</p>
+<ul>
+<li>Either the validity flag is N, or the address tag doesn’t match</li>
+<li>The cache must fetch the data from a lower-level cache or main memory</li>
+<li>The <strong>entire data block</strong> containing the requested data is copied into the cache</li>
+<li>This incurs a <strong>cache miss penalty</strong>—the time required to:
+<ul>
+<li>Access the lower-level cache/memory</li>
+<li>Transfer the block to the higher-level cache</li>
+<li>Insert the block into the cache</li>
+<li>Pass the requested data to the CPU</li>
+</ul></li>
+</ul>
+<p><img src="12_10.png" style="width:90.0%"></p>
+<p>The diagram above illustrates the hierarchical flow: when the CPU requests data, it first checks the fastest cache (L1). On a miss, it checks successively slower caches (L2, L3…) until reaching system memory. When found, the entire block is copied back up through the hierarchy.</p>
+<h6 id="cache-performance-metrics"><strong>1.1.8 Cache Performance Metrics</strong></h6>
+<p>Three key metrics evaluate cache effectiveness:</p>
+<ol type="1">
+<li><strong>Cache Hit Rate</strong>: The percentage of memory accesses satisfied by the cache (typically &gt;95% for modern systems)</li>
+<li><strong>Cache Miss Rate</strong>: The percentage of memory accesses that miss the cache<br>
+<span class="math display">\[\text{Miss Rate} = 1 - \text{Hit Rate}\]</span></li>
+<li><strong>Cache Miss Penalty</strong>: The time cost of a cache miss, typically ~100 CPU cycles</li>
+</ol>
+<p>Even a small miss rate can significantly impact performance due to the high miss penalty. For example, with a 5% miss rate and 100-cycle penalty, approximately 5 out of every 100 memory accesses will stall the CPU for 100 cycles.</p>
+<h6 id="memory-consistency-principle"><strong>1.1.9 Memory Consistency Principle</strong></h6>
+<p>The memory hierarchy maintains a crucial invariant: <strong>If a data block is present at a higher-level cache (e.g., L1), then it must also be present at all lower-level caches (e.g., L2, L3)</strong>.</p>
+<p>This ensures data consistency across the hierarchy—the CPU doesn’t access stale data, and all cache levels maintain a coherent view of memory.</p>
+<h6 id="direct-mapped-cache"><strong>1.1.10 Direct-Mapped Cache</strong></h6>
+<p>In a <strong>direct-mapped cache</strong>, each memory address maps to exactly one possible cache block location. The mapping is determined by the lower bits of the memory address (the block index).</p>
+<p>For example, in a 4-block cache with 2-bit indices:</p>
+<ul>
+<li>Addresses ending in 00 (binary) map to Block 0</li>
+<li>Addresses ending in 01 map to Block 1</li>
+<li>Addresses ending in 10 map to Block 2</li>
+<li>Addresses ending in 11 map to Block 3</li>
+</ul>
+<p>This creates a <strong>conflict</strong>: if a program repeatedly accesses addresses <code>01010</code> and <code>11010</code> (both map to Block 10), they will evict each other from the cache, causing repeated misses—even though other cache blocks might be empty.</p>
+<p><strong>Alternative: Fully Associative Cache</strong></p>
+<p>In a <strong>fully associative cache</strong>, any memory block can be placed in any cache block location. This eliminates conflicts but requires more complex hardware (must check all cache blocks for every access).</p>
+<h5 id="cpu-pipelining"><strong>1.2 CPU Pipelining</strong></h5>
+<h6 id="instruction-execution-stages"><strong>1.2.1 Instruction Execution Stages</strong></h6>
+<p>Every instruction in a RISC-V processor goes through five distinct execution stages, each using different hardware components:</p>
+<ol type="1">
+<li><strong>IF (Instruction Fetch)</strong>: Read the instruction from instruction memory
+<ul>
+<li>Hardware: Program Counter (PC), Instruction Memory</li>
+<li>Time: ~200 picoseconds (ps)</li>
+</ul></li>
+<li><strong>ID (Instruction Decode)</strong>: Decode the instruction and read register operands
+<ul>
+<li>Hardware: Register File, Sign-extend unit, Control Unit</li>
+<li>Time: ~200 ps</li>
+</ul></li>
+<li><strong>EX (Execution)</strong>: Perform the actual computation
+<ul>
+<li>Hardware: ALU (Arithmetic Logic Unit)</li>
+<li>Time: ~200 ps</li>
+</ul></li>
+<li><strong>MA (Memory Access)</strong>: Read from or write to data memory (if needed)
+<ul>
+<li>Hardware: Data Memory</li>
+<li>Time: ~200 ps</li>
+<li>Note: Not all instructions use this stage (e.g., ADD doesn’t access memory)</li>
+</ul></li>
+<li><strong>WB (Write Back)</strong>: Write the result back to a register
+<ul>
+<li>Hardware: Register File (write port)</li>
+<li>Time: ~200 ps</li>
+<li>Note: Not all instructions write back (e.g., store instructions)</li>
+</ul></li>
+</ol>
+<p><img src="12_2.png" style="width:80.0%"></p>
+<p>For a single instruction like <code>add x19, x0, x1</code>, the total execution time is 5 × 200 ps = 1000 ps (1 nanosecond).</p>
+<h6 id="pipeline-registers"><strong>1.2.2 Pipeline Registers</strong></h6>
+<p>To enable pipelining, the processor inserts <strong>pipeline registers</strong> (also called <strong>interstage registers</strong>) between each execution stage:</p>
+<ul>
+<li><strong>IF/ID register</strong>: Stores data between Instruction Fetch and Instruction Decode</li>
+<li><strong>ID/EX register</strong>: Stores data between Instruction Decode and Execution</li>
+<li><strong>EX/MEM register</strong>: Stores data between Execution and Memory Access</li>
+<li><strong>MEM/WB register</strong>: Stores data between Memory Access and Write Back</li>
+</ul>
+<p><img src="12_1.png" style="width:90.0%"></p>
+<p>These registers are synchronized by the <strong>clock signal (CLK)</strong>. On each clock edge:</p>
+<ul>
+<li>Each pipeline register captures the output from the previous stage</li>
+<li>Each stage begins processing the data from its input register</li>
+<li>All stages work simultaneously on different instructions</li>
+</ul>
+<h6 id="the-pipelining-concept"><strong>1.2.3 The Pipelining Concept</strong></h6>
+<p><strong>Pipelining</strong> is a technique where multiple instructions execute simultaneously, with each instruction at a different stage of completion. Think of it like an assembly line in a factory:</p>
+<ul>
+<li>Station 1 (IF) works on instruction 5</li>
+<li>Station 2 (ID) works on instruction 4</li>
+<li>Station 3 (EX) works on instruction 3</li>
+<li>Station 4 (MA) works on instruction 2</li>
+<li>Station 5 (WB) works on instruction 1</li>
+</ul>
+<p><img src="12_3.png" style="width:60.0%"></p>
+<p>This table shows the “staircase” pattern of pipelining. In clock cycle 5, all five stages are active simultaneously, each processing a different instruction.</p>
+<h6 id="pipelining-advantages"><strong>1.2.4 Pipelining Advantages</strong></h6>
+<p><strong>Throughput Improvement</strong>: Although each individual instruction still takes 5 stages to complete, pipelining drastically improves <strong>throughput</strong>—the number of instructions completed per unit time.</p>
+<ul>
+<li><strong>Without pipelining</strong>: Complete 1 instruction every 1000 ps<br>
+Throughput = 1 instruction / 1000 ps = 1 billion instructions/second</li>
+<li><strong>With 5-stage pipelining</strong>: Complete 1 instruction every 200 ps (after initial fill)<br>
+Throughput = 1 instruction / 200 ps = 5 billion instructions/second</li>
+</ul>
+<p><strong>Ideal speedup</strong>: With <span class="math inline">\(N\)</span> pipeline stages, the theoretical speedup approaches <span class="math inline">\(N\)</span> times. In practice, speedups of 3-4× are typical due to hazards and overhead.</p>
+<h6 id="risc-v-design-principles-for-efficient-pipelining"><strong>1.2.5 RISC-V Design Principles for Efficient Pipelining</strong></h6>
+<p>RISC-V’s instruction set architecture was specifically designed to facilitate efficient pipelining:</p>
+<p><strong>Principle 1: Fixed-Length Instructions</strong></p>
+<p>All RISC-V instructions are exactly 32 bits long. This allows the IF stage to always fetch exactly 4 bytes, simplifying pipeline control.</p>
+<p><strong>Principle 2: Few Instruction Formats with Minimal Differences</strong></p>
+<p><img src="12_4.png" style="width:90.0%"></p>
+<p>RISC-V has only 6 instruction formats (R-type, I-type, S-type, B-type, U-type, J-type), and critical fields (like opcode, rd, rs1, rs2) appear at the same bit positions across formats. This allows the ID stage to begin decoding before knowing the exact instruction type.</p>
+<p><strong>Principle 3: Memory Operations Only in Load/Store Instructions</strong></p>
+<p>Only load (<code>lw</code>, <code>ld</code>) and store (<code>sw</code>, <code>sd</code>) instructions access memory. Arithmetic instructions (<code>add</code>, <code>sub</code>, etc.) work only with registers. This simplifies the pipeline—the MA stage can be bypassed for most instructions.</p>
+<h6 id="pipeline-hazards"><strong>1.2.6 Pipeline Hazards</strong></h6>
+<p>Pipelining introduces complications called <strong>hazards</strong>—situations where the next instruction cannot execute in the next clock cycle.</p>
+<p><strong>Data Hazard Example</strong>:</p>
+<p>Consider these two instructions:</p>
+<pre><code>A: add x19, x0, x1    // x19 = x0 + x1
+B: sub x2, x19, x3    // x2 = x19 - x3</code></pre>
+<p>Instruction B depends on the result of instruction A (the value in register <code>x19</code>). However:</p>
+<ul>
+<li>Instruction A writes <code>x19</code> in its WB stage (clock cycle 5)</li>
+<li>Instruction B needs <code>x19</code> in its ID stage (clock cycle 3)</li>
+</ul>
+<p><img src="12_5.png" style="width:80.0%"></p>
+<p>This creates a <strong>data hazard</strong>: instruction B would read the old value of <code>x19</code> before A writes the new value.</p>
+<p><strong>Solutions to Data Hazards</strong>:</p>
+<ol type="1">
+<li><strong>Stalling (Pipeline Bubble)</strong>: Pause instruction B for several clock cycles until A completes WB. This works but wastes cycles.</li>
+<li><strong>Forwarding (Bypassing)</strong>: As soon as A completes its EX stage (clock cycle 3), forward the result directly to B’s EX stage through a dedicated hardware path, bypassing the register file. This avoids most stalls and provides dramatic average speedup.</li>
+<li><strong>Compiler Instruction Reordering</strong>: The compiler can insert independent instructions between A and B to fill the delay slot, avoiding stalls entirely.</li>
+</ol>
+<h6 id="compiler-optimization-for-pipelining"><strong>1.2.7 Compiler Optimization for Pipelining</strong></h6>
+<p>Modern compilers optimize code to minimize pipeline stalls. Consider this C code:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>a <span class="op">=</span> b <span class="op">+</span> e<span class="op">;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>c <span class="op">=</span> b <span class="op">+</span> f<span class="op">;</span></span></code></pre></div>
+<p><strong>Non-optimized assembly</strong> (suffers stalls):</p>
+<pre class="assembly"><code>lw  x1, 0(x31)    // Load b
+lw  x2, 8(x31)    // Load e
+add x3, x1, x2    // Stall waiting for x1, x2
+sw  x3, 24(x31)   // Store a
+lw  x4, 16(x31)   // Load f
+add x5, x1, x4    // Stall waiting for x4
+sw  x5, 32(x31)   // Store c</code></pre>
+<p><strong>Optimized assembly</strong> (reordered to avoid stalls):</p>
+<pre class="assembly"><code>lw  x1, 0(x31)    // Load b
+lw  x2, 8(x31)    // Load e
+lw  x4, 16(x31)   // Load f (moved up!)
+add x3, x1, x2    // No stall—x1, x2 are ready
+sw  x3, 24(x31)   // Store a
+add x5, x1, x4    // No stall—x1, x4 are ready
+sw  x5, 32(x31)   // Store c</code></pre>
+<p>By moving the third load instruction earlier, the compiler fills the delay slot created by the first two loads, eliminating stalls.</p>
+<h5 id="gpu-architecture-and-parallel-computing"><strong>1.3 GPU Architecture and Parallel Computing</strong></h5>
+<h6 id="flynns-taxonomy"><strong>1.3.1 Flynn’s Taxonomy</strong></h6>
+<p>Michael Flynn (1966, 1972) classified computer architectures based on how they handle instructions and data streams:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 30%">
+<col style="width: 13%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Architecture</th>
+<th>Instructions</th>
+<th>Data</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>SISD</strong></td>
+<td>Single</td>
+<td>Single</td>
+<td>Traditional serial processor—one instruction operates on one data item at a time</td>
+</tr>
+<tr class="even">
+<td><strong>SIMD</strong></td>
+<td>Single</td>
+<td>Multiple</td>
+<td>One instruction operates on multiple data items simultaneously (e.g., vector processors, GPUs)</td>
+</tr>
+<tr class="odd">
+<td><strong>MISD</strong></td>
+<td>Multiple</td>
+<td>Single</td>
+<td>Multiple instructions operate on the same data (rare; used for fault tolerance)</td>
+</tr>
+<tr class="even">
+<td><strong>MIMD</strong></td>
+<td>Multiple</td>
+<td>Multiple</td>
+<td>Multiple independent processors executing different instructions on different data (multi-core CPUs)</td>
+</tr>
+</tbody>
+</table>
+<p>Modern computing uses primarily:</p>
+<ul>
+<li><strong>SISD</strong>: Basic single-core CPU operation</li>
+<li><strong>SIMD</strong>: GPUs, vector extensions (SSE, AVX)</li>
+<li><strong>MIMD</strong>: Multi-core processors</li>
+<li><strong>SIMT</strong> (Single Instruction Multiple Threads): NVIDIA’s variant of SIMD combining multithreading with data parallelism</li>
+</ul>
+<p><img src="12_11.png" style="width:90.0%"></p>
+<p><img src="12_12.png" style="width:90.0%"></p>
+<p><img src="12_13.png" style="width:90.0%"></p>
+<h6 id="cpu-vs-gpu-architectural-philosophy"><strong>1.3.2 CPU vs GPU Architectural Philosophy</strong></h6>
+<p>CPUs and GPUs have fundamentally different design philosophies:</p>
+<p><strong>CPU Design (Latency-Optimized)</strong>:</p>
+<ul>
+<li>Large control logic for complex instruction handling</li>
+<li>Large cache memory (L1/L2/L3) to reduce average latency</li>
+<li>Few but powerful cores (4-16 typical)</li>
+<li>Optimized for <strong>serial task performance</strong> and low latency</li>
+<li>Analogy: A sports car—fast for individual passengers (2 people at 200 km/hr)</li>
+</ul>
+<p><strong>GPU Design (Throughput-Optimized)</strong>:</p>
+<ul>
+<li>Minimal control logic (instructions are simple and uniform)</li>
+<li>Small cache (rely on memory bandwidth)</li>
+<li>Massive number of simple cores (hundreds to thousands)</li>
+<li>Optimized for <strong>parallel data processing</strong> and high throughput</li>
+<li>Analogy: A bus—slow for individuals but carries many (50 people at 50 km/hr)</li>
+</ul>
+<p>The throughput of a bus (people × speed) is actually higher: 50 × 50 = 2,500 person-km/hr vs.&nbsp;2 × 200 = 400 person-km/hr.</p>
+<p><img src="12_14.png" style="width:90.0%"></p>
+<h6 id="the-processor-memory-performance-gap-and-gpus"><strong>1.3.3 The Processor-Memory Performance Gap and GPUs</strong></h6>
+<p><img src="12_6.png" style="width:70.0%"></p>
+<p>The same Memory Wall problem that motivated caches also motivates GPUs. However, GPUs address it differently:</p>
+<ul>
+<li><strong>CPUs</strong>: Use deep cache hierarchies to hide latency</li>
+<li><strong>GPUs</strong>: Use massive parallelism—while some threads wait for memory, thousands of other threads continue computing</li>
+</ul>
+<h6 id="gpu-motivation-matrix-operations"><strong>1.3.4 GPU Motivation: Matrix Operations</strong></h6>
+<p>Modern graphics, scientific computing, and AI/ML workloads heavily involve matrix operations. Consider matrix multiplication <span class="math inline">\(C = AB\)</span>:</p>
+<p><span class="math display">\[c_{ij} = \sum_{\ell=1}^{n} a_{i\ell} b_{\ell j}\]</span></p>
+<p>Key observations:</p>
+<ol type="1">
+<li><strong>Each output element is independent</strong>—computing <span class="math inline">\(c_{11}\)</span> doesn’t affect computing <span class="math inline">\(c_{12}\)</span></li>
+<li><strong>All elements use the same operation</strong>—multiply and accumulate</li>
+<li><strong>Thousands of elements</strong> need the same computation</li>
+</ol>
+<p>This is perfect for SIMD parallelism: apply the same instruction simultaneously to many data elements.</p>
+<p><img src="12_15.png" style="width:90.0%"></p>
+<h6 id="nvidia-gpu-architecture-example-teslageforce-8800"><strong>1.3.5 NVIDIA GPU Architecture Example (Tesla/GeForce 8800)</strong></h6>
+<p>A typical NVIDIA GPU contains:</p>
+<ul>
+<li><strong>14 Streaming Multiprocessors (SMs)</strong>: Each SM is a group of processing cores</li>
+<li><strong>8 Streaming Processors (SP cores) per SM</strong>: Each SP is a simple ALU</li>
+<li><strong>112 total SP cores</strong> (14 × 8)</li>
+<li><strong>10,752 concurrent threads</strong> can be active simultaneously</li>
+</ul>
+<p>Each SM contains:</p>
+<ul>
+<li>Multiple SP cores (the actual compute units)</li>
+<li>Shared memory (fast, shared among threads in a block)</li>
+<li>Instruction cache (I-Cache)</li>
+<li>Constant cache (C-Cache)</li>
+<li>Special Function Units (SFUs) for transcendental functions (sin, cos, etc.)</li>
+</ul>
+<p><img src="12_16.png" style="width:100.0%"></p>
+<h6 id="gpu-programming-model-cuda"><strong>1.3.6 GPU Programming Model: CUDA</strong></h6>
+<p>NVIDIA’s CUDA (Compute Unified Device Architecture) programming model maps software concepts to hardware:</p>
+<p><strong>Software Hierarchy</strong>:</p>
+<ol type="1">
+<li><strong>Kernel</strong>: A function that executes on the GPU, applied to many data elements</li>
+<li><strong>Thread</strong>: A single execution of the kernel (analogous to a single matrix element computation)</li>
+<li><strong>Thread Block</strong>: A group of threads that can cooperate and share data</li>
+<li><strong>Grid</strong>: A collection of thread blocks that execute the same kernel</li>
+</ol>
+<p><strong>Hardware Mapping</strong>:</p>
+<ul>
+<li><strong>Thread</strong> → executes on one <strong>SP core</strong></li>
+<li><strong>Thread Block</strong> → executes on one <strong>SM</strong></li>
+<li><strong>Grid</strong> → executes on the entire <strong>GPU</strong></li>
+</ul>
+<p>For matrix multiplication <span class="math inline">\(C = AB\)</span> where <span class="math inline">\(C\)</span> is <span class="math inline">\(m \times p\)</span>:</p>
+<ul>
+<li>Each element <span class="math inline">\(c_{ij}\)</span> is computed by one <strong>thread</strong></li>
+<li>Threads are organized into <strong>blocks</strong> (e.g., 16×16 threads per block)</li>
+<li>Multiple <strong>blocks</strong> form a <strong>grid</strong> covering the entire matrix <span class="math inline">\(C\)</span></li>
+</ul>
+<p><img src="12_17.png" style="width:90.0%"></p>
+<p><img src="12_18.png" style="width:90.0%"></p>
+<h6 id="gpu-memory-subsystem"><strong>1.3.7 GPU Memory Subsystem</strong></h6>
+<p>GPUs use a separate memory subsystem from the CPU:</p>
+<p><strong>CPU Memory Subsystem</strong>:</p>
+<ul>
+<li>System DRAM (8-32 GB)</li>
+<li>Connected to CPU via North Bridge chipset</li>
+<li>Bandwidth: ~6.4 GB/s</li>
+</ul>
+<p><strong>GPU Memory Subsystem</strong>:</p>
+<ul>
+<li>Graphics DRAM (dedicated GPU memory, 4-24 GB typical)</li>
+<li>Directly connected to GPU</li>
+<li>Bandwidth: Up to 35 GB/s (internal) or higher in modern GPUs</li>
+</ul>
+<p><strong>Data Flow for GPU Computing</strong>:</p>
+<ol type="1">
+<li>CPU allocates memory in System DRAM</li>
+<li>CPU copies data from System DRAM → Graphics DRAM (via North Bridge, ~6.4 GB/s)</li>
+<li>GPU processes data directly from Graphics DRAM (~35 GB/s internal bandwidth)</li>
+<li>CPU copies results from Graphics DRAM → System DRAM (or to display)</li>
+</ol>
+<p>The bottleneck is often the CPU-GPU data transfer (step 2 and 4), not the GPU computation itself. Modern systems use techniques like unified memory and direct GPU access to mitigate this.</p>
+<p><img src="12_19.png" style="width:90.0%"></p>
+<p><img src="12_22.jpeg" style="width:90.0%"></p>
+<h6 id="cpu-vs-gpu-performance-example"><strong>1.3.8 CPU vs GPU Performance Example</strong></h6>
+<p>Consider an image processing task on a 1392×1040 image:</p>
+<p><strong>CPU Execution</strong>: 130 ms</p>
+<p><strong>GPU Execution</strong>:</p>
+<ul>
+<li>Allocate GPU memory: ~1.8 ms</li>
+<li>Transfer image Host → GPU: ~4.5 ms</li>
+<li>Execute GPU code: ~2.7 ms</li>
+<li>Transfer result GPU → Host: ~4.5 ms</li>
+<li>Deallocate GPU memory: ~4.5 ms</li>
+<li><strong>Total</strong>: ~18 ms</li>
+</ul>
+<p>The GPU is <strong>~7× faster</strong> despite the overhead of memory transfers. For larger workloads or repeated operations (where data stays on the GPU), speedups of 30-100× are common.</p>
+<p><img src="12_20.png" style="width:100.0%"></p>
+<h6 id="applications-of-gpu-computing"><strong>1.3.9 Applications of GPU Computing</strong></h6>
+<p>Modern GPUs are used far beyond graphics:</p>
+<p><strong>Traditional Graphics</strong>: Rendering 3D scenes, video processing, display output</p>
+<p><strong>General-Purpose GPU Computing (GPGPU)</strong>:</p>
+<ol type="1">
+<li><strong>Scientific Computing</strong>: Physics simulations, climate modeling, computational chemistry</li>
+<li><strong>Machine Learning / AI</strong>:
+<ul>
+<li>Training neural networks (dominated by matrix multiplications)</li>
+<li>Deep learning inference</li>
+<li>This market has grown exponentially—GPU chips for AI applications increased from &lt;100K units in 2017 to &gt;2.5M projected for 2025</li>
+</ul></li>
+<li><strong>Image/Video Processing</strong>: Real-time video enhancement, medical imaging</li>
+<li><strong>Cryptography</strong>: Mining cryptocurrencies, encryption/decryption</li>
+<li><strong>Financial Modeling</strong>: Monte Carlo simulations, risk analysis</li>
+</ol>
+<p><strong>Why GPUs Excel at AI/ML</strong>:</p>
+<ul>
+<li>Neural networks are essentially huge matrix multiplications</li>
+<li>Training requires the same operations on millions of data samples (perfect SIMD pattern)</li>
+<li>High floating-point throughput (measured in TFLOPS—trillions of floating-point operations per second)</li>
+<li>Performance/cost ratio is 3-10× better than CPUs for these workloads</li>
+</ul>
+<p><img src="12_21.png" style="width:90.0%"></p>
+<p>The chart above shows the explosive growth in GPU chips used for AI applications, from under 100,000 units in 2017 to over 2.5 million projected for 2025, spanning automotive, robotics, mobile devices, and more.</p>
+<h6 id="gpu-programming-tools"><strong>1.3.10 GPU Programming Tools</strong></h6>
+<p>Several programming frameworks enable GPU computing:</p>
+<ul>
+<li><strong>CUDA</strong>: NVIDIA’s proprietary framework, most mature and widely used</li>
+<li><strong>OpenCL</strong>: Open standard, works on multiple vendors’ GPUs and other accelerators</li>
+<li><strong>ROCm</strong>: AMD’s open-source GPU computing platform</li>
+<li><strong>SYCL</strong>: C++-based abstraction layer for heterogeneous computing</li>
+</ul>
+<p><strong>CUDA Example</strong>:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">// CPU version</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> saxpy_serial<span class="op">(</span><span class="dt">int</span> n<span class="op">,</span> <span class="dt">float</span> a<span class="op">,</span> <span class="dt">float</span> <span class="op">*</span>x<span class="op">,</span> <span class="dt">float</span> <span class="op">*</span>y<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> n<span class="op">;</span> <span class="op">++</span>i<span class="op">)</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>        y<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> a <span class="op">*</span> x<span class="op">[</span>i<span class="op">]</span> <span class="op">+</span> y<span class="op">[</span>i<span class="op">];</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co">// GPU version</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>__global__ <span class="dt">void</span> saxpy_parallel<span class="op">(</span><span class="dt">int</span> n<span class="op">,</span> <span class="dt">float</span> a<span class="op">,</span> <span class="dt">float</span> <span class="op">*</span>x<span class="op">,</span> <span class="dt">float</span> <span class="op">*</span>y<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> i <span class="op">=</span> blockIdx<span class="op">.</span>x <span class="op">*</span> blockDim<span class="op">.</span>x <span class="op">+</span> threadIdx<span class="op">.</span>x<span class="op">;</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>i <span class="op">&lt;</span> n<span class="op">)</span> y<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> a <span class="op">*</span> x<span class="op">[</span>i<span class="op">]</span> <span class="op">+</span> y<span class="op">[</span>i<span class="op">];</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>The <code>__global__</code> keyword marks a kernel function. Each thread computes its index <code>i</code> from block and thread IDs, then computes one element.</p>
+<h6 id="hardware-accelerators-beyond-gpus"><strong>1.3.11 Hardware Accelerators Beyond GPUs</strong></h6>
+<p>Modern systems use various specialized accelerators:</p>
+<ul>
+<li><strong>TPU (Tensor Processing Unit)</strong>: Google’s custom ASIC for machine learning, optimized specifically for TensorFlow operations</li>
+<li><strong>NPU (Neural Processing Unit)</strong>: Specialized processors for AI inference in mobile devices and edge computing</li>
+<li><strong>FPGA (Field-Programmable Gate Array)</strong>: Reconfigurable hardware for custom acceleration</li>
+<li><strong>Domain-Specific Accelerators</strong>: Custom chips for cryptocurrency mining, video encoding, etc.</li>
+</ul>
+<p>These represent a trend toward <strong>heterogeneous computing</strong>—systems combining general-purpose CPUs with specialized accelerators, each optimized for specific workload types.</p>
+<h4 id="definitions"><strong>2. Definitions</strong></h4>
+<ul>
+<li><strong>Cache</strong>: A small, fast memory that stores copies of frequently accessed data from main memory to reduce average access time.</li>
+<li><strong>Cache Block (Cache Line)</strong>: The minimum unit of data transfer between cache and memory; an indivisible portion either present or absent in the cache.</li>
+<li><strong>Block Index</strong>: The portion of a memory address that identifies which cache block location to check (lower bits of the address).</li>
+<li><strong>Address Tag</strong>: The portion of a memory address stored in a cache block to identify which memory location the cached data came from (upper bits of the address).</li>
+<li><strong>Validity Flag</strong>: A bit in each cache block indicating whether the block contains valid, initialized data (Y/N or 1/0).</li>
+<li><strong>Cache Hit</strong>: The condition when requested data is found in the cache and can be immediately provided to the CPU.</li>
+<li><strong>Cache Miss</strong>: The condition when requested data is not found in the cache and must be fetched from a lower-level cache or main memory.</li>
+<li><strong>Cache Miss Penalty</strong>: The time required to fetch missing data from a lower-level cache or memory, including access latency, transfer time, cache insertion, and data delivery to the CPU.</li>
+<li><strong>Cache Hit Rate</strong>: The percentage of memory accesses satisfied by the cache (typically &gt;95% in modern systems).</li>
+<li><strong>Cache Miss Rate</strong>: The percentage of memory accesses that miss the cache; equals <span class="math inline">\(1 - \text{Hit Rate}\)</span>.</li>
+<li><strong>Spatial Locality</strong>: The principle that if data at address <span class="math inline">\(X\)</span> is accessed, nearby addresses are likely to be accessed soon.</li>
+<li><strong>Temporal Locality</strong>: The principle that if data at address <span class="math inline">\(X\)</span> is accessed, the same address is likely to be accessed again in the near future.</li>
+<li><strong>Direct-Mapped Cache</strong>: A cache organization where each memory address maps to exactly one cache block location.</li>
+<li><strong>Fully Associative Cache</strong>: A cache organization where any memory block can be placed in any cache block location.</li>
+<li><strong>Memory Consistency Principle</strong>: The invariant that if a data block is present in a higher-level cache, it must also be present in all lower-level caches.</li>
+<li><strong>SRAM (Static RAM)</strong>: Fast memory technology using flip-flop circuits; used for CPU caches and registers.</li>
+<li><strong>DRAM (Dynamic RAM)</strong>: Slower but denser memory technology using capacitors; used for main system memory; requires periodic refresh.</li>
+<li><strong>Pipeline</strong>: A technique where multiple instructions execute simultaneously, each at a different stage of completion.</li>
+<li><strong>Pipeline Stages</strong>: The distinct phases of instruction execution: IF (Instruction Fetch), ID (Instruction Decode), EX (Execution), MA (Memory Access), WB (Write Back).</li>
+<li><strong>Pipeline Registers</strong>: Storage elements between pipeline stages that hold intermediate results and synchronize stage transitions on clock edges.</li>
+<li><strong>Data Hazard</strong>: A pipeline conflict where an instruction depends on the result of a previous instruction that hasn’t completed yet.</li>
+<li><strong>Forwarding (Bypassing)</strong>: A technique to resolve data hazards by passing results directly from one pipeline stage to another without waiting for write-back.</li>
+<li><strong>Pipeline Stall (Bubble)</strong>: A delay inserted in the pipeline to resolve hazards, where one or more stages remain idle for a cycle.</li>
+<li><strong>Throughput</strong>: The number of instructions completed per unit time (instructions/second).</li>
+<li><strong>Flynn’s Taxonomy</strong>: A classification of computer architectures based on instruction and data streams: SISD, SIMD, MISD, MIMD.</li>
+<li><strong>SISD (Single Instruction Single Data)</strong>: Traditional architecture where one instruction operates on one data item at a time.</li>
+<li><strong>SIMD (Single Instruction Multiple Data)</strong>: Architecture where one instruction operates on multiple data items simultaneously.</li>
+<li><strong>MIMD (Multiple Instruction Multiple Data)</strong>: Architecture with multiple processors executing different instructions on different data.</li>
+<li><strong>GPU (Graphics Processing Unit)</strong>: A specialized processor with hundreds to thousands of simple cores, optimized for parallel data processing.</li>
+<li><strong>Streaming Multiprocessor (SM)</strong>: A cluster of processing cores in a GPU that executes thread blocks.</li>
+<li><strong>Streaming Processor (SP) Core</strong>: An individual compute unit (ALU) within an SM.</li>
+<li><strong>Kernel</strong>: A GPU function that executes on many data elements in parallel.</li>
+<li><strong>Thread</strong>: A single execution instance of a kernel.</li>
+<li><strong>Thread Block</strong>: A group of threads that execute together on one SM and can share data.</li>
+<li><strong>Grid</strong>: A collection of thread blocks executing the same kernel across the GPU.</li>
+<li><strong>CUDA (Compute Unified Device Architecture)</strong>: NVIDIA’s parallel computing platform and programming model for GPU computing.</li>
+<li><strong>GPGPU (General-Purpose computing on GPU)</strong>: Using GPU hardware for non-graphics computations like scientific simulations and machine learning.</li>
+<li><strong>Heterogeneous Computing</strong>: Computing systems that combine general-purpose CPUs with specialized accelerators (GPUs, TPUs, etc.).</li>
+</ul>
+<h4 id="examples"><strong>3. Examples</strong></h4>
+<h5 id="direct-mapped-cache-execution-trace-lecture-14-example-1"><strong>3.1. Direct-Mapped Cache Execution Trace</strong> (Lecture 14, Example 1)</h5>
+<p>Consider a direct-mapped cache with 4 blocks (2-bit block index) and a 5-bit memory address space (32 locations). Initially, all cache blocks have Validity Flag = N. Execute the following memory access sequence:</p>
+<ol type="1">
+<li><code>LW 01010</code> (Load Word from address 01010)</li>
+<li><code>LW 01100</code> (Load Word from address 01100)</li>
+<li><code>LW 01010</code> (Load Word from address 01010)</li>
+<li><code>LW 11010</code> (Load Word from address 11010)</li>
+<li><code>LW 01010</code> (Load Word from address 01010)</li>
+</ol>
+<p>For each access, determine whether it is a cache hit or miss, and show the cache state.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> In a direct-mapped cache, the address is split into Block Index (lower bits) and Address Tag (upper bits). A hit occurs when the block at the computed index has Validity = Y and the stored tag matches the requested tag.</p>
+<p><strong>Address Breakdown:</strong></p>
+<p>For a 5-bit address with 2-bit block index:</p>
+<ul>
+<li><strong>Bits [1:0]</strong>: Block Index (which cache block to check)</li>
+<li><strong>Bits [4:2]</strong>: Address Tag (identifies which memory block)</li>
+</ul>
+<p><strong>Initial Cache State:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Block Index</th>
+<th>Validity</th>
+<th>Tag</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>00</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>01</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>10</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>11</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>Access 1: LW 01010</strong></p>
+<ol type="1">
+<li><strong>Parse address</strong>: <code>01010</code> → Tag = <code>010</code>, Index = <code>10</code></li>
+<li><strong>Check cache block 10</strong>: Validity = N (invalid)</li>
+<li><strong>Result</strong>: <strong>MISS</strong></li>
+<li><strong>Action</strong>: Load <span class="math inline">\(W_{01010}\)</span> from memory into cache block 10</li>
+</ol>
+<p><strong>Cache State After Access 1:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Block Index</th>
+<th>Validity</th>
+<th>Tag</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>00</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>01</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>10</td>
+<td><strong>Y</strong></td>
+<td><strong>010</strong></td>
+<td><span class="math inline">\(W_{01010}\)</span></td>
+</tr>
+<tr class="even">
+<td>11</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>Access 2: LW 01100</strong></p>
+<ol type="1">
+<li><strong>Parse address</strong>: <code>01100</code> → Tag = <code>011</code>, Index = <code>00</code></li>
+<li><strong>Check cache block 00</strong>: Validity = N (invalid)</li>
+<li><strong>Result</strong>: <strong>MISS</strong></li>
+<li><strong>Action</strong>: Load <span class="math inline">\(W_{01100}\)</span> from memory into cache block 00</li>
+</ol>
+<p><strong>Cache State After Access 2:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Block Index</th>
+<th>Validity</th>
+<th>Tag</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>00</strong></td>
+<td><strong>Y</strong></td>
+<td><strong>011</strong></td>
+<td><span class="math inline">\(W_{01100}\)</span></td>
+</tr>
+<tr class="even">
+<td>01</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>10</td>
+<td>Y</td>
+<td>010</td>
+<td><span class="math inline">\(W_{01010}\)</span></td>
+</tr>
+<tr class="even">
+<td>11</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>Access 3: LW 01010</strong></p>
+<ol type="1">
+<li><strong>Parse address</strong>: <code>01010</code> → Tag = <code>010</code>, Index = <code>10</code></li>
+<li><strong>Check cache block 10</strong>: Validity = Y, Tag = <code>010</code> ✓ (matches!)</li>
+<li><strong>Result</strong>: <strong>HIT</strong></li>
+<li><strong>Action</strong>: Read data directly from cache (no memory access needed)</li>
+</ol>
+<p><strong>Cache State After Access 3:</strong> (unchanged)</p>
+<hr>
+<p><strong>Access 4: LW 11010</strong></p>
+<ol type="1">
+<li><strong>Parse address</strong>: <code>11010</code> → Tag = <code>110</code>, Index = <code>10</code></li>
+<li><strong>Check cache block 10</strong>: Validity = Y, Tag = <code>010</code> ✗ (doesn’t match <code>110</code>)</li>
+<li><strong>Result</strong>: <strong>MISS</strong> (conflict—different tag for same index)</li>
+<li><strong>Action</strong>: <strong>Evict</strong> old data, load <span class="math inline">\(W_{11010}\)</span> from memory into cache block 10</li>
+</ol>
+<p><strong>Cache State After Access 4:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Block Index</th>
+<th>Validity</th>
+<th>Tag</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>00</td>
+<td>Y</td>
+<td>011</td>
+<td><span class="math inline">\(W_{01100}\)</span></td>
+</tr>
+<tr class="even">
+<td>01</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>10</td>
+<td><strong>Y</strong></td>
+<td><strong>110</strong></td>
+<td><span class="math inline">\(W_{11010}\)</span></td>
+</tr>
+<tr class="even">
+<td>11</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>Access 5: LW 01010</strong></p>
+<ol type="1">
+<li><strong>Parse address</strong>: <code>01010</code> → Tag = <code>010</code>, Index = <code>10</code></li>
+<li><strong>Check cache block 10</strong>: Validity = Y, Tag = <code>110</code> ✗ (doesn’t match <code>010</code>)</li>
+<li><strong>Result</strong>: <strong>MISS</strong> (the data was evicted in Access 4!)</li>
+<li><strong>Action</strong>: Evict <span class="math inline">\(W_{11010}\)</span>, reload <span class="math inline">\(W_{01010}\)</span> into cache block 10</li>
+</ol>
+<p><strong>Cache State After Access 5:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Block Index</th>
+<th>Validity</th>
+<th>Tag</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>00</td>
+<td>Y</td>
+<td>011</td>
+<td><span class="math inline">\(W_{01100}\)</span></td>
+</tr>
+<tr class="even">
+<td>01</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>10</td>
+<td><strong>Y</strong></td>
+<td><strong>010</strong></td>
+<td><span class="math inline">\(W_{01010}\)</span></td>
+</tr>
+<tr class="even">
+<td>11</td>
+<td>N</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>Summary:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Access</th>
+<th>Address</th>
+<th>Block Index</th>
+<th>Tag</th>
+<th>Result</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>01010</td>
+<td>10</td>
+<td>010</td>
+<td><strong>MISS</strong></td>
+<td>Block invalid</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>01100</td>
+<td>00</td>
+<td>011</td>
+<td><strong>MISS</strong></td>
+<td>Block invalid</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>01010</td>
+<td>10</td>
+<td>010</td>
+<td><strong>HIT</strong></td>
+<td>Tag matches</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>11010</td>
+<td>10</td>
+<td>110</td>
+<td><strong>MISS</strong></td>
+<td>Tag mismatch (conflict)</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>01010</td>
+<td>10</td>
+<td>010</td>
+<td><strong>MISS</strong></td>
+<td>Tag mismatch (data was evicted)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key Observation</strong>: Accesses 4 and 5 demonstrate a <strong>conflict miss</strong>—addresses <code>01010</code> and <code>11010</code> both map to block 10, causing them to evict each other repeatedly. This is a weakness of direct-mapped caches.</p>
+<p><strong>Answer:</strong> Hit rate = 1/5 = 20%, Miss rate = 4/5 = 80%</p>
+</details>
+<h5 id="cache-miss-for-store-instructions-lecture-14-example-2"><strong>3.2. Cache Miss for Store Instructions</strong> (Lecture 14, Example 2)</h5>
+<p>Can a cache miss occur for a store instruction (e.g., <code>SW 11010</code>)? If so, explain what happens.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Store instructions can indeed experience cache misses. When storing data, the processor typically follows a <strong>write-allocate</strong> policy.</p>
+<p><strong>Answer:</strong> <strong>Yes</strong>, cache misses can occur for store instructions.</p>
+<p><strong>Explanation:</strong></p>
+<p>When executing <code>SW 11010</code> (Store Word to address 11010):</p>
+<ol type="1">
+<li><strong>Parse address</strong>: Extract Block Index and Tag</li>
+<li><strong>Check cache</strong>: Look up the cache block</li>
+<li><strong>If MISS</strong> (block invalid or tag mismatch):
+<ul>
+<li>The processor must first <strong>load the entire block</strong> from memory into the cache (write-allocate policy)</li>
+<li>Then <strong>update</strong> the specific word within that block</li>
+<li>Mark the block as <strong>dirty</strong> (modified)</li>
+</ul></li>
+<li><strong>If HIT</strong>:
+<ul>
+<li>Directly update the word in the cache</li>
+<li>Mark the block as dirty</li>
+</ul></li>
+</ol>
+<p><strong>Why load on a store miss?</strong></p>
+<p>Caches operate on <strong>blocks</strong>, not individual words. To maintain cache coherency and enable future loads from that block, the processor loads the entire block, then modifies the relevant portion.</p>
+<p><strong>Write Policies:</strong></p>
+<ul>
+<li><strong>Write-through</strong>: Every store also updates main memory immediately (slower but simpler)</li>
+<li><strong>Write-back</strong>: Stores only update the cache; memory is updated when the block is evicted (faster but requires dirty bit tracking)</li>
+</ul>
+<p>Most modern systems use <strong>write-back</strong> with a <strong>write-allocate</strong> policy for better performance.</p>
+</details>
+<h5 id="pipeline-data-hazard-resolution-lecture-14-example-3"><strong>3.3. Pipeline Data Hazard Resolution</strong> (Lecture 14, Example 3)</h5>
+<p>Given the instruction sequence:</p>
+<pre class="assembly"><code>A: add x19, x0, x1
+B: sub x2, x19, x3</code></pre>
+<p>Instruction B depends on the result in register <code>x19</code> from instruction A. Explain:</p>
+<ol type="a">
+<li>Why this creates a data hazard<br>
+</li>
+<li>How forwarding resolves the hazard<br>
+</li>
+<li>What would happen without forwarding</li>
+</ol>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Data hazards occur when an instruction needs a result that a previous instruction hasn’t yet written back. Forwarding (bypassing) passes results directly between pipeline stages.</p>
+<p><strong>(a) Why this creates a data hazard:</strong></p>
+<p>In a 5-stage pipeline:</p>
+<ul>
+<li>Instruction A writes <code>x19</code> in its <strong>WB stage</strong> (clock cycle 5)</li>
+<li>Instruction B needs <code>x19</code> in its <strong>ID stage</strong> (clock cycle 3) and <strong>EX stage</strong> (clock cycle 4)</li>
+</ul>
+<p>Timeline without any solution:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Clock Cycle</th>
+<th>1</th>
+<th>2</th>
+<th>3</th>
+<th>4</th>
+<th>5</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A: add</td>
+<td>IF</td>
+<td>ID</td>
+<td>EX</td>
+<td>MA</td>
+<td>WB (writes x19)</td>
+</tr>
+<tr class="even">
+<td>B: sub</td>
+<td></td>
+<td>IF</td>
+<td>ID (needs x19!)</td>
+<td>EX (needs x19!)</td>
+<td>MA</td>
+</tr>
+</tbody>
+</table>
+<p>Instruction B would read the <strong>old value</strong> of <code>x19</code> from the register file before A writes the new value—producing incorrect results.</p>
+<p><strong>(b) How forwarding resolves the hazard:</strong></p>
+<p><strong>Forwarding</strong> (also called <strong>bypassing</strong>) creates a direct data path from the output of one pipeline stage to the input of another.</p>
+<p>For this example:</p>
+<ul>
+<li>After instruction A completes its <strong>EX stage</strong> (clock cycle 3), the result is available in the <strong>EX/MEM pipeline register</strong></li>
+<li>This result can be <strong>forwarded directly</strong> to instruction B’s EX stage (clock cycle 4) via a dedicated hardware path</li>
+<li>Instruction B’s EX stage uses the forwarded value instead of reading from the register file</li>
+</ul>
+<p>Timeline with forwarding:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Clock Cycle</th>
+<th>1</th>
+<th>2</th>
+<th>3</th>
+<th>4</th>
+<th>5</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A: add</td>
+<td>IF</td>
+<td>ID</td>
+<td>EX (computes x19)</td>
+<td>MA</td>
+<td>WB</td>
+</tr>
+<tr class="even">
+<td>B: sub</td>
+<td></td>
+<td>IF</td>
+<td>ID</td>
+<td>EX (uses forwarded x19)</td>
+<td>MA</td>
+</tr>
+</tbody>
+</table>
+<p>No stalls needed—the pipeline continues at full speed.</p>
+<p><strong>(c) What would happen without forwarding:</strong></p>
+<p>Without forwarding, the processor must <strong>stall</strong> instruction B until A completes WB:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Clock Cycle</th>
+<th>1</th>
+<th>2</th>
+<th>3</th>
+<th>4</th>
+<th>5</th>
+<th>6</th>
+<th>7</th>
+<th>8</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A: add</td>
+<td>IF</td>
+<td>ID</td>
+<td>EX</td>
+<td>MA</td>
+<td>WB</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
+<td>B: sub</td>
+<td></td>
+<td>IF</td>
+<td><strong>stall</strong></td>
+<td><strong>stall</strong></td>
+<td><strong>stall</strong></td>
+<td>ID</td>
+<td>EX</td>
+<td>MA</td>
+</tr>
+</tbody>
+</table>
+<p>Instruction B is delayed by 3 clock cycles, severely reducing throughput. This is why modern processors implement extensive forwarding networks.</p>
+<p><strong>Answer:</strong> Forwarding allows the pipeline to continue without stalls by passing results directly between stages, typically providing 2-3× speedup compared to stalling.</p>
+</details>
+<h5 id="compiler-instruction-reordering-lecture-14-example-4"><strong>3.4. Compiler Instruction Reordering</strong> (Lecture 14, Example 4)</h5>
+<p>The following C code computes two sums:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>a <span class="op">=</span> b <span class="op">+</span> e<span class="op">;</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>c <span class="op">=</span> b <span class="op">+</span> f<span class="op">;</span></span></code></pre></div>
+<p>Show how a compiler can reorder RISC-V assembly instructions to minimize pipeline stalls. Assume register <code>x31</code> holds the base address of variables.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Compilers can reorder independent instructions to fill delay slots created by dependencies, reducing pipeline stalls.</p>
+<p><strong>Initial (naive) assembly code:</strong></p>
+<pre class="assembly"><code>lw  x1, 0(x31)    // Load b
+lw  x2, 8(x31)    // Load e
+add x3, x1, x2    // a = b + e  [STALL: waiting for x1, x2]
+sw  x3, 24(x31)   // Store a
+lw  x4, 16(x31)   // Load f
+add x5, x1, x4    // c = b + f  [STALL: waiting for x4]
+sw  x5, 32(x31)   // Store c</code></pre>
+<p><strong>Problem:</strong> The <code>add</code> instructions must stall waiting for the <code>lw</code> instructions to complete (load-use hazard).</p>
+<p><strong>Optimized assembly code:</strong></p>
+<pre class="assembly"><code>lw  x1, 0(x31)    // Load b
+lw  x2, 8(x31)    // Load e
+lw  x4, 16(x31)   // Load f  [MOVED UP!]
+add x3, x1, x2    // a = b + e  [No stall—x1, x2 ready]
+sw  x3, 24(x31)   // Store a
+add x5, x1, x4    // c = b + f  [No stall—x1, x4 ready]
+sw  x5, 32(x31)   // Store c</code></pre>
+<p><strong>Explanation:</strong></p>
+<ol type="1">
+<li><strong>Identify independent instruction</strong>: The third load (<code>lw x4, 16(x31)</code>) doesn’t depend on any previous computations</li>
+<li><strong>Move it earlier</strong>: Place it immediately after the first two loads</li>
+<li><strong>Fill the delay slot</strong>: By the time the first <code>add</code> executes, all three load values are ready (loads take ~2-3 cycles in a typical pipeline)</li>
+<li><strong>Result</strong>: Both <code>add</code> instructions can execute without stalling</li>
+</ol>
+<p><strong>Performance Improvement:</strong></p>
+<ul>
+<li>Original: ~11-12 cycles (with stalls)</li>
+<li>Optimized: ~7-8 cycles (no stalls)</li>
+<li>Speedup: ~40-50% improvement</li>
+</ul>
+<p><strong>Answer:</strong> By reordering the third load instruction to execute before the first add, the compiler fills the delay slot and eliminates pipeline stalls, significantly improving performance.</p>
+</details>
+
+
+<style>
+	.article-buttons {
+		margin-top: 1rem;
+	}
+
+	.mark-read {
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .9rem;
+		line-height: 1.5;
+	}
+
+	.mark-read:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-read.active {
+		background: #4285F4;
+		color: #fff;
+		border-color: #4285F4;
+	}
+
+	.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.sidebar-link.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
+</style>
+
+<div class="article-buttons">
+	<button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const basePath = '/inno_notes/';
+		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
+			document.querySelector('.article-buttons')?.remove();
+		}
+
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
+
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
+			sidebarLinks.forEach(l => {
+				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
+			});
+		}
+
+		const sidebar = document.querySelector('#quarto-sidebar');
+		if (!sidebar) return;
+
+		const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+		sections.forEach(section => {
+			const toggle = section.querySelector('.sidebar-item-toggle');
+			const targetId = toggle?.getAttribute('data-bs-target');
+			const target = targetId ? document.querySelector(targetId) : null;
+			if (!toggle || !target) return;
+
+			const storageKey = `sidebar_section_${targetId}`;
+
+			const saved = localStorage.getItem(storageKey);
+			if (saved === 'open') {
+				target.classList.add('show');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			} else {
+				// collapse by default if not explicitly opened
+				target.classList.remove('show');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			}
+
+			target.addEventListener('show.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'open');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			});
+
+			target.addEventListener('hide.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'closed');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			});
+		});
+
+		const scrollKey = 'sidebar_scroll_top';
+		const savedScroll = localStorage.getItem(scrollKey);
+		if (savedScroll && !isNaN(parseInt(savedScroll, 10))) {
+			sidebar.scrollTop = parseInt(savedScroll, 10);
+		}
+		sidebar.addEventListener('scroll', () => {
+			localStorage.setItem(scrollKey, sidebar.scrollTop);
+		});
+	});
+</script>
+
+
+
+
+</body></html>

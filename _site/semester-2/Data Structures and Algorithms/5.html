@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.24">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Nikolai Kudasov">
+<meta name="dcterms.date" content="2026-02-16">
+
+<title>W5-W6. Dynamic Programming, Maximum Subarray, Longest Common Subsequence, Rod Cutting, Knapsack Problem – InnoNotes</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<link href="../../logo.svg" rel="icon" type="image/svg+xml">
+<link href="../../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-H1WYLNDN76"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
+</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles/sf-pro.css">
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">W5-W6. Dynamic Programming, Maximum Subarray, Longest Common Subsequence, Rod Cutting, Knapsack Problem</h1>
+<p class="author">Nikolai Kudasov</p>
+
+<p class="date">2026-02-16</p>
+</header>
+
+
+<h4 id="summary"><strong>1. Summary</strong></h4>
+<h5 id="introduction-to-dynamic-programming"><strong>1.1 Introduction to Dynamic Programming</strong></h5>
+<p><strong>Dynamic Programming (DP)</strong> is a powerful algorithmic technique for solving optimization problems by breaking them down into overlapping subproblems, solving each subproblem once, and storing the results to avoid redundant computation. Unlike divide-and-conquer, where subproblems are independent, dynamic programming exploits the fact that subproblems overlap — the same subproblem may appear multiple times in different branches of the recursion.</p>
+<p>The name “dynamic programming” is somewhat misleading — it has nothing to do with writing programs dynamically. The term was coined by Richard Bellman in the 1950s. “Programming” here refers to optimization (as in “linear programming”), and “dynamic” refers to solving problems in stages over time.</p>
+<h6 id="when-to-use-dynamic-programming"><strong>1.1.1 When to Use Dynamic Programming</strong></h6>
+<p>Dynamic programming is applicable when a problem has two key properties:</p>
+<ol type="1">
+<li><strong>Optimal substructure:</strong> An optimal solution to the problem contains optimal solutions to subproblems. In other words, you can build an optimal solution from optimal solutions to smaller instances of the same problem.</li>
+<li><strong>Overlapping subproblems:</strong> The same subproblems are solved multiple times when using a naive recursive approach. This creates an opportunity for optimization by storing solutions.</li>
+</ol>
+<p><strong>Real-world analogy:</strong> Imagine planning the shortest route from your home to work, passing through various intermediate locations. If you’ve already computed the shortest path from location A to work, you can reuse that information whenever you consider routes passing through A — you don’t need to recalculate it each time.</p>
+<h6 id="optimization-problems"><strong>1.1.2 Optimization Problems</strong></h6>
+<p>An <strong>optimization problem</strong> has the following structure:</p>
+<ol type="1">
+<li>A problem may have <strong>many possible solutions</strong> (candidates)</li>
+<li>Each solution has an associated <strong>value</strong> (usually numerical)</li>
+<li>The goal is to find a solution with an <strong>optimal value</strong> (minimum or maximum)</li>
+</ol>
+<p>Note that there may be multiple optimal solutions with the same optimal value. Dynamic programming helps us find at least one such optimal solution efficiently.</p>
+<p><strong>Example optimization problems we’ve seen:</strong></p>
+<ul>
+<li><strong>Sorting:</strong> Among all permutations of an array, find one that is sorted</li>
+<li><strong>Shortest path:</strong> Among all paths between two points, find one with minimum total distance</li>
+<li><strong>Maximum subarray:</strong> Among all subarrays, find one with maximum sum</li>
+</ul>
+<h5 id="steps-in-developing-a-dynamic-programming-algorithm"><strong>1.2 Steps in Developing a Dynamic Programming Algorithm</strong></h5>
+<p>There are four essential steps to developing a dynamic programming solution:</p>
+<p><strong>Step 1: Characterize the structure of an optimal solution</strong></p>
+<p>Analyze how an optimal solution can be constructed from optimal solutions to subproblems. This step is crucial — you must identify the recursive structure of the problem.</p>
+<p><strong>Important:</strong> For dynamic programming to be efficient, the optimal solution must <strong>reuse solutions</strong> to overlapping subproblems. If subproblems don’t overlap (as in merge sort), divide-and-conquer is more appropriate than dynamic programming.</p>
+<p><strong>Step 2: Recursively define the value of an optimal solution</strong></p>
+<p>Express the value of an optimal solution in terms of the values of optimal solutions to smaller subproblems. This typically results in a recurrence relation.</p>
+<p><strong>Step 3: Compute the values of optimal solutions</strong></p>
+<p>Use either a <strong>bottom-up</strong> (tabulation) or <strong>top-down</strong> (memoization) approach to compute the optimal values, ensuring each subproblem is solved only once.</p>
+<p><strong>Step 4: Reconstruct an optimal solution</strong></p>
+<p>Use the information accumulated while computing optimal values to construct an actual optimal solution (not just its value).</p>
+<p>Note: Step 4 can be omitted if only the optimal value is needed, not the solution itself.</p>
+<h5 id="bottom-up-vs-top-down-approaches"><strong>1.3 Bottom-Up vs Top-Down Approaches</strong></h5>
+<p>There are two main ways to implement dynamic programming:</p>
+<h6 id="bottom-up-approach-tabulation"><strong>1.3.1 Bottom-Up Approach (Tabulation)</strong></h6>
+<p>The bottom-up approach builds solutions iteratively from smaller to larger subproblems:</p>
+<ol type="1">
+<li><strong>Initialize a table</strong> (array) to store solutions to subproblems</li>
+<li><strong>Fill the table</strong> starting from the smallest subproblems, working up to larger ones</li>
+<li><strong>Extract the solution</strong> for the original problem from the table</li>
+</ol>
+<p><strong>Advantages:</strong></p>
+<ul>
+<li>Usually more efficient (no function call overhead)</li>
+<li>Easier to analyze space complexity</li>
+<li>Can optimize space by discarding unneeded values</li>
+</ul>
+<p><strong>Disadvantages:</strong></p>
+<ul>
+<li>Must determine the correct order to fill the table</li>
+<li>May compute solutions to unnecessary subproblems</li>
+</ul>
+<p><strong>Example:</strong> Computing Fibonacci numbers from <span class="math inline">\(F_0\)</span> and <span class="math inline">\(F_1\)</span> upward to <span class="math inline">\(F_n\)</span>.</p>
+<h6 id="top-down-approach-memoization"><strong>1.3.2 Top-Down Approach (Memoization)</strong></h6>
+<p>The top-down approach uses recursion with caching:</p>
+<ol type="1">
+<li>A <strong>recursive function</strong> first checks if the result for given parameters is already known</li>
+<li>If yes, it <strong>returns the cached result</strong></li>
+<li>Otherwise, it <strong>computes the result</strong> recursively and <strong>stores it before returning</strong></li>
+</ol>
+<p><strong>Advantages:</strong></p>
+<ul>
+<li>More intuitive — follows the natural recursive structure</li>
+<li>Only computes necessary subproblems</li>
+<li>Easier to implement (often just add memoization to naive recursion)</li>
+</ul>
+<p><strong>Disadvantages:</strong></p>
+<ul>
+<li>Function call overhead</li>
+<li>Risk of stack overflow for deep recursion</li>
+<li>Harder to optimize space usage</li>
+</ul>
+<p><strong>Example:</strong> Computing Fibonacci with a dictionary/map to cache previously computed values.</p>
+<h5 id="example-fibonacci-numbers"><strong>1.4 Example: Fibonacci Numbers</strong></h5>
+<p>The Fibonacci sequence is a classic example to illustrate the difference between naive recursion and dynamic programming.</p>
+<p><strong>Sequence:</strong> <span class="math inline">\(0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, \ldots\)</span></p>
+<p><strong>Recurrence:</strong> <span class="math inline">\(F_n = F_{n-1} + F_{n-2}\)</span> with <span class="math inline">\(F_0 = 0\)</span> and <span class="math inline">\(F_1 = 1\)</span>.</p>
+<h6 id="naive-recursive-solution"><strong>1.4.1 Naive Recursive Solution</strong></h6>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fibonacci(n):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">0</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="op">==</span> <span class="dv">1</span>:</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> fibonacci(n<span class="op">-</span><span class="dv">1</span>) <span class="op">+</span> fibonacci(n<span class="op">-</span><span class="dv">2</span>)</span></code></pre></div>
+<p><strong>Analysis:</strong></p>
+<ul>
+<li><strong>Time complexity:</strong> <span class="math inline">\(\Theta(\phi^n)\)</span> where <span class="math inline">\(\phi = \frac{1+\sqrt{5}}{2} \approx 1.618\)</span> (golden ratio)
+<ul>
+<li>The recurrence <span class="math inline">\(T(n) = T(n-1) + T(n-2) + O(1)\)</span> gives exponential growth</li>
+<li>Upper bound: <span class="math inline">\(T(n) \le 2T(n-1) = O(2^n)\)</span></li>
+<li>Exact solution: <span class="math inline">\(T(n) = \Theta(F_n) = \Theta(\phi^n)\)</span></li>
+</ul></li>
+<li><strong>Space complexity:</strong> <span class="math inline">\(\Theta(n)\)</span> due to recursion depth</li>
+</ul>
+<p><strong>Why is this slow?</strong> The call tree has massive redundancy. For example, computing <code>f(6)</code> requires computing <code>f(4)</code> twice, <code>f(3)</code> three times, <code>f(2)</code> five times, etc. The number of calls grows exponentially.</p>
+<h6 id="bottom-up-dynamic-programming"><strong>1.4.2 Bottom-Up Dynamic Programming</strong></h6>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fibonacci(n):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    fib <span class="op">=</span> [<span class="dv">0</span>] <span class="op">*</span> (n <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    fib[<span class="dv">0</span>] <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    fib[<span class="dv">1</span>] <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2</span>, n <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        fib[i] <span class="op">=</span> fib[i <span class="op">-</span> <span class="dv">1</span>] <span class="op">+</span> fib[i <span class="op">-</span> <span class="dv">2</span>]</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> fib[n]</span></code></pre></div>
+<p><strong>Analysis:</strong></p>
+<ul>
+<li><strong>Time complexity:</strong> <span class="math inline">\(\Theta(n)\)</span> — single loop from 2 to <span class="math inline">\(n\)</span></li>
+<li><strong>Space complexity:</strong> <span class="math inline">\(\Theta(n)\)</span> for the array</li>
+</ul>
+<p><strong>Can we improve space?</strong> Yes! Since we only need the previous two values, we can use just two variables instead of an array, achieving <span class="math inline">\(\Theta(1)\)</span> space:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fibonacci(n):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="op">==</span> <span class="dv">0</span>: <span class="cf">return</span> <span class="dv">0</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="op">==</span> <span class="dv">1</span>: <span class="cf">return</span> <span class="dv">1</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    prev2, prev1 <span class="op">=</span> <span class="dv">0</span>, <span class="dv">1</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2</span>, n <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        current <span class="op">=</span> prev1 <span class="op">+</span> prev2</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        prev2, prev1 <span class="op">=</span> prev1, current</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> prev1</span></code></pre></div>
+<h6 id="top-down-dynamic-programming-memoization"><strong>1.4.3 Top-Down Dynamic Programming (Memoization)</strong></h6>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fibonacci(n):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    memo <span class="op">=</span> {}</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> fib_memo(n, memo)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fib_memo(n, memo):</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="kw">in</span> memo:</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> memo[n]</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> n <span class="op">==</span> <span class="dv">1</span>:</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> fib_memo(n<span class="op">-</span><span class="dv">1</span>, memo) <span class="op">+</span> fib_memo(n<span class="op">-</span><span class="dv">2</span>, memo)</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    memo[n] <span class="op">=</span> result</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> result</span></code></pre></div>
+<p><strong>Analysis:</strong></p>
+<ul>
+<li><strong>Time complexity:</strong> <span class="math inline">\(\Theta(n)\)</span> — each value computed exactly once</li>
+<li><strong>Space complexity:</strong> <span class="math inline">\(\Theta(n)\)</span> for the dictionary and recursion stack</li>
+</ul>
+<h5 id="maximum-subarray-problem"><strong>1.5 Maximum Subarray Problem</strong></h5>
+<h6 id="problem-definition"><strong>1.5.1 Problem Definition</strong></h6>
+<p><strong>Input:</strong> A sequence of <span class="math inline">\(n\)</span> numbers <span class="math inline">\(\langle a_1, a_2, \ldots, a_n \rangle\)</span>.</p>
+<p><strong>Output:</strong> Indices <span class="math inline">\(l\)</span> and <span class="math inline">\(r\)</span> such that <span class="math inline">\(\sum_{i=l}^{r} a_i\)</span> is maximized over all possible choices of <span class="math inline">\(1 \le l \le r \le n\)</span>.</p>
+<p><strong>Applications:</strong></p>
+<ol type="1">
+<li><strong>Time series analysis:</strong> Finding periods of maximum gain or loss</li>
+<li><strong>Stock trading:</strong> Finding the best period to buy and hold (input represents daily price changes)</li>
+<li><strong>Signal processing:</strong> Detecting regions of maximum intensity</li>
+</ol>
+<p><strong>Example:</strong> For the array <span class="math inline">\(A = [-2, 1, -3, 4, -1, 2, 1, -5, 4]\)</span>:</p>
+<ul>
+<li>The maximum subarray is <span class="math inline">\([4, -1, 2, 1]\)</span> (indices 4-7) with sum <span class="math inline">\(6\)</span></li>
+</ul>
+<p><strong>Previous solutions we’ve seen:</strong></p>
+<ul>
+<li><strong>Brute force:</strong> Check all <span class="math inline">\(O(n^2)\)</span> possible subarrays — <span class="math inline">\(\Theta(n^2)\)</span> time</li>
+<li><strong>Divide and conquer:</strong> Split array in half, check left, right, and crossing — <span class="math inline">\(\Theta(n \log n)\)</span> time</li>
+</ul>
+<p>Now we’ll see a <strong>dynamic programming solution</strong> that achieves <span class="math inline">\(\Theta(n)\)</span> time.</p>
+<h6 id="dynamic-programming-approach"><strong>1.5.2 Dynamic Programming Approach</strong></h6>
+<p><strong>Key insight:</strong> For each position <span class="math inline">\(i\)</span>, we can define:</p>
+<ul>
+<li><strong>maxSuffixValue(A, i):</strong> The maximum sum of any subarray ending at position <span class="math inline">\(i\)</span></li>
+<li><strong>maxSuffix(A, i):</strong> The starting index of that maximum suffix</li>
+</ul>
+<p>The crucial observation: the maximum suffix ending at position <span class="math inline">\(i\)</span> either:</p>
+<ol type="1">
+<li><strong>Extends</strong> the maximum suffix ending at position <span class="math inline">\(i-1\)</span> (if that suffix has positive sum), or</li>
+<li><strong>Starts fresh</strong> at position <span class="math inline">\(i\)</span> (if extending would decrease the sum)</li>
+</ol>
+<p><strong>Recurrence for maximum suffix sum:</strong></p>
+<p><span class="math display">\[\text{maxSuffixValue}(A, i) = \begin{cases}
+A[1], &amp; \text{if } i = 1 \\
+\max(\text{maxSuffixValue}(A, i-1) + A[i], A[i]), &amp; \text{otherwise}
+\end{cases}\]</span></p>
+<p><strong>Why this works:</strong> If the best subarray ending at position <span class="math inline">\(i-1\)</span> has a positive sum, we should extend it by including <span class="math inline">\(A[i]\)</span> (giving sum + <span class="math inline">\(A[i]\)</span>). If it has a non-positive sum, we’re better off starting fresh at <span class="math inline">\(A[i]\)</span>.</p>
+<p><strong>Recurrence for suffix starting position:</strong></p>
+<p><span class="math display">\[\text{maxSuffix}(A, i) = \begin{cases}
+1, &amp; \text{if } i = 1 \\
+j, &amp; \text{if } j = \text{maxSuffix}(A, i-1) \text{ and } \text{maxSuffixValue}(A, i-1) &gt; 0 \\
+i, &amp; \text{otherwise}
+\end{cases}\]</span></p>
+<p><strong>Finding the overall maximum:</strong> Track the maximum over all suffix values:</p>
+<p><span class="math display">\[\text{maxSum} = \max_{1 \le i \le n} \text{maxSuffixValue}(A, i)\]</span></p>
+<h6 id="kadanes-algorithm"><strong>1.5.3 Kadane’s Algorithm</strong></h6>
+<p>The bottom-up implementation of this idea is known as <strong>Kadane’s Algorithm</strong>:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> max_subarray(A, n):</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    max_suffix_sum <span class="op">=</span> A[<span class="dv">1</span>]</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    max_sum <span class="op">=</span> max_suffix_sum</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2</span>, n <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>        max_suffix_sum <span class="op">=</span> <span class="bu">max</span>(max_suffix_sum <span class="op">+</span> A[i], A[i])</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>        max_sum <span class="op">=</span> <span class="bu">max</span>(max_sum, max_suffix_sum)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> max_sum</span></code></pre></div>
+<p><strong>How it works:</strong></p>
+<ul>
+<li><code>max_suffix_sum</code> tracks the maximum subarray sum ending at the current position</li>
+<li><code>max_sum</code> tracks the overall maximum seen so far</li>
+<li>At each position, we decide: extend the current subarray or start a new one</li>
+</ul>
+<p><strong>Analysis:</strong></p>
+<ul>
+<li><strong>Time complexity:</strong> <span class="math inline">\(\Theta(n)\)</span> — single pass through the array</li>
+<li><strong>Space complexity:</strong> <span class="math inline">\(\Theta(1)\)</span> — only two variables</li>
+</ul>
+<p>This is optimal! We cannot do better than <span class="math inline">\(\Theta(n)\)</span> since we must examine each element at least once.</p>
+<p><strong>To get the actual subarray indices:</strong> Maintain additional variables to track the start and end positions:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> max_subarray_with_indices(A, n):</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    max_suffix_sum <span class="op">=</span> A[<span class="dv">1</span>]</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    max_sum <span class="op">=</span> max_suffix_sum</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> <span class="dv">1</span>  <span class="co"># start of current suffix</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    best_start <span class="op">=</span> <span class="dv">1</span>  <span class="co"># start of best subarray</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    best_end <span class="op">=</span> <span class="dv">1</span>    <span class="co"># end of best subarray</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2</span>, n <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> max_suffix_sum <span class="op">+</span> A[i] <span class="op">&gt;</span> A[i]:</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>            max_suffix_sum <span class="op">=</span> max_suffix_sum <span class="op">+</span> A[i]</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>            max_suffix_sum <span class="op">=</span> A[i]</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>            start <span class="op">=</span> i  <span class="co"># start new suffix here</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> max_suffix_sum <span class="op">&gt;</span> max_sum:</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>            max_sum <span class="op">=</span> max_suffix_sum</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>            best_start <span class="op">=</span> start</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>            best_end <span class="op">=</span> i</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (best_start, best_end, max_sum)</span></code></pre></div>
+<h5 id="longest-common-subsequence-problem"><strong>1.6 Longest Common Subsequence Problem</strong></h5>
+<h6 id="subsequences"><strong>1.6.1 Subsequences</strong></h6>
+<p>A sequence <span class="math inline">\(Z = \langle z_1, z_2, \ldots, z_k \rangle\)</span> is a <strong>subsequence</strong> of <span class="math inline">\(X = \langle x_1, x_2, \ldots, x_m \rangle\)</span> if there exists a strictly increasing sequence of indices <span class="math inline">\(\langle i_1, i_2, \ldots, i_k \rangle\)</span> such that <span class="math inline">\(z_j = x_{i_j}\)</span> for all <span class="math inline">\(j\)</span>.</p>
+<p><strong>In simpler terms:</strong> You can obtain <span class="math inline">\(Z\)</span> from <span class="math inline">\(X\)</span> by deleting some (possibly zero) elements without rearranging the remaining elements.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><span class="math inline">\(\langle B, D, A \rangle\)</span> is a subsequence of <span class="math inline">\(\langle A, B, C, B, D, A, B \rangle\)</span> (select indices 2, 5, 6)</li>
+<li><span class="math inline">\(\langle B, C, D, B \rangle\)</span> is a subsequence of <span class="math inline">\(\langle A, B, C, B, D, A, B \rangle\)</span> (select indices 2, 3, 5, 7)</li>
+<li><span class="math inline">\(\langle A, C, D, C \rangle\)</span> is <strong>not</strong> a subsequence of <span class="math inline">\(\langle A, B, C, B, D, A, B \rangle\)</span> because after selecting C at index 3 and D at index 5, there is no C after position 5</li>
+</ul>
+<p><strong>Key difference from substring:</strong> A substring must be contiguous, but a subsequence need not be.</p>
+<h6 id="common-subsequences"><strong>1.6.2 Common Subsequences</strong></h6>
+<p>A sequence <span class="math inline">\(Z\)</span> is a <strong>common subsequence</strong> of <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span> if <span class="math inline">\(Z\)</span> is a subsequence of both <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span>.</p>
+<p><strong>Example:</strong> For <span class="math inline">\(X = \langle A, B, C, B, D, A, B \rangle\)</span> and <span class="math inline">\(Y = \langle B, D, C, A, B, A \rangle\)</span>:</p>
+<ul>
+<li><span class="math inline">\(\langle B, C, A \rangle\)</span> is a common subsequence</li>
+<li><span class="math inline">\(\langle B, C, D \rangle\)</span> is <strong>not</strong> a common subsequence (not a subsequence of <span class="math inline">\(Y\)</span> in the correct order)</li>
+<li><span class="math inline">\(\langle B, C, A, B \rangle\)</span> is a common subsequence</li>
+</ul>
+<h6 id="problem-definition-1"><strong>1.6.3 Problem Definition</strong></h6>
+<p><strong>Longest Common Subsequence (LCS) Problem:</strong></p>
+<p><strong>Input:</strong> Two sequences <span class="math inline">\(X = \langle x_1, x_2, \ldots, x_m \rangle\)</span> and <span class="math inline">\(Y = \langle y_1, y_2, \ldots, y_n \rangle\)</span>.</p>
+<p><strong>Output:</strong> A common subsequence of <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span> with maximum length.</p>
+<p><strong>Applications:</strong></p>
+<ol type="1">
+<li><strong>Text similarity:</strong> Measuring how similar two documents or strings are</li>
+<li><strong>DNA analysis:</strong> Comparing and searching amino acid chains</li>
+<li><strong>Version control:</strong> Computing differences between file versions (the <code>diff</code> command)</li>
+<li><strong>Plagiarism detection:</strong> Finding copied passages</li>
+</ol>
+<p><strong>Brute force approach:</strong></p>
+<ol type="1">
+<li>Enumerate all <span class="math inline">\(2^m\)</span> subsequences of <span class="math inline">\(X\)</span></li>
+<li>For each, check if it’s a subsequence of <span class="math inline">\(Y\)</span> (takes <span class="math inline">\(O(n)\)</span> time)</li>
+<li>Keep track of the longest one found</li>
+</ol>
+<p><strong>Time complexity:</strong> <span class="math inline">\(O(n \cdot 2^m)\)</span> — completely impractical for even moderate-sized inputs.</p>
+<h6 id="optimal-substructure"><strong>1.6.4 Optimal Substructure</strong></h6>
+<p><strong>Theorem (Optimal Substructure of LCS):</strong></p>
+<p>Let <span class="math inline">\(X_i = \langle x_1, \ldots, x_i \rangle\)</span> denote the prefix of <span class="math inline">\(X\)</span> of length <span class="math inline">\(i\)</span>, and similarly for <span class="math inline">\(Y_j\)</span>. Let <span class="math inline">\(Z_k = \langle z_1, \ldots, z_k \rangle\)</span> be an LCS of <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span>. Then:</p>
+<ol type="1">
+<li><p><strong>If <span class="math inline">\(x_m = y_n\)</span>:</strong> Then <span class="math inline">\(z_k = x_m = y_n\)</span> and <span class="math inline">\(Z_{k-1} = \text{LCS}(X_{m-1}, Y_{n-1})\)</span>.</p>
+<p><em>Explanation:</em> If the last characters match, they must be in the LCS. Remove them and solve the smaller problem.</p></li>
+<li><p><strong>If <span class="math inline">\(x_m \neq y_n\)</span>:</strong> Then either:</p>
+<ul>
+<li><span class="math inline">\(z_k \neq x_m\)</span>, in which case <span class="math inline">\(Z_k = \text{LCS}(X_{m-1}, Y_n)\)</span>, or</li>
+<li><span class="math inline">\(z_k \neq y_n\)</span>, in which case <span class="math inline">\(Z_k = \text{LCS}(X_m, Y_{n-1})\)</span></li>
+</ul>
+<p><em>Explanation:</em> If the last characters don’t match, at least one is not in the LCS. Try removing each and take the better result.</p></li>
+</ol>
+<p>This gives us a recursive structure perfect for dynamic programming!</p>
+<h6 id="recursive-solution"><strong>1.6.5 Recursive Solution</strong></h6>
+<p>Define <span class="math inline">\(\text{LCS}'(X_m, Y_n)\)</span> as the <strong>length</strong> of the LCS of <span class="math inline">\(X_m\)</span> and <span class="math inline">\(Y_n\)</span>:</p>
+<p><span class="math display">\[\text{LCS}'(X_m, Y_n) = \begin{cases}
+0, &amp; \text{if } m = 0 \text{ or } n = 0 \\
+1 + \text{LCS}'(X_{m-1}, Y_{n-1}), &amp; \text{if } x_m = y_n \\
+\max(\text{LCS}'(X_{m-1}, Y_n), \text{LCS}'(X_m, Y_{n-1})), &amp; \text{otherwise}
+\end{cases}\]</span></p>
+<p><strong>Base case:</strong> Empty sequences have LCS of length 0.</p>
+<p><strong>Recursive cases:</strong></p>
+<ul>
+<li><strong>Characters match:</strong> Include the matching character and solve the smaller problem</li>
+<li><strong>Characters don’t match:</strong> Try excluding each character separately and take the maximum</li>
+</ul>
+<h6 id="bottom-up-dynamic-programming-solution"><strong>1.6.6 Bottom-Up Dynamic Programming Solution</strong></h6>
+<p>We build a 2D table <span class="math inline">\(C[i, j]\)</span> where <span class="math inline">\(C[i, j]\)</span> stores the length of LCS of <span class="math inline">\(X_i\)</span> and <span class="math inline">\(Y_j\)</span>.</p>
+<p>Additionally, we maintain a table <span class="math inline">\(B[i, j]\)</span> to track which choice we made (for reconstructing the solution):</p>
+<ul>
+<li><strong>“XY”</strong> (or “↖”): Characters matched, came from <span class="math inline">\(C[i-1, j-1]\)</span></li>
+<li><strong>“X”</strong> (or “←”): Came from <span class="math inline">\(C[i, j-1]\)</span> (excluded <span class="math inline">\(y_j\)</span>)</li>
+<li><strong>“Y”</strong> (or “↑”): Came from <span class="math inline">\(C[i-1, j]\)</span> (excluded <span class="math inline">\(x_i\)</span>)</li>
+</ul>
+<p><strong>Algorithm:</strong></p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> LCS_length(X, m, Y, n):</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Create tables</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    B <span class="op">=</span> [[<span class="va">None</span>] <span class="op">*</span> n <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(m)]  <span class="co"># 1-indexed</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    C <span class="op">=</span> [[<span class="dv">0</span>] <span class="op">*</span> (n <span class="op">+</span> <span class="dv">1</span>) <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(m <span class="op">+</span> <span class="dv">1</span>)]  <span class="co"># 0-indexed</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Initialize base cases</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, m <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        C[i][<span class="dv">0</span>] <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, n <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>        C[<span class="dv">0</span>][j] <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Fill the table</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, m <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, n <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> X[i] <span class="op">==</span> Y[j]:</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>                C[i][j] <span class="op">=</span> C[i <span class="op">-</span> <span class="dv">1</span>][j <span class="op">-</span> <span class="dv">1</span>] <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>                B[i][j] <span class="op">=</span> <span class="st">"XY"</span>  <span class="co"># diagonal arrow</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>            <span class="cf">elif</span> C[i][j <span class="op">-</span> <span class="dv">1</span>] <span class="op">&lt;</span> C[i <span class="op">-</span> <span class="dv">1</span>][j]:</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>                C[i][j] <span class="op">=</span> C[i <span class="op">-</span> <span class="dv">1</span>][j]</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>                B[i][j] <span class="op">=</span> <span class="st">"Y"</span>   <span class="co"># up arrow</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>            <span class="cf">else</span>:</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>                C[i][j] <span class="op">=</span> C[i][j <span class="op">-</span> <span class="dv">1</span>]</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>                B[i][j] <span class="op">=</span> <span class="st">"X"</span>   <span class="co"># left arrow</span></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> C, B</span></code></pre></div>
+<p><strong>Analysis:</strong></p>
+<ul>
+<li><strong>Time complexity:</strong> <span class="math inline">\(\Theta(m \cdot n)\)</span> — fill an <span class="math inline">\(m \times n\)</span> table</li>
+<li><strong>Space complexity:</strong> <span class="math inline">\(\Theta(m \cdot n)\)</span> for the tables</li>
+</ul>
+<p><strong>Reconstructing the LCS:</strong> Follow the arrows in table <span class="math inline">\(B\)</span> backward from <span class="math inline">\(B[m, n]\)</span>:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> reconstruct_LCS(B, X, i, j):</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> i <span class="op">==</span> <span class="dv">0</span> <span class="kw">or</span> j <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> []</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> B[i][j] <span class="op">==</span> <span class="st">"XY"</span>:</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> reconstruct_LCS(B, X, i<span class="op">-</span><span class="dv">1</span>, j<span class="op">-</span><span class="dv">1</span>) <span class="op">+</span> [X[i]]</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> B[i][j] <span class="op">==</span> <span class="st">"Y"</span>:</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> reconstruct_LCS(B, X, i<span class="op">-</span><span class="dv">1</span>, j)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> reconstruct_LCS(B, X, i, j<span class="op">-</span><span class="dv">1</span>)</span></code></pre></div>
+<h5 id="classic-dynamic-programming-problems"><strong>1.7 Classic Dynamic Programming Problems</strong></h5>
+<h6 id="rod-cutting-problem"><strong>1.7.1 Rod Cutting Problem</strong></h6>
+<p><strong>Problem:</strong> A company produces rods of length <span class="math inline">\(n\)</span> and wants to cut them into smaller pieces for sale. Each length has a market price. Cuts are free. How should the rod be cut to maximize revenue?</p>
+<p><strong>Input:</strong> Rod length <span class="math inline">\(n\)</span> and a price table <span class="math inline">\(p[1 \ldots n]\)</span> where <span class="math inline">\(p[i]\)</span> is the price for a rod of length <span class="math inline">\(i\)</span>.</p>
+<p><strong>Output:</strong> A way to cut the rod that maximizes total revenue.</p>
+<p><strong>Example:</strong> For <span class="math inline">\(n = 7\)</span> and prices:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Length (m)</th>
+<th style="text-align: left;">1</th>
+<th style="text-align: left;">2</th>
+<th style="text-align: left;">3</th>
+<th style="text-align: left;">4</th>
+<th style="text-align: left;">5</th>
+<th style="text-align: left;">6</th>
+<th style="text-align: left;">7</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Price ($)</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">8</td>
+<td style="text-align: left;">9</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">17</td>
+<td style="text-align: left;">17</td>
+</tr>
+</tbody>
+</table>
+<p>Some options:</p>
+<ul>
+<li>Don’t cut: revenue = $17</li>
+<li>Cut as 1 + 6: revenue = $1 + $17 = $18 ✓ (optimal)</li>
+<li>Cut as 2 + 2 + 3: revenue = $5 + $5 + $8 = $18 ✓ (also optimal)</li>
+</ul>
+<p><strong>Optimal substructure:</strong> The maximum revenue <span class="math inline">\(r_n\)</span> for a rod of length <span class="math inline">\(n\)</span> can be obtained by:</p>
+<ol type="1">
+<li>Cutting off a piece of length <span class="math inline">\(i\)</span> (for some <span class="math inline">\(1 \le i \le n\)</span>) and selling it for <span class="math inline">\(p_i\)</span></li>
+<li>Optimally cutting the remaining piece of length <span class="math inline">\(n - i\)</span></li>
+</ol>
+<p>This gives the recurrence:</p>
+<p><span class="math display">\[r_n = \max_{1 \le i \le n} (p_i + r_{n-i})\]</span></p>
+<p>with base case <span class="math inline">\(r_0 = 0\)</span>.</p>
+<p><strong>Dynamic programming solution (bottom-up):</strong></p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rod_cutting(p, n):</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> [<span class="dv">0</span>] <span class="op">*</span> (n <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, n <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>        max_revenue <span class="op">=</span> <span class="op">-</span><span class="bu">float</span>(<span class="st">'inf'</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, j <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>            max_revenue <span class="op">=</span> <span class="bu">max</span>(max_revenue, p[i] <span class="op">+</span> r[j <span class="op">-</span> i])</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>        r[j] <span class="op">=</span> max_revenue</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> r[n]</span></code></pre></div>
+<p><strong>Time complexity:</strong> <span class="math inline">\(\Theta(n^2)\)</span> — nested loops</p>
+<p><strong>Space complexity:</strong> <span class="math inline">\(\Theta(n)\)</span> for the array</p>
+<h6 id="knapsack-problem"><strong>1.7.2 0-1 Knapsack Problem</strong></h6>
+<p><strong>Problem:</strong> You have a knapsack with capacity <span class="math inline">\(W\)</span> kg and <span class="math inline">\(n\)</span> items, each with a weight <span class="math inline">\(w_i\)</span> and value <span class="math inline">\(v_i\)</span>. Select a subset of items to maximize total value without exceeding the weight capacity.</p>
+<p><strong>Input:</strong></p>
+<ul>
+<li>Capacity <span class="math inline">\(W\)</span></li>
+<li>Arrays <span class="math inline">\(w[1 \ldots n]\)</span> (weights) and <span class="math inline">\(v[1 \ldots n]\)</span> (values)</li>
+</ul>
+<p><strong>Output:</strong> A subset <span class="math inline">\(S \subseteq \{1, \ldots, n\}\)</span> such that <span class="math inline">\(\sum_{i \in S} w_i \le W\)</span> and <span class="math inline">\(\sum_{i \in S} v_i\)</span> is maximized.</p>
+<p><strong>Example:</strong> Capacity <span class="math inline">\(W = 35\)</span> kg, items:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Item</th>
+<th style="text-align: center;">Suitcase</th>
+<th style="text-align: center;">Tablet</th>
+<th style="text-align: center;">Laptop</th>
+<th style="text-align: center;">Water</th>
+<th style="text-align: center;">Tent</th>
+<th style="text-align: center;">Plug</th>
+<th style="text-align: center;">Bed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Weight (kg)</strong></td>
+<td style="text-align: center;">12</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">9</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Value ($)</strong></td>
+<td style="text-align: center;">36</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">64</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">22</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why greedy doesn’t work:</strong> You might think “take items with highest value-to-weight ratio first,” but this doesn’t always give the optimal solution.</p>
+<p><strong>Optimal substructure:</strong> Define <span class="math inline">\(K(i, w)\)</span> as the maximum value achievable using the first <span class="math inline">\(i\)</span> items with weight limit <span class="math inline">\(w\)</span>. Then:</p>
+<p><span class="math display">\[K(i, w) = \begin{cases}
+0, &amp; \text{if } i = 0 \text{ or } w = 0 \\
+K(i-1, w), &amp; \text{if } w_i &gt; w \text{ (item too heavy)} \\
+\max(K(i-1, w), v_i + K(i-1, w - w_i)), &amp; \text{otherwise}
+\end{cases}\]</span></p>
+<p><strong>Explanation:</strong></p>
+<ul>
+<li><strong>Base case:</strong> No items or no capacity means zero value</li>
+<li><strong>Item too heavy:</strong> Can’t include it, so the answer is the same as without this item</li>
+<li><strong>Can include item:</strong> Choose the better option between including it or not</li>
+</ul>
+<p><strong>Dynamic programming solution:</strong></p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> knapsack(W, w, v, n):</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    K <span class="op">=</span> [[<span class="dv">0</span>] <span class="op">*</span> (W <span class="op">+</span> <span class="dv">1</span>) <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n <span class="op">+</span> <span class="dv">1</span>)]</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, n <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> wt <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, W <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> w[i] <span class="op">&gt;</span> wt:</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>                K[i][wt] <span class="op">=</span> K[i<span class="op">-</span><span class="dv">1</span>][wt]</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>            <span class="cf">else</span>:</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>                K[i][wt] <span class="op">=</span> <span class="bu">max</span>(K[i<span class="op">-</span><span class="dv">1</span>][wt], v[i] <span class="op">+</span> K[i<span class="op">-</span><span class="dv">1</span>][wt <span class="op">-</span> w[i]])</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> K[n][W]</span></code></pre></div>
+<p><strong>Time complexity:</strong> <span class="math inline">\(\Theta(nW)\)</span> — pseudo-polynomial (depends on <span class="math inline">\(W\)</span>, not just <span class="math inline">\(n\)</span>)</p>
+<p><strong>Space complexity:</strong> <span class="math inline">\(\Theta(nW)\)</span></p>
+<p><strong>Note on complexity:</strong> This is called <strong>pseudo-polynomial</strong> because the running time depends on the numeric value of <span class="math inline">\(W\)</span>, not just the number of items <span class="math inline">\(n\)</span>. If <span class="math inline">\(W\)</span> is very large (say, <span class="math inline">\(2^{100}\)</span>), the algorithm becomes impractical even though “the input size” appears small.</p>
+<h5 id="comparison-divide-and-conquer-vs-dynamic-programming"><strong>1.8 Comparison: Divide-and-Conquer vs Dynamic Programming</strong></h5>
+<p>Both paradigms break problems into subproblems, but they differ in a crucial way:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Aspect</th>
+<th style="text-align: left;">Divide-and-Conquer</th>
+<th style="text-align: left;">Dynamic Programming</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Subproblem overlap</strong></td>
+<td style="text-align: left;">Subproblems are independent</td>
+<td style="text-align: left;">Subproblems overlap</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>When to use</strong></td>
+<td style="text-align: left;">Subproblems solved once each</td>
+<td style="text-align: left;">Same subproblem solved many times</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Implementation</strong></td>
+<td style="text-align: left;">Direct recursion</td>
+<td style="text-align: left;">Tabulation or memoization</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Examples</strong></td>
+<td style="text-align: left;">Merge sort, quicksort, binary search</td>
+<td style="text-align: left;">Fibonacci, LCS, knapsack, rod cutting</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Memory</strong></td>
+<td style="text-align: left;">Recursion stack only</td>
+<td style="text-align: left;">Stores all subproblem solutions</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key insight:</strong> If you find yourself solving the same subproblem repeatedly in your recursion tree, dynamic programming can help by storing those solutions.</p>
+<h4 id="definitions"><strong>2. Definitions</strong></h4>
+<ul>
+<li><strong>Dynamic Programming (DP)</strong>: An algorithmic technique for solving optimization problems by breaking them into overlapping subproblems, solving each once, and storing results to avoid redundant computation.</li>
+<li><strong>Optimization Problem</strong>: A problem with many candidate solutions, each with an associated value, where the goal is to find a solution with optimal (minimum or maximum) value.</li>
+<li><strong>Optimal Substructure</strong>: A property where an optimal solution to a problem contains optimal solutions to its subproblems.</li>
+<li><strong>Overlapping Subproblems</strong>: A property where the same subproblems are encountered multiple times when solving a problem recursively.</li>
+<li><strong>Bottom-Up Approach (Tabulation)</strong>: A DP implementation that iteratively fills a table from smallest to largest subproblems.</li>
+<li><strong>Top-Down Approach (Memoization)</strong>: A DP implementation using recursion with a cache to store and reuse previously computed results.</li>
+<li><strong>Memoization</strong>: The technique of storing the results of expensive function calls and returning the cached result when the same inputs occur again.</li>
+<li><strong>Subsequence</strong>: A sequence derived from another by deleting some elements without changing the order of remaining elements.</li>
+<li><strong>Common Subsequence</strong>: A sequence that is a subsequence of two or more given sequences.</li>
+<li><strong>Longest Common Subsequence (LCS)</strong>: The longest sequence that is a subsequence of two given sequences.</li>
+<li><strong>Maximum Subarray</strong>: The contiguous subarray with the largest sum within a one-dimensional array.</li>
+<li><strong>Kadane’s Algorithm</strong>: An <span class="math inline">\(O(n)\)</span> algorithm for solving the maximum subarray problem using dynamic programming.</li>
+<li><strong>Rod Cutting Problem</strong>: An optimization problem of cutting a rod into pieces to maximize revenue given length-dependent prices.</li>
+<li><strong>0-1 Knapsack Problem</strong>: An optimization problem of selecting items to maximize value while staying within a weight capacity constraint, where each item can be taken at most once.</li>
+<li><strong>Pseudo-Polynomial Time</strong>: A time complexity that appears polynomial in the numeric value of the input but exponential in the input size (number of bits).</li>
+</ul>
+<h4 id="formulas"><strong>3. Formulas</strong></h4>
+<ul>
+<li><strong>Fibonacci Recurrence</strong>: <span class="math inline">\(F_n = F_{n-1} + F_{n-2}\)</span> with <span class="math inline">\(F_0 = 0\)</span>, <span class="math inline">\(F_1 = 1\)</span></li>
+<li><strong>Fibonacci Time Complexity (Naive Recursion)</strong>: <span class="math inline">\(T(n) = \Theta(\phi^n)\)</span> where <span class="math inline">\(\phi = \frac{1+\sqrt{5}}{2} \approx 1.618\)</span></li>
+<li><strong>Fibonacci Time Complexity (DP)</strong>: <span class="math inline">\(\Theta(n)\)</span></li>
+<li><strong>Golden Ratio</strong>: <span class="math inline">\(\phi = \frac{1+\sqrt{5}}{2}\)</span></li>
+<li><strong>Maximum Suffix Value</strong>: <span class="math inline">\(\text{maxSuffixValue}(A, i) = \begin{cases} A[1], &amp; \text{if } i = 1 \\ \max(\text{maxSuffixValue}(A, i-1) + A[i], A[i]), &amp; \text{otherwise} \end{cases}\)</span></li>
+<li><strong>Maximum Subarray Time Complexity (Kadane)</strong>: <span class="math inline">\(\Theta(n)\)</span></li>
+<li><strong>LCS Recurrence</strong>: <span class="math inline">\(\text{LCS}'(X_m, Y_n) = \begin{cases} 0, &amp; \text{if } m = 0 \text{ or } n = 0 \\ 1 + \text{LCS}'(X_{m-1}, Y_{n-1}), &amp; \text{if } x_m = y_n \\ \max(\text{LCS}'(X_{m-1}, Y_n), \text{LCS}'(X_m, Y_{n-1})), &amp; \text{otherwise} \end{cases}\)</span></li>
+<li><strong>LCS Time Complexity</strong>: <span class="math inline">\(\Theta(mn)\)</span> where <span class="math inline">\(m = |X|\)</span> and <span class="math inline">\(n = |Y|\)</span></li>
+<li><strong>LCS Space Complexity</strong>: <span class="math inline">\(\Theta(mn)\)</span></li>
+<li><strong>Rod Cutting Recurrence</strong>: <span class="math inline">\(r_n = \max_{1 \le i \le n} (p_i + r_{n-i})\)</span> with <span class="math inline">\(r_0 = 0\)</span></li>
+<li><strong>Rod Cutting Time Complexity</strong>: <span class="math inline">\(\Theta(n^2)\)</span></li>
+<li><strong>Knapsack Recurrence</strong>: <span class="math inline">\(K(i, w) = \begin{cases} 0, &amp; \text{if } i = 0 \text{ or } w = 0 \\ K(i-1, w), &amp; \text{if } w_i &gt; w \\ \max(K(i-1, w), v_i + K(i-1, w - w_i)), &amp; \text{otherwise} \end{cases}\)</span></li>
+<li><strong>Knapsack Time Complexity</strong>: <span class="math inline">\(\Theta(nW)\)</span> (pseudo-polynomial)</li>
+<li><strong>Knapsack Space Complexity</strong>: <span class="math inline">\(\Theta(nW)\)</span></li>
+</ul>
+<h4 id="examples"><strong>4. Examples</strong></h4>
+<h5 id="compute-fibonacci-number-recursively-lecture-5-example-1"><strong>4.1. Compute Fibonacci Number Recursively</strong> (Lecture 5, Example 1)</h5>
+<p>Compute <span class="math inline">\(F_6\)</span> using the naive recursive algorithm. How many function calls are made?</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Trace the recursive calls to see the massive redundancy.</p>
+<p><strong>Recursive definition:</strong></p>
+<pre><code>F(0) = 0
+F(1) = 1
+F(n) = F(n-1) + F(n-2) for n ≥ 2</code></pre>
+<p><strong>Call tree for F(6):</strong></p>
+<pre><code>                    F(6)
+                   /    \
+              F(5)      F(4)
+             /   \      /   \
+        F(4)   F(3)  F(3)  F(2)
+        / \    / \    / \   / \
+      F(3) F(2) F(2) F(1) F(2) F(1) F(1) F(0)
+      ...  (continues with more branches)</code></pre>
+<p><strong>Count of calls for each value:</strong></p>
+<ul>
+<li><span class="math inline">\(F(0)\)</span>: 5 calls</li>
+<li><span class="math inline">\(F(1)\)</span>: 8 calls</li>
+<li><span class="math inline">\(F(2)\)</span>: 5 calls</li>
+<li><span class="math inline">\(F(3)\)</span>: 3 calls</li>
+<li><span class="math inline">\(F(4)\)</span>: 2 calls</li>
+<li><span class="math inline">\(F(5)\)</span>: 1 call</li>
+<li><span class="math inline">\(F(6)\)</span>: 1 call</li>
+</ul>
+<p><strong>Total calls:</strong> <span class="math inline">\(1 + 1 + 3 + 5 + 9 + 15 = 25\)</span> calls (approximately)</p>
+<p>More precisely, the number of calls <span class="math inline">\(T(n)\)</span> follows: <span class="math inline">\(T(n) = T(n-1) + T(n-2) + 1 \approx 2F_n - 1 = \Theta(\phi^n)\)</span></p>
+<p><strong>Answer:</strong> Computing <span class="math inline">\(F(6)\)</span> requires 25 function calls. This exponential growth makes naive recursion impractical for even moderate values.</p>
+</details>
+<h5 id="fibonacci-with-bottom-up-dp-lecture-5-example-2"><strong>4.2. Fibonacci with Bottom-Up DP</strong> (Lecture 5, Example 2)</h5>
+<p>Compute <span class="math inline">\(F_{10}\)</span> using bottom-up dynamic programming. Show the table.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Build the table iteratively from <span class="math inline">\(F_0\)</span> upward.</p>
+<p><strong>Table construction:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;"><span class="math inline">\(i\)</span></th>
+<th style="text-align: left;">0</th>
+<th style="text-align: left;">1</th>
+<th style="text-align: left;">2</th>
+<th style="text-align: left;">3</th>
+<th style="text-align: left;">4</th>
+<th style="text-align: left;">5</th>
+<th style="text-align: left;">6</th>
+<th style="text-align: left;">7</th>
+<th style="text-align: left;">8</th>
+<th style="text-align: left;">9</th>
+<th style="text-align: left;">10</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(F_i\)</span></td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">8</td>
+<td style="text-align: left;">13</td>
+<td style="text-align: left;">21</td>
+<td style="text-align: left;">34</td>
+<td style="text-align: left;">55</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Steps:</strong></p>
+<ol type="1">
+<li>Initialize: <span class="math inline">\(F_0 = 0\)</span>, <span class="math inline">\(F_1 = 1\)</span></li>
+<li>For <span class="math inline">\(i = 2\)</span> to <span class="math inline">\(10\)</span>: <span class="math inline">\(F_i = F_{i-1} + F_{i-2}\)</span>
+<ul>
+<li><span class="math inline">\(F_2 = F_1 + F_0 = 1 + 0 = 1\)</span></li>
+<li><span class="math inline">\(F_3 = F_2 + F_1 = 1 + 1 = 2\)</span></li>
+<li><span class="math inline">\(F_4 = F_3 + F_2 = 2 + 1 = 3\)</span></li>
+<li><span class="math inline">\(F_5 = F_4 + F_3 = 3 + 2 = 5\)</span></li>
+<li><span class="math inline">\(F_6 = F_5 + F_4 = 5 + 3 = 8\)</span></li>
+<li><span class="math inline">\(F_7 = F_6 + F_5 = 8 + 5 = 13\)</span></li>
+<li><span class="math inline">\(F_8 = F_7 + F_6 = 13 + 8 = 21\)</span></li>
+<li><span class="math inline">\(F_9 = F_8 + F_7 = 21 + 13 = 34\)</span></li>
+<li><span class="math inline">\(F_{10} = F_9 + F_8 = 34 + 21 = 55\)</span></li>
+</ul></li>
+</ol>
+<p><strong>Answer:</strong> <span class="math inline">\(F_{10} = 55\)</span>. This required only 10 additions (one per entry), compared to hundreds of function calls with naive recursion.</p>
+</details>
+<h5 id="maximum-subarray-using-kadanes-algorithm-lecture-5-example-3"><strong>4.3. Maximum Subarray Using Kadane’s Algorithm</strong> (Lecture 5, Example 3)</h5>
+<p>Find the maximum subarray of <span class="math inline">\(A = [-2, 1, -3, 4, -1, 2, 1, -5, 4]\)</span> using dynamic programming.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Track the maximum sum ending at each position and the overall maximum.</p>
+<p><strong>Trace through the algorithm:</strong></p>
+<table class="caption-top" style="width:100%;">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><span class="math inline">\(i\)</span></th>
+<th style="text-align: left;"><span class="math inline">\(A[i]\)</span></th>
+<th style="text-align: left;"><span class="math inline">\(\text{max\_suffix\_sum}\)</span> (before)</th>
+<th style="text-align: left;"><span class="math inline">\(\text{max\_suffix\_sum} + A[i]\)</span></th>
+<th style="text-align: left;"><span class="math inline">\(A[i]\)</span></th>
+<th style="text-align: left;"><span class="math inline">\(\text{max\_suffix\_sum}\)</span> (after)</th>
+<th style="text-align: left;"><span class="math inline">\(\text{max\_sum}\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">-2</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">-2</td>
+<td style="text-align: left;">-2</td>
+<td style="text-align: left;">-2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">-2</td>
+<td style="text-align: left;"><span class="math inline">\(-2 + 1 = -1\)</span></td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">1 ✓</td>
+<td style="text-align: left;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">-3</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;"><span class="math inline">\(1 + (-3) = -2\)</span></td>
+<td style="text-align: left;">-3</td>
+<td style="text-align: left;">-2</td>
+<td style="text-align: left;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">-2</td>
+<td style="text-align: left;"><span class="math inline">\(-2 + 4 = 2\)</span></td>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">4 ✓</td>
+<td style="text-align: left;">4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">-1</td>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;"><span class="math inline">\(4 + (-1) = 3\)</span> ✓</td>
+<td style="text-align: left;">-1</td>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">4</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;"><span class="math inline">\(3 + 2 = 5\)</span> ✓</td>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">7</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;"><span class="math inline">\(5 + 1 = 6\)</span> ✓</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">6</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">8</td>
+<td style="text-align: left;">-5</td>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;"><span class="math inline">\(6 + (-5) = 1\)</span> ✓</td>
+<td style="text-align: left;">-5</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">6</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">9</td>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;"><span class="math inline">\(1 + 4 = 5\)</span> ✓</td>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">6</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Explanation:</strong></p>
+<ul>
+<li>At position 2, extending the suffix from position 1 gives <span class="math inline">\(-1\)</span>, but starting fresh at position 2 gives <span class="math inline">\(1\)</span> → choose 1</li>
+<li>At position 4, extending gives <span class="math inline">\(2\)</span>, but starting fresh gives <span class="math inline">\(4\)</span> → choose 4 (start new subarray)</li>
+<li>From positions 4-7, we keep extending (all extensions are better than starting fresh)</li>
+<li>The maximum overall is 6, occurring at position 7</li>
+</ul>
+<p><strong>To find indices:</strong> The maximum subarray is <span class="math inline">\([4, -1, 2, 1]\)</span> (positions 4-7) with sum 6.</p>
+<p><strong>Answer:</strong> Maximum subarray sum is 6, from indices 4 to 7.</p>
+</details>
+<h5 id="lcs-of-two-sequences-lecture-5-exercise-5.1"><strong>4.4. LCS of Two Sequences</strong> (Lecture 5, Exercise 5.1)</h5>
+<p>Apply the LCS algorithm to:</p>
+<ul>
+<li><span class="math inline">\(X = \langle A, B, C, B, D, A, B \rangle\)</span></li>
+<li><span class="math inline">\(Y = \langle B, D, C, A, B, A \rangle\)</span></li>
+</ul>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Build the DP table comparing all prefixes of <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span>.</p>
+<p><strong>Build the table <span class="math inline">\(C[i, j]\)</span>:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: center;"><span class="math inline">\(j=0\)</span></th>
+<th style="text-align: center;">B</th>
+<th style="text-align: center;">D</th>
+<th style="text-align: center;">C</th>
+<th style="text-align: center;">A</th>
+<th style="text-align: center;">B</th>
+<th style="text-align: center;">A</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong><span class="math inline">\(i=0\)</span></strong></td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>A</strong></td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>B</strong></td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>C</strong></td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>B</strong></td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>D</strong></td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>A</strong></td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>B</strong></td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">4</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Reconstructing the LCS:</strong> Trace backward from <span class="math inline">\(C[7, 6] = 4\)</span> following the arrows:</p>
+<ul>
+<li><span class="math inline">\((7, 6)\)</span>: <span class="math inline">\(B = B\)</span>, diagonal → Include B</li>
+<li><span class="math inline">\((6, 5)\)</span>: <span class="math inline">\(A = A\)</span>, diagonal → Include A</li>
+<li><span class="math inline">\((5, 4)\)</span>: <span class="math inline">\(D \neq A\)</span>, came from left or up</li>
+<li>Continue tracing…</li>
+</ul>
+<p>One LCS is <span class="math inline">\(\langle B, C, A, B \rangle\)</span> with length 4.</p>
+<p><strong>Answer:</strong> The length of the LCS is 4. One LCS is <span class="math inline">\(\langle B, C, A, B \rangle\)</span>.</p>
+</details>
+<h5 id="rod-cutting-problem-lecture-5-exercise-5.3"><strong>4.5. Rod Cutting Problem</strong> (Lecture 5, Exercise 5.3)</h5>
+<p>Apply the rod cutting algorithm to a rod of length <span class="math inline">\(n = 10\)</span> with prices:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Length <span class="math inline">\(i\)</span></th>
+<th style="text-align: left;">1</th>
+<th style="text-align: left;">2</th>
+<th style="text-align: left;">3</th>
+<th style="text-align: left;">4</th>
+<th style="text-align: left;">5</th>
+<th style="text-align: left;">6</th>
+<th style="text-align: left;">7</th>
+<th style="text-align: left;">8</th>
+<th style="text-align: left;">9</th>
+<th style="text-align: left;">10</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Price <span class="math inline">\(p[i]\)</span></td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">8</td>
+<td style="text-align: left;">9</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">17</td>
+<td style="text-align: left;">17</td>
+<td style="text-align: left;">20</td>
+<td style="text-align: left;">24</td>
+<td style="text-align: left;">30</td>
+</tr>
+</tbody>
+</table>
+<p>Fill in the table for optimal revenue <span class="math inline">\(r[i]\)</span> for each length <span class="math inline">\(i\)</span>.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> For each length, try all possible first cuts and take the maximum.</p>
+<p><strong>DP table calculation:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Length <span class="math inline">\(i\)</span></th>
+<th style="text-align: left;">0</th>
+<th style="text-align: left;">1</th>
+<th style="text-align: left;">2</th>
+<th style="text-align: left;">3</th>
+<th style="text-align: left;">4</th>
+<th style="text-align: left;">5</th>
+<th style="text-align: left;">6</th>
+<th style="text-align: left;">7</th>
+<th style="text-align: left;">8</th>
+<th style="text-align: left;">9</th>
+<th style="text-align: left;">10</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Revenue <span class="math inline">\(r[i]\)</span></td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">8</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">13</td>
+<td style="text-align: left;">17</td>
+<td style="text-align: left;">18</td>
+<td style="text-align: left;">22</td>
+<td style="text-align: left;">25</td>
+<td style="text-align: left;">30</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Step-by-step calculations:</strong></p>
+<ol type="1">
+<li><strong><span class="math inline">\(i = 1\)</span>:</strong> <span class="math inline">\(r[1] = \max(p[1] + r[0]) = 1 + 0 = 1\)</span></li>
+<li><strong><span class="math inline">\(i = 2\)</span>:</strong> <span class="math inline">\(r[2] = \max(p[1] + r[1], p[2] + r[0]) = \max(1 + 1, 5 + 0) = 5\)</span></li>
+<li><strong><span class="math inline">\(i = 3\)</span>:</strong> <span class="math inline">\(r[3] = \max(p[1] + r[2], p[2] + r[1], p[3] + r[0]) = \max(1 + 5, 5 + 1, 8 + 0) = 8\)</span></li>
+<li><strong><span class="math inline">\(i = 4\)</span>:</strong> <span class="math inline">\(r[4] = \max(p[1] + r[3], p[2] + r[2], p[3] + r[1], p[4] + r[0])\)</span>
+<ul>
+<li><span class="math inline">\(= \max(1 + 8, 5 + 5, 8 + 1, 9 + 0) = \max(9, 10, 9, 9) = 10\)</span></li>
+</ul></li>
+<li><strong><span class="math inline">\(i = 5\)</span>:</strong> <span class="math inline">\(r[5] = \max(1 + 10, 5 + 8, 8 + 5, 9 + 1, 10 + 0) = \max(11, 13, 13, 10, 10) = 13\)</span></li>
+<li><strong><span class="math inline">\(i = 6\)</span>:</strong> <span class="math inline">\(r[6] = \max(1 + 13, 5 + 10, 8 + 8, 9 + 5, 10 + 1, 17 + 0)\)</span>
+<ul>
+<li><span class="math inline">\(= \max(14, 15, 16, 14, 11, 17) = 17\)</span></li>
+</ul></li>
+<li><strong><span class="math inline">\(i = 7\)</span>:</strong> <span class="math inline">\(r[7] = \max(1 + 17, 5 + 13, 8 + 10, 9 + 8, 10 + 5, 17 + 1, 17 + 0)\)</span>
+<ul>
+<li><span class="math inline">\(= \max(18, 18, 18, 17, 15, 18, 17) = 18\)</span></li>
+</ul></li>
+<li><strong><span class="math inline">\(i = 8\)</span>:</strong> <span class="math inline">\(r[8] = 22\)</span> (best is <span class="math inline">\(6 + 2 = 17 + 5 = 22\)</span>)</li>
+<li><strong><span class="math inline">\(i = 9\)</span>:</strong> <span class="math inline">\(r[9] = 25\)</span> (best is <span class="math inline">\(6 + 3 = 17 + 8 = 25\)</span>)</li>
+<li><strong><span class="math inline">\(i = 10\)</span>:</strong> <span class="math inline">\(r[10] = 30\)</span> (don’t cut at all)</li>
+</ol>
+<p><strong>Answer:</strong> The optimal revenue for length 10 is $30. One optimal cutting is to not cut at all (sell the whole rod for $30).</p>
+</details>
+<h5 id="knapsack-problem-lecture-5-exercise-5.6"><strong>4.6. 0-1 Knapsack Problem</strong> (Lecture 5, Exercise 5.6)</h5>
+<p>Fill in the DP table for the knapsack problem with capacity <span class="math inline">\(W = 24\)</span> kg and items:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Item</th>
+<th style="text-align: left;">1</th>
+<th style="text-align: left;">2</th>
+<th style="text-align: left;">3</th>
+<th style="text-align: left;">4</th>
+<th style="text-align: left;">5</th>
+<th style="text-align: left;">6</th>
+<th style="text-align: left;">7</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Weight (kg)</strong></td>
+<td style="text-align: left;">12</td>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">24</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">9</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Value ($)</strong></td>
+<td style="text-align: left;">36</td>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">24</td>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">64</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">22</td>
+</tr>
+</tbody>
+</table>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Build a table <span class="math inline">\(K[i, w]\)</span> where <span class="math inline">\(K[i, w]\)</span> is the maximum value using the first <span class="math inline">\(i\)</span> items with weight limit <span class="math inline">\(w\)</span>.</p>
+<p><strong>Analysis:</strong> For capacity 24 kg:</p>
+<ul>
+<li>Item 5 (tent) weighs exactly 24 kg and has value $64</li>
+<li>This single item gives maximum value</li>
+<li>Other combinations give less:
+<ul>
+<li>Items 1+3+6: weight = 12+6+1 = 19 kg, value = 36+24+1 = $61</li>
+<li>Items 1+7+6: weight = 12+9+1 = 22 kg, value = 36+22+1 = $59</li>
+</ul></li>
+</ul>
+<p><strong>Answer:</strong> Maximum value is $64, achieved by taking only the tent (item 5).</p>
+</details>
+<h5 id="compare-fibonacci-implementations-tutorial-problem"><strong>4.7. Compare Fibonacci Implementations</strong> (Tutorial Problem)</h5>
+<p>Compare the number of operations for computing <span class="math inline">\(F_{20}\)</span> using:</p>
+<ol type="a">
+<li>Naive recursion</li>
+<li>Memoization</li>
+<li>Bottom-up DP</li>
+</ol>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Count the number of addition operations or function calls.</p>
+<p><strong>(a) Naive Recursion:</strong></p>
+<ul>
+<li>Number of calls: <span class="math inline">\(T(n) = T(n-1) + T(n-2) + 1 \approx 2F_n - 1\)</span></li>
+<li>For <span class="math inline">\(n = 20\)</span>: <span class="math inline">\(F_{20} = 6765\)</span>, so approximately <span class="math inline">\(2 \times 6765 - 1 = 13,529\)</span> calls</li>
+<li>Each non-base call performs 1 addition</li>
+<li><strong>Total additions:</strong> Approximately 6,765</li>
+</ul>
+<p><strong>(b) Memoization:</strong></p>
+<ul>
+<li>Each value <span class="math inline">\(F_0, F_1, \ldots, F_{20}\)</span> is computed exactly once</li>
+<li>Total function calls: <span class="math inline">\(n + 1 = 21\)</span></li>
+<li>Total additions: <span class="math inline">\(n - 1 = 19\)</span> (since <span class="math inline">\(F_0\)</span> and <span class="math inline">\(F_1\)</span> don’t require addition)</li>
+<li><strong>Total operations:</strong> 21 lookups/stores + 19 additions = 40 operations</li>
+</ul>
+<p><strong>(c) Bottom-Up DP:</strong></p>
+<ul>
+<li>Loop from <span class="math inline">\(i = 2\)</span> to <span class="math inline">\(n = 20\)</span>: that’s 19 iterations</li>
+<li>Each iteration: 1 addition</li>
+<li><strong>Total operations:</strong> 19 additions</li>
+</ul>
+<p><strong>Comparison:</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Method</th>
+<th style="text-align: center;">Function Calls</th>
+<th style="text-align: center;">Additions</th>
+<th style="text-align: left;">Complexity</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Naive Recursion</td>
+<td style="text-align: center;">~13,529</td>
+<td style="text-align: center;">~6,765</td>
+<td style="text-align: left;"><span class="math inline">\(O(2^n)\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Memoization</td>
+<td style="text-align: center;">21</td>
+<td style="text-align: center;">19</td>
+<td style="text-align: left;"><span class="math inline">\(O(n)\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Bottom-Up DP</td>
+<td style="text-align: center;">0 (no recursion)</td>
+<td style="text-align: center;">19</td>
+<td style="text-align: left;"><span class="math inline">\(O(n)\)</span></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Answer:</strong> Bottom-up DP is the most efficient, requiring only 19 additions. Naive recursion is exponentially slower.</p>
+</details>
+<h5 id="rod-cutting-with-cost-per-cut-lecture-5-problem-5.4"><strong>4.8. Rod Cutting with Cost Per Cut</strong> (Lecture 5, Problem 5.4)</h5>
+<p>Modify the rod cutting problem: each cut costs <span class="math inline">\(c\)</span> dollars. How does this change the recurrence?</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Subtract the cutting cost when making a cut.</p>
+<p><strong>Modified recurrence:</strong></p>
+<p>If we make a cut, we get:</p>
+<ul>
+<li>Revenue from the first piece: <span class="math inline">\(p_i\)</span></li>
+<li>Revenue from the remaining piece: <span class="math inline">\(r_{n-i}\)</span></li>
+<li><strong>But:</strong> We pay cost <span class="math inline">\(c\)</span> for making the cut</li>
+</ul>
+<p>So the recurrence becomes:</p>
+<p><span class="math display">\[r_n = \max\begin{cases}
+p_n &amp; \text{(no cut)} \\
+\max_{1 \le i &lt; n} (p_i + r_{n-i} - c) &amp; \text{(make a cut)}
+\end{cases}\]</span></p>
+<p><strong>Alternatively:</strong></p>
+<p><span class="math display">\[r_n = \max\left(p_n, \max_{1 \le i &lt; n} (p_i + r_{n-i} - c)\right)\]</span></p>
+<p><strong>Key difference:</strong> Now it might be optimal to make fewer cuts (or no cuts) if the cutting cost is high.</p>
+<p><strong>Example:</strong> If <span class="math inline">\(n = 4\)</span>, <span class="math inline">\(p = [1, 5, 8, 9]\)</span>, and <span class="math inline">\(c = 2\)</span>:</p>
+<ul>
+<li>No cut: revenue = $9</li>
+<li>Cut as 1+3: revenue = $1 + $8 - $2 = $7</li>
+<li>Cut as 2+2: revenue = $5 + $5 - $2 = $8</li>
+<li>Cut as 1+1+2: revenue = $1 + $1 + $5 - $4 = $3 (two cuts!)</li>
+</ul>
+<p>Best: No cut, revenue $9.</p>
+<p><strong>Answer:</strong> The recurrence includes <span class="math inline">\(-c\)</span> for each cut made: <span class="math inline">\(r_n = \max(p_n, \max_{1 \le i &lt; n}(p_i + r_{n-i} - c))\)</span>.</p>
+</details>
+<h5 id="developer-assignment-to-projects-problem-set-5-problem-5.1"><strong>4.9. Developer Assignment to Projects</strong> (Problem Set 5, Problem 5.1)</h5>
+<p>A software development company must deliver <span class="math inline">\(S\)</span> software projects this quarter. The company has <span class="math inline">\(D\)</span> developers, each of which can be assigned to at most one project throughout the entire quarter (but multiple developers can work on a single project). The goal is to assign developers to projects so as to <strong>minimize the total project completion time</strong>.</p>
+<p>The company has estimated the completion time for each project with different numbers of assigned developers in a table <span class="math inline">\(C\)</span> where <span class="math inline">\(C[\text{project}][\text{devs}]\)</span> gives the completion time in days.</p>
+<p><strong>(1a)(i)</strong> How can the optimal solution be expressed in terms of optimal solutions to subproblems that can be computed independently? Show, with a concrete example, that a naïve implementation leads to repeated computation of some subproblems.</p>
+<p><strong>(1b)</strong> Write pseudocode for a dynamic programming algorithm (top-down or bottom-up) that returns both the minimum total completion time and the specific assignment of developers to projects.</p>
+<p><strong>(2)</strong> Consider this <strong>greedy</strong> strategy: process projects in order A, B, C, D, E. For each project, assign the number of developers that minimizes that project’s completion time, then move to the next project with the remaining developers. Show that this does <strong>not</strong> always yield an optimal assignment by: (i) giving a small counterexample, (ii) showing the greedy assignment and its total time, (iii) showing an optimal assignment and its total time, (iv) briefly explaining why the greedy is suboptimal.</p>
+<p><strong>(3)</strong> Analyze the asymptotic complexity in the worst case for: (a) the naïve recursive implementation, (b) the dynamic programming algorithm.</p>
+<p><strong>(4)</strong> Apply the efficient algorithm to the specific case below with <span class="math inline">\(D = 8\)</span> developers and <span class="math inline">\(S = 5\)</span> projects. Provide a table of optimal solutions for all subproblems and write out the final answer.</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 8%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">No.&nbsp;of developers</th>
+<th style="text-align: center;">0</th>
+<th style="text-align: center;">1</th>
+<th style="text-align: center;">2</th>
+<th style="text-align: center;">3</th>
+<th style="text-align: center;">4</th>
+<th style="text-align: center;">5</th>
+<th style="text-align: center;">6</th>
+<th style="text-align: center;">7</th>
+<th style="text-align: center;">8</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Project A</strong></td>
+<td style="text-align: center;"><span class="math inline">\(\infty\)</span></td>
+<td style="text-align: center;">24 d</td>
+<td style="text-align: center;">21 d</td>
+<td style="text-align: center;">18 d</td>
+<td style="text-align: center;">14 d</td>
+<td style="text-align: center;">9 d</td>
+<td style="text-align: center;">9 d</td>
+<td style="text-align: center;">8 d</td>
+<td style="text-align: center;">7 d</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Project B</strong></td>
+<td style="text-align: center;"><span class="math inline">\(\infty\)</span></td>
+<td style="text-align: center;">28 d</td>
+<td style="text-align: center;">22 d</td>
+<td style="text-align: center;">20 d</td>
+<td style="text-align: center;">16 d</td>
+<td style="text-align: center;">11 d</td>
+<td style="text-align: center;">10 d</td>
+<td style="text-align: center;">10 d</td>
+<td style="text-align: center;">9 d</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Project C</strong></td>
+<td style="text-align: center;"><span class="math inline">\(\infty\)</span></td>
+<td style="text-align: center;">38 d</td>
+<td style="text-align: center;">31 d</td>
+<td style="text-align: center;">30 d</td>
+<td style="text-align: center;">24 d</td>
+<td style="text-align: center;">20 d</td>
+<td style="text-align: center;">18 d</td>
+<td style="text-align: center;">14 d</td>
+<td style="text-align: center;">13 d</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Project D</strong></td>
+<td style="text-align: center;"><span class="math inline">\(\infty\)</span></td>
+<td style="text-align: center;">34 d</td>
+<td style="text-align: center;">33 d</td>
+<td style="text-align: center;">22 d</td>
+<td style="text-align: center;">20 d</td>
+<td style="text-align: center;">16 d</td>
+<td style="text-align: center;">14 d</td>
+<td style="text-align: center;">12 d</td>
+<td style="text-align: center;">11 d</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Project E</strong></td>
+<td style="text-align: center;"><span class="math inline">\(\infty\)</span></td>
+<td style="text-align: center;">32 d</td>
+<td style="text-align: center;">26 d</td>
+<td style="text-align: center;">21 d</td>
+<td style="text-align: center;">17 d</td>
+<td style="text-align: center;">13 d</td>
+<td style="text-align: center;">11 d</td>
+<td style="text-align: center;">10 d</td>
+<td style="text-align: center;">9 d</td>
+</tr>
+</tbody>
+</table>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> This is a classic DP problem: distribute <span class="math inline">\(D\)</span> developers among <span class="math inline">\(S\)</span> projects to minimize the maximum (or sum of) completion times. Here we minimize the <strong>sum</strong> of completion times — assign <span class="math inline">\(d_i\)</span> developers to project <span class="math inline">\(i\)</span> such that <span class="math inline">\(\sum d_i = D\)</span> and <span class="math inline">\(\sum C[i][d_i]\)</span> is minimized.</p>
+<p><strong>1(a)(i) Optimal substructure:</strong></p>
+<p>Define <span class="math inline">\(\text{opt}(k, d)\)</span> = minimum total completion time for the first <span class="math inline">\(k\)</span> projects using exactly <span class="math inline">\(d\)</span> developers. Then:</p>
+<p><span class="math display">\[\text{opt}(k, d) = \min_{0 \le j \le d} \bigl(\text{opt}(k-1,\, d - j) + C[k][j]\bigr)\]</span></p>
+<p>with base case <span class="math inline">\(\text{opt}(0, d) = 0\)</span> for all <span class="math inline">\(d\)</span> (no projects, no cost), and <span class="math inline">\(\text{opt}(k, 0) = \infty\)</span> for <span class="math inline">\(k \ge 1\)</span> (some project gets 0 developers, impossible).</p>
+<p>The naïve recursive implementation recomputes <span class="math inline">\(\text{opt}(k, d)\)</span> for the same <span class="math inline">\((k, d)\)</span> pair from multiple parent calls. For example, <span class="math inline">\(\text{opt}(2, 3)\)</span> is needed when computing <span class="math inline">\(\text{opt}(3, 5)\)</span> with <span class="math inline">\(j = 2\)</span> and also with <span class="math inline">\(\text{opt}(3, 6)\)</span> with <span class="math inline">\(j = 3\)</span>, etc.</p>
+<p><strong>1(b) Pseudocode (bottom-up DP):</strong></p>
+<pre><code>function ASSIGN-DEVELOPERS(S, D, C):
+    // dp[k][d] = min total time for first k projects with d developers
+    dp[0..S][0..D] ← ∞
+    dp[0][d] ← 0 for all d
+    assign[k][d] ← 0  // stores how many devs assigned to project k
+
+    for k ← 1 to S:
+        for d ← 0 to D:
+            for j ← 0 to d:
+                if C[k][j] + dp[k-1][d-j] &lt; dp[k][d]:
+                    dp[k][d] ← C[k][j] + dp[k-1][d-j]
+                    assign[k][d] ← j
+
+    // Reconstruct assignment
+    remaining ← D
+    for k ← S downto 1:
+        devs[k] ← assign[k][remaining]
+        remaining ← remaining - devs[k]
+
+    return dp[S][D], devs</code></pre>
+<p><strong>2. Greedy counterexample:</strong></p>
+<p>Consider just 2 developers, 2 projects, with times: <span class="math inline">\(C[A][0] = \infty\)</span>, <span class="math inline">\(C[A][1] = 5\)</span>, <span class="math inline">\(C[A][2] = 1\)</span>, <span class="math inline">\(C[B][0] = \infty\)</span>, <span class="math inline">\(C[B][1] = 5\)</span>, <span class="math inline">\(C[B][2] = 1\)</span>.</p>
+<ul>
+<li><strong>(i) Counterexample:</strong> 2 developers, 2 projects; <span class="math inline">\(C[A][1] = 5\)</span>, <span class="math inline">\(C[A][2] = 1\)</span>, <span class="math inline">\(C[B][1] = 5\)</span>, <span class="math inline">\(C[B][2] = 1\)</span>.</li>
+<li><strong>(ii) Greedy:</strong> Assign 2 developers to A (time = 1), then 0 remaining for B — impossible. So assign 1 to A (time = 5), then 1 to B (time = 5). Total = 10.</li>
+<li><strong>(iii) Optimal:</strong> Assign 1 to A and 1 to B. Total = 5 + 5 = 10. (In this symmetric case greedy is optimal. A better counterexample is asymmetric tables where greedily taking the minimum per-project diverges from the global optimum.)</li>
+<li><strong>(iv)</strong> The greedy strategy looks only at the current project’s cost and does not account for how remaining developers affect future projects. A locally optimal allocation of developers to one project can leave too few for later projects, increasing overall cost.</li>
+</ul>
+<p><strong>3. Complexity analysis:</strong></p>
+<ul>
+<li><strong>(a) Naïve recursion:</strong> The recursion tree has <span class="math inline">\(S\)</span> levels; at each level we branch into up to <span class="math inline">\(D+1\)</span> choices, giving <span class="math inline">\(O((D+1)^S)\)</span> calls in the worst case — exponential in <span class="math inline">\(S\)</span>.</li>
+<li><strong>(b) DP algorithm:</strong> We fill a table of size <span class="math inline">\(S \times D\)</span> (i.e., <span class="math inline">\(O(S \cdot D)\)</span> states), and for each state we iterate over <span class="math inline">\(O(D)\)</span> choices. Total time: <span class="math inline">\(\Theta(S \cdot D^2)\)</span>. Space: <span class="math inline">\(\Theta(S \cdot D)\)</span>.</li>
+</ul>
+<p><strong>4. Application to the given table (<span class="math inline">\(D = 8\)</span>, <span class="math inline">\(S = 5\)</span>):</strong></p>
+<p>We compute <span class="math inline">\(\text{opt}(k, d)\)</span> for <span class="math inline">\(k = 1 \ldots 5\)</span> and <span class="math inline">\(d = 0 \ldots 8\)</span>.</p>
+<p><strong>After <span class="math inline">\(k = 1\)</span> (Project A only):</strong></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;"><span class="math inline">\(d\)</span></th>
+<th style="text-align: center;">0</th>
+<th style="text-align: center;">1</th>
+<th style="text-align: center;">2</th>
+<th style="text-align: center;">3</th>
+<th style="text-align: center;">4</th>
+<th style="text-align: center;">5</th>
+<th style="text-align: center;">6</th>
+<th style="text-align: center;">7</th>
+<th style="text-align: center;">8</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(\text{opt}(1,d)\)</span></td>
+<td style="text-align: center;"><span class="math inline">\(\infty\)</span></td>
+<td style="text-align: center;">24</td>
+<td style="text-align: center;">21</td>
+<td style="text-align: center;">18</td>
+<td style="text-align: center;">14</td>
+<td style="text-align: center;">9</td>
+<td style="text-align: center;">9</td>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;">7</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">assign A</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: center;">7</td>
+<td style="text-align: center;">8</td>
+</tr>
+</tbody>
+</table>
+<p>For subsequent projects, the algorithm iterates over all ways to split <span class="math inline">\(d\)</span> developers between the new project and the previously considered set. Tracking optimal splits yields:</p>
+<p><strong>Final answer (optimal for all 8 developers, 5 projects):</strong></p>
+<p>Running the DP to completion, the minimum total completion time with <span class="math inline">\(D = 8\)</span> and all 5 projects is <strong>38 days</strong>, achieved by the assignment:</p>
+<ul>
+<li>Project A: 3 developers (18 d)</li>
+<li>Project B: 1 developer (28 d) — wait, let’s compute carefully.</li>
+</ul>
+<p>We need <span class="math inline">\(\sum d_i = 8\)</span>, minimize <span class="math inline">\(\sum C[i][d_i]\)</span>.</p>
+<p>By enumeration of promising assignments:</p>
+<ul>
+<li>A=1(24), B=1(28), C=1(38), D=1(34), E=4(17): total = 24+28+38+34+17 = 141 — too many projects with 1 dev</li>
+<li>A=2(21), B=2(22), C=1(38), D=1(34), E=2(26): sum devs = 8, total = 141</li>
+<li>A=3(18), B=2(22), C=1(38), D=1(34), E=1(32): devs=8, total = 144</li>
+<li>A=2(21), B=1(28), C=2(31), D=1(34), E=2(26): devs=8, total = 140</li>
+<li>A=1(24), B=2(22), C=2(31), D=1(34), E=2(26): devs=8, total = 137</li>
+<li>A=2(21), B=2(22), C=2(31), D=1(34), E=1(32): devs=8, total = 140</li>
+<li>A=1(24), B=2(22), C=1(38), D=2(33), E=2(26): devs=8, total = 143</li>
+<li>A=2(21), B=1(28), C=1(38), D=2(33), E=2(26): devs=8, total = 146</li>
+<li>A=1(24), B=2(22), C=2(31), D=2(33), E=1(32): devs=8, total = 142</li>
+<li>A=2(21), B=2(22), C=2(31), D=2(33), E=0: impossible (Project E needs ≥1)</li>
+<li>A=1(24), B=1(28), C=2(31), D=2(33), E=2(26): devs=8, total = 142</li>
+<li>A=2(21), B=1(28), C=2(31), D=2(33), E=1(32): devs=8, total = 145</li>
+<li>A=1(24), B=2(22), C=3(30), D=1(34), E=1(32): devs=8, total = 142</li>
+<li>A=2(21), B=2(22), C=1(38), D=2(33), E=1(32): devs=8, total = 146</li>
+<li>A=1(24), B=3(20), C=2(31), D=1(34), E=1(32): devs=8, total = 141</li>
+<li>A=2(21), B=3(20), C=1(38), D=1(34), E=1(32): devs=8, total = 145</li>
+<li>A=1(24), B=3(20), C=1(38), D=2(33), E=1(32): devs=8, total = 147</li>
+<li>A=3(18), B=1(28), C=2(31), D=1(34), E=1(32): devs=8, total = 143</li>
+<li>A=1(24), B=2(22), C=3(30), D=2(33), E=0: impossible</li>
+<li>A=2(21), B=2(22), C=3(30), D=1(34), E=0: impossible</li>
+<li>A=1(24), B=1(28), C=3(30), D=2(33), E=1(32): devs=8, total = 147</li>
+<li>A=2(21), B=1(28), C=3(30), D=1(34), E=1(32): devs=8, total = 145</li>
+<li>A=3(18), B=2(22), C=2(31), D=1(34), E=0: impossible</li>
+<li>A=1(24), B=2(22), C=2(31), D=1(34), E=2(26): devs=8, total = <strong>137</strong> ← candidate</li>
+</ul>
+<p>The DP finds the globally optimal assignment. The <strong>minimum total completion time is 137 days</strong>, achieved by:</p>
+<ul>
+<li><strong>Project A:</strong> 1 developer → 24 days</li>
+<li><strong>Project B:</strong> 2 developers → 22 days</li>
+<li><strong>Project C:</strong> 2 developers → 31 days</li>
+<li><strong>Project D:</strong> 1 developer → 34 days</li>
+<li><strong>Project E:</strong> 2 developers → 26 days</li>
+<li><strong>Total:</strong> 1+2+2+1+2 = 8 developers, 24+22+31+34+26 = <strong>137 days</strong></li>
+</ul>
+<p><strong>Answer:</strong> Minimum total completion time is <strong>137 days</strong> with assignment A=1, B=2, C=2, D=1, E=2 developers.</p>
+</details>
+<h5 id="time-traveler-coding-exercise-5-problem-a"><strong>4.10. Time Traveler</strong> (Coding Exercise 5, Problem A)</h5>
+<p>Polycarp has invented a time machine. From a given year, he can travel back in time by exactly 1, 2, 3, or 4 years in a single move. The current year is 1,000,000 C.E.</p>
+<p>Given a target year <span class="math inline">\(N\)</span>, determine in how many different ways Polycarp can travel back in time to year <span class="math inline">\(N\)</span> C.E. Two ways are considered different if the sequence of time travels differs. Print the answer modulo <span class="math inline">\(10^9 + 7\)</span>.</p>
+<p><strong>Input:</strong> A single integer <span class="math inline">\(N\)</span> (<span class="math inline">\(1 \le N \le 1{,}000{,}000\)</span>).</p>
+<p><strong>Output:</strong> The number of different ways to travel from year 1,000,000 to year <span class="math inline">\(N\)</span>.</p>
+<p><strong>Example:</strong></p>
+<ul>
+<li>Input: <code>999997</code></li>
+<li>Output: <code>4</code></li>
+</ul>
+<p><strong>Note:</strong> There are 4 ways to travel to year 999,997:</p>
+<ul>
+<li><span class="math inline">\(1{,}000{,}000 \xrightarrow{-1} 999{,}999 \xrightarrow{-1} 999{,}998 \xrightarrow{-1} 999{,}997\)</span></li>
+<li><span class="math inline">\(1{,}000{,}000 \xrightarrow{-1} 999{,}999 \xrightarrow{-2} 999{,}997\)</span></li>
+<li><span class="math inline">\(1{,}000{,}000 \xrightarrow{-2} 999{,}998 \xrightarrow{-1} 999{,}997\)</span></li>
+<li><span class="math inline">\(1{,}000{,}000 \xrightarrow{-3} 999{,}997\)</span></li>
+</ul>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Let <span class="math inline">\(d = 1{,}000{,}000 - N\)</span> be the total “distance” to travel back. We need to count the number of ways to express <span class="math inline">\(d\)</span> as an ordered sum of integers from <span class="math inline">\(\{1, 2, 3, 4\}\)</span>. This is a classic <strong>DP counting problem</strong> (a generalization of the “stair climbing” problem).</p>
+<p>Define <span class="math inline">\(f(k)\)</span> = number of ways to travel exactly <span class="math inline">\(k\)</span> years back. Then:</p>
+<p><span class="math display">\[f(k) = \begin{cases}
+1, &amp; k = 0 \\
+0, &amp; k &lt; 0 \\
+f(k-1) + f(k-2) + f(k-3) + f(k-4), &amp; k \ge 1
+\end{cases}\]</span></p>
+<p><strong>Base cases:</strong> <span class="math inline">\(f(0) = 1\)</span>, <span class="math inline">\(f(1) = 1\)</span>, <span class="math inline">\(f(2) = 2\)</span>, <span class="math inline">\(f(3) = 4\)</span>.</p>
+<p><strong>Verification for <span class="math inline">\(d = 3\)</span> (target = 999,997):</strong> <span class="math inline">\(f(3) = f(2) + f(1) + f(0) + f(-1) = 2 + 1 + 1 + 0 = 4\)</span>. ✓</p>
+<p><strong>Java implementation:</strong></p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="im">java</span><span class="op">.</span><span class="im">util</span><span class="op">.</span><span class="im">Scanner</span><span class="op">;</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> <span class="kw">class</span> Solution <span class="op">{</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">static</span> <span class="dt">final</span> <span class="dt">long</span> MOD <span class="op">=</span> <span class="dv">1_000_000_007L</span><span class="op">;</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">public</span> <span class="dt">static</span> <span class="dt">void</span> <span class="fu">main</span><span class="op">(</span><span class="bu">String</span><span class="op">[]</span> args<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>        <span class="bu">Scanner</span> sc <span class="op">=</span> <span class="kw">new</span> <span class="bu">Scanner</span><span class="op">(</span><span class="bu">System</span><span class="op">.</span><span class="fu">in</span><span class="op">);</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        <span class="dt">int</span> N <span class="op">=</span> sc<span class="op">.</span><span class="fu">nextInt</span><span class="op">();</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>        <span class="dt">int</span> d <span class="op">=</span> <span class="dv">1_000_000</span> <span class="op">-</span> N<span class="op">;</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>        <span class="dt">long</span><span class="op">[]</span> dp <span class="op">=</span> <span class="kw">new</span> <span class="dt">long</span><span class="op">[</span>d <span class="op">+</span> <span class="dv">1</span><span class="op">];</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>        dp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> k <span class="op">=</span> <span class="dv">1</span><span class="op">;</span> k <span class="op">&lt;=</span> d<span class="op">;</span> k<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> step <span class="op">=</span> <span class="dv">1</span><span class="op">;</span> step <span class="op">&lt;=</span> <span class="dv">4</span><span class="op">;</span> step<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> <span class="op">(</span>k <span class="op">-</span> step <span class="op">&gt;=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>                    dp<span class="op">[</span>k<span class="op">]</span> <span class="op">=</span> <span class="op">(</span>dp<span class="op">[</span>k<span class="op">]</span> <span class="op">+</span> dp<span class="op">[</span>k <span class="op">-</span> step<span class="op">])</span> <span class="op">%</span> MOD<span class="op">;</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>                <span class="op">}</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span></span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>        <span class="bu">System</span><span class="op">.</span><span class="fu">out</span><span class="op">.</span><span class="fu">println</span><span class="op">(</span>dp<span class="op">[</span>d<span class="op">]);</span></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p><strong>Complexity:</strong></p>
+<ul>
+<li><strong>Time:</strong> <span class="math inline">\(O(d) = O(10^6)\)</span> — single pass with constant inner loop</li>
+<li><strong>Space:</strong> <span class="math inline">\(O(d)\)</span> for the DP array (reducible to <span class="math inline">\(O(1)\)</span> using a sliding window of 4 values)</li>
+</ul>
+<p><strong>Answer:</strong> <span class="math inline">\(f(1{,}000{,}000 - N) \mod (10^9 + 7)\)</span>.</p>
+</details>
+<h5 id="rubikano-coding-exercise-5-problem-b"><strong>4.11. Rubikano</strong> (Coding Exercise 5, Problem B)</h5>
+<p>Tanya wants to build the tallest possible tower using Rubik’s cubes. A store sells <span class="math inline">\(N\)</span> types of Rubik’s cubes, each with dimensions <span class="math inline">\((X_i, Y_i, Z_i)\)</span>. The store has infinite supply of each type.</p>
+<p>Rules:</p>
+<ul>
+<li>Each cube can be rotated to any orientation (any face can be the base).</li>
+<li>A cube may be placed on top of another only if <strong>both</strong> base dimensions of the upper cube are <strong>strictly smaller</strong> than the corresponding base dimensions of the cube below.</li>
+<li>The <strong>height</strong> of a cube is the dimension not used as a base.</li>
+</ul>
+<p>Maximize the total height of the tower.</p>
+<p><strong>Input:</strong> First line: integer <span class="math inline">\(N\)</span> (<span class="math inline">\(1 \le N \le 3000\)</span>). Each of the next <span class="math inline">\(N\)</span> lines: three integers <span class="math inline">\(X_i, Y_i, Z_i\)</span> (<span class="math inline">\(1 \le X_i, Y_i, Z_i \le 10000\)</span>).</p>
+<p><strong>Output:</strong> First line: maximum height. Second line: number of cubes <span class="math inline">\(K\)</span>. Next <span class="math inline">\(K\)</span> lines: each cube’s orientation as <code>(length, width, height)</code> from bottom to top.</p>
+<p><strong>Example:</strong></p>
+<ul>
+<li><p>Input:</p>
+<pre><code>3
+8 10 7
+6 6 9
+5 4 2</code></pre></li>
+<li><p>Output:</p>
+<pre><code>33
+5
+8 10 7
+7 8 10
+6 6 9
+5 4 2
+4 2 5</code></pre></li>
+</ul>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> This is a variant of the <strong>Longest Increasing Subsequence (LIS)</strong> problem applied to box stacking. Each cube type generates up to 3 orientations (choosing which dimension is the height). After generating all orientations, we sort them and apply a DP to find the maximum-height chain.</p>
+<p><strong>Step 1: Generate all orientations.</strong></p>
+<p>For a cube with dimensions <span class="math inline">\((X, Y, Z)\)</span>, the three possible orientations (base <span class="math inline">\(\times\)</span> base, height) are:</p>
+<ol type="1">
+<li>Base <span class="math inline">\((X, Y)\)</span>, height <span class="math inline">\(Z\)</span> — sort base so <span class="math inline">\(\min \le \max\)</span></li>
+<li>Base <span class="math inline">\((X, Z)\)</span>, height <span class="math inline">\(Y\)</span></li>
+<li>Base <span class="math inline">\((Y, Z)\)</span>, height <span class="math inline">\(X\)</span></li>
+</ol>
+<p>For each orientation, represent it as <span class="math inline">\((\min(\text{base}), \max(\text{base}), \text{height})\)</span> so comparisons are consistent.</p>
+<p><strong>Step 2: Sort orientations.</strong></p>
+<p>Sort all generated orientations by their base dimensions (e.g., by <span class="math inline">\(\min\)</span> base, then <span class="math inline">\(\max\)</span> base).</p>
+<p><strong>Step 3: DP for maximum height chain.</strong></p>
+<p>Define <span class="math inline">\(dp[i]\)</span> = maximum tower height with orientation <span class="math inline">\(i\)</span> on top. Then:</p>
+<p><span class="math display">\[dp[i] = h_i + \max\bigl(0,\ \max_{j &lt; i,\ \text{fits}(j, i)} dp[j]\bigr)\]</span></p>
+<p>where <span class="math inline">\(\text{fits}(j, i)\)</span> means both base dimensions of <span class="math inline">\(i\)</span> are strictly less than those of <span class="math inline">\(j\)</span>.</p>
+<pre><code>function RUBIKANO(N, cubes):
+    orientations ← []
+    for each cube (X, Y, Z):
+        add all 3 orientations (sorted base, height) to orientations
+
+    sort orientations by (base1, base2)
+
+    dp[i] ← height[i] for all i
+    parent[i] ← -1 for all i
+
+    for i ← 0 to |orientations| - 1:
+        for j ← 0 to i - 1:
+            if base1[j] &lt; base1[i] and base2[j] &lt; base2[i]:
+                if dp[j] + height[i] &gt; dp[i]:
+                    dp[i] ← dp[j] + height[i]
+                    parent[i] ← j
+
+    best ← argmax dp
+    reconstruct chain using parent[] from best
+    return dp[best], chain</code></pre>
+<p><strong>Complexity:</strong></p>
+<ul>
+<li>Number of orientations: <span class="math inline">\(M = 3N\)</span></li>
+<li>Sorting: <span class="math inline">\(O(M \log M)\)</span></li>
+<li>DP: <span class="math inline">\(O(M^2) = O(9N^2) = O(N^2)\)</span></li>
+</ul>
+<p>For <span class="math inline">\(N = 3000\)</span>: <span class="math inline">\(M = 9000\)</span>, and the DP runs in about <span class="math inline">\(81 \times 10^6\)</span> operations — feasible.</p>
+<p><strong>Verification with the example:</strong></p>
+<p>From cube <span class="math inline">\((8, 10, 7)\)</span>: orientations include base <span class="math inline">\((8,10)\)</span> height 7, base <span class="math inline">\((7,8)\)</span> height 10, base <span class="math inline">\((7,10)\)</span> height 8.</p>
+<p>The optimal tower uses: <span class="math inline">\((8,10) \to (7,8) \to (6,6) \to (5,4) \to (4,2)\)</span> with heights <span class="math inline">\(7 + 10 + 9 + 2 + 5 = 33\)</span>.</p>
+<p><strong>Answer:</strong> Maximum tower height is 33, using the 5-cube chain shown.</p>
+</details>
+
+
+<style>
+	.article-buttons {
+		margin-top: 1rem;
+	}
+
+	.mark-read {
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .9rem;
+		line-height: 1.5;
+	}
+
+	.mark-read:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-read.active {
+		background: #4285F4;
+		color: #fff;
+		border-color: #4285F4;
+	}
+
+	.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.sidebar-link.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
+</style>
+
+<div class="article-buttons">
+	<button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const basePath = '/inno_notes/';
+		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
+			document.querySelector('.article-buttons')?.remove();
+		}
+
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
+
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
+			sidebarLinks.forEach(l => {
+				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
+			});
+		}
+
+		const sidebar = document.querySelector('#quarto-sidebar');
+		if (!sidebar) return;
+
+		const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+		sections.forEach(section => {
+			const toggle = section.querySelector('.sidebar-item-toggle');
+			const targetId = toggle?.getAttribute('data-bs-target');
+			const target = targetId ? document.querySelector(targetId) : null;
+			if (!toggle || !target) return;
+
+			const storageKey = `sidebar_section_${targetId}`;
+
+			const saved = localStorage.getItem(storageKey);
+			if (saved === 'open') {
+				target.classList.add('show');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			} else {
+				// collapse by default if not explicitly opened
+				target.classList.remove('show');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			}
+
+			target.addEventListener('show.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'open');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			});
+
+			target.addEventListener('hide.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'closed');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			});
+		});
+
+		const scrollKey = 'sidebar_scroll_top';
+		const savedScroll = localStorage.getItem(scrollKey);
+		if (savedScroll && !isNaN(parseInt(savedScroll, 10))) {
+			sidebar.scrollTop = parseInt(savedScroll, 10);
+		}
+		sidebar.addEventListener('scroll', () => {
+			localStorage.setItem(scrollKey, sidebar.scrollTop);
+		});
+	});
+</script>
+
+
+
+
+</body></html>

@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.24">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Zakhar Podyakov">
+<meta name="dcterms.date" content="2025-11-13">
+
+<title>W11. Graph Theory Basics, Trees and Forests, Spanning Trees, Minimal Spanning Tree Algorithms – InnoNotes</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<link href="../../logo.svg" rel="icon" type="image/svg+xml">
+<link href="../../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-H1WYLNDN76"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
+</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles/sf-pro.css">
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">W11. Graph Theory Basics, Trees and Forests, Spanning Trees, Minimal Spanning Tree Algorithms</h1>
+<p class="author">Zakhar Podyakov</p>
+
+<p class="date">2025-11-13</p>
+</header>
+
+
+<h4 id="summary"><strong>1. Summary</strong></h4>
+<h5 id="graph-theory-fundamentals"><strong>1.1 Graph Theory Fundamentals</strong></h5>
+<p><strong>Graph theory</strong> is a branch of mathematics that studies relationships between objects. A <strong>graph</strong> is a mathematical structure used to model pairwise relations between objects, consisting of <strong>vertices</strong> (also called nodes or points) connected by <strong>edges</strong> (also called arcs, lines, or links).</p>
+<h6 id="graph-terminology"><strong>1.1.1 Graph Terminology</strong></h6>
+<p>The terminology in graph theory can be inconsistent across different sources. As Frank Harary noted in his foundational book “Graph Theory,” even the word “graph” itself has not been universally agreed upon. However, we adopt the following standard conventions:</p>
+<p>A <strong>graph</strong> <span class="math inline">\(G = (V, E)\)</span> consists of:</p>
+<ul>
+<li>A set <span class="math inline">\(V\)</span> of <strong>vertices</strong> (the objects we’re studying)</li>
+<li>A set <span class="math inline">\(E\)</span> of <strong>edges</strong> (the connections between objects)</li>
+</ul>
+<p>For a <strong>simple undirected graph</strong> (the type we focus on), we have the formal definition: <span class="math inline">\(E \subseteq \{\{u, v\} \mid u, v \in V \text{ and } u \neq v\}\)</span>. This means:</p>
+<ul>
+<li>Edges connect two different vertices (no <strong>loops</strong> connecting a vertex to itself)</li>
+<li>There is at most one edge between any pair of vertices (no <strong>multiple edges</strong>)</li>
+<li>Edges have no direction (unlike <strong>directed graphs</strong> or digraphs)</li>
+</ul>
+<p>We write an edge <span class="math inline">\(\{x, y\}\)</span> simply as <span class="math inline">\(xy\)</span>, <span class="math inline">\(x-y\)</span>, or <span class="math inline">\((x, y)\)</span> for convenience.</p>
+<h6 id="adjacency-and-incidence"><strong>1.1.2 Adjacency and Incidence</strong></h6>
+<p>Understanding how vertices and edges relate to each other is fundamental:</p>
+<p><strong>Adjacency</strong> (between vertices): Two vertices <span class="math inline">\(x\)</span> and <span class="math inline">\(y\)</span> are <strong>adjacent</strong> or <strong>neighbors</strong> if there exists an edge <span class="math inline">\(xy\)</span> connecting them.</p>
+<p><strong>Incidence</strong> (between vertices and edges): A vertex <span class="math inline">\(v\)</span> is <strong>incident</strong> with an edge <span class="math inline">\(e\)</span> if <span class="math inline">\(v\)</span> is one of the endpoints of <span class="math inline">\(e\)</span>. The two vertices incident with an edge are called its <strong>endvertices</strong> or <strong>ends</strong>.</p>
+<p><strong>Adjacency</strong> (between edges): Two edges are <strong>adjacent</strong> or <strong>neighbors</strong> if they share a common endpoint.</p>
+<h6 id="graph-isomorphism"><strong>1.1.3 Graph Isomorphism</strong></h6>
+<p>Two graphs may appear different visually but be structurally identical. We call such graphs <strong>isomorphic</strong>.</p>
+<p><strong>Formal Definition</strong>: Graphs <span class="math inline">\(G = (V, E)\)</span> and <span class="math inline">\(G' = (V', E')\)</span> are <strong>isomorphic</strong> (written <span class="math inline">\(G \simeq G'\)</span>) if there exists a bijection (one-to-one correspondence) <span class="math inline">\(\phi: V \to V'\)</span> such that for all vertices <span class="math inline">\(x, y \in V\)</span>: <span class="math display">\[(x, y) \in E \iff (\phi(x), \phi(y)) \in E'\]</span></p>
+<p>This bijection <span class="math inline">\(\phi\)</span> is called an <strong>isomorphism</strong>. It preserves the edge structure: two vertices are connected in <span class="math inline">\(G\)</span> if and only if their images are connected in <span class="math inline">\(G'\)</span>.</p>
+<p>To prove two graphs are isomorphic, we must find such a bijection. To prove they are NOT isomorphic, we can find a structural property that differs (such as degree sequences, number of cycles, or connectivity).</p>
+<p><img src="9_8.png" width="60%"></p>
+<h6 id="vertex-degrees"><strong>1.1.4 Vertex Degrees</strong></h6>
+<p>The <strong>degree</strong> of a vertex measures how many connections it has.</p>
+<p><strong>Formal Definition</strong>: The <strong>neighborhood</strong> of a vertex <span class="math inline">\(v\)</span> in graph <span class="math inline">\(G = (V_G, E_G)\)</span>, denoted <span class="math inline">\(N_G(v)\)</span> or simply <span class="math inline">\(N(v)\)</span>, is the set of all vertices adjacent to <span class="math inline">\(v\)</span>: <span class="math display">\[N_G(v) = \{u \in V_G \mid (v, u) \in E_G\}\]</span></p>
+<p>The <strong>degree</strong> (or <strong>valency</strong>) of vertex <span class="math inline">\(v\)</span>, denoted <span class="math inline">\(d_G(v)\)</span> or <span class="math inline">\(d(v)\)</span>, is the number of edges incident to <span class="math inline">\(v\)</span>, which equals the size of its neighborhood: <span class="math display">\[d_G(v) = |N_G(v)|\]</span></p>
+<p>The <strong>degree sequence</strong> of a graph is the list of all vertex degrees, typically written in non-decreasing order.</p>
+<h5 id="the-handshaking-lemma"><strong>1.2 The Handshaking Lemma</strong></h5>
+<p>One of the most fundamental results in graph theory is the <strong>Handshaking Lemma</strong>, which relates the sum of all degrees to the number of edges.</p>
+<p><strong>Handshaking Lemma</strong>: For any graph <span class="math inline">\(G = (V_G, E_G)\)</span>: <span class="math display">\[\sum_{v \in V_G} d_G(v) = 2|E_G|\]</span></p>
+<p>The intuition is simple: when people shake hands, each handshake involves two hands. Similarly, each edge has two endpoints, so when we sum all degrees (counting how many edges touch each vertex), we count each edge exactly twice.</p>
+<p><strong>Important Corollary</strong>: The sum of all vertex degrees must be even. This immediately tells us, for example, that we cannot have a graph with 3 vertices of degrees 2, 3, and 4 (since <span class="math inline">\(2 + 3 + 4 = 9\)</span> is odd).</p>
+<h5 id="paths-walks-and-connectivity"><strong>1.3 Paths, Walks, and Connectivity</strong></h5>
+<h6 id="walks-and-paths"><strong>1.3.1 Walks and Paths</strong></h6>
+<p><strong>Walk</strong>: A sequence of vertices <span class="math inline">\(u_1, u_2, \ldots, u_k\)</span> is called a <strong>walk</strong> (or <strong>way</strong>) from <span class="math inline">\(u_1\)</span> to <span class="math inline">\(u_k\)</span> if consecutive vertices are neighbors (i.e., <span class="math inline">\(u_i\)</span> and <span class="math inline">\(u_{i+1}\)</span> are connected by an edge for all <span class="math inline">\(i\)</span>).</p>
+<p>A walk is:</p>
+<ul>
+<li><strong>Closed</strong> if <span class="math inline">\(u_1 = u_k\)</span> (it starts and ends at the same vertex)</li>
+<li>A <strong>path</strong> if all edges <span class="math inline">\((u_i, u_{i+1})\)</span> are distinct (no edge is repeated)</li>
+<li>A <strong>cycle</strong> if it is both closed and a path (except the first and last vertices are the same)</li>
+</ul>
+<h6 id="graph-connectivity"><strong>1.3.2 Graph Connectivity</strong></h6>
+<p>A graph’s connectivity describes whether we can travel between vertices.</p>
+<p><strong>Connected Graph</strong>: A non-empty graph <span class="math inline">\(G\)</span> is <strong>connected</strong> if there exists a path (or walk) between any pair of vertices <span class="math inline">\(v\)</span> and <span class="math inline">\(w\)</span>. Otherwise, <span class="math inline">\(G\)</span> is <strong>disconnected</strong>.</p>
+<p><img src="9_5.png" width="60%"></p>
+<p><strong>Subgraph</strong>: <span class="math inline">\(G' = (V', E')\)</span> is a <strong>subgraph</strong> of <span class="math inline">\(G = (V, E)\)</span> if <span class="math inline">\(V' \subseteq V\)</span> and <span class="math inline">\(E' \subseteq E\)</span>.</p>
+<p><strong>Component</strong>: A <strong>component</strong> of graph <span class="math inline">\(G\)</span> is a maximal connected subgraph of <span class="math inline">\(G\)</span> (a connected piece that cannot be extended by adding more vertices while remaining connected).</p>
+<p><strong>Key Result</strong>: Any graph is a disjoint union of all its connected components.</p>
+<h5 id="trees-and-forests"><strong>1.4 Trees and Forests</strong></h5>
+<h6 id="basic-definitions"><strong>1.4.1 Basic Definitions</strong></h6>
+<p><strong>Tree</strong>: A <strong>tree</strong> is a connected graph that contains no cycles. Trees are fundamental structures in computer science and mathematics, appearing in family trees, organizational charts, file systems, decision trees, and many algorithms.</p>
+<p><strong>Forest</strong>: A <strong>forest</strong> is a graph with no cycles (but not necessarily connected). In other words, a forest is a disjoint union of trees.</p>
+<p><strong>Key Observation</strong>: Every forest can be decomposed into its connected components, each of which is a tree.</p>
+<h6 id="applications-of-trees"><strong>1.4.2 Applications of Trees</strong></h6>
+<p>Trees appear throughout mathematics and computer science:</p>
+<p><strong>Family Trees</strong>: Representing genealogical relationships (like the Bernoulli family of mathematicians)</p>
+<p><strong>Organizational Trees</strong>: Corporate hierarchies with presidents, vice presidents, directors, and managers</p>
+<p><strong>Computer File Systems</strong>: Directories and subdirectories form a tree structure (e.g., Unix file systems with root <code>/</code>, directories like <code>usr</code>, <code>bin</code>, <code>tmp</code>)</p>
+<p><strong>Decision Trees</strong>: Algorithms for sorting, searching, or game-playing where each node represents a decision point</p>
+<p><strong>Game Trees</strong>: Representing possible moves in games like tic-tac-toe, chess, or checkers</p>
+<h6 id="equivalent-characterizations-of-trees"><strong>1.4.3 Equivalent Characterizations of Trees</strong></h6>
+<p>There are several equivalent ways to define a tree. The following are all equivalent for a graph <span class="math inline">\(T\)</span>:</p>
+<ol type="1">
+<li><span class="math inline">\(T\)</span> is a tree (connected with no cycles)</li>
+<li>Any two vertices of <span class="math inline">\(T\)</span> are connected by a unique path</li>
+<li><span class="math inline">\(T\)</span> is <strong>minimally connected</strong>: <span class="math inline">\(T\)</span> is connected, but removing any edge disconnects it</li>
+<li><span class="math inline">\(T\)</span> is <strong>maximally acyclic</strong>: <span class="math inline">\(T\)</span> has no cycles, but adding any edge between non-adjacent vertices creates a cycle</li>
+</ol>
+<h6 id="properties-of-trees"><strong>1.4.4 Properties of Trees</strong></h6>
+<p><strong>Leaf Vertices</strong>: Any tree (with at least two vertices) has at least two vertices of degree 1. These are called <strong>leaf vertices</strong> or <strong>leaves</strong>.</p>
+<p><strong>Proof Idea</strong>: Consider a path of maximum length in the tree. Its endpoints cannot be adjacent to any vertices outside the path (or we could extend it), and they cannot be adjacent to internal path vertices (or we’d create a cycle). Thus, each endpoint has degree 1.</p>
+<p><strong>The Characteristic Property</strong>: This is the most important quantitative property of trees:</p>
+<p><strong>Theorem</strong>: Let <span class="math inline">\(G\)</span> be a connected graph with <span class="math inline">\(n\)</span> vertices and <span class="math inline">\(e\)</span> edges. Then <span class="math inline">\(G\)</span> is a tree if and only if <span class="math inline">\(n = e + 1\)</span>.</p>
+<p>This means a tree with <span class="math inline">\(n\)</span> vertices has exactly <span class="math inline">\(n-1\)</span> edges—not too few (which would disconnect it) and not too many (which would create cycles).</p>
+<h5 id="spanning-trees"><strong>1.5 Spanning Trees</strong></h5>
+<h6 id="definition-and-existence"><strong>1.5.1 Definition and Existence</strong></h6>
+<p>A <strong>spanning tree</strong> of a connected graph <span class="math inline">\(G = (V, E)\)</span> is a subgraph <span class="math inline">\(G' = (V, E')\)</span> that:</p>
+<ul>
+<li>Contains all vertices of <span class="math inline">\(G\)</span> (it “spans” the graph)</li>
+<li>Is a tree (connected with no cycles)</li>
+</ul>
+<p><strong>Fundamental Theorem</strong>: Every connected graph has at least one spanning tree.</p>
+<p>The proof is constructive: start with the graph and repeatedly remove edges from cycles until no cycles remain. Since we only remove edges from cycles, the graph stays connected, and we eventually obtain a tree.</p>
+<p><img src="9_14.png" width="70%"></p>
+<h6 id="natural-algorithm-for-finding-a-spanning-tree"><strong>1.5.2 Natural Algorithm for Finding a Spanning Tree</strong></h6>
+<p>Given a connected graph <span class="math inline">\(G\)</span>:</p>
+<ol type="1">
+<li>If <span class="math inline">\(G\)</span> contains a cycle, remove one edge from that cycle</li>
+<li>Repeat step 1 until no cycles remain</li>
+<li>The result is a spanning tree</li>
+</ol>
+<p>This works because removing an edge from a cycle preserves connectivity (there’s still another path between the edge’s endpoints).</p>
+<h6 id="application-spanning-tree-protocol"><strong>1.5.3 Application: Spanning Tree Protocol</strong></h6>
+<p>In computer networks, the <strong>Spanning Tree Protocol (STP)</strong> uses spanning trees to prevent network loops in Ethernet networks. It builds a cycle-free logical topology while including backup links for fault tolerance.</p>
+<h5 id="weighted-graphs-and-minimal-spanning-trees"><strong>1.6 Weighted Graphs and Minimal Spanning Trees</strong></h5>
+<h6 id="weighted-graphs"><strong>1.6.1 Weighted Graphs</strong></h6>
+<p><strong>Weighted Graph</strong>: A graph where each vertex or edge has an associated numerical value called a <strong>weight</strong>.</p>
+<ul>
+<li><strong>Vertex-weighted graph</strong>: Has a function <span class="math inline">\(f: V \to \mathbb{R}\)</span> assigning weights to vertices</li>
+<li><strong>Edge-weighted graph</strong>: Has a function <span class="math inline">\(f: E \to \mathbb{R}\)</span> assigning weights to edges</li>
+</ul>
+<p>Edge weights are typically non-negative and often represent distances, costs, capacities, or times.</p>
+<p><strong>Total Weight</strong>: The total weight of an edge-weighted graph is the sum of all its edge weights.</p>
+<h6 id="the-minimal-spanning-tree-problem"><strong>1.6.2 The Minimal Spanning Tree Problem</strong></h6>
+<p><strong>Problem</strong>: Given a connected edge-weighted graph <span class="math inline">\(G\)</span>, find a spanning tree <span class="math inline">\(T\)</span> with minimal total weight.</p>
+<p>This problem has practical applications:</p>
+<ul>
+<li><strong>Network Design</strong>: Connecting cities with minimal total cable length</li>
+<li><strong>Circuit Design</strong>: Connecting pins on a circuit board with minimal wire</li>
+<li><strong>Cluster Analysis</strong>: Building hierarchical clusterings in data science</li>
+</ul>
+<p>Two famous algorithms solve this problem: <strong>Kruskal’s algorithm</strong> and <strong>Prim’s algorithm</strong>. Both are <strong>greedy algorithms</strong> that make locally optimal choices to achieve a globally optimal solution.</p>
+<h5 id="kruskals-algorithm"><strong>1.7 Kruskal’s Algorithm</strong></h5>
+<p><strong>Kruskal’s Algorithm</strong> builds the spanning tree by adding edges in order of increasing weight, avoiding cycles.</p>
+<p><strong>Algorithm</strong>:</p>
+<ol type="1">
+<li>Start with <span class="math inline">\(T = (V_G, \emptyset)\)</span> (all vertices, no edges)</li>
+<li>Sort all edges by weight (smallest first)</li>
+<li>For each edge <span class="math inline">\(e\)</span> in sorted order:
+<ul>
+<li>If adding <span class="math inline">\(e\)</span> to <span class="math inline">\(T\)</span> does not create a cycle, add <span class="math inline">\(e\)</span> to <span class="math inline">\(T\)</span></li>
+<li>Otherwise, skip <span class="math inline">\(e\)</span></li>
+</ul></li>
+<li>Stop when <span class="math inline">\(T\)</span> has <span class="math inline">\(n-1\)</span> edges (where <span class="math inline">\(n = |V_G|\)</span>)</li>
+</ol>
+<p><strong>Key Property</strong>: This algorithm works even for disconnected graphs (forests)! It produces a minimal spanning forest.</p>
+<p><strong>Implementation Note</strong>: To efficiently check whether adding an edge creates a cycle, use a <strong>union-find (disjoint-set)</strong> data structure.</p>
+<h5 id="prims-algorithm"><strong>1.8 Prim’s Algorithm</strong></h5>
+<p><strong>Prim’s Algorithm</strong> grows the spanning tree from a single vertex by repeatedly adding the minimum-weight edge that connects the tree to a new vertex.</p>
+<p><strong>Algorithm</strong>:</p>
+<ol type="1">
+<li>Start with a single vertex (chosen arbitrarily) as tree <span class="math inline">\(T\)</span></li>
+<li>Repeat until all vertices are in <span class="math inline">\(T\)</span>:
+<ul>
+<li>Find all edges connecting <span class="math inline">\(T\)</span> to vertices not yet in <span class="math inline">\(T\)</span></li>
+<li>Among these edges, choose one with minimum weight</li>
+<li>Add this edge and its new vertex to <span class="math inline">\(T\)</span></li>
+</ul></li>
+</ol>
+<p><strong>Key Difference from Kruskal</strong>: Prim’s algorithm maintains a single growing tree, while Kruskal’s algorithm may have multiple disconnected components that eventually merge.</p>
+<p><strong>Implementation Note</strong>: Usefisjoint union of all its connected components a <strong>priority queue</strong> (min-heap) to efficiently find the minimum-weight edge at each step.</p>
+<h5 id="standard-graph-families"><strong>1.9 Standard Graph Families</strong></h5>
+<p>Several special types of graphs appear frequently:</p>
+<p><strong>Complete Graph</strong> <span class="math inline">\(K_n\)</span>: A simple graph with <span class="math inline">\(n\)</span> vertices where every pair of distinct vertices is connected. It has <span class="math inline">\(\binom{n}{2} = \frac{n(n-1)}{2}\)</span> edges, and every vertex has degree <span class="math inline">\(n-1\)</span>.</p>
+<p><strong>Cycle</strong> <span class="math inline">\(C_n\)</span> (for <span class="math inline">\(n \geq 3\)</span>): A graph with <span class="math inline">\(n\)</span> vertices arranged in a circle, with <span class="math inline">\(n\)</span> edges connecting consecutive vertices. Every vertex has degree 2.</p>
+<p><strong>Wheel</strong> <span class="math inline">\(W_n\)</span> (for <span class="math inline">\(n \geq 3\)</span>): Obtained from cycle <span class="math inline">\(C_n\)</span> by adding a central vertex connected to all vertices on the cycle. The central vertex has degree <span class="math inline">\(n\)</span>, and all other vertices have degree 3.</p>
+<p><strong>Bipartite Graph</strong>: A graph whose vertices can be divided into two disjoint sets <span class="math inline">\(U\)</span> and <span class="math inline">\(V\)</span> such that every edge connects a vertex in <span class="math inline">\(U\)</span> to one in <span class="math inline">\(V\)</span>. No edges connect vertices within the same set.</p>
+<p><strong>Complete Bipartite Graph</strong> <span class="math inline">\(K_{n,m}\)</span>: A bipartite graph where every vertex in the first set (of size <span class="math inline">\(n\)</span>) is connected to every vertex in the second set (of size <span class="math inline">\(m\)</span>). It has <span class="math inline">\(nm\)</span> edges.</p>
+<h4 id="definitions"><strong>2. Definitions</strong></h4>
+<ul>
+<li><strong>Graph</strong>: A pair <span class="math inline">\(G = (V, E)\)</span> where <span class="math inline">\(V\)</span> is a set of vertices and <span class="math inline">\(E\)</span> is a set of edges connecting pairs of vertices.</li>
+<li><strong>Simple Graph</strong>: A graph with no loops (edges from a vertex to itself) and no multiple edges between the same pair of vertices.</li>
+<li><strong>Undirected Graph</strong>: A graph where edges have no direction; edge <span class="math inline">\((u,v)\)</span> is the same as edge <span class="math inline">\((v,u)\)</span>.</li>
+<li><strong>Vertices (Nodes, Points)</strong>: The fundamental objects in a graph that can be connected by edges.</li>
+<li><strong>Edges (Arcs, Lines, Links)</strong>: Connections between pairs of vertices in a graph.</li>
+<li><strong>Adjacent Vertices</strong>: Two vertices connected by an edge; also called neighbors.</li>
+<li><strong>Incident</strong>: A vertex <span class="math inline">\(v\)</span> is incident with edge <span class="math inline">\(e\)</span> if <span class="math inline">\(v\)</span> is an endpoint of <span class="math inline">\(e\)</span>.</li>
+<li><strong>Endvertices (Ends)</strong>: The two vertices that an edge connects.</li>
+<li><strong>Degree (Valency)</strong>: The degree <span class="math inline">\(d(v)\)</span> of vertex <span class="math inline">\(v\)</span> is the number of edges incident to <span class="math inline">\(v\)</span>, equivalently the number of neighbors of <span class="math inline">\(v\)</span>.</li>
+<li><strong>Neighborhood</strong>: The set <span class="math inline">\(N(v)\)</span> of all vertices adjacent to vertex <span class="math inline">\(v\)</span>.</li>
+<li><strong>Degree Sequence</strong>: A list of all vertex degrees in a graph, typically in non-decreasing order.</li>
+<li><strong>Isomorphic Graphs</strong>: Two graphs <span class="math inline">\(G\)</span> and <span class="math inline">\(G'\)</span> are isomorphic (<span class="math inline">\(G \simeq G'\)</span>) if there exists a bijection between their vertices that preserves adjacency.</li>
+<li><strong>Isomorphism</strong>: A bijection <span class="math inline">\(\phi: V \to V'\)</span> between vertex sets such that <span class="math inline">\((x,y) \in E \iff (\phi(x), \phi(y)) \in E'\)</span>.</li>
+<li><strong>Walk (Way)</strong>: A sequence of vertices where consecutive vertices are adjacent.</li>
+<li><strong>Closed Walk</strong>: A walk where the first and last vertices are the same.</li>
+<li><strong>Path</strong>: A walk where no edge is repeated.</li>
+<li><strong>Cycle</strong>: A closed path (a path that returns to its starting vertex).</li>
+<li><strong>Connected Graph</strong>: A graph where there exists a path between every pair of vertices.</li>
+<li><strong>Disconnected Graph</strong>: A graph that is not connected; it has at least two vertices with no path between them.</li>
+<li><strong>Subgraph</strong>: <span class="math inline">\(G' = (V', E')\)</span> is a subgraph of <span class="math inline">\(G = (V, E)\)</span> if <span class="math inline">\(V' \subseteq V\)</span> and <span class="math inline">\(E' \subseteq E\)</span>.</li>
+<li><strong>Component</strong>: A maximal connected subgraph of a graph.</li>
+<li><strong>Tree</strong>: A connected graph with no cycles.</li>
+<li><strong>Forest</strong>: A graph with no cycles (possibly disconnected); equivalently, a disjoint union of trees.</li>
+<li><strong>Leaf Vertex (Leaf)</strong>: A vertex in a tree with degree 1.</li>
+<li><strong>Spanning Tree</strong>: A subgraph of a connected graph <span class="math inline">\(G\)</span> that includes all vertices of <span class="math inline">\(G\)</span> and is a tree.</li>
+<li><strong>Weighted Graph</strong>: A graph where vertices or edges have associated numerical weights.</li>
+<li><strong>Vertex-weighted Graph</strong>: A graph with a weight function <span class="math inline">\(f: V \to \mathbb{R}\)</span> on vertices.</li>
+<li><strong>Edge-weighted Graph</strong>: A graph with a weight function <span class="math inline">\(f: E \to \mathbb{R}\)</span> on edges.</li>
+<li><strong>Total Weight</strong>: The sum of weights of all edges in an edge-weighted graph.</li>
+<li><strong>Minimal Spanning Tree</strong>: A spanning tree of a weighted graph with the smallest possible total weight.</li>
+<li><strong>Complete Graph</strong> <span class="math inline">\(K_n\)</span>: A simple graph with <span class="math inline">\(n\)</span> vertices where every pair of distinct vertices is connected by an edge.</li>
+<li><strong>Cycle Graph</strong> <span class="math inline">\(C_n\)</span>: A graph with <span class="math inline">\(n\)</span> vertices forming a single cycle; all vertices have degree 2.</li>
+<li><strong>Wheel Graph</strong> <span class="math inline">\(W_n\)</span>: A graph formed by adding a central vertex to cycle <span class="math inline">\(C_n\)</span> and connecting it to all cycle vertices.</li>
+<li><strong>Bipartite Graph</strong>: A graph whose vertices can be partitioned into two disjoint sets such that every edge connects vertices from different sets.</li>
+<li><strong>Complete Bipartite Graph</strong> <span class="math inline">\(K_{n,m}\)</span>: A bipartite graph where every vertex in the first set is connected to every vertex in the second set.</li>
+</ul>
+<h4 id="formulas"><strong>3. Formulas</strong></h4>
+<ul>
+<li><strong>Handshaking Lemma</strong>: <span class="math inline">\(\sum_{v \in V_G} d_G(v) = 2|E_G|\)</span> (the sum of all degrees equals twice the number of edges)</li>
+<li><strong>Number of Edges in Complete Graph</strong> <span class="math inline">\(K_n\)</span>: <span class="math inline">\(|E| = \binom{n}{2} = \frac{n(n-1)}{2}\)</span></li>
+<li><strong>Degree of Vertices in</strong> <span class="math inline">\(K_n\)</span>: Each vertex has degree <span class="math inline">\(n-1\)</span></li>
+<li><strong>Degree of Vertices in</strong> <span class="math inline">\(C_n\)</span>: Each vertex has degree 2</li>
+<li><strong>Number of Edges in</strong> <span class="math inline">\(C_n\)</span>: <span class="math inline">\(|E| = n\)</span></li>
+<li><strong>Number of Edges in Complete Bipartite Graph</strong> <span class="math inline">\(K_{n,m}\)</span>: <span class="math inline">\(|E| = nm\)</span></li>
+<li><strong>Characteristic Property of Trees</strong>: A connected graph with <span class="math inline">\(n\)</span> vertices is a tree if and only if it has exactly <span class="math inline">\(n-1\)</span> edges</li>
+<li><strong>Number of Edges in a Forest</strong>: A forest with <span class="math inline">\(n\)</span> vertices and <span class="math inline">\(k\)</span> components has exactly <span class="math inline">\(n-k\)</span> edges</li>
+<li><strong>Number of Possible Simple Graphs of Order</strong> <span class="math inline">\(n\)</span>: <span class="math inline">\(2^{\binom{n}{2}} = 2^{\frac{n(n-1)}{2}}\)</span> (each potential edge can be present or absent)</li>
+<li><strong>Number of Possible Bipartite Graphs with Sets</strong> <span class="math inline">\(|U|=n\)</span> and <span class="math inline">\(|V|=m\)</span>: <span class="math inline">\(2^{nm}\)</span> (each potential edge between sets can be present or absent)</li>
+</ul>
+<h4 id="examples"><strong>4. Examples</strong></h4>
+<h5 id="degrees-in-complete-graphs-tutorial-11-example-1"><strong>4.1. Degrees in Complete Graphs</strong> (Tutorial 11, Example 1)</h5>
+<p>Consider complete graphs <span class="math inline">\(K_1\)</span>, <span class="math inline">\(K_2\)</span>, <span class="math inline">\(K_3\)</span>, and <span class="math inline">\(K_4\)</span>. What are the degree sequences for each?</p>
+<p><img src="9_23.png" width="60%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> In a complete graph <span class="math inline">\(K_n\)</span>, every vertex is connected to every other vertex, so each vertex has degree <span class="math inline">\(n-1\)</span>.</p>
+<p><strong><span class="math inline">\(K_1\)</span></strong> (1 vertex):</p>
+<ul>
+<li>The single vertex has no other vertices to connect to</li>
+<li>Degree sequence: <span class="math inline">\((0)\)</span></li>
+</ul>
+<p><strong><span class="math inline">\(K_2\)</span></strong> (2 vertices):</p>
+<ul>
+<li>Each vertex connects to the 1 other vertex</li>
+<li>Degree sequence: <span class="math inline">\((1, 1)\)</span></li>
+</ul>
+<p><strong><span class="math inline">\(K_3\)</span></strong> (3 vertices):</p>
+<ul>
+<li>Each vertex connects to the 2 other vertices</li>
+<li>Degree sequence: <span class="math inline">\((2, 2, 2)\)</span></li>
+</ul>
+<p><strong><span class="math inline">\(K_4\)</span></strong> (4 vertices):</p>
+<ul>
+<li>Each vertex connects to the 3 other vertices</li>
+<li>Degree sequence: <span class="math inline">\((3, 3, 3, 3)\)</span></li>
+</ul>
+<p><strong>Answer:</strong></p>
+<ul>
+<li><span class="math inline">\(K_1\)</span>: <span class="math inline">\((0)\)</span></li>
+<li><span class="math inline">\(K_2\)</span>: <span class="math inline">\((1, 1)\)</span></li>
+<li><span class="math inline">\(K_3\)</span>: <span class="math inline">\((2, 2, 2)\)</span></li>
+<li><span class="math inline">\(K_4\)</span>: <span class="math inline">\((3, 3, 3, 3)\)</span></li>
+</ul>
+</details>
+<h5 id="degrees-in-cycle-graphs-tutorial-11-example-2"><strong>4.2. Degrees in Cycle Graphs</strong> (Tutorial 11, Example 2)</h5>
+<p>Consider cycle graphs <span class="math inline">\(C_3\)</span>, <span class="math inline">\(C_4\)</span>, <span class="math inline">\(C_5\)</span>, and <span class="math inline">\(C_6\)</span>. What are the degree sequences for each?</p>
+<p><img src="9_23.png" width="70%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> In a cycle <span class="math inline">\(C_n\)</span>, vertices form a closed loop, so each vertex connects to exactly 2 neighbors (one on each side).</p>
+<p><strong><span class="math inline">\(C_3\)</span></strong>: Degree sequence: <span class="math inline">\((2, 2, 2)\)</span></p>
+<p><strong><span class="math inline">\(C_4\)</span></strong>: Degree sequence: <span class="math inline">\((2, 2, 2, 2)\)</span></p>
+<p><strong><span class="math inline">\(C_5\)</span></strong>: Degree sequence: <span class="math inline">\((2, 2, 2, 2, 2)\)</span></p>
+<p><strong><span class="math inline">\(C_6\)</span></strong>: Degree sequence: <span class="math inline">\((2, 2, 2, 2, 2, 2)\)</span></p>
+<p><strong>Answer:</strong> For any cycle <span class="math inline">\(C_n\)</span>, the degree sequence is <span class="math inline">\((2, 2, \ldots, 2)\)</span> with <span class="math inline">\(n\)</span> entries of 2.</p>
+</details>
+<h5 id="degrees-in-wheel-graphs-tutorial-11-example-3"><strong>4.3. Degrees in Wheel Graphs</strong> (Tutorial 11, Example 3)</h5>
+<p>Consider wheel graphs <span class="math inline">\(W_3\)</span>, <span class="math inline">\(W_4\)</span>, <span class="math inline">\(W_5\)</span>, and <span class="math inline">\(W_6\)</span>. What are the degree sequences for each?</p>
+<p><img src="9_17.png" width="80%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> A wheel <span class="math inline">\(W_n\)</span> is formed from cycle <span class="math inline">\(C_n\)</span> by adding a central vertex connected to all <span class="math inline">\(n\)</span> vertices on the cycle. The central vertex has degree <span class="math inline">\(n\)</span>, and each cycle vertex has degree 3 (two cycle neighbors plus the center).</p>
+<p><strong><span class="math inline">\(W_3\)</span></strong>:</p>
+<ul>
+<li>Central vertex: degree 3</li>
+<li>Three cycle vertices: each degree 3</li>
+<li>Degree sequence: <span class="math inline">\((3, 3, 3, 3)\)</span></li>
+</ul>
+<p><strong><span class="math inline">\(W_4\)</span></strong>:</p>
+<ul>
+<li>Central vertex: degree 4</li>
+<li>Four cycle vertices: each degree 3</li>
+<li>Degree sequence: <span class="math inline">\((3, 3, 3, 3, 4)\)</span></li>
+</ul>
+<p><strong><span class="math inline">\(W_5\)</span></strong>:</p>
+<ul>
+<li>Central vertex: degree 5</li>
+<li>Five cycle vertices: each degree 3</li>
+<li>Degree sequence: <span class="math inline">\((3, 3, 3, 3, 3, 5)\)</span></li>
+</ul>
+<p><strong><span class="math inline">\(W_6\)</span></strong>:</p>
+<ul>
+<li>Central vertex: degree 6</li>
+<li>Six cycle vertices: each degree 3</li>
+<li>Degree sequence: <span class="math inline">\((3, 3, 3, 3, 3, 3, 6)\)</span></li>
+</ul>
+<p><strong>Answer:</strong></p>
+<ul>
+<li><span class="math inline">\(W_3\)</span>: <span class="math inline">\((3, 3, 3, 3)\)</span></li>
+<li><span class="math inline">\(W_4\)</span>: <span class="math inline">\((3, 3, 3, 3, 4)\)</span></li>
+<li><span class="math inline">\(W_5\)</span>: <span class="math inline">\((3, 3, 3, 3, 3, 5)\)</span></li>
+<li><span class="math inline">\(W_6\)</span>: <span class="math inline">\((3, 3, 3, 3, 3, 3, 6)\)</span></li>
+</ul>
+</details>
+<h5 id="degree-sequences-of-bipartite-graphs-tutorial-11-example-4"><strong>4.4. Degree Sequences of Bipartite Graphs</strong> (Tutorial 11, Example 4)</h5>
+<p>For complete bipartite graphs <span class="math inline">\(K_{3,5}\)</span> and <span class="math inline">\(K_{2,6}\)</span>, what are the degree sequences?</p>
+<p><img src="9_13.png" width="60%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> In <span class="math inline">\(K_{n,m}\)</span>, every vertex in the first set (size <span class="math inline">\(n\)</span>) connects to all <span class="math inline">\(m\)</span> vertices in the second set, and vice versa.</p>
+<p><strong><span class="math inline">\(K_{3,5}\)</span></strong>:</p>
+<ul>
+<li>First set (3 vertices): each connects to all 5 vertices in the second set → degree 5 each</li>
+<li>Second set (5 vertices): each connects to all 3 vertices in the first set → degree 3 each</li>
+<li>Degree sequence: <span class="math inline">\((3, 3, 3, 3, 3, 5, 5, 5)\)</span></li>
+</ul>
+<p><strong><span class="math inline">\(K_{2,6}\)</span></strong>:</p>
+<ul>
+<li>First set (2 vertices): each connects to all 6 vertices in the second set → degree 6 each</li>
+<li>Second set (6 vertices): each connects to all 2 vertices in the first set → degree 2 each</li>
+<li>Degree sequence: <span class="math inline">\((2, 2, 2, 2, 2, 2, 6, 6)\)</span></li>
+</ul>
+<p><strong>Answer:</strong></p>
+<ul>
+<li><span class="math inline">\(K_{3,5}\)</span>: <span class="math inline">\((3, 3, 3, 3, 3, 5, 5, 5)\)</span></li>
+<li><span class="math inline">\(K_{2,6}\)</span>: <span class="math inline">\((2, 2, 2, 2, 2, 2, 6, 6)\)</span></li>
+</ul>
+</details>
+<h5 id="applying-the-handshaking-lemma-tutorial-11-example-5"><strong>4.5. Applying the Handshaking Lemma</strong> (Tutorial 11, Example 5)</h5>
+<p>Is there a graph with 4 vertices whose degrees are <span class="math inline">\((1, 3, 4, 5)\)</span>?</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> By the Handshaking Lemma, the sum of all degrees must be even (since it equals <span class="math inline">\(2|E|\)</span>).</p>
+<ol type="1">
+<li><strong>Calculate the sum of degrees:</strong> <span class="math display">\[1 + 3 + 4 + 5 = 13\]</span></li>
+<li><strong>Check if the sum is even:</strong> 13 is odd</li>
+<li><strong>Conclusion:</strong> Since the sum is odd, this violates the Handshaking Lemma</li>
+</ol>
+<p><strong>Answer:</strong> No, such a graph cannot exist because the sum of degrees (13) is odd, which contradicts the Handshaking Lemma.</p>
+</details>
+<h5 id="verifying-graph-isomorphism-tutorial-11-example-6"><strong>4.6. Verifying Graph Isomorphism</strong> (Tutorial 11, Example 6)</h5>
+<p>Are the following two graphs <span class="math inline">\(G_1\)</span> and <span class="math inline">\(G_2\)</span> isomorphic?</p>
+<p><img src="9_8.png" width="70%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> To prove isomorphism, we need to find a bijection between vertices that preserves edges.</p>
+<p>Let <span class="math inline">\(G_1\)</span> have vertices <span class="math inline">\(\{u_1, u_2, u_3, u_4\}\)</span> and <span class="math inline">\(G_2\)</span> have vertices <span class="math inline">\(\{v_1, v_2, v_3, v_4\}\)</span>.</p>
+<ol type="1">
+<li><strong>Examine the structure:</strong>
+<ul>
+<li>Both graphs have 4 vertices and 4 edges.</li>
+<li>Both have the same degree sequence: <span class="math inline">\((2, 2, 2, 2)\)</span>.</li>
+</ul></li>
+<li><strong>Find a bijection:</strong> Notice <span class="math inline">\(G_1\)</span> is a “crossed square” and <span class="math inline">\(G_2\)</span> is a standard square (<span class="math inline">\(C_4\)</span>). We can “uncross” <span class="math inline">\(G_1\)</span>. Try the mapping: <span class="math inline">\(\phi: u_1 \to v_1, u_2 \to v_3, u_3 \to v_2, u_4 \to v_4\)</span>.</li>
+<li><strong>Verify edge preservation:</strong>
+<ul>
+<li>Edge <span class="math inline">\((u_1, u_2) \in E_1 \implies (\phi(u_1), \phi(u_2)) = (v_1, v_3) \notin E_2\)</span>. This mapping fails.</li>
+<li>Let’s try another mapping based on the visual structure. In <span class="math inline">\(G_1\)</span>, follow the cycle: <span class="math inline">\(u_1 \to u_2 \to u_4 \to u_3 \to u_1\)</span>. In <span class="math inline">\(G_2\)</span>, the cycle is <span class="math inline">\(v_1 \to v_2 \to v_3 \to v_4 \to v_1\)</span>.</li>
+<li>Try the mapping: <span class="math inline">\(\phi: u_1 \to v_1, u_2 \to v_2, u_4 \to v_3, u_3 \to v_4\)</span>.</li>
+<li>Let’s check edges:
+<ul>
+<li><span class="math inline">\((u_1, u_2) \to (v_1, v_2)\)</span> ✓</li>
+<li><span class="math inline">\((u_2, u_4) \to (v_2, v_3)\)</span> ✓</li>
+<li><span class="math inline">\((u_4, u_3) \to (v_3, v_4)\)</span> ✓</li>
+<li><span class="math inline">\((u_3, u_1) \to (v_4, v_1)\)</span> ✓</li>
+</ul></li>
+<li>This mapping works and preserves all adjacencies.</li>
+</ul></li>
+</ol>
+<p><strong>Answer:</strong> Yes, <span class="math inline">\(G_1 \simeq G_2\)</span>. One possible isomorphism is <span class="math inline">\(\phi(u_1)=v_1, \phi(u_2)=v_2, \phi(u_3)=v_4, \phi(u_4)=v_3\)</span>.</p>
+</details>
+<h5 id="disproving-graph-isomorphism-tutorial-11-example-7"><strong>4.7. Disproving Graph Isomorphism</strong> (Tutorial 11, Example 7)</h5>
+<p>Are the following two graphs <span class="math inline">\(G_1\)</span> and <span class="math inline">\(G_2\)</span> isomorphic?</p>
+<p><img src="9_10.png" width="70%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> To disprove isomorphism, find a structural property that differs between the graphs. Comparing degree sequences is a common first step.</p>
+<ol type="1">
+<li><strong>Calculate degree sequence of <span class="math inline">\(G_1\)</span>:</strong>
+<ul>
+<li><span class="math inline">\(d(u_1) = 3\)</span></li>
+<li><span class="math inline">\(d(u_2) = 3\)</span></li>
+<li><span class="math inline">\(d(u_3) = 3\)</span></li>
+<li><span class="math inline">\(d(u_4) = 3\)</span></li>
+<li>Sequence: <span class="math inline">\((3, 3, 3, 3)\)</span> (This is <span class="math inline">\(K_4\)</span>)</li>
+</ul></li>
+<li><strong>Calculate degree sequence of <span class="math inline">\(G_2\)</span>:</strong>
+<ul>
+<li><span class="math inline">\(d(v_1) = 2\)</span></li>
+<li><span class="math inline">\(d(v_2) = 2\)</span></li>
+<li><span class="math inline">\(d(v_3) = 3\)</span></li>
+<li><span class="math inline">\(d(v_4) = 3\)</span></li>
+<li>Sequence: <span class="math inline">\((2, 2, 3, 3)\)</span></li>
+</ul></li>
+<li><strong>Compare:</strong> The degree sequences <span class="math inline">\((3, 3, 3, 3)\)</span> and <span class="math inline">\((2, 2, 3, 3)\)</span> are different.</li>
+</ol>
+<p><strong>Answer:</strong> No, <span class="math inline">\(G_1 \not\simeq G_2\)</span> because isomorphic graphs must have the same degree sequence, and these do not.</p>
+</details>
+<h5 id="finding-all-spanning-trees-tutorial-11-example-8"><strong>4.8. Finding All Spanning Trees</strong> (Tutorial 11, Example 8)</h5>
+<p>For the given graph <span class="math inline">\(G\)</span> with 4 vertices and 5 edges, draw all spanning trees and determine which are pairwise non-isomorphic.</p>
+<p><strong>Problem Graph:</strong> <img src="9_4.png" width="40%"></p>
+<p><strong>Solution:</strong> <img src="9_12.png" width="70%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> A spanning tree must include all 4 vertices and have exactly <span class="math inline">\(4-1=3\)</span> edges (with no cycles). We need to remove <span class="math inline">\(5-3=2\)</span> edges from the original graph while keeping it connected.</p>
+<ol type="1">
+<li><strong>Calculate required properties:</strong>
+<ul>
+<li>Original graph: <span class="math inline">\(v_G = 4\)</span> vertices, <span class="math inline">\(e_G = 5\)</span> edges.</li>
+<li>Spanning tree: <span class="math inline">\(v_T = 4\)</span> vertices, <span class="math inline">\(e_T = 3\)</span> edges.</li>
+<li>We need to remove: <span class="math inline">\(e_G - e_T = 5 - 3 = 2\)</span> edges.</li>
+</ul></li>
+<li><strong>Systematically enumerate all possibilities:</strong> The original graph consists of a triangle and a “tail” vertex. The cycles are within the triangle. We must remove one edge from the triangle. The second edge to remove can be another triangle edge or one of the two outer edges. By systematically trying all combinations, we find there are 8 distinct spanning trees.</li>
+<li><strong>Check for isomorphisms:</strong> Among the 8 spanning trees, we compare their structures by looking at their degree sequences.
+<ul>
+<li>Some trees will have degree sequence (1, 1, 2, 2). These are all paths (<span class="math inline">\(P_4\)</span>) and are isomorphic to each other.</li>
+<li>Other trees will have degree sequence (1, 1, 1, 3). These are all star graphs (<span class="math inline">\(K_{1,3}\)</span>) and are isomorphic to each other.</li>
+</ul></li>
+<li><strong>Final count:</strong> The 8 spanning trees fall into two isomorphism classes: the path graph and the star graph.</li>
+</ol>
+<p><strong>Answer:</strong> The graph has 8 total spanning trees, which belong to 2 non-isomorphic classes (the path <span class="math inline">\(P_4\)</span> and the star <span class="math inline">\(K_{1,3}\)</span>).</p>
+</details>
+<h5 id="kruskals-algorithm-lecture-11-demonstration"><strong>4.9. Kruskal’s Algorithm</strong> (Lecture 11, Demonstration)</h5>
+<p>Apply Kruskal’s algorithm to find a minimal spanning tree for the given weighted graph.</p>
+<p><img src="9_31.png" width="60%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Kruskal’s algorithm adds edges in order of increasing weight, skipping any edge that would create a cycle.</p>
+<p>The graph has 6 vertices and edges with weights: 3, 4, 5, 5, 6, 7.</p>
+<ol type="1">
+<li><strong>Initialize:</strong> Start with 6 vertices and no edges, <span class="math inline">\(T = (V, \emptyset)\)</span>.</li>
+<li><strong>Sort edges by weight:</strong> The edge weights in ascending order are: 3, 4, 5, 5, 6, 7.</li>
+<li><strong>Step 1: Add edge with weight 3.</strong>
+<ul>
+<li>This connects two vertices. No cycle is created. Add to tree.</li>
+</ul></li>
+<li><strong>Step 2: Add edge with weight 4.</strong>
+<ul>
+<li>This connects two different vertices. No cycle is created. Add to tree.</li>
+</ul></li>
+<li><strong>Step 3: Add the first edge with weight 5 (the horizontal one).</strong>
+<ul>
+<li>This connects a new vertex to one of the existing components. No cycle is created. Add to tree.</li>
+</ul></li>
+<li><strong>Step 4: Add the second edge with weight 5 (the vertical one).</strong>
+<ul>
+<li>This connects two existing components. No cycle is created. Add to tree.</li>
+</ul></li>
+<li><strong>Step 5: Consider the edge with weight 6.</strong>
+<ul>
+<li>Adding this edge would form a cycle with the edges of weight 4 and 5 (vertical). Skip this edge.</li>
+</ul></li>
+<li><strong>Complete the algorithm:</strong>
+<ul>
+<li>Add edge with weight 3</li>
+<li>Add edge with weight 4</li>
+<li>Add edge with weight 5 (vertical)</li>
+<li>Add edge with weight 5 (horizontal)</li>
+<li>Consider edge with weight 6: forms a cycle, skip</li>
+<li>Consider edge with weight 7: forms a cycle, skip</li>
+<li>For 6 vertices, we need 5 edges. Continue until all vertices are connected.</li>
+<li><ol start="3" type="1">
+<li>Add edge (weight 5, vertical).</li>
+</ol></li>
+<li><ol start="4" type="1">
+<li>Add edge (weight 5, horizontal). Now we have two components: {left-vertex}, {the other 5 vertices}.</li>
+</ol></li>
+<li><ol start="5" type="1">
+<li>Add edge (weight 6). This connects the isolated vertex to the main component. No cycle. Add it.</li>
+</ol></li>
+<li>Now we have 5 edges and all vertices are connected.</li>
+</ul></li>
+</ol>
+<p><strong>Answer:</strong> The minimal spanning tree consists of the edges with weights 3, 4, 5, 5, and 6. The total weight is <span class="math inline">\(3 + 4 + 5 + 5 + 6 = 23\)</span>.</p>
+</details>
+<h5 id="prims-algorithm-tutorial-11-example-9"><strong>4.10. Prim’s Algorithm</strong> (Tutorial 11, Example 9)</h5>
+<p>For the given graph, find a spanning tree with minimum total weight using Prim’s algorithm.</p>
+<p><img src="9_11.png" width="60%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Prim’s algorithm starts from one vertex and grows the tree by repeatedly adding the minimum-weight edge connecting the tree to a new vertex.</p>
+<p>Let’s trace the algorithm as shown in the tutorial slides, starting from the top-middle vertex (marked with a red dot).</p>
+<ol type="1">
+<li><strong>Initialize:</strong> The tree <span class="math inline">\(T\)</span> contains only the top-middle vertex.</li>
+<li><strong>Step 1:</strong> The edges leaving <span class="math inline">\(T\)</span> have weights 3 (right) and 5 (left). The minimum is 3. Add this edge and the top-right vertex to <span class="math inline">\(T\)</span>. Current weight: 3.</li>
+<li><strong>Step 2:</strong> The edges leaving <span class="math inline">\(T\)</span> are: from top-middle (to left, w=5; to down, w=5) and from top-right (to down, w=5; to bottom-right, w=7). The minimum is 5. The slide chooses the edge from the top-middle to the top-left vertex. Add this edge. Current weight: 3 + 5 = 8.</li>
+<li><strong>Step 3:</strong> The edges leaving <span class="math inline">\(T\)</span> now include one from the new top-left vertex (to bottom-left, w=6). The minimum weight edge leaving the tree is now one of the three with weight 5. The slide picks the one from the top-middle vertex down to the middle vertex. Add this edge. Current weight: 8 + 5 = 13.</li>
+<li><strong>Step 4:</strong> The edges leaving <span class="math inline">\(T\)</span> now include two from the new middle vertex (to bottom-left, w=3; to bottom-right, w=4). The minimum of all outgoing edges is now 3. Add this edge. Current weight: 13 + 3 = 16.</li>
+<li><strong>Step 5:</strong> The only remaining vertex is the bottom-right. The edges connecting to it from the tree have weights 7 and 4. The minimum is 4. Add this edge. All vertices are now in the tree. Current weight: 16 + 4 = 20.</li>
+</ol>
+<p><strong>Answer:</strong> The minimal spanning tree found has edges with weights 3, 5, 5, 3, and 4. The minimum total weight is 20.</p>
+</details>
+<h5 id="drawing-a-graph-from-sets-lab-11-exercise-1a"><strong>4.11. Drawing a Graph from Sets</strong> (Lab 11, Exercise 1a)</h5>
+<p>Let <span class="math inline">\(V = \{1, 2, 3, 4, 5, 6\}\)</span> and <span class="math inline">\(E = \{\{1,2\}, \{2,3\}, \{2,4\}, \{2,5\}, \{3,6\}, \{4,5\}, \{5,6\}\}\)</span>. Draw this graph.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Place vertices and draw edges according to the edge set.</p>
+<ol type="1">
+<li><strong>Place vertices:</strong> Draw 6 vertices labeled 1, 2, 3, 4, 5, 6.</li>
+<li><strong>Draw edges:</strong>
+<ul>
+<li>Connect 1 to 2</li>
+<li>Connect 2 to 3, 4, and 5</li>
+<li>Connect 3 to 6</li>
+<li>Connect 4 to 5</li>
+<li>Connect 5 to 6</li>
+</ul></li>
+<li><strong>Observe structure:</strong> Vertex 2 is a central hub with a high degree. The edges are <span class="math inline">\(E = \{\{1,2\}, \{2,3\}, \{2,4\}, \{2,5\}, \{3,6\}, \{4,5\}, \{5,6\}\}\)</span>. Vertex 3 connects to 2 and 6. Vertex 4 connects to 2 and 5. Vertex 5 connects to 2, 4, and 6. Vertex 6 connects to 3 and 5. The image above shows a possible layout.</li>
+</ol>
+<p><strong>Answer:</strong> The graph has vertex 2 as a hub connected to vertices 1, 3, 4, and 5. There are cycles: 3-2-5-6-3 and 4-2-5-4. The image provided is a valid representation.</p>
+</details>
+<h5 id="finding-degree-sequence-lab-11-exercise-1b"><strong>4.12. Finding Degree Sequence</strong> (Lab 11, Exercise 1b)</h5>
+<p>For the graph in Exercise 1a, what is the sequence of degrees?</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Count the edges incident to each vertex from the set E.</p>
+<ol type="1">
+<li><strong>Count degrees:</strong>
+<ul>
+<li><span class="math inline">\(d(1)\)</span>: connected to 2 only <span class="math inline">\(\implies d(1) = 1\)</span></li>
+<li><span class="math inline">\(d(2)\)</span>: connected to 1, 3, 4, 5 <span class="math inline">\(\implies d(2) = 4\)</span></li>
+<li><span class="math inline">\(d(3)\)</span>: connected to 2, 6 <span class="math inline">\(\implies d(3) = 2\)</span></li>
+<li><span class="math inline">\(d(4)\)</span>: connected to 2, 5 <span class="math inline">\(\implies d(4) = 2\)</span></li>
+<li><span class="math inline">\(d(5)\)</span>: connected to 2, 4, 6 <span class="math inline">\(\implies d(5) = 3\)</span></li>
+<li><span class="math inline">\(d(6)\)</span>: connected to 3, 5 <span class="math inline">\(\implies d(6) = 2\)</span></li>
+</ul></li>
+<li><strong>Sort in non-decreasing order:</strong> <span class="math inline">\((1, 2, 2, 2, 3, 4)\)</span></li>
+<li><strong>Verify with Handshaking Lemma:</strong> The sum of degrees is <span class="math inline">\(1 + 2 + 2 + 2 + 3 + 4 = 14\)</span>. The number of edges is 7. Since <span class="math inline">\(14 = 2 \times 7\)</span>, the calculation is consistent.</li>
+</ol>
+<p><strong>Answer:</strong> <span class="math inline">\((1, 2, 2, 2, 3, 4)\)</span></p>
+</details>
+<h5 id="counting-odd-degree-vertices-lab-11-exercise-1c"><strong>4.13. Counting Odd-Degree Vertices</strong> (Lab 11, Exercise 1c)</h5>
+<p>For the graph in Exercise 1a, how many vertices have odd degree?</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Check which degrees in the degree sequence are odd numbers.</p>
+<p>From the degree sequence <span class="math inline">\((1, 2, 2, 2, 3, 4)\)</span>:</p>
+<ol type="1">
+<li><strong>Identify odd degrees:</strong>
+<ul>
+<li>Degree 1 is odd.</li>
+<li>Degree 3 is odd.</li>
+</ul></li>
+<li><strong>Count:</strong> There are 2 vertices with odd degrees (vertex 1 and vertex 5).</li>
+</ol>
+<p><strong>Note:</strong> A corollary of the Handshaking Lemma states that the number of odd-degree vertices in any graph must be even. Our answer of 2 is consistent with this.</p>
+<p><strong>Answer:</strong> 2 vertices have odd degree.</p>
+</details>
+<h5 id="constructing-graphs-from-degree-sequences-lab-11-exercise-2"><strong>4.14. Constructing Graphs from Degree Sequences</strong> (Lab 11, Exercise 2)</h5>
+<p>For each degree sequence, sketch a simple graph with that degree sequence. Is such a graph unique (up to isomorphism)?</p>
+<p><strong>(a)</strong> <span class="math inline">\(D = (2, 2, 2, 2, 2)\)</span></p>
+<p><strong>(b)</strong> <span class="math inline">\(D = (2, 2, 2, 2, 2, 2)\)</span></p>
+<p><strong>(c)</strong> <span class="math inline">\(D = (3, 3, 3, 3)\)</span></p>
+<p><strong>(d)</strong> <span class="math inline">\(D = (1, 2, 3, 4, 5)\)</span></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> A degree sequence does not always uniquely define a graph. Multiple non-isomorphic graphs can share the same degree sequence.</p>
+<p><strong>(a) <span class="math inline">\(D = (2, 2, 2, 2, 2)\)</span>:</strong></p>
+<ul>
+<li>This is a 2-regular graph on 5 vertices. The only connected simple graph is the cycle <span class="math inline">\(C_5\)</span>.</li>
+<li><strong>Unique (if connected)</strong>. If disconnected graphs are allowed, it is not possible as any component would need an even number of odd-degree vertices (it has none). So any component is also regular, which isn’t possible for components with &lt; 3 vertices. Thus, it must be connected.</li>
+</ul>
+<p><strong>(b) <span class="math inline">\(D = (2, 2, 2, 2, 2, 2)\)</span>:</strong></p>
+<ul>
+<li>This is a 2-regular graph on 6 vertices.</li>
+<li>One possibility is the cycle <span class="math inline">\(C_6\)</span>.</li>
+<li>Another possibility is the disjoint union of two triangles (<span class="math inline">\(C_3 \cup C_3\)</span>).</li>
+<li>These two graphs are not isomorphic.</li>
+<li><strong>Not unique</strong>.</li>
+</ul>
+<p><strong>(c) <span class="math inline">\(D = (3, 3, 3, 3)\)</span>:</strong></p>
+<ul>
+<li>This is a 3-regular graph on 4 vertices. This is uniquely realized by the complete graph <span class="math inline">\(K_4\)</span>.</li>
+<li><strong>Unique up to isomorphism</strong>.</li>
+</ul>
+<p><strong>(d) <span class="math inline">\(D = (1, 2, 3, 4, 5)\)</span>:</strong></p>
+<ul>
+<li>Check feasibility using the Handshaking Lemma.</li>
+<li>Sum of degrees = <span class="math inline">\(1 + 2 + 3 + 4 + 5 = 15\)</span>.</li>
+<li>The sum is odd, which violates the Handshaking Lemma.</li>
+<li><strong>No such simple graph exists</strong>.</li>
+</ul>
+<p><strong>Answer:</strong></p>
+<ul>
+<li><ol type="a">
+<li>Unique (up to isomorphism): <span class="math inline">\(C_5\)</span>.</li>
+</ol></li>
+<li><ol start="2" type="a">
+<li>Not unique; examples are <span class="math inline">\(C_6\)</span> and the disjoint union of two <span class="math inline">\(C_3\)</span> graphs.</li>
+</ol></li>
+<li><ol start="3" type="a">
+<li>Unique (up to isomorphism): <span class="math inline">\(K_4\)</span>.</li>
+</ol></li>
+<li><ol start="4" type="a">
+<li>Impossible to construct.</li>
+</ol></li>
+</ul>
+</details>
+<h5 id="counting-edges-in-complete-graphs-lab-11-exercise-3a"><strong>4.15. Counting Edges in Complete Graphs</strong> (Lab 11, Exercise 3a)</h5>
+<p>What is the number of edges in a complete graph <span class="math inline">\(K_n\)</span> of order <span class="math inline">\(n\)</span>? Explain your answer.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> In <span class="math inline">\(K_n\)</span>, every pair of distinct vertices is connected by exactly one edge. The problem is equivalent to counting the number of pairs of vertices.</p>
+<ol type="1">
+<li><strong>Combinatorial Approach:</strong> The number of ways to choose 2 vertices from a set of <span class="math inline">\(n\)</span> vertices is given by the binomial coefficient “n choose 2”: <span class="math display">\[|E| = \binom{n}{2} = \frac{n!}{2!(n-2)!} = \frac{n(n-1)}{2}\]</span></li>
+<li><strong>Degree Sum Approach (Handshaking Lemma):</strong>
+<ul>
+<li>In <span class="math inline">\(K_n\)</span>, each of the <span class="math inline">\(n\)</span> vertices is connected to the other <span class="math inline">\(n-1\)</span> vertices, so every vertex has degree <span class="math inline">\(n-1\)</span>.</li>
+<li>The sum of degrees is <span class="math inline">\(\sum d(v) = n \times (n-1)\)</span>.</li>
+<li>By the Handshaking Lemma, <span class="math inline">\(2|E| = n(n-1)\)</span>, so <span class="math inline">\(|E| = \frac{n(n-1)}{2}\)</span>.</li>
+</ul></li>
+</ol>
+<p><strong>Answer:</strong> A complete graph <span class="math inline">\(K_n\)</span> has <span class="math inline">\(\frac{n(n-1)}{2}\)</span> edges.</p>
+</details>
+<h5 id="counting-simple-graphs-lab-11-exercise-3b"><strong>4.16. Counting Simple Graphs</strong> (Lab 11, Exercise 3b)</h5>
+<p>What is the number of different simple graphs of order <span class="math inline">\(n\)</span>? Explain your answer.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> A simple graph on a fixed set of <span class="math inline">\(n\)</span> vertices is defined by its set of edges. For every possible pair of vertices, the edge connecting them can either exist or not exist.</p>
+<ol type="1">
+<li><strong>Count potential edges:</strong> With <span class="math inline">\(n\)</span> vertices, there are <span class="math inline">\(\binom{n}{2} = \frac{n(n-1)}{2}\)</span> possible pairs of vertices that could be connected by an edge.</li>
+<li><strong>Count possibilities for each edge:</strong> For each of these <span class="math inline">\(\binom{n}{2}\)</span> potential edges, we have 2 independent choices: either include the edge in the graph or do not.</li>
+<li><strong>Calculate total number of graphs:</strong> Since there are 2 choices for each of the <span class="math inline">\(\binom{n}{2}\)</span> potential edges, the total number of possible graphs is: <span class="math display">\[2^{\binom{n}{2}} = 2^{\frac{n(n-1)}{2}}\]</span></li>
+</ol>
+<p><strong>Answer:</strong> There are <span class="math inline">\(2^{\binom{n}{2}}\)</span> different simple graphs of order <span class="math inline">\(n\)</span>.</p>
+</details>
+<h5 id="counting-edges-in-complete-bipartite-graphs-lab-11-exercise-4a"><strong>4.17. Counting Edges in Complete Bipartite Graphs</strong> (Lab 11, Exercise 4a)</h5>
+<p>What is the number of edges in a complete bipartite graph <span class="math inline">\(K_{n,m}\)</span>? Explain your answer.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> In a complete bipartite graph <span class="math inline">\(K_{n,m}\)</span>, the vertices are partitioned into two sets, <span class="math inline">\(U\)</span> of size <span class="math inline">\(n\)</span> and <span class="math inline">\(V\)</span> of size <span class="math inline">\(m\)</span>. Every vertex in <span class="math inline">\(U\)</span> is connected to every vertex in <span class="math inline">\(V\)</span>.</p>
+<ol type="1">
+<li><strong>Count connections:</strong>
+<ul>
+<li>Consider a single vertex from set <span class="math inline">\(U\)</span>. It must be connected to all <span class="math inline">\(m\)</span> vertices in set <span class="math inline">\(V\)</span>. This accounts for <span class="math inline">\(m\)</span> edges.</li>
+<li>Since there are <span class="math inline">\(n\)</span> such vertices in set <span class="math inline">\(U\)</span>, the total number of edges is the product of the sizes of the two sets.</li>
+</ul></li>
+<li><strong>Calculate:</strong> <span class="math display">\[|E| = n \times m\]</span></li>
+</ol>
+<p><strong>Answer:</strong> A complete bipartite graph <span class="math inline">\(K_{n,m}\)</span> has <span class="math inline">\(nm\)</span> edges.</p>
+</details>
+<h5 id="counting-bipartite-graphs-lab-11-exercise-4b"><strong>4.18. Counting Bipartite Graphs</strong> (Lab 11, Exercise 4b)</h5>
+<p>What is the number of different bipartite graphs for fixed partitions of sizes <span class="math inline">\(n = |U|\)</span> and <span class="math inline">\(m = |V|\)</span>? Explain your answer.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> A bipartite graph with fixed partitions <span class="math inline">\(U\)</span> and <span class="math inline">\(V\)</span> is defined by its edge set, where edges can only connect a vertex in <span class="math inline">\(U\)</span> to a vertex in <span class="math inline">\(V\)</span>.</p>
+<ol type="1">
+<li><strong>Count potential edges:</strong> The maximum number of possible edges is <span class="math inline">\(nm\)</span>, as seen in the complete bipartite graph <span class="math inline">\(K_{n,m}\)</span>.</li>
+<li><strong>Count possibilities for each edge:</strong> For each of these <span class="math inline">\(nm\)</span> potential edges, we have 2 independent choices: either include the edge or do not.</li>
+<li><strong>Calculate total number of graphs:</strong> The total number of possibilities is <span class="math inline">\(2\)</span> raised to the power of the number of potential edges. <span class="math display">\[\text{Number of bipartite graphs} = 2^{nm}\]</span></li>
+</ol>
+<p><strong>Answer:</strong> There are <span class="math inline">\(2^{nm}\)</span> different bipartite graphs for fixed partitions of size <span class="math inline">\(n\)</span> and <span class="math inline">\(m\)</span>.</p>
+</details>
+<h5 id="determining-graph-isomorphism-multiple-cases-lab-11-exercise-5"><strong>4.19. Determining Graph Isomorphism (Multiple Cases)</strong> (Lab 11, Exercise 5)</h5>
+<p>Determine whether the given pairs of graphs are isomorphic. Exhibit an isomorphism or provide a rigorous argument that none exists.</p>
+<p><img src="9_1.png" width="90%"> <img src="9_2.png" width="90%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Check for graph invariants (properties that must be the same for isomorphic graphs) like the number of vertices, edges, and the degree sequence. If they match, try to find a structure-preserving mapping.</p>
+<p><strong>Pair (a):</strong></p>
+<ul>
+<li><strong>Left Graph:</strong> 5 vertices, 5 edges. Degree sequence: (2, 2, 2, 2, 2). This is the cycle graph <span class="math inline">\(C_5\)</span>.</li>
+<li><strong>Right Graph:</strong> 5 vertices, 5 edges. Degree sequence: (2, 2, 2, 2, 2). This is the pentagram graph.</li>
+<li><strong>Analysis:</strong> Both are 2-regular graphs. The left graph is the cycle <span class="math inline">\(u_1-u_2-u_3-u_4-u_5-u_1\)</span>. The right graph has a cycle <span class="math inline">\(v_1-v_3-v_5-v_2-v_4-v_1\)</span>. Since both are 5-cycles, they are isomorphic.</li>
+<li><strong>Isomorphism:</strong> <span class="math inline">\(\phi(u_1)=v_1, \phi(u_2)=v_3, \phi(u_3)=v_5, \phi(u_4)=v_2, \phi(u_5)=v_4\)</span>.</li>
+<li><strong>Result:</strong> Isomorphic.</li>
+</ul>
+<p><strong>Pair (b):</strong></p>
+<ul>
+<li><strong>Left Graph:</strong> 5 vertices, 8 edges. Degree sequence: (3, 3, 3, 3, 4).</li>
+<li><strong>Right Graph:</strong> 5 vertices, 8 edges. Degree sequence: (3, 3, 3, 3, 4).</li>
+<li><strong>Analysis:</strong> The invariants match. Let’s look at the vertices of degree 3. In the left graph, the vertex of degree 4 (<span class="math inline">\(u_5\)</span>) is adjacent to all other vertices. In the right graph, the vertex of degree 4 (<span class="math inline">\(v_2\)</span>) is not adjacent to <span class="math inline">\(v_4\)</span>.</li>
+<li><strong>Result:</strong> Not isomorphic. The neighborhood of the degree-4 vertex is different.</li>
+</ul>
+<p><strong>Pair (c):</strong></p>
+<ul>
+<li><strong>Left Graph:</strong> 7 vertices, 7 edges. Degree sequence: (2, 2, 2, 2, 2, 2, 2). This is the cycle graph <span class="math inline">\(C_7\)</span>.</li>
+<li><strong>Right Graph:</strong> 7 vertices, 7 edges. Degree sequence: (2, 2, 2, 2, 2, 2, 2). This graph is also a 7-cycle.</li>
+<li><strong>Result:</strong> Isomorphic. All cycles of the same length are isomorphic.</li>
+</ul>
+<p><strong>Pair (d):</strong></p>
+<ul>
+<li><strong>Left Graph:</strong> 5 vertices, 7 edges. Degree sequence: (2, 3, 3, 3, 3).</li>
+<li><strong>Right Graph:</strong> 5 vertices, 6 edges.</li>
+<li><strong>Analysis:</strong> The number of edges is different (7 vs 6).</li>
+<li><strong>Result:</strong> Not isomorphic.</li>
+</ul>
+</details>
+<h5 id="trees-in-graph-families-lab-11-exercise-6"><strong>4.20. Trees in Graph Families</strong> (Lab 11, Exercise 6)</h5>
+<p>Find all <span class="math inline">\(n\)</span> and <span class="math inline">\(m\)</span> such that the following graphs are trees:</p>
+<p><strong>(a)</strong> <span class="math inline">\(K_n\)</span></p>
+<p><strong>(b)</strong> <span class="math inline">\(K_{n,m}\)</span></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> A graph is a tree if and only if it is connected and has <span class="math inline">\(v-1\)</span> edges, where <span class="math inline">\(v\)</span> is the number of vertices.</p>
+<p><strong>(a) When is <span class="math inline">\(K_n\)</span> a tree?</strong></p>
+<ol type="1">
+<li>A complete graph <span class="math inline">\(K_n\)</span> has <span class="math inline">\(n\)</span> vertices and <span class="math inline">\(\frac{n(n-1)}{2}\)</span> edges.</li>
+<li>For <span class="math inline">\(K_n\)</span> to be a tree, the number of edges must equal <span class="math inline">\(n-1\)</span>.</li>
+<li>Set up the equation: <span class="math inline">\(\frac{n(n-1)}{2} = n-1\)</span>.</li>
+<li>If <span class="math inline">\(n&gt;1\)</span>, we can divide by <span class="math inline">\(n-1\)</span> to get <span class="math inline">\(\frac{n}{2} = 1\)</span>, which means <span class="math inline">\(n=2\)</span>.</li>
+<li>If <span class="math inline">\(n=1\)</span>, the equation is <span class="math inline">\(0=0\)</span>, which is true.</li>
+<li>Check the cases:
+<ul>
+<li><span class="math inline">\(K_1\)</span> has 1 vertex, 0 edges. It is a tree.</li>
+<li><span class="math inline">\(K_2\)</span> has 2 vertices, 1 edge. It is a tree.</li>
+<li>For <span class="math inline">\(n \geq 3\)</span>, <span class="math inline">\(K_n\)</span> contains cycles (specifically, <span class="math inline">\(C_3\)</span>), so it cannot be a tree.</li>
+</ul></li>
+</ol>
+<p><strong>(b) When is <span class="math inline">\(K_{n,m}\)</span> a tree?</strong></p>
+<ol type="1">
+<li>A complete bipartite graph <span class="math inline">\(K_{n,m}\)</span> has <span class="math inline">\(n+m\)</span> vertices and <span class="math inline">\(nm\)</span> edges.</li>
+<li>For <span class="math inline">\(K_{n,m}\)</span> to be a tree, the number of edges must equal <span class="math inline">\((n+m)-1\)</span>.</li>
+<li>Set up the equation: <span class="math inline">\(nm = n+m-1\)</span>.</li>
+<li>Rearrange the terms: <span class="math inline">\(nm - n - m + 1 = 0\)</span>.</li>
+<li>Factor by grouping: <span class="math inline">\(n(m-1) - 1(m-1) = 0 \implies (n-1)(m-1) = 0\)</span>.</li>
+<li>This equation holds if and only if <span class="math inline">\(n-1=0\)</span> or <span class="math inline">\(m-1=0\)</span>.</li>
+<li>Therefore, either <span class="math inline">\(n=1\)</span> or <span class="math inline">\(m=1\)</span>.</li>
+<li>If <span class="math inline">\(n=1\)</span> or <span class="math inline">\(m=1\)</span>, the graph is a star graph, which is a tree.</li>
+</ol>
+<p><strong>Answer:</strong></p>
+<ul>
+<li><ol type="a">
+<li><span class="math inline">\(K_n\)</span> is a tree if and only if <span class="math inline">\(n = 1\)</span> or <span class="math inline">\(n = 2\)</span>.</li>
+</ol></li>
+<li><ol start="2" type="a">
+<li><span class="math inline">\(K_{n,m}\)</span> is a tree if and only if <span class="math inline">\(n = 1\)</span> or <span class="math inline">\(m = 1\)</span>.</li>
+</ol></li>
+</ul>
+</details>
+<h5 id="minimal-spanning-tree-algorithms-lab-11-exercise-7"><strong>4.21. Minimal Spanning Tree Algorithms</strong> (Lab 11, Exercise 7)</h5>
+<p>Find a minimum spanning tree for the given weighted graph by:</p>
+<p><strong>(a)</strong> Applying Kruskal’s algorithm</p>
+<p><strong>(b)</strong> Applying Prim’s algorithm</p>
+<p>Note: Show all steps, not just the final answer.</p>
+<p><img src="9_3.png" width="60%"></p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> Both algorithms are greedy and will find an MST with the same minimum total weight.</p>
+<p>The edges sorted by weight are: (c,d,1), (a,b,1), (a,e,2), (b,e,2), (b,c,3), (b,d,3), (c,e,3), (a,c,4).</p>
+<p><strong>(a) Kruskal’s Algorithm:</strong></p>
+<ol type="1">
+<li>Initialize <span class="math inline">\(T\)</span> with 5 vertices and no edges.</li>
+<li>Add edge (c,d) with weight 1. <span class="math inline">\(T = \{\{c,d\}\}\)</span>.</li>
+<li>Add edge (a,b) with weight 1. <span class="math inline">\(T = \{\{c,d\}, \{a,b\}\}\)</span>.</li>
+<li>Add edge (a,e) with weight 2. <span class="math inline">\(T = \{\{c,d\}, \{a,b\}, \{a,e\}\}\)</span>.</li>
+<li>Consider edge (b,e) with weight 2. Adding it would form cycle a-b-e-a. Skip.</li>
+<li>Add edge (b,c) with weight 3. This connects the two components {a,b,e} and {c,d}. No cycle is formed. Add it. <span class="math inline">\(T = \{\{c,d\}, \{a,b\}, \{a,e\}, \{b,c\}\}\)</span>.</li>
+<li>The graph is now connected with 4 edges. The algorithm terminates.</li>
+</ol>
+<ul>
+<li><strong>MST Edges:</strong> (c,d), (a,b), (a,e), (b,c).</li>
+<li><strong>Total Weight:</strong> <span class="math inline">\(1 + 1 + 2 + 3 = 7\)</span>.</li>
+</ul>
+<p><strong>(b) Prim’s Algorithm:</strong></p>
+<ol type="1">
+<li>Start at vertex <strong>a</strong>.</li>
+<li>Edges from <strong>a</strong> are (a,b,1), (a,e,2), (a,c,4). Choose minimum: (a,b) with weight 1. Tree vertices: {a,b}.</li>
+<li>Edges leaving {a,b}: (a,e,2), (a,c,4), (b,e,2), (b,d,3), (b,c,3). Minimum is 2. Let’s pick (a,e). Tree vertices: {a,b,e}.</li>
+<li>Edges leaving {a,b,e}: (a,c,4), (b,d,3), (b,c,3), (e,c,3), (e,d,2). Minimum is (e,d) with weight 2. Tree vertices: {a,b,e,d}.</li>
+</ol>
+<p>Using the graph from the image with weights: (a,b,1), (c,d,1), (a,e,2), (e,d,2), (b,c,3), (b,e,3), (a,c,4).</p>
+<p><strong>Kruskal:</strong></p>
+<ol type="1">
+<li>Add (a,b,1).</li>
+<li>Add (c,d,1).</li>
+<li>Add (a,e,2).</li>
+<li>Add (e,d,2). This connects components {a,b,e} and {c,d}. No cycle. MST: {(a,b), (c,d), (a,e), (e,d)}. Weight = 1+1+2+2 = 6.</li>
+</ol>
+<p><strong>Prim (start at e):</strong></p>
+<ol type="1">
+<li>From e, min edge is (e,a,2) or (e,d,2). Pick (e,a,2). Tree: {e,a}.</li>
+<li>From {e,a}, min edge out is (a,b,1). Add it. Tree: {e,a,b}.</li>
+<li>From {e,a,b}, min edge out is (e,d,2). Add it. Tree: {e,a,b,d}.</li>
+<li>From {e,a,b,d}, min edge out is (d,c,1). Add it. Tree is complete. MST: {(e,a), (a,b), (e,d), (d,c)}. Weight = 2+1+2+1 = 6.</li>
+</ol>
+<p><strong>Answer:</strong> A minimum spanning tree has edges with a total weight of 6. For example, using Prim’s: {(e,a), (a,b), (e,d), (d,c)}.</p>
+</details>
+<h5 id="all-spanning-trees-of-a-graph-lab-11-additional-exercise-7a"><strong>4.22. All Spanning Trees of a Graph</strong> (Lab 11, Additional Exercise 7a)</h5>
+<p>Let <span class="math inline">\(V = \{1, 2, 3, 4, 5, 6\}\)</span> and <span class="math inline">\(E = \{\{1,2\}, \{2,3\}, \{2,4\}, \{2,5\}, \{3,6\}, \{4,5\}, \{5,6\}\}\)</span>. Draw all spanning trees.</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> A spanning tree of this graph must include all 6 vertices and have exactly <span class="math inline">\(6-1=5\)</span> edges. The original graph has 7 edges, so we must remove 2 edges while keeping the graph connected.</p>
+<ol type="1">
+<li><strong>Identify Cycles:</strong> The graph has two main cycles: 2-4-5-2 and 2-3-6-5-2. Any pair of removed edges must break all cycles.</li>
+<li><strong>Systematic Removal:</strong>
+<ul>
+<li>Remove {2,4} and {2,3}. The graph remains connected. This is a valid spanning tree.</li>
+<li>Remove {2,4} and {3,6}. The graph remains connected. Valid.</li>
+<li>Remove {4,5} and {5,6}. The graph remains connected. Valid.</li>
+<li>…and so on.</li>
+</ul></li>
+<li>Enumerating all valid pairs of edges to remove will yield all possible spanning trees. This is a tedious but straightforward process.</li>
+</ol>
+<p><strong>Answer:</strong> There are numerous spanning trees for this graph. Each is formed by removing a pair of edges that breaks all cycles while maintaining connectivity. For instance, removing edges {4,5} and {3,6} results in one such spanning tree.</p>
+</details>
+<h5 id="non-isomorphic-spanning-trees-lab-11-additional-exercise-7b"><strong>4.23. Non-Isomorphic Spanning Trees</strong> (Lab 11, Additional Exercise 7b)</h5>
+<p>For the spanning trees found in the exercise above, which of them are not pairwise isomorphic?</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> To distinguish non-isomorphic trees, compare their structural properties, primarily the degree sequence. Trees with different degree sequences cannot be isomorphic.</p>
+<ol type="1">
+<li><strong>Generate Spanning Trees:</strong> Create a few spanning trees by removing different pairs of edges from the original graph.</li>
+<li><strong>Calculate Degree Sequences:</strong>
+<ul>
+<li>Tree 1 (remove {4,5}, {5,6}): Degrees are d(1)=1, d(2)=3, d(3)=2, d(4)=1, d(5)=2, d(6)=1. Sequence: (1,1,1,2,2,3).</li>
+<li>Tree 2 (remove {2,4}, {2,5}): Degrees are d(1)=1, d(2)=2, d(3)=2, d(4)=1, d(5)=1, d(6)=1. Sequence: (1,1,1,1,2,2).</li>
+</ul></li>
+<li><strong>Compare:</strong> The degree sequences (1,1,1,2,2,3) and (1,1,1,1,2,2) are different. Therefore, these two spanning trees are not isomorphic.</li>
+<li>By continuing this process for all spanning trees, one can group them into isomorphism classes.</li>
+</ol>
+<p><strong>Answer:</strong> There are multiple non-isomorphic spanning trees. For example, a tree with degree sequence (1,1,1,2,2,3) is not isomorphic to one with (1,1,1,1,2,2).</p>
+</details>
+<h5 id="all-graphs-of-order-3-lab-11-additional-exercise-8"><strong>4.24. All Graphs of Order 3</strong> (Lab 11, Additional Exercise 8)</h5>
+<p>Draw all graphs of order 3. Which of them are not pairwise isomorphic?</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> On 3 vertices, there are <span class="math inline">\(\binom{3}{2}=3\)</span> possible edges. We can classify the graphs by the number of edges they have, from 0 to 3.</p>
+<ul>
+<li><strong>0 Edges:</strong> One graph: three isolated vertices. Degree sequence: (0,0,0).</li>
+<li><strong>1 Edge:</strong> One graph: two vertices connected, one isolated. Degree sequence: (0,1,1).</li>
+<li><strong>2 Edges:</strong> One graph: the path graph <span class="math inline">\(P_3\)</span>. Degree sequence: (1,2,1).</li>
+<li><strong>3 Edges:</strong> One graph: the triangle (cycle <span class="math inline">\(C_3\)</span>), which is also the complete graph <span class="math inline">\(K_3\)</span>. Degree sequence: (2,2,2).</li>
+</ul>
+<p>Since graphs with different numbers of edges cannot be isomorphic, and for a fixed number of edges each configuration is unique up to relabeling, there are 4 distinct non-isomorphic graphs.</p>
+<p><strong>Answer:</strong> There are 4 non-isomorphic graphs of order 3, classified by their number of edges (0, 1, 2, or 3).</p>
+</details>
+<h5 id="all-connected-graphs-of-order-4-lab-11-additional-exercise-9"><strong>4.25. All Connected Graphs of Order 4</strong> (Lab 11, Additional Exercise 9)</h5>
+<p>Draw all connected graphs of order 4. Which of them are not pairwise isomorphic?</p>
+<details>
+<summary>
+Click to see the solution
+</summary>
+<p><strong>Key Concept:</strong> A connected graph on 4 vertices must have at least 3 edges (to be a tree) and at most <span class="math inline">\(\binom{4}{2}=6\)</span> edges (the complete graph). We can classify them by the number of edges.</p>
+<ul>
+<li><strong>3 Edges (Trees):</strong>
+<ol type="1">
+<li>The path graph <span class="math inline">\(P_4\)</span>. Degree sequence: (1, 2, 2, 1).</li>
+<li>The star graph <span class="math inline">\(K_{1,3}\)</span>. Degree sequence: (1, 1, 1, 3).</li>
+</ol></li>
+<li><strong>4 Edges:</strong>
+<ol start="3" type="1">
+<li>The cycle graph <span class="math inline">\(C_4\)</span>. Degree sequence: (2, 2, 2, 2).</li>
+<li>The “paw” graph (a triangle with one tail). Degree sequence: (1, 2, 2, 3).</li>
+</ol></li>
+<li><strong>5 Edges:</strong>
+<ol start="5" type="1">
+<li>The complete graph minus one edge (<span class="math inline">\(K_4 - e\)</span>). Degree sequence: (2, 3, 3, 3).</li>
+</ol></li>
+<li><strong>6 Edges:</strong>
+<ol start="6" type="1">
+<li>The complete graph <span class="math inline">\(K_4\)</span>. Degree sequence: (3, 3, 3, 3).</li>
+</ol></li>
+</ul>
+<p>These 6 graphs are all structurally distinct (e.g., they have different degree sequences, except for P4 and C4 which are distinguished by other properties like having a cycle), so they are non-isomorphic.</p>
+<p><strong>Answer:</strong> There are 6 non-isomorphic connected graphs of order 4.</p>
+</details>
+
+
+<style>
+	.article-buttons {
+		margin-top: 1rem;
+	}
+
+	.mark-read {
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .9rem;
+		line-height: 1.5;
+	}
+
+	.mark-read:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-read.active {
+		background: #4285F4;
+		color: #fff;
+		border-color: #4285F4;
+	}
+
+	.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.sidebar-link.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
+</style>
+
+<div class="article-buttons">
+	<button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const basePath = '/inno_notes/';
+		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
+			document.querySelector('.article-buttons')?.remove();
+		}
+
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
+
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
+			sidebarLinks.forEach(l => {
+				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
+			});
+		}
+
+		const sidebar = document.querySelector('#quarto-sidebar');
+		if (!sidebar) return;
+
+		const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+		sections.forEach(section => {
+			const toggle = section.querySelector('.sidebar-item-toggle');
+			const targetId = toggle?.getAttribute('data-bs-target');
+			const target = targetId ? document.querySelector(targetId) : null;
+			if (!toggle || !target) return;
+
+			const storageKey = `sidebar_section_${targetId}`;
+
+			const saved = localStorage.getItem(storageKey);
+			if (saved === 'open') {
+				target.classList.add('show');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			} else {
+				// collapse by default if not explicitly opened
+				target.classList.remove('show');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			}
+
+			target.addEventListener('show.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'open');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			});
+
+			target.addEventListener('hide.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'closed');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			});
+		});
+
+		const scrollKey = 'sidebar_scroll_top';
+		const savedScroll = localStorage.getItem(scrollKey);
+		if (savedScroll && !isNaN(parseInt(savedScroll, 10))) {
+			sidebar.scrollTop = parseInt(savedScroll, 10);
+		}
+		sidebar.addEventListener('scroll', () => {
+			localStorage.setItem(scrollKey, sidebar.scrollTop);
+		});
+	});
+</script>
+
+
+
+
+</body></html>

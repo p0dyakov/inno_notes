@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.24">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Artem Burmyakov">
+<meta name="dcterms.date" content="2025-10-17">
+
+<title>W7. Digital Circuits, Synchronous vs.&nbsp;Asynchronous, Latches vs.&nbsp;Flip-Flops – InnoNotes</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<link href="../../logo.svg" rel="icon" type="image/svg+xml">
+<link href="../../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
+<script src="../../site_libs/quarto-contrib/videojs/video.min.js"></script>
+<link href="../../site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-H1WYLNDN76"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
+</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles/sf-pro.css">
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">W7. Digital Circuits, Synchronous vs.&nbsp;Asynchronous, Latches vs.&nbsp;Flip-Flops</h1>
+<p class="author">Artem Burmyakov</p>
+
+<p class="date">2025-10-17</p>
+</header>
+
+
+<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="7.mp4"></video></div>
+<p><a href="https://notebooklm.google.com/notebook/beeee03d-fe5f-42bd-b34c-60d102b4a1a3?artifactId=0f9d73a6-b91e-4776-b2fd-c61a64db1bf8">Quiz</a> | <a href="https://notebooklm.google.com/notebook/beeee03d-fe5f-42bd-b34c-60d102b4a1a3?artifactId=a02843e5-d23e-4e73-ba5c-7c63d3aa9125">Flashcards</a></p>
+<h4 id="summary"><strong>1. Summary</strong></h4>
+<h5 id="classification-of-digital-logic-circuits"><strong>1.1 Classification of Digital Logic Circuits</strong></h5>
+<p>Digital logic circuits are the fundamental building blocks of all digital systems, including computers. They are broadly categorized into two main types based on how they handle inputs and memory.</p>
+<h6 id="combinational-circuits"><strong>1.1.1 Combinational Circuits</strong></h6>
+<p>A <strong>combinational circuit</strong> is a type of digital circuit whose output is determined <em>solely by its current inputs</em>. Think of it as a simple calculator: the answer you get depends only on the numbers and the operation you enter at that moment.</p>
+<ul>
+<li><strong>No Memory:</strong> These circuits have no memory. They cannot store any information about past inputs.</li>
+<li><strong>No Clock:</strong> Their operation is not synchronized by a clock signal.</li>
+<li><strong>Examples:</strong> A basic <strong>adder circuit</strong> that sums two bits is a classic example. The <strong>Arithmetic Logic Unit (ALU)</strong> in a CPU, which performs calculations like addition and subtraction, is a complex combinational circuit.</li>
+</ul>
+<h6 id="sequential-circuits"><strong>1.1.2 Sequential Circuits</strong></h6>
+<p>A <strong>sequential circuit</strong> is more complex. Its output depends not only on the <em>current inputs</em> but also on the <em>sequence of past inputs</em>. This is possible because sequential circuits have <strong>memory elements</strong> that store information about the circuit’s previous state.</p>
+<ul>
+<li><strong>Memory:</strong> They contain memory elements like latches or flip-flops to store state.</li>
+<li><strong>Feedback:</strong> The stored information is fed back into the circuit, influencing future outputs.</li>
+<li><strong>Examples:</strong> CPU registers, memory, and counters are all sequential circuits.</li>
+</ul>
+<p>Sequential circuits are further divided into two subcategories based on their timing and synchronization.</p>
+<h6 id="asynchronous-sequential-circuits"><strong>1.1.2.1 Asynchronous Sequential Circuits</strong></h6>
+<p><strong>Asynchronous circuits</strong>, also known as <em>self-timed</em> or <em>ripple-clock circuits</em>, do not use a global clock signal to coordinate changes. The state of the circuit changes as soon as its inputs change.</p>
+<ul>
+<li><strong>Trigger:</strong> Changes are triggered by any change in the input signals.</li>
+<li><strong>Timing:</strong> The speed of operation depends on the propagation delays of the logic gates.</li>
+<li><strong>Use Cases:</strong> They are used in applications where speed is critical and global synchronization is difficult, such as in simplified microprocessors, carry-lookahead adders, and communication interfaces. An <strong>S/R Latch</strong> is a fundamental asynchronous memory element.</li>
+</ul>
+<h6 id="synchronous-sequential-circuits"><strong>1.1.2.2 Synchronous Sequential Circuits</strong></h6>
+<p><strong>Synchronous circuits</strong> use a master clock signal to orchestrate all state changes. All operations happen in lockstep, synchronized to the ticks (or edges) of the clock. This is like a rowing team where everyone paddles in unison, guided by the coxswain’s calls.</p>
+<ul>
+<li><strong>Trigger:</strong> State changes are triggered by the clock signal (specifically, the rising or falling edge of the clock pulse).</li>
+<li><strong>Timing:</strong> The clock governs the entire circuit’s activity, ensuring orderly and predictable operations.</li>
+<li><strong>Use Cases:</strong> Most modern digital systems, including <strong>CPU chips</strong> and <strong>register files</strong>, are synchronous because they are more reliable and easier to design and debug. A <strong>Flip-Flop</strong> is the fundamental synchronous memory element.</li>
+</ul>
+<p><img src="7_9.png" style="width:80.0%"> <img src="7_2.png" style="width:80.0%"></p>
+<h5 id="the-need-for-input-synchronization"><strong>1.2 The Need for Input Synchronization</strong></h5>
+<p>In a real-world system like a CPU, different input signals for a component like an ALU might arrive at slightly different times due to varying path lengths and component delays. This is called <em>input skew</em>. If an ALU (a combinational circuit) processes these unsynchronized inputs as they arrive, it can produce incorrect, glitchy outputs before the inputs stabilize.</p>
+<p>To prevent this, synchronous systems use <strong>registers</strong> (built from flip-flops) to store the inputs. The registers all load their data on the same clock edge, ensuring that the ALU receives a stable, synchronized set of inputs to work with. This guarantees a correct and predictable result.</p>
+<p><img src="7_1.png" style="width:80.0%"></p>
+<h5 id="memory-elements-latches-and-flip-flops"><strong>1.3 Memory Elements: Latches and Flip-Flops</strong></h5>
+<h6 id="the-sr-latch-asynchronous"><strong>1.3.1 The S/R Latch (Asynchronous)</strong></h6>
+<p>The <strong>S/R Latch</strong> (Set-Reset Latch) is one of the simplest memory elements. It is an asynchronous circuit built from two cross-coupled NOR gates.</p>
+<ul>
+<li><strong>Set (S=1, R=0):</strong> The output <code>Q</code> is “set” to 1.</li>
+<li><strong>Reset (S=0, R=1):</strong> The output <code>Q</code> is “reset” to 0.</li>
+<li><strong>Hold (S=0, R=0):</strong> The output <code>Q</code> holds its previous value. This is the memory feature.</li>
+<li><strong>Illegal State (S=1, R=1):</strong> This input combination is forbidden because it leads to an unpredictable or unstable state. In a NOR latch, it forces <code>Q</code> to 0, but when S and R return to 0, the final state is uncertain (a race condition).</li>
+</ul>
+<p>A major problem with the S/R Latch is its vulnerability to propagation delays. If inputs S and R are meant to change simultaneously but one is slightly delayed, the latch might momentarily enter the illegal state, causing errors.</p>
+<p><img src="7_8.png" style="width:80.0%"></p>
+<h6 id="the-clock-signal"><strong>1.3.2 The Clock Signal</strong></h6>
+<p>Synchronous circuits rely on a <strong>clock signal</strong>, which is a periodic square wave that oscillates between a low state (0) and a high state (1). It’s generated by a <strong>clock oscillator</strong>.</p>
+<ul>
+<li><strong>Asserted State:</strong> The high voltage level (logic 1).</li>
+<li><strong>Deasserted State:</strong> The low voltage level (logic 0).</li>
+<li><strong>Rising Edge:</strong> The transition from low to high.</li>
+<li><strong>Falling Edge:</strong> The transition from high to low.</li>
+<li><strong>Clock Period (<span class="math inline">\(T_c\)</span>):</strong> The time for one full cycle (e.g., in nanoseconds).</li>
+<li><strong>Clock Frequency (<span class="math inline">\(F_c\)</span>):</strong> The number of cycles per second (<span class="math inline">\(1/T_c\)</span>), measured in Hertz (Hz) or Gigahertz (GHz).</li>
+</ul>
+<p>Circuits can be designed to react to the clock in two ways:</p>
+<ul>
+<li><strong>Level-Triggered:</strong> The circuit is active and responds to inputs for the entire duration the clock is in a specific state (e.g., asserted high). Latches are level-triggered.</li>
+<li><strong>Edge-Triggered:</strong> The circuit only responds to inputs at the precise moment of a clock transition (either the rising or falling edge). Flip-flops are edge-triggered.</li>
+</ul>
+<p><img src="7_3.png" style="width:80.0%"> <img src="7_4.png" style="width:80.0%"> <img src="7_5.png" style="width:80.0%"></p>
+<h6 id="the-flip-flop-synchronous"><strong>1.3.3 The Flip-Flop (Synchronous)</strong></h6>
+<p>A <strong>flip-flop</strong> is an edge-triggered memory element. It solves the problems of the basic latch by only changing its state on a clock edge. The most common design is the <strong>Master-Slave Flip-Flop</strong>.</p>
+<p>This design consists of two latches connected in series: a <strong>master latch</strong> and a <strong>slave latch</strong>.</p>
+<ol type="1">
+<li><strong>Clock is High (Asserted):</strong> The master latch is enabled and accepts the external S and R inputs. The slave latch is disabled and holds the previous output value.</li>
+<li><strong>Clock goes Low (Falling Edge):</strong> The master latch is disabled, locking in the value it captured. Simultaneously, the slave latch is enabled and copies the now-stable output from the master.</li>
+</ol>
+<p>The final output of the flip-flop (from the slave) only updates on the falling edge of the clock. This structure isolates the output from any glitches or changes that occur on the inputs while the clock is high, ensuring a clean, single state change per clock cycle.</p>
+<p><img src="7_6.png" style="width:80.0%"> <img src="7_7.png" style="width:80.0%"></p>
+<h5 id="comparison-asynchronous-vs.-synchronous-circuits"><strong>1.4 Comparison: Asynchronous vs.&nbsp;Synchronous Circuits</strong></h5>
+<p><img src="7_10.png" style="width:80.0%"></p>
+<h4 id="definitions"><strong>2. Definitions</strong></h4>
+<ul>
+<li><strong>Combinational Circuit:</strong> A digital circuit whose output depends only on the present combination of inputs. It has no memory.</li>
+<li><strong>Sequential Circuit:</strong> A digital circuit whose output depends on both current inputs and the past sequence of inputs, requiring memory elements to store its state.</li>
+<li><strong>Asynchronous Circuit:</strong> A sequential circuit that does not use a global clock; its state changes in direct response to changes in its inputs.</li>
+<li><strong>Synchronous Circuit:</strong> A sequential circuit whose operation is synchronized by a global clock signal. State changes occur only at discrete moments in time, defined by the clock’s edges.</li>
+<li><strong>Clock Signal:</strong> A periodic electronic signal used to coordinate the actions of a digital circuit.</li>
+<li><strong>Clock Oscillator:</strong> A physical device that generates a stable, periodic clock signal, typically by converting direct current (DC) into an alternating signal.</li>
+<li><strong>Latch:</strong> A level-triggered memory element. It is transparent, meaning its output changes in response to its inputs as long as the clock signal is in its active level (e.g., high). The S/R Latch is a basic asynchronous example.</li>
+<li><strong>Flip-Flop:</strong> An edge-triggered memory element. It stores a bit of data, and its output changes only at the moment of a clock signal’s rising or falling edge.</li>
+<li><strong>Level-Triggered:</strong> A circuit that is activated for the entire duration that a control signal (like a clock) is at a specific level (e.g., high or low).</li>
+<li><strong>Edge-Triggered:</strong> A circuit that is activated only at the transition point (edge) of a control signal, either from low-to-high (rising edge) or high-to-low (falling edge).</li>
+<li><strong>Master-Slave Flip-Flop:</strong> A type of flip-flop constructed from two latches (a master and a slave) that isolates the inputs from the outputs, making the circuit edge-triggered. The master captures the input on one clock level, and the slave updates the output on the subsequent clock edge.</li>
+</ul>
+
+
+<style>
+	.article-buttons {
+		margin-top: 1rem;
+	}
+
+	.mark-read {
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .9rem;
+		line-height: 1.5;
+	}
+
+	.mark-read:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-read.active {
+		background: #4285F4;
+		color: #fff;
+		border-color: #4285F4;
+	}
+
+	.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.sidebar-link.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
+</style>
+
+<div class="article-buttons">
+	<button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const basePath = '/inno_notes/';
+		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
+			document.querySelector('.article-buttons')?.remove();
+		}
+
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
+
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
+			sidebarLinks.forEach(l => {
+				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
+			});
+		}
+
+		const sidebar = document.querySelector('#quarto-sidebar');
+		if (!sidebar) return;
+
+		const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+		sections.forEach(section => {
+			const toggle = section.querySelector('.sidebar-item-toggle');
+			const targetId = toggle?.getAttribute('data-bs-target');
+			const target = targetId ? document.querySelector(targetId) : null;
+			if (!toggle || !target) return;
+
+			const storageKey = `sidebar_section_${targetId}`;
+
+			const saved = localStorage.getItem(storageKey);
+			if (saved === 'open') {
+				target.classList.add('show');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			} else {
+				// collapse by default if not explicitly opened
+				target.classList.remove('show');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			}
+
+			target.addEventListener('show.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'open');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			});
+
+			target.addEventListener('hide.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'closed');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			});
+		});
+
+		const scrollKey = 'sidebar_scroll_top';
+		const savedScroll = localStorage.getItem(scrollKey);
+		if (savedScroll && !isNaN(parseInt(savedScroll, 10))) {
+			sidebar.scrollTop = parseInt(savedScroll, 10);
+		}
+		sidebar.addEventListener('scroll', () => {
+			localStorage.setItem(scrollKey, sidebar.scrollTop);
+		});
+	});
+</script>
+<script>videojs(video_shortcode_videojs_video1);</script>
+
+
+
+
+</body></html>

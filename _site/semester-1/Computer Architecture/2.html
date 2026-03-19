@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.24">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Artem Burmyakov">
+<meta name="dcterms.date" content="2025-09-18">
+
+<title>W2. Hierarchy of Memories, Moore’s Law, Parallelism, Pipelining, and Design Principles – InnoNotes</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<link href="../../logo.svg" rel="icon" type="image/svg+xml">
+<link href="../../site_libs/quarto-contrib/quarto-auto-dark-mode-1.0.0/auto-dark-mode.css" rel="stylesheet">
+<script src="../../site_libs/quarto-contrib/videojs/video.min.js"></script>
+<link href="../../site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-H1WYLNDN76"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../styles/sf-pro.css">
+</head>
+
+<body>
+
+
+<header id="title-block-header">
+<h1 class="title">W2. Hierarchy of Memories, Moore’s Law, Parallelism, Pipelining, and Design Principles</h1>
+<p class="author">Artem Burmyakov</p>
+
+<p class="date">2025-09-18</p>
+</header>
+
+
+<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title=""><source src="2.mp4"></video></div>
+<p><a href="https://notebooklm.google.com/notebook/3809ccea-e8a2-40e3-9260-903dccaab6da?artifactId=3aac7f40-d46a-4b2d-81c7-470a2e051ee2">Quiz</a> | <a href="https://notebooklm.google.com/notebook/3809ccea-e8a2-40e3-9260-903dccaab6da?artifactId=f7ce9005-0733-4776-9d4a-baf7011ff5c7">Flashcards</a></p>
+<h4 id="summary"><strong>1. Summary</strong></h4>
+<h5 id="the-hierarchy-of-memories"><strong>1.1 The Hierarchy of Memories</strong></h5>
+<p>In computer architecture, the <strong>memory hierarchy</strong> is a fundamental concept that organizes a computer’s storage into a pyramid-like structure. This organization is necessary to balance three competing factors: <em>speed</em>, <em>capacity</em>, and <em>cost</em>. Processors are extremely fast, but high-speed memory is expensive and thus has a small capacity. Conversely, large-capacity storage is affordable but much slower. The memory hierarchy solves this problem by creating layers of memory, where each level is smaller, faster, and more expensive per byte than the level below it. The closer a memory level is to the CPU, the faster the CPU can access it.</p>
+<p>The typical levels of the memory hierarchy, from fastest to slowest, are:</p>
+<ol type="1">
+<li><strong>CPU Registers</strong>: These are the fastest and smallest memory units, located directly inside the CPU. They hold the data that the CPU is actively manipulating at any given moment, such as the results of arithmetic operations. Access is virtually instantaneous, occurring within a single CPU clock cycle.</li>
+<li><strong>Cache Memory</strong>: This is a small, very fast memory that sits between the CPU and the main system memory. It stores frequently accessed data and instructions, allowing the CPU to retrieve them much faster than from the main memory. This process of storing data in a cache is known as <strong>caching</strong>. Caches are typically divided into levels (L1, L2, L3), with L1 being the smallest and fastest.</li>
+<li><strong>System Memory (RAM - Random Access Memory)</strong>: This is the computer’s main working memory, where the operating system, applications, and data in current use are kept so that they can be quickly reached by the computer’s processor. It is significantly larger than cache but also slower.</li>
+<li><strong>Storage Devices (Secondary Storage)</strong>: This includes devices like Solid-State Drives (SSDs) and Flash Memory. They provide long-term, high-capacity storage for data and programs. This is the slowest but largest level of the hierarchy and is used to store data persistently.</li>
+</ol>
+<p><img src="1_2.png" style="width:80.0%"></p>
+<p>An important distinction within the hierarchy is between <strong>volatile</strong> and <strong>non-volatile</strong> memory.</p>
+<ul>
+<li><em>Volatile Memory</em> (Registers, Cache, RAM) requires power to maintain the stored information. It loses all its data when the power is turned off.</li>
+<li><em>Non-Volatile Memory</em> (SSDs, HDDs, Flash Memory) retains its stored information even when not powered.</li>
+</ul>
+<h5 id="design-simplification-via-abstraction"><strong>1.2 Design Simplification via Abstraction</strong></h5>
+<p><strong>Abstraction</strong> is a core principle in computer architecture used to manage complexity. It involves hiding the complex details of a system while exposing only the essential features. This allows designers and programmers to work with a simplified model of a component without needing to understand its intricate internal workings.</p>
+<p>For example, a CPU can be viewed at several levels of abstraction:</p>
+<ul>
+<li><strong>Highest Level (Simplest):</strong> A programmer views the CPU as a single, opaque block that executes instructions. They interact with it through a defined instruction set without needing to know how the instructions are physically carried out.</li>
+<li><strong>Intermediate Level:</strong> An architect sees the CPU as a collection of major functional components, such as the <strong>Control Unit (CU)</strong>, <strong>Arithmetic Logic Unit (ALU)</strong>, and <strong>registers</strong>. This level describes <em>what</em> the components do and how they connect.</li>
+<li><strong>Lowest Level (Most Detailed):</strong> An engineer sees the CPU as a detailed diagram of logic gates, transistors, and wires that implement its functions. This level describes <em>how</em> the components are built.</li>
+</ul>
+<p>By using abstraction, a complex system like a computer can be designed, built, and programmed in manageable layers.</p>
+<p><img src="2_2.png" style="width:80.0%"></p>
+<h5 id="moores-law-and-its-stagnation"><strong>1.3 Moore’s Law and Its Stagnation</strong></h5>
+<p><strong>Moore’s Law</strong> is an observation made by Intel co-founder Gordon Moore in 1965. It states that the number of transistors on an integrated circuit (IC) doubles approximately every two years. For decades, this trend also meant that CPU execution speed doubled every 18-24 months, leading to exponential growth in computing power.</p>
+<p>However, since around 2008, the growth in single-thread performance and CPU clock speed has significantly slowed down, leading to what is often called the stagnation of Moore’s Law. This is not because transistor density has stopped increasing, but because of two fundamental physical limits:</p>
+<ol type="1">
+<li><strong>Heat Dissipation:</strong> As transistors become smaller and more densely packed, the heat they generate becomes a major problem. Increasing clock speed further leads to higher power consumption and excessive heat, which can damage the chip and requires complex cooling solutions. This is known as the <em>power wall</em>.</li>
+<li><strong>Speed of Light Limitation:</strong> Signals within a CPU chip travel at nearly the speed of light. As chips get faster and more complex, the time it takes for a signal to travel across the chip becomes a significant limiting factor in how quickly the chip can operate.</li>
+</ol>
+<p>Because of these limitations, the industry has shifted its focus from making single processors faster to adding more processors (or <strong>cores</strong>) to a single chip. This has led to the rise of <em>multicore</em> and <em>multiprocessor</em> systems, where performance is increased through parallelism rather than raw clock speed.</p>
+<p><img src="2_3.png" style="width:80.0%"> <img src="2_4.png" style="width:40.0%"></p>
+<h5 id="performance-via-parallelism"><strong>1.4 Performance via Parallelism</strong></h5>
+<p><strong>Parallelism</strong>, or parallel processing, involves using multiple processing units to execute multiple tasks or parts of a single task simultaneously. This contrasts with a uniprocessor system, which executes instructions sequentially (one after another). A computer with multiple CPUs or a single CPU with multiple cores is a parallel system.</p>
+<p>The goal of multiprocessing is to speed up computation by dividing work among multiple cores. This is highly effective for tasks that can be broken down into independent sub-tasks. However, a major challenge is <em>instruction dependency</em>, where one instruction needs the result of a previous one before it can execute. Such dependencies force a sequential execution and limit the benefits of parallelism, a concept formalized by Amdahl’s Law.</p>
+<p><img src="2_5.png" style="width:80.0%"></p>
+<h5 id="performance-via-pipelining"><strong>1.5 Performance via Pipelining</strong></h5>
+<p><strong>Pipelining</strong> is another technique to improve performance, but it works differently from parallelism. Instead of using multiple processors, pipelining uses a single processor and breaks down the execution of an instruction into several stages. It then overlaps these stages for different instructions, much like an assembly line. This increases the <em>instruction throughput</em> (the number of instructions completed per unit of time).</p>
+<p>A classic five-stage pipeline includes:</p>
+<ol type="1">
+<li><strong>Instruction Fetch (IF):</strong> Fetch the next instruction from memory.</li>
+<li><strong>Instruction Decode (ID):</strong> Decode the instruction to determine the required action.</li>
+<li><strong>Execute (EX):</strong> Perform the calculation using the ALU.</li>
+<li><strong>Memory Access (MEM):</strong> Read from or write to system memory if required.</li>
+<li><strong>Write Back (WB):</strong> Write the result back to a CPU register.</li>
+</ol>
+<p>While one instruction is in the Execute stage, the next one is being decoded, and the one after that is being fetched. <em>Pipelining improves performance by increasing instruction throughput on a single processor, while parallelism improves performance by running multiple instructions truly simultaneously on different hardware units.</em></p>
+<p><img src="2_6.png" style="width:80.0%"></p>
+<h5 id="performance-via-speculation-prediction"><strong>1.6 Performance via Speculation (Prediction)</strong></h5>
+<p><strong>Speculative execution</strong> is an optimization technique where a processor makes an educated guess about the future execution path of a program and begins executing instructions from that predicted path before it’s certain the path will be taken. This is most commonly used for <strong>branch prediction</strong>.</p>
+<p>When the CPU encounters a conditional branch (e.g., an <code>if</code> statement), instead of waiting to see which branch is taken (which would stall the pipeline), the <em>branch predictor</em> guesses the outcome. The CPU then speculatively executes instructions along the predicted path.</p>
+<ul>
+<li>If the prediction was <strong>correct</strong>, the results are kept, and time was saved by avoiding a pipeline stall.</li>
+<li>If the prediction was <strong>incorrect</strong>, the speculative results are discarded, and the CPU starts executing from the correct path. This incurs a performance penalty, but since modern predictors are highly accurate (often &gt;95%), the overall performance gain is significant.</li>
+</ul>
+<p><img src="2_7.png" style="width:60.0%"></p>
+<h5 id="other-fundamental-ideas"><strong>1.7 Other Fundamental Ideas</strong></h5>
+<ul>
+<li><strong>Dependability via Redundancy</strong>: This principle involves adding spare components (e.g., extra CPUs, memory units, or power supplies) to a system to increase its reliability. If a primary component fails, a redundant one can take over, ensuring the system continues to operate without interruption. This is critical in applications like spacecraft, servers, and other mission-critical systems.</li>
+<li><strong>Make the Common Case Fast</strong>: This is a design philosophy that prioritizes optimizing the performance of the most frequent operations or use cases. By focusing engineering resources on making common tasks as fast as possible, the overall system performance is improved, even if less common tasks are not as highly optimized.</li>
+<li><strong>Finite State Machines (FSM)</strong>: An FSM is a mathematical model of computation used to design both hardware and software systems. It consists of a finite number of <em>states</em> and the <em>transitions</em> between them, which are triggered by inputs. FSMs are a powerful and convenient tool for modeling the behavior of systems like network protocols, compilers, and hardware components like processor caches.</li>
+</ul>
+<p><img src="2_8.png" style="width:60.0%"></p>
+<h5 id="noorthbridge-southbridge-hardware-layout"><strong>1.8 Noorthbridge / Southbridge Hardware Layout</strong></h5>
+<p>In traditional motherboard architecture, the <strong>chipset</strong> is divided into two main components: the <strong>Northbridge</strong> and the <strong>Southbridge</strong>. This design acts as a hub to manage data flow between the CPU and the various other parts of the computer.</p>
+<ul>
+<li>The <strong>Northbridge</strong>, also known as the memory controller hub, is the faster of the two chips and is directly connected to the CPU via the <strong>Front-Side Bus (FSB)</strong>. Its primary role is to handle communication with the most performance-critical components:
+<ul>
+<li><strong>System Memory (RAM)</strong>: It controls the flow of data to and from the main memory.</li>
+<li><strong>High-speed graphics card slot</strong>: It manages the connection to the AGP or PCI Express slot, providing a direct, high-bandwidth path for the graphics card.</li>
+</ul></li>
+<li>The <strong>Southbridge</strong>, or I/O controller hub, is connected to the Northbridge (not directly to the CPU) and is responsible for managing the slower peripheral devices and input/output (I/O) functions. These include:
+<ul>
+<li><strong>PCI Slots</strong> for expansion cards.</li>
+<li><strong>SATA and IDE</strong> ports for storage drives.</li>
+<li><strong>USB ports</strong> for external devices.</li>
+<li><strong>Onboard audio and Ethernet</strong>.</li>
+<li>The <strong>Flash ROM (BIOS)</strong>, which is accessed via the LPC Bus.</li>
+<li>Legacy ports (Serial, Parallel, Keyboard, Mouse) managed by the <strong>Super I/O</strong> chip.</li>
+</ul></li>
+</ul>
+<p>This separation allowed high-speed traffic between the CPU, RAM, and graphics card to be handled by the Northbridge without being slowed down by the numerous, slower peripheral devices managed by the Southbridge. It is important to note that this architecture is now considered legacy. In modern systems, the functions of the Northbridge (especially the memory controller) have been integrated directly into the CPU, and the Southbridge’s role has been consolidated into a single chip known as the <strong>Platform Controller Hub (PCH)</strong>, resulting in a more efficient design.</p>
+<p><img src="2_1.png" style="width:40.0%"></p>
+<h4 id="definitions"><strong>2. Definitions</strong></h4>
+<ul>
+<li><strong>Computer Architecture</strong>: The design and fundamental operational structure of a computer system. It defines the system’s parts and their interrelationships, including the instruction set, microarchitecture, and overall system design.</li>
+<li><strong>CPU (Central Processing Unit)</strong>: The primary component of a computer that executes instructions. It contains the Control Unit and the Arithmetic Logic Unit.</li>
+<li><strong>ALU (Arithmetic Logic Unit)</strong>: The part of the CPU that performs arithmetic (e.g., addition, subtraction) and logic (e.g., AND, OR, NOT) operations.</li>
+<li><strong>Control Unit (CU)</strong>: The part of the CPU that directs the operation of the processor. It fetches instructions, decodes them, and tells the other parts of the computer system how to carry them out.</li>
+<li><strong>Register</strong>: A small, extremely fast memory location located directly inside the CPU used to hold a single piece of data (like a number or an instruction) during processing.</li>
+<li><strong>Cache Memory</strong>: A small amount of very fast, volatile memory that stores frequently accessed data from the main memory, reducing the average time to access data by avoiding slower RAM access.</li>
+<li><strong>System Memory (RAM)</strong>: The main volatile hardware memory in a computing device where the operating system, application programs, and data in current use are kept for quick access by the processor.</li>
+<li><strong>Volatile Memory</strong>: Memory that requires constant power to maintain stored information; its contents are lost when power is turned off.</li>
+<li><strong>Non-Volatile Memory</strong>: Memory that can retain stored information even after power is removed.</li>
+<li><strong>Abstraction</strong>: The technique of hiding complex implementation details and showing only the necessary features of an object or system to simplify its use and design.</li>
+<li><strong>Moore’s Law</strong>: The observation that the number of transistors in an integrated circuit doubles about every two years, which historically led to exponential growth in computing power.</li>
+<li><strong>Parallelism</strong>: The simultaneous execution of multiple instructions or tasks on multiple processing units (cores) to achieve faster computation.</li>
+<li><strong>Pipelining</strong>: A technique where a single processor overlaps the execution of multiple instructions by breaking each into stages and processing them in an assembly-line fashion to increase instruction throughput.</li>
+<li><strong>Speculative Execution</strong>: An optimization technique where a processor performs a task before it is known whether the task is actually needed, most often used for branch prediction.</li>
+<li><strong>Redundancy</strong>: The inclusion of extra components in a system that are not strictly necessary for its basic functioning, intended to increase reliability in case of component failure.</li>
+<li><strong>Finite State Machine (FSM)</strong>: A computational model consisting of a finite number of states and transitions between them in response to inputs, used to model the behavior of dynamic systems.</li>
+</ul>
+
+
+<style>
+	.article-buttons {
+		margin-top: 1rem;
+	}
+
+	.mark-read {
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .9rem;
+		line-height: 1.5;
+	}
+
+	.mark-read:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-read.active {
+		background: #4285F4;
+		color: #fff;
+		border-color: #4285F4;
+	}
+
+	.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.sidebar-link.read-title {
+		text-decoration: line-through;
+		opacity: .7;
+	}
+
+	.mark-solved {
+		padding: 3px 8px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		background: #f8f9fa;
+		color: #212529;
+		font-family: sans-serif;
+		cursor: pointer;
+		transition: background-color .2s, border-color .2s, color .2s;
+		font-size: .8rem;
+		line-height: 1.5;
+		margin-left: 8px;
+		vertical-align: middle;
+	}
+
+	.mark-solved:hover {
+		background: #e9ecef;
+		border-color: #bdbdbd;
+	}
+
+	.mark-solved.active {
+		background: #34a853;
+		color: #fff;
+		border-color: #34a853;
+	}
+
+	.solved-title {
+		text-decoration: line-through;
+		opacity: .6;
+	}
+</style>
+
+<div class="article-buttons">
+	<button class="mark-read" data-article-id="">Mark as Read</button>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const basePath = '/inno_notes/';
+		const curPath = window.location.pathname.replace(/index\.html$/, '').replace(basePath, '');
+		const isHome = curPath === '/' || curPath === '' || curPath.includes('index');
+		if (isHome) {
+			document.querySelector('.article-buttons')?.remove();
+		}
+
+		if (!isHome) {
+			const currentUrl = window.location.href;
+			const btn = document.querySelector('.mark-read');
+			const title = document.querySelector('h1');
+			const sidebarLinks = document.querySelectorAll('.sidebar-item-text.sidebar-link[data-original-href]');
+
+			const getRead = () => localStorage.getItem(`read_${currentUrl}`);
+			const setRead = (v) => v ? localStorage.setItem(`read_${currentUrl}`, 'true')
+				: localStorage.removeItem(`read_${currentUrl}`);
+
+			const updateUI = (isRead) => {
+				btn.classList.toggle('active', isRead);
+				btn.textContent = isRead ? 'Read' : 'Mark as Read';
+				title?.classList.toggle('read-title', isRead);
+				sidebarLinks.forEach(l => {
+					const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+					if (h === currentUrl) l.classList.toggle('read-title', isRead);
+				});
+			};
+
+			updateUI(!!getRead());
+
+			btn?.addEventListener('click', () => {
+				const was = !!getRead();
+				setRead(!was);
+				updateUI(!was);
+			});
+
+			sidebarLinks.forEach(l => {
+				const h = l.getAttribute('data-original-href') || l.getAttribute('href') || '';
+				if (localStorage.getItem(`read_${h}`)) l.classList.add('read-title');
+			});
+		}
+
+		// Mark as Solved buttons for examples (sections 3.N / 4.N)
+		if (!isHome) {
+			const pageKey = window.location.pathname;
+			document.querySelectorAll('h5').forEach(h5 => {
+				const text = h5.textContent || '';
+				if (!/^\s*[34]\.\d+[\.\s]/.test(text)) return;
+
+				const solvedKey = `solved_${pageKey}_${text.trim()}`;
+				const btn = document.createElement('button');
+				btn.className = 'mark-solved';
+				btn.textContent = '✓ Solved';
+
+				// Wrap text nodes in a span so strikethrough doesn't affect other children (e.g. anchor icon)
+				let textSpan = h5.querySelector('.problem-title-text');
+				if (!textSpan) {
+					textSpan = document.createElement('span');
+					textSpan.className = 'problem-title-text';
+					const nodes = [...h5.childNodes].filter(n => n.nodeType === Node.TEXT_NODE || n.nodeName === 'STRONG' || n.nodeName === 'EM');
+					nodes.forEach(n => textSpan.appendChild(n.cloneNode(true)));
+					nodes.forEach(n => n.parentNode?.removeChild(n));
+					h5.prepend(textSpan);
+				}
+
+				const applyState = (solved) => {
+					btn.classList.toggle('active', solved);
+					textSpan.classList.toggle('solved-title', solved);
+				};
+
+				applyState(!!localStorage.getItem(solvedKey));
+
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const was = !!localStorage.getItem(solvedKey);
+					was ? localStorage.removeItem(solvedKey) : localStorage.setItem(solvedKey, 'true');
+					applyState(!was);
+				});
+
+				h5.appendChild(btn);
+			});
+		}
+
+		const sidebar = document.querySelector('#quarto-sidebar');
+		if (!sidebar) return;
+
+		const sections = sidebar.querySelectorAll('li.sidebar-item-section');
+		sections.forEach(section => {
+			const toggle = section.querySelector('.sidebar-item-toggle');
+			const targetId = toggle?.getAttribute('data-bs-target');
+			const target = targetId ? document.querySelector(targetId) : null;
+			if (!toggle || !target) return;
+
+			const storageKey = `sidebar_section_${targetId}`;
+
+			const saved = localStorage.getItem(storageKey);
+			if (saved === 'open') {
+				target.classList.add('show');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			} else {
+				// collapse by default if not explicitly opened
+				target.classList.remove('show');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			}
+
+			target.addEventListener('show.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'open');
+				toggle.setAttribute('aria-expanded', 'true');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+			});
+
+			target.addEventListener('hide.bs.collapse', () => {
+				localStorage.setItem(storageKey, 'closed');
+				toggle.setAttribute('aria-expanded', 'false');
+				toggle.querySelector('i')?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+			});
+		});
+
+		const scrollKey = 'sidebar_scroll_top';
+		const savedScroll = localStorage.getItem(scrollKey);
+		if (savedScroll && !isNaN(parseInt(savedScroll, 10))) {
+			sidebar.scrollTop = parseInt(savedScroll, 10);
+		}
+		sidebar.addEventListener('scroll', () => {
+			localStorage.setItem(scrollKey, sidebar.scrollTop);
+		});
+	});
+</script>
+<script>videojs(video_shortcode_videojs_video1);</script>
+
+
+
+
+</body></html>
