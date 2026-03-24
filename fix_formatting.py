@@ -138,27 +138,8 @@ def process_file(filepath):
     # === Extract all examples ===
     all_examples = get_all_examples(lines)
 
-    # === Detect AI artifacts ===
-    in_code = False
+    # === Detect AI artifacts (disabled) ===
     ai_found = []
-    for i, line in enumerate(lines):
-        s = line.strip()
-        if s.startswith('```'):
-            in_code = not in_code
-            continue
-        if in_code:
-            continue
-        for pat in AI_PATTERNS:
-            if re.search(pat, s):
-                # Store full line context and section header for Claude review
-                section = get_section_header(lines, i)
-                ai_found.append({
-                    'line_num': i + 1,
-                    'line': line,
-                    'text': s[:200],
-                    'section': section
-                })
-                break
 
     # === Pass 1: Remove blank lines within lists ===
     result = []
@@ -235,6 +216,39 @@ def process_file(filepath):
                 result.append('')
                 added += 1
 
+    lines = result
+
+    # === Pass 3: Ensure '---' before top-level numbered section headers ===
+    # Matches: #### **N. SectionName** (e.g. #### **2. Definitions**)
+    SECTION_HEADER_RE = re.compile(r'^####\s+\*\*\d+\.')
+    result = []
+    in_code = False
+    separators_added = 0
+
+    for i, line in enumerate(lines):
+        if line.strip().startswith('```'):
+            in_code = not in_code
+
+        if not in_code and SECTION_HEADER_RE.match(line):
+            section_num = int(re.search(r'####\s+\*\*(\d+)\.', line).group(1))
+            if section_num > 1:
+                # Ensure there's a '***' immediately before this header
+                last_nonblank_idx = None
+                for k in range(len(result) - 1, -1, -1):
+                    if result[k].strip() != '':
+                        last_nonblank_idx = k
+                        break
+
+                if last_nonblank_idx is None or result[last_nonblank_idx].strip() not in ('---', '***'):
+                    while result and result[-1].strip() == '':
+                        result.pop()
+                    result.append('')
+                    result.append('***')
+                    result.append('')
+                    separators_added += 1
+
+        result.append(line)
+
     # Write back
     new_content = '\n'.join(result)
     changed = new_content != content
@@ -242,7 +256,7 @@ def process_file(filepath):
         with open(filepath, 'w') as f:
             f.write(new_content)
 
-    return removed, added, ai_found, changed, all_examples
+    return removed, added + separators_added, ai_found, changed, all_examples
 
 
 # ─── Main ───
@@ -284,51 +298,43 @@ for fp in qmd_files:
             all_artifacts[fp] = ai
         print()
 
-# === Create review folder structure ===
-if all_examples_map or all_artifacts:
-    print(f"{'=' * 70}")
-    print(f"Creating review folder: {REVIEW_FOLDER}/")
-    print(f"{'=' * 70}\n")
-
-    # Create base review folder
-    Path(REVIEW_FOLDER).mkdir(exist_ok=True)
-
-    # Create review files for each file with examples or artifacts
-    for file_path in set(list(all_examples_map.keys()) + list(all_artifacts.keys())):
-        # Create directory structure
-        review_file = Path(REVIEW_FOLDER) / file_path
-        review_file.parent.mkdir(parents=True, exist_ok=True)
-
-        # Get all examples and artifacts for this file
-        examples = all_examples_map.get(file_path, [])
-        artifacts = all_artifacts.get(file_path, [])
-
-        # Create set of artifact line numbers for quick lookup
-        artifact_lines = {a['line_num'] for a in artifacts}
-
-        # Write review file with all examples
-        review_content = f"# All Examples: {file_path}\n\n"
-        review_content += f"Total examples: {len(examples)}\n"
-        if artifacts:
-            review_content += f"Examples with AI artifacts: {len([a for a in artifacts if a['line_num'] in artifact_lines])}\n\n"
-        review_content += "---\n\n"
-
-        for example in examples:
-            # Check if this example has an artifact
-            has_artifact = any(
-                artifact['line_num'] >= example['line_num'] and
-                artifact['line_num'] <= example['line_num'] + 50  # Within ~50 lines of header
-                for artifact in artifacts
-            )
-            marker = "⚠️ " if has_artifact else ""
-            review_content += f"{marker}{example['text']}\n\n"
-
-        with open(review_file, 'w') as f:
-            f.write(review_content)
-
-        print(f"  ✓ Created: {review_file}")
-
-    print(f"\n{'=' * 70}\n")
+# === Create review folder structure (disabled) ===
+# if all_examples_map or all_artifacts:
+#     print(f"{'=' * 70}")
+#     print(f"Creating review folder: {REVIEW_FOLDER}/")
+#     print(f"{'=' * 70}\n")
+#
+#     Path(REVIEW_FOLDER).mkdir(exist_ok=True)
+#
+#     for file_path in set(list(all_examples_map.keys()) + list(all_artifacts.keys())):
+#         review_file = Path(REVIEW_FOLDER) / file_path
+#         review_file.parent.mkdir(parents=True, exist_ok=True)
+#
+#         examples = all_examples_map.get(file_path, [])
+#         artifacts = all_artifacts.get(file_path, [])
+#         artifact_lines = {a['line_num'] for a in artifacts}
+#
+#         review_content = f"# All Examples: {file_path}\n\n"
+#         review_content += f"Total examples: {len(examples)}\n"
+#         if artifacts:
+#             review_content += f"Examples with AI artifacts: {len([a for a in artifacts if a['line_num'] in artifact_lines])}\n\n"
+#         review_content += "---\n\n"
+#
+#         for example in examples:
+#             has_artifact = any(
+#                 artifact['line_num'] >= example['line_num'] and
+#                 artifact['line_num'] <= example['line_num'] + 50
+#                 for artifact in artifacts
+#             )
+#             marker = "⚠️ " if has_artifact else ""
+#             review_content += f"{marker}{example['text']}\n\n"
+#
+#         with open(review_file, 'w') as f:
+#             f.write(review_content)
+#
+#         print(f"  ✓ Created: {review_file}")
+#
+#     print(f"\n{'=' * 70}\n")
 
 print(f"{'=' * 70}")
 print(f"SUMMARY:")
