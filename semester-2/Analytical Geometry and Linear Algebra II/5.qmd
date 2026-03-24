@@ -49,71 +49,6 @@ That closest point is the **orthogonal projection** of $\mathbf{b}$ onto $\mathc
 
 The **error vector** $\mathbf{e} = \mathbf{b} - \mathbf{p} = \mathbf{b} - A\hat{\mathbf{x}}$ is orthogonal to the entire column space $\mathcal{C}(A)$. This orthogonality condition is the key to deriving the solution.
 
-```{python}
-#| echo: false
-#| fig-cap: "Geometric interpretation of least squares: the projection **p** of **b** onto C(A) minimizes the distance ‖b − Ax‖. The error vector **e** = **b** − **p** is perpendicular to the column space."
-#| label: fig-leastsquares-geometry
-
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowPatch
-import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-
-fig = plt.figure(figsize=(7, 5))
-ax = fig.add_subplot(111, projection='3d')
-ax.set_facecolor('#f8f8f8')
-
-# Draw the column space plane as a shaded parallelogram
-u = np.array([1, 0, 0])
-v = np.array([0, 1, 0])
-corners = np.array([
-    -1.5*u - 1.5*v,
-     1.5*u - 1.5*v,
-     1.5*u + 1.5*v,
-    -1.5*u + 1.5*v
-])
-poly = Poly3DCollection([corners], alpha=0.18, facecolor='steelblue', edgecolor='steelblue', linewidth=0.5)
-ax.add_collection3d(poly)
-ax.text(1.3, 1.3, 0.05, r'$\mathcal{C}(A)$', fontsize=11, color='steelblue', fontweight='bold')
-
-# Define vectors
-origin = np.array([0, 0, 0])
-p = np.array([0.6, 0.8, 0])
-b = np.array([0.6, 0.8, 1.2])
-e = b - p
-
-# Draw b
-ax.quiver(*origin, *b, color='#c0392b', linewidth=2, arrow_length_ratio=0.12)
-ax.text(*(b + np.array([0.05, 0.05, 0.05])), r'$\mathbf{b}$', fontsize=12, color='#c0392b')
-
-# Draw p
-ax.quiver(*origin, *p, color='#27ae60', linewidth=2, arrow_length_ratio=0.12)
-ax.text(*(p + np.array([0.05, -0.12, -0.08])), r'$\mathbf{p} = A\hat{\mathbf{x}}$', fontsize=10, color='#27ae60')
-
-# Draw error e = b - p (dashed)
-ax.quiver(*p, *e, color='#8e44ad', linewidth=2, arrow_length_ratio=0.15,
-          linestyle='dashed')
-ax.text(*(p + e/2 + np.array([0.08, 0.0, 0.0])), r'$\mathbf{e}=\mathbf{b}-\mathbf{p}$',
-        fontsize=10, color='#8e44ad')
-
-# Right-angle mark at p
-ax.scatter(*p, color='#27ae60', s=18, zorder=5)
-
-ax.set_xlim([-0.3, 1.5])
-ax.set_ylim([-0.3, 1.5])
-ax.set_zlim([0, 1.5])
-ax.set_xticks([])
-ax.set_yticks([])
-ax.set_zticks([])
-ax.grid(False)
-ax.set_title("Projection onto Column Space", fontsize=12, pad=10)
-
-plt.tight_layout()
-plt.show()
-```
-
 ##### **1.3 The Normal Equations**
 
 The orthogonality condition $\mathbf{e} \perp \mathcal{C}(A)$ means $\mathbf{e}$ is orthogonal to every column of $A$. Since the columns span $\mathcal{C}(A)$, this is equivalent to:
@@ -208,50 +143,6 @@ $$A = \begin{pmatrix} 1 & t_1 \\ 1 & t_2 \\ \vdots & \vdots \\ 1 & t_n \end{pmat
 The least-squares solution via normal equations $A^T A\hat{\mathbf{x}} = A^T \mathbf{b}$ gives the best-fit line.
 
 **Key fact:** The best-fit line always passes through the **point of averages** $(\bar{t}, \bar{b})$ where $\bar{t} = \frac{1}{n}\sum t_i$ and $\bar{b} = \frac{1}{n}\sum b_i$. This follows directly from the first normal equation.
-
-```{python}
-#| echo: false
-#| fig-cap: "Least-squares line fitting: data points (blue) with residual errors (orange dashed) to the best-fit line (red). The line passes through the point of averages (green star)."
-#| label: fig-linefitting
-
-import matplotlib.pyplot as plt
-import numpy as np
-
-t = np.array([0, 1, 3, 4])
-b = np.array([0, 8, 8, 20])
-
-# Least-squares fit
-A = np.column_stack([np.ones(len(t)), t])
-x_hat = np.linalg.lstsq(A, b, rcond=None)[0]
-C, D = x_hat
-
-t_line = np.linspace(-0.3, 4.5, 200)
-b_line = C + D * t_line
-
-t_mean, b_mean = np.mean(t), np.mean(b)
-
-fig, ax = plt.subplots(figsize=(6, 4))
-ax.set_facecolor('#f8f8f8')
-
-ax.plot(t_line, b_line, color='#c0392b', linewidth=2, label=f'$y = {C:.1f} + {D:.1f}t$')
-ax.scatter(t, b, color='steelblue', s=60, zorder=5, label='Data points')
-
-for ti, bi in zip(t, b):
-    bi_fit = C + D * ti
-    ax.plot([ti, ti], [bi, bi_fit], color='#e67e22', linewidth=1.2,
-            linestyle='--', alpha=0.8)
-
-ax.scatter([t_mean], [b_mean], color='#27ae60', s=120, marker='*',
-           zorder=6, label=f'Center $(\overline{{t}}, \overline{{b}}) = ({t_mean:.0f}, {b_mean:.0f})$')
-
-ax.set_xlabel('$t$', fontsize=12)
-ax.set_ylabel('$b$', fontsize=12)
-ax.set_title('Least-Squares Line Fitting', fontsize=13)
-ax.legend(fontsize=9)
-ax.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.show()
-```
 
 ###### **1.5.2 Fitting a Plane and Higher Dimensions**
 
@@ -840,7 +731,7 @@ $$Q = \begin{pmatrix} 1/2 & 1/2 & 1/2 \\ 1/2 & -1/2 & 1/2 \\ 1/2 & -1/2 & -1/2 \
 
 </details>
 
-##### **4.17. Orthogonal Basis via Gram-Schmidt — Task 1** (Assignments, Section 6.4, Task 1)
+##### **4.17. Orthogonal Basis via Gram-Schmidt — Task 1** (Assignment 5, Task 1)
 
 Given vectors $\mathbf{x}_1 = \begin{bmatrix} 3 \\ 0 \\ -1 \end{bmatrix}$ and $\mathbf{x}_2 = \begin{bmatrix} 8 \\ 5 \\ -6 \end{bmatrix}$ that span a subspace $W$, apply the Gram-Schmidt process to find an orthogonal basis for $W$.
 
@@ -862,7 +753,7 @@ $$\mathbf{v}_j = \mathbf{x}_j - \sum_{i=1}^{j-1} \frac{\mathbf{x}_j \cdot \mathb
 
 </details>
 
-##### **4.18. Orthogonal Basis — Task 2** (Assignments, Section 6.4, Task 2)
+##### **4.18. Orthogonal Basis — Task 2** (Assignment 5, Task 2)
 
 Given $\mathbf{x}_1 = \begin{bmatrix} 0 \\ 4 \\ 2 \end{bmatrix}$ and $\mathbf{x}_2 = \begin{bmatrix} 5 \\ 6 \\ -7 \end{bmatrix}$, find an orthogonal basis for $W = \text{span}\{\mathbf{x}_1, \mathbf{x}_2\}$.
 
@@ -880,7 +771,7 @@ Given $\mathbf{x}_1 = \begin{bmatrix} 0 \\ 4 \\ 2 \end{bmatrix}$ and $\mathbf{x}
 
 </details>
 
-##### **4.19. Orthogonal Basis — Task 3** (Assignments, Section 6.4, Task 3)
+##### **4.19. Orthogonal Basis — Task 3** (Assignment 5, Task 3)
 
 Given $\mathbf{x}_1 = \begin{bmatrix} 2 \\ -5 \\ 1 \end{bmatrix}$ and $\mathbf{x}_2 = \begin{bmatrix} 4 \\ -9/2 \\ 3/2 \end{bmatrix}$, find an orthogonal basis for their span.
 
@@ -902,7 +793,7 @@ Given $\mathbf{x}_1 = \begin{bmatrix} 2 \\ -5 \\ 1 \end{bmatrix}$ and $\mathbf{x
 
 </details>
 
-##### **4.20. Orthogonal Basis — Task 4** (Assignments, Section 6.4, Task 4)
+##### **4.20. Orthogonal Basis — Task 4** (Assignment 5, Task 4)
 
 Given $\mathbf{x}_1 = \begin{bmatrix} 3 \\ -4 \\ 5 \end{bmatrix}$ and $\mathbf{x}_2 = \begin{bmatrix} -3 \\ 14 \\ -7 \end{bmatrix}$, find an orthogonal basis.
 
@@ -920,7 +811,7 @@ Given $\mathbf{x}_1 = \begin{bmatrix} 3 \\ -4 \\ 5 \end{bmatrix}$ and $\mathbf{x
 
 </details>
 
-##### **4.21. Orthogonal Basis in $\mathbb{R}^4$ — Task 5** (Assignments, Section 6.4, Task 5)
+##### **4.21. Orthogonal Basis in $\mathbb{R}^4$ — Task 5** (Assignment 5, Task 5)
 
 Given $\mathbf{x}_1 = \begin{bmatrix} 1 \\ -4 \\ 0 \\ 1 \end{bmatrix}$ and $\mathbf{x}_2 = \begin{bmatrix} 7 \\ -7 \\ -4 \\ 1 \end{bmatrix}$, apply Gram-Schmidt to find an orthogonal basis for their span.
 
@@ -938,7 +829,7 @@ Given $\mathbf{x}_1 = \begin{bmatrix} 1 \\ -4 \\ 0 \\ 1 \end{bmatrix}$ and $\mat
 
 </details>
 
-##### **4.22. Orthogonal Basis in $\mathbb{R}^4$ — Task 6** (Assignments, Section 6.4, Task 6)
+##### **4.22. Orthogonal Basis in $\mathbb{R}^4$ — Task 6** (Assignment 5, Task 6)
 
 Given $\mathbf{x}_1 = \begin{bmatrix} 3 \\ -1 \\ 2 \\ -1 \end{bmatrix}$ and $\mathbf{x}_2 = \begin{bmatrix} -5 \\ 9 \\ -9 \\ 3 \end{bmatrix}$, find an orthogonal basis.
 
@@ -956,7 +847,7 @@ Given $\mathbf{x}_1 = \begin{bmatrix} 3 \\ -1 \\ 2 \\ -1 \end{bmatrix}$ and $\ma
 
 </details>
 
-##### **4.23. Computing $R$ from $Q$ and $A$ — Task 13** (Assignments, Section 6.4, Task 13)
+##### **4.23. Computing $R$ from $Q$ and $A$ — Task 13** (Assignment 5, Task 7)
 
 Given that $A$ and $Q$ are known, compute $R = Q^T A$ for:
 
@@ -982,7 +873,7 @@ $$R = \begin{bmatrix} 6 & 12 \\ 0 & 6 \end{bmatrix}$$
 
 </details>
 
-##### **4.24. Computing $R$ from $Q$ and $A$ — Task 14** (Assignments, Section 6.4, Task 14)
+##### **4.24. Computing $R$ from $Q$ and $A$ — Task 14** (Assignment 5, Task 8)
 
 Given:
 
@@ -1006,7 +897,7 @@ $$R = \begin{bmatrix} 7 & 7 \\ 0 & 7 \end{bmatrix}$$
 
 </details>
 
-##### **4.25. Normal Equations and Least-Squares Solution — Task 1** (Assignments, Section 6.5, Task 1)
+##### **4.25. Normal Equations and Least-Squares Solution — Task 1** (Assignment 5, Task 9)
 
 For the system $A\mathbf{x} = \mathbf{b}$ where $A = \begin{bmatrix} -1 & 2 \\ 2 & -3 \\ -1 & 3 \end{bmatrix}$ and $\mathbf{b} = \begin{bmatrix} 4 \\ 1 \\ 2 \end{bmatrix}$:
 
@@ -1036,7 +927,7 @@ $$\hat{\mathbf{x}} = \frac{1}{11}\begin{bmatrix} 22 & 11 \\ 11 & 6 \end{bmatrix}
 
 </details>
 
-##### **4.26. Normal Equations — Task 2** (Assignments, Section 6.5, Task 2)
+##### **4.26. Normal Equations — Task 2** (Assignment 5, Task 10)
 
 For $A = \begin{bmatrix} 2 & 1 \\ -2 & 0 \\ 2 & 3 \end{bmatrix}$ and $\mathbf{b} = \begin{bmatrix} -5 \\ 8 \\ 1 \end{bmatrix}$:
 
@@ -1059,7 +950,7 @@ $$\hat{\mathbf{x}} = \frac{1}{56}\begin{bmatrix} 10 & -8 \\ -8 & 12 \end{bmatrix
 
 </details>
 
-##### **4.27. Normal Equations — Task 3** (Assignments, Section 6.5, Task 3)
+##### **4.27. Normal Equations — Task 3** (Assignment 5, Task 11)
 
 For $A = \begin{bmatrix} 1 & -2 \\ -1 & 2 \\ 0 & 3 \\ 2 & 5 \end{bmatrix}$ and $\mathbf{b} = \begin{bmatrix} 3 \\ 1 \\ -4 \\ 2 \end{bmatrix}$:
 
@@ -1081,7 +972,7 @@ $$\hat{\mathbf{x}} = \frac{1}{216}\begin{bmatrix} 42 & -6 \\ -6 & 6 \end{bmatrix
 
 </details>
 
-##### **4.28. Normal Equations — Task 4** (Assignments, Section 6.5, Task 4)
+##### **4.28. Normal Equations — Task 4** (Assignment 5, Task 12)
 
 For $A = \begin{bmatrix} 1 & 3 \\ 1 & -1 \\ 1 & 1 \end{bmatrix}$ and $\mathbf{b} = \begin{bmatrix} 5 \\ 1 \\ 0 \end{bmatrix}$:
 
@@ -1103,7 +994,7 @@ $$\hat{\mathbf{x}} = \frac{1}{24}\begin{bmatrix} 11 & -3 \\ -3 & 3 \end{bmatrix}
 
 </details>
 
-##### **4.29. Least-Squares Solution with Free Variable — Task 5** (Assignments, Section 6.5, Task 5)
+##### **4.29. Least-Squares Solution with Free Variable — Task 5** (Assignment 5, Task 13)
 
 Find all least-squares solutions of $A\mathbf{x} = \mathbf{b}$ where $A$ and $\mathbf{b}$ yield the augmented normal equation matrix:
 
@@ -1127,7 +1018,7 @@ $$\hat{\mathbf{x}} = \begin{bmatrix} 5 \\ -3 \\ 0 \end{bmatrix} + t\begin{bmatri
 
 </details>
 
-##### **4.30. Least-Squares Solution with Free Variable — Task 6** (Assignments, Section 6.5, Task 6)
+##### **4.30. Least-Squares Solution with Free Variable — Task 6** (Assignment 5, Task 14)
 
 The normal equations reduce to:
 
@@ -1149,7 +1040,7 @@ $$\hat{\mathbf{x}} = \begin{bmatrix} 5 \\ -1 \\ 0 \end{bmatrix} + t\begin{bmatri
 
 </details>
 
-##### **4.31. Least Squares via QR — Task 15** (Assignments, Section 6.5, Task 15)
+##### **4.31. Least Squares via QR — Task 15** (Assignment 5, Task 15)
 
 Given $R = \begin{bmatrix} 3 & 5 \\ 0 & 1 \end{bmatrix}$ and $Q^T \mathbf{b} = \begin{bmatrix} 7 \\ -1 \end{bmatrix}$, find the least-squares solution of $A\mathbf{x} = \mathbf{b}$.
 
@@ -1164,7 +1055,7 @@ $$\left[ R \mid Q^T \mathbf{b} \right] = \left[ \begin{array}{cc|c} 3 & 5 & 7 \\
 
 </details>
 
-##### **4.32. Least Squares via QR — Task 16** (Assignments, Section 6.5, Task 16)
+##### **4.32. Least Squares via QR — Task 16** (Assignment 5, Task 16)
 
 Given $R = \begin{bmatrix} 2 & 3 \\ 0 & 5 \end{bmatrix}$ and $Q^T \mathbf{b} = \begin{bmatrix} 17/2 \\ 9/2 \end{bmatrix}$, find the least-squares solution.
 

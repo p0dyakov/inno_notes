@@ -579,281 +579,6 @@ The key limitation of FSAs is their **fixed memory**: they are suitable for patt
 
 #### **4. Examples**
 
-##### **4.1. FST — Translating All Strings Over $\{a,b\}$** (Tutorial 7, Example 1)
-
-Build a Finite State Transducer that accepts any string $x \in \{a, b\}^*$ and translates it by the rule $a \mapsto A$, $b \mapsto B$ (convert lowercase to uppercase).
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Since every string is accepted, a single accepting state with self-loops suffices.
-
-1.  **Define the FST components:**
-    *   States: $Q = \{q_0\}$; initial state $q_0$; accepting: $F = \{q_0\}$
-    *   Input alphabet: $I = \{a, b\}$; Output alphabet: $O = \{A, B\}$
-2.  **Transitions (both are self-loops on $q_0$):**
-    *   $q_0 \xrightarrow{a/A} q_0$: read $a$, write $A$
-    *   $q_0 \xrightarrow{b/B} q_0$: read $b$, write $B$
-3.  **Trace for input $aba$:**
-    *   Read $a$ in $q_0$: output $A$, stay in $q_0$
-    *   Read $b$ in $q_0$: output $B$, stay in $q_0$
-    *   Read $a$ in $q_0$: output $A$, stay in $q_0$
-    *   End of input; $q_0 \in F$ → **accepted**
-
-**Answer:** Output $ABA$. The FST has one state $q_0$ (accepting) with self-loops $a/A$ and $b/B$.
-
-</details>
-
-##### **4.2. FST — Translating Only Strings Without $b$'s** (Tutorial 7, Example 2)
-
-Build a Finite State Transducer that accepts strings $x \in \{a, b\}^*$ containing no $b$'s, and translates them by $a \mapsto A$, $b \mapsto B$. Strings containing $b$ are rejected (translation undefined).
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Use a sink (non-accepting) state to handle $b$'s. Once a $b$ is seen, the string is rejected regardless of further input.
-
-1.  **States:** $q_0$ (accepting — no $b$ seen), $q_1$ (non-accepting sink — $b$ seen)
-2.  **Transitions:**
-    *   $q_0 \xrightarrow{a/A} q_0$: read $a$ in $q_0$, output $A$, stay
-    *   $q_0 \xrightarrow{b/B} q_1$: read $b$ in $q_0$, output $B$, go to sink
-    *   $q_1 \xrightarrow{a/\varepsilon} q_1$: read $a$ in sink, output nothing
-    *   $q_1 \xrightarrow{b/\varepsilon} q_1$: read $b$ in sink, output nothing
-3.  **Trace for $aaa$:** stays in $q_0$, outputs $AAA$ → **accepted**, translation = $AAA$
-4.  **Trace for $aba$:** $q_0 \xrightarrow{a/A} q_0 \xrightarrow{b/B} q_1 \xrightarrow{a/\varepsilon} q_1$ → **rejected** (translation undefined)
-
-**Answer:** The FST has states $\{q_0, q_1\}$ with $q_0$ accepting. Strings without $b$'s are translated to their uppercase version; strings with $b$'s are rejected.
-
-</details>
-
-##### **4.3. PDT — Translating $a^n b^n \to A^n B^n$** (Tutorial 7, Example 3)
-
-Build a Pushdown Transducer for $L = \{a^n b^n \mid n \geq 1\}$ that translates each string by $a \mapsto A$, $b \mapsto B$, i.e., $\tau(a^n b^n) = A^n B^n$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** This translation requires a stack because we need to count $n$ $a$'s and then verify $n$ $b$'s. An FST cannot count to an arbitrary $n$.
-
-1.  **States:** $q_0$ (start), $q_1$ (reading $a$'s), $q_2$ (reading $b$'s), $q_3$ (accepting)
-2.  **Stack alphabet:** $\Gamma = \{Z_0, A\}$
-3.  **Transitions:**
-
-    | From | To | Label | Meaning |
-    |:---|:---|:---|:---|
-    | $q_0$ | $q_1$ | $a, Z_0/AZ_0, A$ | First $a$: push $A$, output $A$ |
-    | $q_1$ | $q_1$ | $a, A/AA, A$ | More $a$'s: push $A$, output $A$ |
-    | $q_1$ | $q_2$ | $b, A/\varepsilon, B$ | First $b$: pop $A$, output $B$ |
-    | $q_2$ | $q_2$ | $b, A/\varepsilon, B$ | More $b$'s: pop $A$, output $B$ |
-    | $q_2$ | $q_3$ | $\varepsilon, Z_0/Z_0, \varepsilon$ | Stack empty (only $Z_0$): accept |
-4.  **Trace for $aabb$:**
-    *   $\langle q_0, aabb, Z_0, \varepsilon \rangle \vdash \langle q_1, abb, AZ_0, A \rangle$ (output $A$)
-    *   $\langle q_1, abb, AZ_0, A \rangle \vdash \langle q_1, bb, AAZ_0, AA \rangle$ (output $A$)
-    *   $\langle q_1, bb, AAZ_0, AA \rangle \vdash \langle q_2, b, AZ_0, AAB \rangle$ (output $B$)
-    *   $\langle q_2, b, AZ_0, AAB \rangle \vdash \langle q_2, \varepsilon, Z_0, AABB \rangle$ (output $B$)
-    *   $\langle q_2, \varepsilon, Z_0, AABB \rangle \vdash \langle q_3, \varepsilon, Z_0, AABB \rangle$ — **ACCEPT**
-
-**Answer:** $\tau(a^n b^n) = A^n B^n$. The PDT uses a stack to count $a$'s, then matches $b$'s one-for-one.
-
-</details>
-
-##### **4.4. PDT — Translating $a^n b^n \to b^n$** (Tutorial 7, Example 4)
-
-Build a Deterministic Pushdown Transducer for $L = \{a^n b^n \mid n > 0\}$ with translation $\tau(a^n b^n) = b^n$ (output only the $b$-part, discarding the $a$'s).
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** During the push phase (reading $a$'s), output *nothing* ($\varepsilon$). Only during the pop phase (reading $b$'s), output $b$ for each pop.
-
-1.  **States:** $q_0$ (reading $a$'s), $q_1$ (reading $b$'s), $q_F$ (accepting)
-2.  **Transitions:**
-
-    | From | To | Label | Meaning |
-    |:---|:---|:---|:---|
-    | $q_0$ | $q_0$ | $a, Z_0/AZ_0, \varepsilon$ | First $a$: push $A$, NO output |
-    | $q_0$ | $q_0$ | $a, A/AA, \varepsilon$ | More $a$'s: push $A$, NO output |
-    | $q_0$ | $q_1$ | $b, A/\varepsilon, b$ | First $b$: pop $A$, output $b$ |
-    | $q_1$ | $q_1$ | $b, A/\varepsilon, b$ | More $b$'s: pop $A$, output $b$ |
-    | $q_1$ | $q_F$ | $\varepsilon, Z_0/Z_0, \varepsilon$ | Stack empty: accept, no output |
-3.  **Trace for $aaabb$** (i.e., $n = 3$... but $aaabb$ has 3 $a$'s and 2 $b$'s, not in $L$; use $aabb$):
-    *   Push $A$, push $A$ (no output), then pop $A$ (output $b$), pop $A$ (output $b$), see $Z_0$ → accept.
-    *   Output: $bb = b^2$.
-
-**Answer:** $\tau(a^n b^n) = b^n$. The stack counts $a$'s; output is generated only in the pop phase.
-
-</details>
-
-##### **4.5. PDT — Translating $a^n b^n \to b^n a^n$** (Tutorial 7, Example 5)
-
-Build a DPDT for $L = \{a^n b^n \mid n > 0\}$ with translation $\tau(a^n b^n) = b^n a^n$ (swap the two blocks).
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Output $b$ during the *push* phase (reading $a$'s), and output $a$ during the *pop* phase (reading $b$'s). This "swaps" the outputs.
-
-1.  **States:** $q_0$ (reading $a$'s), $q_1$ (reading $b$'s), $q_F$ (accepting)
-2.  **Transitions:**
-
-    | From | To | Label | Meaning |
-    |:---|:---|:---|:---|
-    | $q_0$ | $q_0$ | $a, Z_0/AZ_0, b$ | First $a$: push $A$, output $b$ |
-    | $q_0$ | $q_0$ | $a, A/AA, b$ | More $a$'s: push $A$, output $b$ |
-    | $q_0$ | $q_1$ | $b, A/\varepsilon, a$ | First $b$: pop $A$, output $a$ |
-    | $q_1$ | $q_1$ | $b, A/\varepsilon, a$ | More $b$'s: pop $A$, output $a$ |
-    | $q_1$ | $q_F$ | $\varepsilon, Z_0/Z_0, \varepsilon$ | Done: accept |
-3.  **Trace for $aabb$:**
-    *   Read $a$: output $b$, push $A$
-    *   Read $a$: output $b$, push $A$
-    *   Read $b$: output $a$, pop $A$
-    *   Read $b$: output $a$, pop $A$
-    *   See $Z_0$ → accept. Output: $bbaa = b^2 a^2$. ✓
-
-**Answer:** $\tau(a^n b^n) = b^n a^n$. Output $b$'s during push and $a$'s during pop.
-
-</details>
-
-##### **4.6. DPDA Closure Under Union — Counterexample** (Lecture 7, Example 3)
-
-Show that the class of languages recognized by DPDAs is **not** closed under union, using $L_1 = \{a^n b^n \mid n \geq 1\}$ and $L_2 = \{a^n b^{2n} \mid n \geq 1\}$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Both $L_1$ and $L_2$ are individually recognized by DPDAs, but their union cannot be recognized by any DPDA — because a deterministic machine cannot decide which language to prepare for during the push phase.
-
-1.  **Verify $L_1 \in \mathbf{DPDA}$:** Build a DPDA that pushes one $A$ per $a$, then pops one $A$ per $b$. Accepts when $Z_0$ is on top after all $b$'s. Standard construction.
-2.  **Verify $L_2 \in \mathbf{DPDA}$:** Build a DPDA that pushes *two* $A$'s per $a$, then pops one $A$ per $b$. Accepts when $Z_0$ is on top.
-3.  **Argue $L_1 \cup L_2 \notin \mathbf{DPDA}$:**
-    *   A DPDA reading $a^n$ must decide in its stack preparation whether it will face $n$ or $2n$ $b$'s.
-    *   After the $a$'s are read, the stack is committed. When the $b$'s arrive, the machine cannot re-examine the $a$-count.
-    *   A deterministic machine cannot simultaneously prepare for both $n$ $b$'s and $2n$ $b$'s.
-    *   A formal proof uses the fact that $\{a^n b^n c^n\} \notin \mathbf{PDA}$ (via Bar-Hillel Lemma) combined with algebraic manipulation.
-4.  **Conclusion:** $L_1 \cup L_2 \notin \mathbf{DPDA}$, so **DPDA is not closed under $\cup$**.
-
-**Answer:** DPDA is not closed under union. The union $\{a^n b^n\} \cup \{a^n b^{2n}\}$ witnesses this, as neither component alone poses a problem but their union does.
-
-</details>
-
-##### **4.7. DPDA — Constructing the DPDA for $L_1 = \{a^n b^n c^m \mid n, m > 0\}$** (Tutorial 7, Example 6)
-
-Build a DPDA that recognizes $L_1 = \{a^n b^n c^m \mid n, m > 0\}$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Push $A$'s for each $a$, match $b$'s against them, then accept any positive number of $c$'s (the $c$'s don't affect the stack count).
-
-1.  **States:** $q_0$ (start), $q_1$ (reading $a$'s), $q_2$ (reading $b$'s), $q_3$ (reading $c$'s — accepting)
-2.  **Transitions:**
-
-    | From | To | Label | Meaning |
-    |:---|:---|:---|:---|
-    | $q_0$ | $q_1$ | $a, Z_0/AZ_0$ | First $a$: push $A$ |
-    | $q_1$ | $q_1$ | $a, A/AA$ | More $a$'s: push $A$ |
-    | $q_1$ | $q_2$ | $b, A/\varepsilon$ | First $b$: pop $A$ |
-    | $q_2$ | $q_2$ | $b, A/\varepsilon$ | More $b$'s: pop $A$ |
-    | $q_2$ | $q_3$ | $c, Z_0/Z_0$ | First $c$ (stack shows $Z_0$, so $a$'s matched $b$'s): enter accepting phase |
-    | $q_3$ | $q_3$ | $c, Z_0/Z_0$ | More $c$'s: stay |
-3.  **Acceptance:** $q_3$ is the accepting state; reached only when $n$ $b$'s exactly matched $n$ $a$'s and at least one $c$ was seen.
-
-**Answer:** The DPDA with states $q_0, q_1, q_2, q_3$ (accepting) as above recognizes $L_1 = \{a^n b^n c^m \mid n, m > 0\}$.
-
-</details>
-
-##### **4.8. DPDA — Constructing the DPDA for $L_2 = \{a^m b^n c^n \mid n, m > 0\}$** (Tutorial 7, Example 7)
-
-Build a DPDA that recognizes $L_2 = \{a^m b^n c^n \mid n, m > 0\}$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Skip over the $a$'s (they don't constrain anything), then count $b$'s by pushing to the stack, then verify the $c$'s by popping.
-
-1.  **States:** $q_0$ (start), $q_1$ (reading $a$'s), $q_2$ (reading $b$'s), $q_3$ (reading $c$'s), $q_4$ (accepting)
-2.  **Transitions:**
-
-    | From | To | Label | Meaning |
-    |:---|:---|:---|:---|
-    | $q_0$ | $q_1$ | $a, Z_0/Z_0$ | First $a$: no stack change |
-    | $q_1$ | $q_1$ | $a, Z_0/Z_0$ | More $a$'s: no stack change |
-    | $q_1$ | $q_2$ | $b, Z_0/BZ_0$ | First $b$: push $B$ |
-    | $q_2$ | $q_2$ | $b, B/BB$ | More $b$'s: push $B$ |
-    | $q_2$ | $q_3$ | $c, B/\varepsilon$ | First $c$: pop $B$ |
-    | $q_3$ | $q_3$ | $c, B/\varepsilon$ | More $c$'s: pop $B$ |
-    | $q_3$ | $q_4$ | $\varepsilon, Z_0/Z_0$ | Stack has only $Z_0$: all $b$'s matched $c$'s → accept |
-3.  **Acceptance:** $q_4$ is accepting, reached via $\varepsilon$-move when stack shows $Z_0$.
-
-**Answer:** The DPDA with states $q_0, q_1, q_2, q_3, q_4$ (accepting) as above recognizes $L_2 = \{a^m b^n c^n \mid n, m > 0\}$.
-
-</details>
-
-##### **4.9. DPDA Closure Under Intersection — Counterexample** (Tutorial 7, Example 8)
-
-Show that $L_1 \cap L_2 = \{a^n b^n c^n \mid n > 0\}$ using $L_1 = \{a^n b^n c^m \mid n,m > 0\} \in \mathbf{DPDA}$ and $L_2 = \{a^m b^n c^n \mid n,m > 0\} \in \mathbf{DPDA}$, and conclude that DPDA is not closed under intersection.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Both $L_1$ and $L_2$ are DPDAs (built in previous examples). Their intersection is $\{a^n b^n c^n\}$, which is not even a CFL (provable via Bar-Hillel).
-
-1.  **Compute the intersection:**
-    $$L_1 \cap L_2 = \{a^n b^n c^m\} \cap \{a^m b^n c^n\} = \{a^n b^n c^n \mid n > 0\}$$
-    (A string belongs to both iff the $a$-count equals the $b$-count AND the $b$-count equals the $c$-count, so all three counts are equal.)
-2.  **Apply Bar-Hillel Lemma to $\{a^n b^n c^n\}$:** Assume it is a CFL. Let $m$ be the Bar-Hillel constant. Choose $w = a^m b^m c^m$. Any decomposition $w = x_1 x_2 x_3 x_4 x_5$ with $|x_2 x_3 x_4| \leq m$ spans at most two of the three symbol groups. Pumping up ($i = 2$) increases only those two groups, making the counts unequal. Contradiction. So $\{a^n b^n c^n\} \notin \mathbf{CFL}$, and thus $\notin \mathbf{DPDA}$.
-3.  **Conclusion:** $L_1, L_2 \in \mathbf{DPDA}$ but $L_1 \cap L_2 \notin \mathbf{DPDA}$. Therefore **DPDA is not closed under $\cap$**.
-
-**Answer:** The intersection $\{a^n b^n c^n\}$ is not a CFL, so it cannot be recognized by any DPDA. Non-closure under intersection is proved.
-
-</details>
-
-##### **4.10. DPDA Closure Under Complement — Construction Idea** (Lecture 7, Example 1)
-
-Explain why the class of DPDA languages is closed under complement, and outline the construction of the complement DPDA.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Complement of a DPDA language is computable by (1) making the DPDA acyclic, (2) completing its transition function, and (3) swapping accepting and non-accepting states.
-
-1.  **Why naive state-swapping fails:**
-    A DPDA on input $x$ may end in a non-accepting state $q$ but then take an $\varepsilon$-move to reach accepting state $q'$. If we simply swap states, $q$ becomes accepting, so the "complement" DPDA also accepts $x$ — which is wrong (both accept $x$, but they should have opposite behavior).
-2.  **Step 1 — Eliminate loops (make acyclic):**
-    Transform the DPDA so that after consuming all input, no further $\varepsilon$-moves are possible. This ensures the computation halts in a single well-defined state. Every DPDA can be equivalently expressed as an acyclic DPDA (proof omitted; it requires carefully removing $\varepsilon$-move cycles without changing the accepted language).
-3.  **Step 2 — Complete $\delta$:**
-    Add a non-accepting "error" state $q_{\text{err}}$ and route all undefined transitions there. Now $\delta$ is a total function: every configuration has exactly one successor.
-4.  **Step 3 — Swap accepting and non-accepting states:**
-    Since the machine is now acyclic and total, it always halts in exactly one state after reading the full input. Swapping $F$ and $Q \setminus F$ correctly inverts the acceptance: strings that were accepted are now rejected, and vice versa.
-5.  **Result:** The complement DPDA recognizes $L^c$ whenever the original DPDA recognizes $L$. Therefore **DPDA is closed under ${}^c$**.
-
-**Answer:** DPDA is closed under complement via the three-step construction: eliminate loops, complete $\delta$, swap final/non-final states.
-
-</details>
-
-##### **4.11. DPDA Closure Under Difference — Proof by Contradiction** (Lecture 7, Example 2)
-
-Prove that DPDA is not closed under set difference ($\setminus$).
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Use the identity $A \cap B = A \setminus B^c$ and the fact that DPDA is closed under complement to derive a contradiction with non-closure under intersection.
-
-1.  **Assume for contradiction** that DPDA is closed under $\setminus$.
-2.  **Use the identity:** For any sets $A, B$:
-    $$A \cap B = A \setminus B^c$$
-3.  **Apply closure assumptions:**
-    *   Since DPDA is closed under complement (proved): $B \in \mathbf{DPDA} \Rightarrow B^c \in \mathbf{DPDA}$.
-    *   By the assumed closure under difference: $A \in \mathbf{DPDA}$ and $B^c \in \mathbf{DPDA} \Rightarrow A \setminus B^c \in \mathbf{DPDA}$.
-    *   Therefore $A \cap B = A \setminus B^c \in \mathbf{DPDA}$ for any $A, B \in \mathbf{DPDA}$.
-4.  **But:** We proved that DPDA is *not* closed under intersection (using $\{a^n b^n c^m\} \cap \{a^m b^n c^n\} = \{a^n b^n c^n\} \notin \mathbf{DPDA}$). **Contradiction!**
-5.  **Conclusion:** The assumption was wrong. **DPDA is not closed under $\setminus$**.
-
-**Answer:** By contradiction using $A \cap B = A \setminus B^c$ and DPDA's closure under complement, non-closure under $\cap$ implies non-closure under $\setminus$.
-
-</details>
-
 ##### **4.12. Build a DPDT for $L_1 = \{a^n b^m \mid n \geq 1 \wedge n \leq m\}$ Translating to $a^n b^n$** (Lab 6, Exercise 1)
 
 Build a Deterministic Pushdown Transducer that accepts $x \in L_1$ where $L_1 = \{a^n b^m \mid n \geq 1 \wedge n \leq m\}$, and translates it into $a^n b^n$ (keep only $n$ $a$'s and $n$ $b$'s, discarding the excess $b$'s).
@@ -1032,3 +757,278 @@ Use stack symbols $P$ (primary marker — produces output) and $S$ (secondary ma
 </details>
 
 
+##### **4.10. DPDA Closure Under Complement — Construction Idea** (Lecture 7, Example 1)
+
+Explain why the class of DPDA languages is closed under complement, and outline the construction of the complement DPDA.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Complement of a DPDA language is computable by (1) making the DPDA acyclic, (2) completing its transition function, and (3) swapping accepting and non-accepting states.
+
+1.  **Why naive state-swapping fails:**
+    A DPDA on input $x$ may end in a non-accepting state $q$ but then take an $\varepsilon$-move to reach accepting state $q'$. If we simply swap states, $q$ becomes accepting, so the "complement" DPDA also accepts $x$ — which is wrong (both accept $x$, but they should have opposite behavior).
+2.  **Step 1 — Eliminate loops (make acyclic):**
+    Transform the DPDA so that after consuming all input, no further $\varepsilon$-moves are possible. This ensures the computation halts in a single well-defined state. Every DPDA can be equivalently expressed as an acyclic DPDA (proof omitted; it requires carefully removing $\varepsilon$-move cycles without changing the accepted language).
+3.  **Step 2 — Complete $\delta$:**
+    Add a non-accepting "error" state $q_{\text{err}}$ and route all undefined transitions there. Now $\delta$ is a total function: every configuration has exactly one successor.
+4.  **Step 3 — Swap accepting and non-accepting states:**
+    Since the machine is now acyclic and total, it always halts in exactly one state after reading the full input. Swapping $F$ and $Q \setminus F$ correctly inverts the acceptance: strings that were accepted are now rejected, and vice versa.
+5.  **Result:** The complement DPDA recognizes $L^c$ whenever the original DPDA recognizes $L$. Therefore **DPDA is closed under ${}^c$**.
+
+**Answer:** DPDA is closed under complement via the three-step construction: eliminate loops, complete $\delta$, swap final/non-final states.
+
+</details>
+
+##### **4.11. DPDA Closure Under Difference — Proof by Contradiction** (Lecture 7, Example 2)
+
+Prove that DPDA is not closed under set difference ($\setminus$).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the identity $A \cap B = A \setminus B^c$ and the fact that DPDA is closed under complement to derive a contradiction with non-closure under intersection.
+
+1.  **Assume for contradiction** that DPDA is closed under $\setminus$.
+2.  **Use the identity:** For any sets $A, B$:
+    $$A \cap B = A \setminus B^c$$
+3.  **Apply closure assumptions:**
+    *   Since DPDA is closed under complement (proved): $B \in \mathbf{DPDA} \Rightarrow B^c \in \mathbf{DPDA}$.
+    *   By the assumed closure under difference: $A \in \mathbf{DPDA}$ and $B^c \in \mathbf{DPDA} \Rightarrow A \setminus B^c \in \mathbf{DPDA}$.
+    *   Therefore $A \cap B = A \setminus B^c \in \mathbf{DPDA}$ for any $A, B \in \mathbf{DPDA}$.
+4.  **But:** We proved that DPDA is *not* closed under intersection (using $\{a^n b^n c^m\} \cap \{a^m b^n c^n\} = \{a^n b^n c^n\} \notin \mathbf{DPDA}$). **Contradiction!**
+5.  **Conclusion:** The assumption was wrong. **DPDA is not closed under $\setminus$**.
+
+**Answer:** By contradiction using $A \cap B = A \setminus B^c$ and DPDA's closure under complement, non-closure under $\cap$ implies non-closure under $\setminus$.
+
+</details>
+
+
+##### **4.6. DPDA Closure Under Union — Counterexample** (Lecture 7, Example 3)
+
+Show that the class of languages recognized by DPDAs is **not** closed under union, using $L_1 = \{a^n b^n \mid n \geq 1\}$ and $L_2 = \{a^n b^{2n} \mid n \geq 1\}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Both $L_1$ and $L_2$ are individually recognized by DPDAs, but their union cannot be recognized by any DPDA — because a deterministic machine cannot decide which language to prepare for during the push phase.
+
+1.  **Verify $L_1 \in \mathbf{DPDA}$:** Build a DPDA that pushes one $A$ per $a$, then pops one $A$ per $b$. Accepts when $Z_0$ is on top after all $b$'s. Standard construction.
+2.  **Verify $L_2 \in \mathbf{DPDA}$:** Build a DPDA that pushes *two* $A$'s per $a$, then pops one $A$ per $b$. Accepts when $Z_0$ is on top.
+3.  **Argue $L_1 \cup L_2 \notin \mathbf{DPDA}$:**
+    *   A DPDA reading $a^n$ must decide in its stack preparation whether it will face $n$ or $2n$ $b$'s.
+    *   After the $a$'s are read, the stack is committed. When the $b$'s arrive, the machine cannot re-examine the $a$-count.
+    *   A deterministic machine cannot simultaneously prepare for both $n$ $b$'s and $2n$ $b$'s.
+    *   A formal proof uses the fact that $\{a^n b^n c^n\} \notin \mathbf{PDA}$ (via Bar-Hillel Lemma) combined with algebraic manipulation.
+4.  **Conclusion:** $L_1 \cup L_2 \notin \mathbf{DPDA}$, so **DPDA is not closed under $\cup$**.
+
+**Answer:** DPDA is not closed under union. The union $\{a^n b^n\} \cup \{a^n b^{2n}\}$ witnesses this, as neither component alone poses a problem but their union does.
+
+</details>
+
+##### **4.1. FST — Translating All Strings Over $\{a,b\}$** (Tutorial 7, Example 1)
+
+Build a Finite State Transducer that accepts any string $x \in \{a, b\}^*$ and translates it by the rule $a \mapsto A$, $b \mapsto B$ (convert lowercase to uppercase).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Since every string is accepted, a single accepting state with self-loops suffices.
+
+1.  **Define the FST components:**
+    *   States: $Q = \{q_0\}$; initial state $q_0$; accepting: $F = \{q_0\}$
+    *   Input alphabet: $I = \{a, b\}$; Output alphabet: $O = \{A, B\}$
+2.  **Transitions (both are self-loops on $q_0$):**
+    *   $q_0 \xrightarrow{a/A} q_0$: read $a$, write $A$
+    *   $q_0 \xrightarrow{b/B} q_0$: read $b$, write $B$
+3.  **Trace for input $aba$:**
+    *   Read $a$ in $q_0$: output $A$, stay in $q_0$
+    *   Read $b$ in $q_0$: output $B$, stay in $q_0$
+    *   Read $a$ in $q_0$: output $A$, stay in $q_0$
+    *   End of input; $q_0 \in F$ → **accepted**
+
+**Answer:** Output $ABA$. The FST has one state $q_0$ (accepting) with self-loops $a/A$ and $b/B$.
+
+</details>
+
+##### **4.2. FST — Translating Only Strings Without $b$'s** (Tutorial 7, Example 2)
+
+Build a Finite State Transducer that accepts strings $x \in \{a, b\}^*$ containing no $b$'s, and translates them by $a \mapsto A$, $b \mapsto B$. Strings containing $b$ are rejected (translation undefined).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use a sink (non-accepting) state to handle $b$'s. Once a $b$ is seen, the string is rejected regardless of further input.
+
+1.  **States:** $q_0$ (accepting — no $b$ seen), $q_1$ (non-accepting sink — $b$ seen)
+2.  **Transitions:**
+    *   $q_0 \xrightarrow{a/A} q_0$: read $a$ in $q_0$, output $A$, stay
+    *   $q_0 \xrightarrow{b/B} q_1$: read $b$ in $q_0$, output $B$, go to sink
+    *   $q_1 \xrightarrow{a/\varepsilon} q_1$: read $a$ in sink, output nothing
+    *   $q_1 \xrightarrow{b/\varepsilon} q_1$: read $b$ in sink, output nothing
+3.  **Trace for $aaa$:** stays in $q_0$, outputs $AAA$ → **accepted**, translation = $AAA$
+4.  **Trace for $aba$:** $q_0 \xrightarrow{a/A} q_0 \xrightarrow{b/B} q_1 \xrightarrow{a/\varepsilon} q_1$ → **rejected** (translation undefined)
+
+**Answer:** The FST has states $\{q_0, q_1\}$ with $q_0$ accepting. Strings without $b$'s are translated to their uppercase version; strings with $b$'s are rejected.
+
+</details>
+
+##### **4.3. PDT — Translating $a^n b^n \to A^n B^n$** (Tutorial 7, Example 3)
+
+Build a Pushdown Transducer for $L = \{a^n b^n \mid n \geq 1\}$ that translates each string by $a \mapsto A$, $b \mapsto B$, i.e., $\tau(a^n b^n) = A^n B^n$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** This translation requires a stack because we need to count $n$ $a$'s and then verify $n$ $b$'s. An FST cannot count to an arbitrary $n$.
+
+1.  **States:** $q_0$ (start), $q_1$ (reading $a$'s), $q_2$ (reading $b$'s), $q_3$ (accepting)
+2.  **Stack alphabet:** $\Gamma = \{Z_0, A\}$
+3.  **Transitions:**
+
+    | From | To | Label | Meaning |
+    |:---|:---|:---|:---|
+    | $q_0$ | $q_1$ | $a, Z_0/AZ_0, A$ | First $a$: push $A$, output $A$ |
+    | $q_1$ | $q_1$ | $a, A/AA, A$ | More $a$'s: push $A$, output $A$ |
+    | $q_1$ | $q_2$ | $b, A/\varepsilon, B$ | First $b$: pop $A$, output $B$ |
+    | $q_2$ | $q_2$ | $b, A/\varepsilon, B$ | More $b$'s: pop $A$, output $B$ |
+    | $q_2$ | $q_3$ | $\varepsilon, Z_0/Z_0, \varepsilon$ | Stack empty (only $Z_0$): accept |
+4.  **Trace for $aabb$:**
+    *   $\langle q_0, aabb, Z_0, \varepsilon \rangle \vdash \langle q_1, abb, AZ_0, A \rangle$ (output $A$)
+    *   $\langle q_1, abb, AZ_0, A \rangle \vdash \langle q_1, bb, AAZ_0, AA \rangle$ (output $A$)
+    *   $\langle q_1, bb, AAZ_0, AA \rangle \vdash \langle q_2, b, AZ_0, AAB \rangle$ (output $B$)
+    *   $\langle q_2, b, AZ_0, AAB \rangle \vdash \langle q_2, \varepsilon, Z_0, AABB \rangle$ (output $B$)
+    *   $\langle q_2, \varepsilon, Z_0, AABB \rangle \vdash \langle q_3, \varepsilon, Z_0, AABB \rangle$ — **ACCEPT**
+
+**Answer:** $\tau(a^n b^n) = A^n B^n$. The PDT uses a stack to count $a$'s, then matches $b$'s one-for-one.
+
+</details>
+
+##### **4.4. PDT — Translating $a^n b^n \to b^n$** (Tutorial 7, Example 4)
+
+Build a Deterministic Pushdown Transducer for $L = \{a^n b^n \mid n > 0\}$ with translation $\tau(a^n b^n) = b^n$ (output only the $b$-part, discarding the $a$'s).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** During the push phase (reading $a$'s), output *nothing* ($\varepsilon$). Only during the pop phase (reading $b$'s), output $b$ for each pop.
+
+1.  **States:** $q_0$ (reading $a$'s), $q_1$ (reading $b$'s), $q_F$ (accepting)
+2.  **Transitions:**
+
+    | From | To | Label | Meaning |
+    |:---|:---|:---|:---|
+    | $q_0$ | $q_0$ | $a, Z_0/AZ_0, \varepsilon$ | First $a$: push $A$, NO output |
+    | $q_0$ | $q_0$ | $a, A/AA, \varepsilon$ | More $a$'s: push $A$, NO output |
+    | $q_0$ | $q_1$ | $b, A/\varepsilon, b$ | First $b$: pop $A$, output $b$ |
+    | $q_1$ | $q_1$ | $b, A/\varepsilon, b$ | More $b$'s: pop $A$, output $b$ |
+    | $q_1$ | $q_F$ | $\varepsilon, Z_0/Z_0, \varepsilon$ | Stack empty: accept, no output |
+3.  **Trace for $aaabb$** (i.e., $n = 3$... but $aaabb$ has 3 $a$'s and 2 $b$'s, not in $L$; use $aabb$):
+    *   Push $A$, push $A$ (no output), then pop $A$ (output $b$), pop $A$ (output $b$), see $Z_0$ → accept.
+    *   Output: $bb = b^2$.
+
+**Answer:** $\tau(a^n b^n) = b^n$. The stack counts $a$'s; output is generated only in the pop phase.
+
+</details>
+
+##### **4.5. PDT — Translating $a^n b^n \to b^n a^n$** (Tutorial 7, Example 5)
+
+Build a DPDT for $L = \{a^n b^n \mid n > 0\}$ with translation $\tau(a^n b^n) = b^n a^n$ (swap the two blocks).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Output $b$ during the *push* phase (reading $a$'s), and output $a$ during the *pop* phase (reading $b$'s). This "swaps" the outputs.
+
+1.  **States:** $q_0$ (reading $a$'s), $q_1$ (reading $b$'s), $q_F$ (accepting)
+2.  **Transitions:**
+
+    | From | To | Label | Meaning |
+    |:---|:---|:---|:---|
+    | $q_0$ | $q_0$ | $a, Z_0/AZ_0, b$ | First $a$: push $A$, output $b$ |
+    | $q_0$ | $q_0$ | $a, A/AA, b$ | More $a$'s: push $A$, output $b$ |
+    | $q_0$ | $q_1$ | $b, A/\varepsilon, a$ | First $b$: pop $A$, output $a$ |
+    | $q_1$ | $q_1$ | $b, A/\varepsilon, a$ | More $b$'s: pop $A$, output $a$ |
+    | $q_1$ | $q_F$ | $\varepsilon, Z_0/Z_0, \varepsilon$ | Done: accept |
+3.  **Trace for $aabb$:**
+    *   Read $a$: output $b$, push $A$
+    *   Read $a$: output $b$, push $A$
+    *   Read $b$: output $a$, pop $A$
+    *   Read $b$: output $a$, pop $A$
+    *   See $Z_0$ → accept. Output: $bbaa = b^2 a^2$. ✓
+
+**Answer:** $\tau(a^n b^n) = b^n a^n$. Output $b$'s during push and $a$'s during pop.
+
+</details>
+
+##### **4.7. DPDA — Constructing the DPDA for $L_1 = \{a^n b^n c^m \mid n, m > 0\}$** (Tutorial 7, Example 6)
+
+Build a DPDA that recognizes $L_1 = \{a^n b^n c^m \mid n, m > 0\}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Push $A$'s for each $a$, match $b$'s against them, then accept any positive number of $c$'s (the $c$'s don't affect the stack count).
+
+1.  **States:** $q_0$ (start), $q_1$ (reading $a$'s), $q_2$ (reading $b$'s), $q_3$ (reading $c$'s — accepting)
+2.  **Transitions:**
+
+    | From | To | Label | Meaning |
+    |:---|:---|:---|:---|
+    | $q_0$ | $q_1$ | $a, Z_0/AZ_0$ | First $a$: push $A$ |
+    | $q_1$ | $q_1$ | $a, A/AA$ | More $a$'s: push $A$ |
+    | $q_1$ | $q_2$ | $b, A/\varepsilon$ | First $b$: pop $A$ |
+    | $q_2$ | $q_2$ | $b, A/\varepsilon$ | More $b$'s: pop $A$ |
+    | $q_2$ | $q_3$ | $c, Z_0/Z_0$ | First $c$ (stack shows $Z_0$, so $a$'s matched $b$'s): enter accepting phase |
+    | $q_3$ | $q_3$ | $c, Z_0/Z_0$ | More $c$'s: stay |
+3.  **Acceptance:** $q_3$ is the accepting state; reached only when $n$ $b$'s exactly matched $n$ $a$'s and at least one $c$ was seen.
+
+**Answer:** The DPDA with states $q_0, q_1, q_2, q_3$ (accepting) as above recognizes $L_1 = \{a^n b^n c^m \mid n, m > 0\}$.
+
+</details>
+
+##### **4.8. DPDA — Constructing the DPDA for $L_2 = \{a^m b^n c^n \mid n, m > 0\}$** (Tutorial 7, Example 7)
+
+Build a DPDA that recognizes $L_2 = \{a^m b^n c^n \mid n, m > 0\}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Skip over the $a$'s (they don't constrain anything), then count $b$'s by pushing to the stack, then verify the $c$'s by popping.
+
+1.  **States:** $q_0$ (start), $q_1$ (reading $a$'s), $q_2$ (reading $b$'s), $q_3$ (reading $c$'s), $q_4$ (accepting)
+2.  **Transitions:**
+
+    | From | To | Label | Meaning |
+    |:---|:---|:---|:---|
+    | $q_0$ | $q_1$ | $a, Z_0/Z_0$ | First $a$: no stack change |
+    | $q_1$ | $q_1$ | $a, Z_0/Z_0$ | More $a$'s: no stack change |
+    | $q_1$ | $q_2$ | $b, Z_0/BZ_0$ | First $b$: push $B$ |
+    | $q_2$ | $q_2$ | $b, B/BB$ | More $b$'s: push $B$ |
+    | $q_2$ | $q_3$ | $c, B/\varepsilon$ | First $c$: pop $B$ |
+    | $q_3$ | $q_3$ | $c, B/\varepsilon$ | More $c$'s: pop $B$ |
+    | $q_3$ | $q_4$ | $\varepsilon, Z_0/Z_0$ | Stack has only $Z_0$: all $b$'s matched $c$'s → accept |
+3.  **Acceptance:** $q_4$ is accepting, reached via $\varepsilon$-move when stack shows $Z_0$.
+
+**Answer:** The DPDA with states $q_0, q_1, q_2, q_3, q_4$ (accepting) as above recognizes $L_2 = \{a^m b^n c^n \mid n, m > 0\}$.
+
+</details>
+
+##### **4.9. DPDA Closure Under Intersection — Counterexample** (Tutorial 7, Example 8)
+
+Show that $L_1 \cap L_2 = \{a^n b^n c^n \mid n > 0\}$ using $L_1 = \{a^n b^n c^m \mid n,m > 0\} \in \mathbf{DPDA}$ and $L_2 = \{a^m b^n c^n \mid n,m > 0\} \in \mathbf{DPDA}$, and conclude that DPDA is not closed under intersection.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Both $L_1$ and $L_2$ are DPDAs (built in previous examples). Their intersection is $\{a^n b^n c^n\}$, which is not even a CFL (provable via Bar-Hillel).
+
+1.  **Compute the intersection:**
+    $$L_1 \cap L_2 = \{a^n b^n c^m\} \cap \{a^m b^n c^n\} = \{a^n b^n c^n \mid n > 0\}$$
+    (A string belongs to both iff the $a$-count equals the $b$-count AND the $b$-count equals the $c$-count, so all three counts are equal.)
+2.  **Apply Bar-Hillel Lemma to $\{a^n b^n c^n\}$:** Assume it is a CFL. Let $m$ be the Bar-Hillel constant. Choose $w = a^m b^m c^m$. Any decomposition $w = x_1 x_2 x_3 x_4 x_5$ with $|x_2 x_3 x_4| \leq m$ spans at most two of the three symbol groups. Pumping up ($i = 2$) increases only those two groups, making the counts unequal. Contradiction. So $\{a^n b^n c^n\} \notin \mathbf{CFL}$, and thus $\notin \mathbf{DPDA}$.
+3.  **Conclusion:** $L_1, L_2 \in \mathbf{DPDA}$ but $L_1 \cap L_2 \notin \mathbf{DPDA}$. Therefore **DPDA is not closed under $\cap$**.
+
+**Answer:** The intersection $\{a^n b^n c^n\}$ is not a CFL, so it cannot be recognized by any DPDA. Non-closure under intersection is proved.
+
+</details>

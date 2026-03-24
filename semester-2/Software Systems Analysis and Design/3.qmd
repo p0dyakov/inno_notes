@@ -765,6 +765,229 @@ All three describe the same fundamental mechanism that makes virtual functions w
 ***
 
 #### **3. Examples**
+
+##### **3.6. Complete Object-Oriented Zoo Example** (Lab 3, Task)
+
+Build a complete zoo animal hierarchy demonstrating inheritance, virtual functions, multiple inheritance, and polymorphism.
+
+**Requirements:**
+
+1.  Define a base class `Animal` with common attributes and virtual functions
+2.  Create intermediate classes `LandAnimal` and `WaterAnimal`
+3.  Implement derived classes `Lion` and `Dolphin`
+4.  Create class `Frog` that inherits from both `LandAnimal` and `WaterAnimal` (multiple inheritance)
+5.  Use a collection to demonstrate polymorphism
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Building a complete OOP system with inheritance hierarchy, virtual functions, and polymorphic collections.
+
+```cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+
+// Base class: Animal
+class Animal {
+protected:
+    string name;
+    int age;
+public:
+    Animal(string n, int a) : name(n), age(a) { }
+
+    // Pure virtual function - all animals must make sounds
+    virtual void makeSound() const = 0;
+
+    // Virtual destructor
+    virtual ~Animal() {
+        cout << "Animal destructor for " << name << endl;
+    }
+
+    virtual void describe() const {
+        cout << "Animal: " << name << ", Age: " << age << endl;
+    }
+};
+
+// Intermediate class: LandAnimal
+class LandAnimal : virtual public Animal {
+public:
+    LandAnimal(string n, int a) : Animal(n, a) { }
+
+    virtual void walk() const {
+        cout << name << " is walking on land." << endl;
+    }
+
+    virtual ~LandAnimal() {
+        cout << "LandAnimal destructor for " << name << endl;
+    }
+};
+
+// Intermediate class: WaterAnimal
+class WaterAnimal : virtual public Animal {
+public:
+    WaterAnimal(string n, int a) : Animal(n, a) { }
+
+    virtual void swim() const {
+        cout << name << " is swimming in water." << endl;
+    }
+
+    virtual ~WaterAnimal() {
+        cout << "WaterAnimal destructor for " << name << endl;
+    }
+};
+
+// Derived class: Lion (land animal only)
+class Lion : public LandAnimal {
+public:
+    Lion(string n, int a) : Animal(n, a), LandAnimal(n, a) { }
+
+    void makeSound() const override {
+        cout << name << " roars: ROARRRR!" << endl;
+    }
+
+    void walk() const override {
+        cout << name << " walks majestically on the savanna." << endl;
+    }
+
+    ~Lion() {
+        cout << "Lion destructor for " << name << endl;
+    }
+};
+
+// Derived class: Dolphin (water animal only)
+class Dolphin : public WaterAnimal {
+public:
+    Dolphin(string n, int a) : Animal(n, a), WaterAnimal(n, a) { }
+
+    void makeSound() const override {
+        cout << name << " clicks: Click-click-click!" << endl;
+    }
+
+    void swim() const override {
+        cout << name << " swims gracefully through the ocean." << endl;
+    }
+
+    ~Dolphin() {
+        cout << "Dolphin destructor for " << name << endl;
+    }
+};
+
+// Derived class: Frog (multiple inheritance - both land and water)
+class Frog : public LandAnimal, public WaterAnimal {
+public:
+    Frog(string n, int a)
+        : Animal(n, a), LandAnimal(n, a), WaterAnimal(n, a) { }
+
+    void makeSound() const override {
+        cout << name << " croaks: Ribbit ribbit!" << endl;
+    }
+
+    void walk() const override {
+        cout << name << " hops on the ground." << endl;
+    }
+
+    void swim() const override {
+        cout << name << " swims in the pond." << endl;
+    }
+
+    ~Frog() {
+        cout << "Frog destructor for " << name << endl;
+    }
+};
+
+int main() {
+    cout << "=== Creating Zoo Animals ===" << endl;
+
+    // Create a vector of Animal pointers (polymorphic container)
+    vector<Animal*> zoo;
+
+    // Add various animals
+    zoo.push_back(new Lion("Leo", 5));
+    zoo.push_back(new Dolphin("Flipper", 3));
+    zoo.push_back(new Frog("Kermit", 1));
+    zoo.push_back(new Lion("Simba", 2));
+    zoo.push_back(new Dolphin("Moby", 8));
+    zoo.push_back(new Frog("Fredrick", 2));
+
+    cout << "\n=== All Animals Make Sounds ===" << endl;
+    for (Animal* animal : zoo) {
+        animal->makeSound();
+    }
+
+    cout << "\n=== Land Animals Walking ===" << endl;
+    Lion* lion = dynamic_cast<Lion*>(zoo[0]);
+    if (lion) lion->walk();
+
+    Frog* frog = dynamic_cast<Frog*>(zoo[2]);
+    if (frog) frog->walk();
+
+    cout << "\n=== Water Animals Swimming ===" << endl;
+    Dolphin* dolphin = dynamic_cast<Dolphin*>(zoo[1]);
+    if (dolphin) dolphin->swim();
+
+    if (frog) frog->swim();  // Frog can also swim!
+
+    cout << "\n=== Cleanup ===" << endl;
+    for (Animal* animal : zoo) {
+        delete animal;
+    }
+    zoo.clear();
+
+    cout << "Zoo cleaned up!" << endl;
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Creating Zoo Animals ===
+
+=== All Animals Make Sounds ===
+Leo roars: ROARRRR!
+Flipper clicks: Click-click-click!
+Kermit croaks: Ribbit ribbit!
+Simba roars: ROARRRR!
+Moby clicks: Click-click-click!
+Fredrick croaks: Ribbit ribbit!
+
+=== Land Animals Walking ===
+Leo walks majestically on the savanna.
+Kermit hops on the ground.
+
+=== Water Animals Swimming ===
+Flipper swims gracefully through the ocean.
+Fredrick swims in the pond.
+
+=== Cleanup ===
+Lion destructor for Leo
+LandAnimal destructor for Leo
+Animal destructor for Leo
+... (similar for other animals)
+Zoo cleaned up!
+```
+
+**Explanation:**
+
+1.  **Base class:** `Animal` has pure virtual `makeSound()` ensuring all animals implement it
+2.  **Single inheritance:** `Lion` inherits from `LandAnimal`; `Dolphin` inherits from `WaterAnimal`
+3.  **Multiple inheritance:** `Frog` inherits from both `LandAnimal` and `WaterAnimal`, demonstrating it can both walk and swim
+4.  **Polymorphic collection:** The `vector<Animal*>` can hold any derived type; polymorphic calls work correctly
+5.  **Virtual destructors:** Ensure proper cleanup order when deleting through base pointers
+6.  **Dynamic casting:** `dynamic_cast` allows checking if an animal is a specific type before calling type-specific methods
+
+**Design discussion:**
+
+*   **Abstraction layer:** The `Animal` interface defines the contract
+*   **Extensibility:** Adding new animal types requires no changes to existing code
+*   **Reusability:** `LandAnimal` and `WaterAnimal` can be used independently
+*   **Flexibility:** `Frog` demonstrates that a single class can inherit from multiple intermediate classes
+
+**Answer:** Complete zoo hierarchy demonstrating all major OOP concepts: inheritance, virtual functions, multiple inheritance, polymorphism, and proper resource cleanup.
+
+</details>
+
 ##### **3.1. Inheritance Access Rules - Public, Protected, Private** (Tutorial 3, Example 1)
 
 Write a program demonstrating the accessibility of base class members under different inheritance modes.
@@ -1261,227 +1484,5 @@ for (int i = 0; i < animalAmount; i++) {
 The abstract class approach is cleaner, safer, and more maintainable.
 
 **Answer:** Abstract classes define contracts through pure virtual functions, ensuring all derived classes provide required implementations. This enables clean polymorphic design patterns.
-
-</details>
-
-##### **3.6. Complete Object-Oriented Zoo Example** (Lab 3, Task)
-
-Build a complete zoo animal hierarchy demonstrating inheritance, virtual functions, multiple inheritance, and polymorphism.
-
-**Requirements:**
-
-1.  Define a base class `Animal` with common attributes and virtual functions
-2.  Create intermediate classes `LandAnimal` and `WaterAnimal`
-3.  Implement derived classes `Lion` and `Dolphin`
-4.  Create class `Frog` that inherits from both `LandAnimal` and `WaterAnimal` (multiple inheritance)
-5.  Use a collection to demonstrate polymorphism
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Building a complete OOP system with inheritance hierarchy, virtual functions, and polymorphic collections.
-
-```cpp
-#include <iostream>
-#include <vector>
-using namespace std;
-
-// Base class: Animal
-class Animal {
-protected:
-    string name;
-    int age;
-public:
-    Animal(string n, int a) : name(n), age(a) { }
-
-    // Pure virtual function - all animals must make sounds
-    virtual void makeSound() const = 0;
-
-    // Virtual destructor
-    virtual ~Animal() {
-        cout << "Animal destructor for " << name << endl;
-    }
-
-    virtual void describe() const {
-        cout << "Animal: " << name << ", Age: " << age << endl;
-    }
-};
-
-// Intermediate class: LandAnimal
-class LandAnimal : virtual public Animal {
-public:
-    LandAnimal(string n, int a) : Animal(n, a) { }
-
-    virtual void walk() const {
-        cout << name << " is walking on land." << endl;
-    }
-
-    virtual ~LandAnimal() {
-        cout << "LandAnimal destructor for " << name << endl;
-    }
-};
-
-// Intermediate class: WaterAnimal
-class WaterAnimal : virtual public Animal {
-public:
-    WaterAnimal(string n, int a) : Animal(n, a) { }
-
-    virtual void swim() const {
-        cout << name << " is swimming in water." << endl;
-    }
-
-    virtual ~WaterAnimal() {
-        cout << "WaterAnimal destructor for " << name << endl;
-    }
-};
-
-// Derived class: Lion (land animal only)
-class Lion : public LandAnimal {
-public:
-    Lion(string n, int a) : Animal(n, a), LandAnimal(n, a) { }
-
-    void makeSound() const override {
-        cout << name << " roars: ROARRRR!" << endl;
-    }
-
-    void walk() const override {
-        cout << name << " walks majestically on the savanna." << endl;
-    }
-
-    ~Lion() {
-        cout << "Lion destructor for " << name << endl;
-    }
-};
-
-// Derived class: Dolphin (water animal only)
-class Dolphin : public WaterAnimal {
-public:
-    Dolphin(string n, int a) : Animal(n, a), WaterAnimal(n, a) { }
-
-    void makeSound() const override {
-        cout << name << " clicks: Click-click-click!" << endl;
-    }
-
-    void swim() const override {
-        cout << name << " swims gracefully through the ocean." << endl;
-    }
-
-    ~Dolphin() {
-        cout << "Dolphin destructor for " << name << endl;
-    }
-};
-
-// Derived class: Frog (multiple inheritance - both land and water)
-class Frog : public LandAnimal, public WaterAnimal {
-public:
-    Frog(string n, int a)
-        : Animal(n, a), LandAnimal(n, a), WaterAnimal(n, a) { }
-
-    void makeSound() const override {
-        cout << name << " croaks: Ribbit ribbit!" << endl;
-    }
-
-    void walk() const override {
-        cout << name << " hops on the ground." << endl;
-    }
-
-    void swim() const override {
-        cout << name << " swims in the pond." << endl;
-    }
-
-    ~Frog() {
-        cout << "Frog destructor for " << name << endl;
-    }
-};
-
-int main() {
-    cout << "=== Creating Zoo Animals ===" << endl;
-
-    // Create a vector of Animal pointers (polymorphic container)
-    vector<Animal*> zoo;
-
-    // Add various animals
-    zoo.push_back(new Lion("Leo", 5));
-    zoo.push_back(new Dolphin("Flipper", 3));
-    zoo.push_back(new Frog("Kermit", 1));
-    zoo.push_back(new Lion("Simba", 2));
-    zoo.push_back(new Dolphin("Moby", 8));
-    zoo.push_back(new Frog("Fredrick", 2));
-
-    cout << "\n=== All Animals Make Sounds ===" << endl;
-    for (Animal* animal : zoo) {
-        animal->makeSound();
-    }
-
-    cout << "\n=== Land Animals Walking ===" << endl;
-    Lion* lion = dynamic_cast<Lion*>(zoo[0]);
-    if (lion) lion->walk();
-
-    Frog* frog = dynamic_cast<Frog*>(zoo[2]);
-    if (frog) frog->walk();
-
-    cout << "\n=== Water Animals Swimming ===" << endl;
-    Dolphin* dolphin = dynamic_cast<Dolphin*>(zoo[1]);
-    if (dolphin) dolphin->swim();
-
-    if (frog) frog->swim();  // Frog can also swim!
-
-    cout << "\n=== Cleanup ===" << endl;
-    for (Animal* animal : zoo) {
-        delete animal;
-    }
-    zoo.clear();
-
-    cout << "Zoo cleaned up!" << endl;
-
-    return 0;
-}
-```
-
-**Output:**
-```
-=== Creating Zoo Animals ===
-
-=== All Animals Make Sounds ===
-Leo roars: ROARRRR!
-Flipper clicks: Click-click-click!
-Kermit croaks: Ribbit ribbit!
-Simba roars: ROARRRR!
-Moby clicks: Click-click-click!
-Fredrick croaks: Ribbit ribbit!
-
-=== Land Animals Walking ===
-Leo walks majestically on the savanna.
-Kermit hops on the ground.
-
-=== Water Animals Swimming ===
-Flipper swims gracefully through the ocean.
-Fredrick swims in the pond.
-
-=== Cleanup ===
-Lion destructor for Leo
-LandAnimal destructor for Leo
-Animal destructor for Leo
-... (similar for other animals)
-Zoo cleaned up!
-```
-
-**Explanation:**
-
-1.  **Base class:** `Animal` has pure virtual `makeSound()` ensuring all animals implement it
-2.  **Single inheritance:** `Lion` inherits from `LandAnimal`; `Dolphin` inherits from `WaterAnimal`
-3.  **Multiple inheritance:** `Frog` inherits from both `LandAnimal` and `WaterAnimal`, demonstrating it can both walk and swim
-4.  **Polymorphic collection:** The `vector<Animal*>` can hold any derived type; polymorphic calls work correctly
-5.  **Virtual destructors:** Ensure proper cleanup order when deleting through base pointers
-6.  **Dynamic casting:** `dynamic_cast` allows checking if an animal is a specific type before calling type-specific methods
-
-**Design discussion:**
-
-*   **Abstraction layer:** The `Animal` interface defines the contract
-*   **Extensibility:** Adding new animal types requires no changes to existing code
-*   **Reusability:** `LandAnimal` and `WaterAnimal` can be used independently
-*   **Flexibility:** `Frog` demonstrates that a single class can inherit from multiple intermediate classes
-
-**Answer:** Complete zoo hierarchy demonstrating all major OOP concepts: inheritance, virtual functions, multiple inheritance, polymorphism, and proper resource cleanup.
 
 </details>

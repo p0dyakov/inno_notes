@@ -1460,7 +1460,420 @@ void C::f(int x) {  // C::f specifies this is a member of C
 
 #### **3. Examples**
 
-##### **3.1. Implementing a Non-Copyable Class** (Lecture 4, Example)
+
+##### **3.10. Bank Account Class - Complete Implementation** (Lab 4, Task 1)
+
+Implement a complete bank account system demonstrating:
+
+*   Base class `Account` with basic operations
+*   Derived class `SavingsAccount` with interest calculation
+*   Use of `this` pointer
+*   Constant member functions
+*   Deleted functions for copy prevention
+*   Defaulted constructor
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Building a complete class hierarchy demonstrating all major C++ class features from this lecture.
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+class Account {
+private:
+    int accountNumber;
+    double balance;
+    string ownerName;
+
+public:
+    // Defaulted default constructor
+    Account() = default;
+
+    // Parameterized constructor
+    Account(int accNum, double initialBalance, string owner)
+        : accountNumber(accNum), balance(initialBalance), ownerName(owner) {
+        cout << "Account created for " << ownerName << endl;
+    }
+
+    // Deleted copy constructor and assignment operator
+    Account(const Account&) = delete;
+    Account& operator=(const Account&) = delete;
+
+    // Deposit money (uses this pointer for demonstration)
+    void deposit(double amount) {
+        if (amount > 0) {
+            this->balance += amount;  // Explicit use of this
+            cout << "Deposited: $" << amount << endl;
+        } else {
+            cout << "Invalid deposit amount" << endl;
+        }
+    }
+
+    // Withdraw money (ensures balance doesn't go negative)
+    void withdraw(double amount) {
+        if (amount > 0 && this->balance >= amount) {
+            this->balance -= amount;
+            cout << "Withdrawn: $" << amount << endl;
+        } else {
+            cout << "Invalid withdrawal or insufficient funds" << endl;
+        }
+    }
+
+    // Constant member functions (don't modify state)
+    double getBalance() const {
+        return balance;
+    }
+
+    int getAccountNumber() const {
+        return accountNumber;
+    }
+
+    string getOwnerName() const {
+        return ownerName;
+    }
+
+    // Virtual destructor for proper inheritance
+    virtual ~Account() {
+        cout << "Account destroyed for " << ownerName << endl;
+    }
+};
+
+class SavingsAccount : public Account {
+private:
+    double interestRate;  // Annual interest rate (e.g., 2.5 for 2.5%)
+
+public:
+    // Constructor delegating to base class
+    SavingsAccount(int accNum, double initialBalance, string owner, double rate)
+        : Account(accNum, initialBalance, owner), interestRate(rate) {
+        cout << "SavingsAccount created with " << interestRate << "% interest" << endl;
+    }
+
+    // Calculate and deposit interest
+    void calculateInterest() {
+        double interest = this->getBalance() * (interestRate / 100.0);
+        cout << "Calculating interest: $" << interest << endl;
+        this->deposit(interest);  // Use inherited deposit method
+    }
+
+    // Constant member function
+    double getInterestRate() const {
+        return interestRate;
+    }
+
+    ~SavingsAccount() {
+        cout << "SavingsAccount destroyed" << endl;
+    }
+};
+
+int main() {
+    cout << "=== Creating Savings Account ===" << endl;
+    SavingsAccount savings(123456, 1000.0, "John Doe", 2.5);
+
+    cout << "\n=== Initial State ===" << endl;
+    cout << "Account Number: " << savings.getAccountNumber() << endl;
+    cout << "Owner's Name: " << savings.getOwnerName() << endl;
+    cout << "Current Balance: $" << savings.getBalance() << endl;
+    cout << "Interest Rate: " << savings.getInterestRate() << "%" << endl;
+
+    cout << "\n=== Performing Transactions ===" << endl;
+    savings.deposit(500.0);
+    savings.withdraw(200.0);
+
+    cout << "\n=== After Transactions ===" << endl;
+    cout << "Current Balance: $" << savings.getBalance() << endl;
+
+    cout << "\n=== Calculating Interest ===" << endl;
+    savings.calculateInterest();
+
+    cout << "\n=== Final State ===" << endl;
+    cout << "Final Balance: $" << savings.getBalance() << endl;
+
+    // Attempting to copy would cause compile error
+    // SavingsAccount copy = savings;  // ERROR: copy constructor deleted
+    // Account acc2 = savings;         // ERROR: copy constructor deleted
+
+    cout << "\n=== Exiting (destructors called) ===" << endl;
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Creating Savings Account ===
+Account created for John Doe
+SavingsAccount created with 2.5% interest
+
+=== Initial State ===
+Account Number: 123456
+Owner's Name: John Doe
+Current Balance: $1000
+Interest Rate: 2.5%
+
+=== Performing Transactions ===
+Deposited: $500
+Withdrawn: $200
+
+=== After Transactions ===
+Current Balance: $1300
+
+=== Calculating Interest ===
+Calculating interest: $32.5
+Deposited: $32.5
+
+=== Final State ===
+Final Balance: $1332.5
+
+=== Exiting (destructors called) ===
+SavingsAccount destroyed
+Account destroyed for John Doe
+```
+
+**Explanation:**
+
+1.  **Defaulted constructor:** `Account() = default` explicitly generates default constructor
+2.  **Deleted functions:** Copy constructor and assignment deleted to prevent account duplication
+3.  **this pointer:**
+    *   Used explicitly in `deposit()` and `withdraw()` for clarity
+    *   `this->balance` accesses member through pointer
+4.  **Constant member functions:**
+    *   `getBalance()`, `getAccountNumber()`, `getOwnerName()` marked const
+    *   Can be called on const Account objects
+    *   Promise not to modify object state
+5.  **Inheritance:**
+    *   `SavingsAccount` inherits from `Account`
+    *   Uses base class constructor in initializer list
+    *   Extends functionality with interest calculation
+6.  **Virtual destructor:**
+    *   Ensures proper cleanup when deleting through base pointer
+    *   Destructors called in reverse order (derived, then base)
+
+**Design decisions:**
+
+*   Accounts cannot be copied (unique resource)
+*   Balance can only be modified through deposit/withdraw (encapsulation)
+*   Const member functions allow reading state without modification risk
+*   Interest calculation uses existing deposit method (code reuse)
+
+**Answer:** Complete implementation demonstrating defaulted/deleted functions, this pointer usage, const correctness, proper initialization, and inheritance.
+
+</details>
+
+##### **3.11. Shape Hierarchy with Type Casting** (Lab 4, Task 2)
+
+Implement a shape hierarchy and demonstrate the four different cast types in practical scenarios.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Using the appropriate cast type for different scenarios in an inheritance hierarchy.
+
+```cpp
+#include <iostream>
+#include <cmath>
+using namespace std;
+
+class Shape {
+public:
+    virtual double area() const = 0;      // Pure virtual
+    virtual double perimeter() const = 0; // Pure virtual
+    virtual ~Shape() { }                  // Virtual destructor
+};
+
+class Rectangle : public Shape {
+private:
+    double width;
+    double height;
+
+public:
+    Rectangle(double w, double h) : width(w), height(h) { }
+
+    double area() const override {
+        return width * height;
+    }
+
+    double perimeter() const override {
+        return 2 * (width + height);
+    }
+
+    // Rectangle-specific method
+    double diagonal() const {
+        return sqrt(width * width + height * height);
+    }
+
+    double getWidth() const { return width; }
+    double getHeight() const { return height; }
+};
+
+class Circle : public Shape {
+private:
+    double radius;
+
+public:
+    Circle(double r) : radius(r) { }
+
+    double area() const override {
+        return M_PI * radius * radius;
+    }
+
+    double perimeter() const override {
+        return 2 * M_PI * radius;
+    }
+
+    // Circle-specific method
+    double diameter() const {
+        return 2 * radius;
+    }
+
+    double getRadius() const { return radius; }
+};
+
+int main() {
+    Rectangle rectangle(5.0, 3.0);
+    Circle circle(4.0);
+
+    Shape* shape = &rectangle;
+
+    cout << "=== Demonstrate static casting [1] ===" << endl;
+    // Static cast: Compile-time downcast (no runtime check)
+    // Safe here because we KNOW shape points to Rectangle
+    const Rectangle* rectPtr = static_cast<const Rectangle*>(shape);
+    cout << "Rectangle width: " << rectPtr->getWidth() << endl;
+    cout << "Rectangle height: " << rectPtr->getHeight() << endl;
+    cout << "Rectangle diagonal: " << rectPtr->diagonal() << endl;
+
+    cout << "\n=== Demonstrate dynamic casting [2] ===" << endl;
+    // Dynamic cast: Runtime type checking
+    // Check if shape is actually a Circle
+    if (const Circle* circPtr = dynamic_cast<const Circle*>(shape)) {
+        cout << "Shape is a Circle with radius: " << circPtr->getRadius() << endl;
+    } else {
+        cout << "Shape is NOT a Circle" << endl;
+    }
+
+    // Now point to circle and check again
+    shape = &circle;
+    if (const Circle* circPtr = dynamic_cast<const Circle*>(shape)) {
+        cout << "Shape is a Circle with radius: " << circPtr->getRadius() << endl;
+        cout << "Circle diameter: " << circPtr->diameter() << endl;
+    } else {
+        cout << "Shape is NOT a Circle" << endl;
+    }
+
+    cout << "\n=== Demonstrate const casting [3] ===" << endl;
+    // Const cast: Remove const qualifier
+    // WARNING: Only safe if the original object wasn't const
+    const Rectangle* constRectPtr = &rectangle;
+
+    // Need to modify through a const pointer (normally not allowed)
+    // Remove const to call non-const method
+    Rectangle* mutableRectPtr = const_cast<Rectangle*>(constRectPtr);
+
+    // Now can call non-const methods (if they existed)
+    cout << "Successfully removed const (use with caution!)" << endl;
+    cout << "Area: " << mutableRectPtr->area() << endl;
+
+    cout << "\n=== Demonstrate reinterpret casting [4] ===" << endl;
+    // Reinterpret cast: Low-level bit reinterpretation
+    int intValue = 42;
+
+    // Treat the integer's bits as if they were a double
+    // WARNING: This is just for demonstration - meaningless operation!
+    double* doublePtr = reinterpret_cast<double*>(&intValue);
+
+    cout << "Integer value: " << intValue << endl;
+    cout << "Integer address: " << &intValue << endl;
+    cout << "Reinterpreted as double pointer: " << doublePtr << endl;
+    // Don't dereference doublePtr - it doesn't point to a valid double!
+
+    // More practical use: store pointer as integer
+    Shape* shapePtr = &rectangle;
+    long ptrAsInt = reinterpret_cast<long>(shapePtr);
+    cout << "Pointer stored as integer: " << ptrAsInt << endl;
+
+    // Convert back
+    Shape* restoredPtr = reinterpret_cast<Shape*>(ptrAsInt);
+    cout << "Restored pointer area: " << restoredPtr->area() << endl;
+
+    cout << "\n=== Summary ===" << endl;
+    cout << "1. static_cast: Fast compile-time cast (use when type is known)" << endl;
+    cout << "2. dynamic_cast: Safe runtime cast (use when type is uncertain)" << endl;
+    cout << "3. const_cast: Remove const (use rarely, with caution)" << endl;
+    cout << "4. reinterpret_cast: Bit reinterpretation (use for low-level operations)" << endl;
+
+    return 0;
+}
+```
+
+**Output:**
+```
+=== Demonstrate static casting [1] ===
+Rectangle width: 5
+Rectangle height: 3
+Rectangle diagonal: 5.83095
+
+=== Demonstrate dynamic casting [2] ===
+Shape is NOT a Circle
+Shape is a Circle with radius: 4
+Circle diameter: 8
+
+=== Demonstrate const casting [3] ===
+Successfully removed const (use with caution!)
+Area: 15
+
+=== Demonstrate reinterpret casting [4] ===
+Integer value: 42
+Integer address: 0x7ffeefbff5ac
+Reinterpreted as double pointer: 0x7ffeefbff5ac
+Pointer stored as integer: 140732920755372
+Restored pointer area: 15
+
+=== Summary ===
+1. static_cast: Fast compile-time cast (use when type is known)
+2. dynamic_cast: Safe runtime cast (use when type is uncertain)
+3. const_cast: Remove const (use rarely, with caution)
+4. reinterpret_cast: Bit reinterpretation (use for low-level operations)
+```
+
+**Explanation:**
+
+1.  **static_cast [1]:**
+    *   Downcast from `Shape*` to `const Rectangle*`
+    *   Compile-time cast - no runtime checking
+    *   Safe here because we know `shape` points to `Rectangle`
+    *   Faster than `dynamic_cast` but requires programmer certainty
+2.  **dynamic_cast [2]:**
+    *   Runtime type checking
+    *   Returns `nullptr` if cast fails (object is not of target type)
+    *   First check fails (shape points to Rectangle, not Circle)
+    *   Second check succeeds (shape now points to Circle)
+    *   Safer but has runtime overhead
+3.  **const_cast [3]:**
+    *   Removes const qualification
+    *   Allows calling non-const methods through const pointer
+    *   Only safe if original object wasn't const
+    *   Use sparingly - indicates potential design issue
+4.  **reinterpret_cast [4]:**
+    *   Reinterprets bit pattern without conversion
+    *   Used to store pointer as integer and restore it
+    *   Most dangerous cast - bypasses type system
+    *   Use only for low-level operations
+
+**When to use each:**
+
+*   **Use `static_cast`** when you're certain of the type (performance-critical code)
+*   **Use `dynamic_cast`** when you need runtime safety (uncertain about type)
+*   **Use `const_cast`** when interfacing with legacy APIs (avoid if possible)
+*   **Use `reinterpret_cast`** for system programming only (almost never in application code)
+
+**Answer:** Demonstrated all four cast types in practical scenarios. `static_cast` for known-safe conversions, `dynamic_cast` for runtime-safe downcasts, `const_cast` for const removal, `reinterpret_cast` for low-level operations.
+
+</details>
+
+##### **3.1. Implementing a Non-Copyable Class** (Lecture 4, Example 1)
 
 Create a class that can be instantiated but cannot be copied, demonstrating proper use of `= default` and `= delete`.
 
@@ -1609,7 +2022,7 @@ Resource 1 (moved-from) destroyed
 
 </details>
 
-##### **3.2. Constructor Initializer Lists** (Lecture 4, Example)
+##### **3.2. Constructor Initializer Lists** (Lecture 4, Example 2)
 
 Demonstrate proper use of constructor initializer lists for both base class initialization and member initialization.
 
@@ -1756,7 +2169,7 @@ Members are always initialized in **declaration order**, not initializer list or
 
 </details>
 
-##### **3.3. Delegating Constructors** (Lecture 4, Example)
+##### **3.3. Delegating Constructors** (Lecture 4, Example 3)
 
 Demonstrate using delegating constructors to reduce code duplication when multiple constructors share common initialization logic.
 
@@ -2674,417 +3087,5 @@ void identifyAnimal(Animal* a) {
 ```
 
 **Answer:** `typeid` returns `type_info` reference for runtime type checking. Use `typeid(*ptr)` for dynamic type, `typeid(ptr)` for static type. Compare with `==` operator.
-
-</details>
-
-##### **3.10. Bank Account Class - Complete Implementation** (Lab 4, Task 1)
-
-Implement a complete bank account system demonstrating:
-
-*   Base class `Account` with basic operations
-*   Derived class `SavingsAccount` with interest calculation
-*   Use of `this` pointer
-*   Constant member functions
-*   Deleted functions for copy prevention
-*   Defaulted constructor
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Building a complete class hierarchy demonstrating all major C++ class features from this lecture.
-
-```cpp
-#include <iostream>
-#include <string>
-using namespace std;
-
-class Account {
-private:
-    int accountNumber;
-    double balance;
-    string ownerName;
-
-public:
-    // Defaulted default constructor
-    Account() = default;
-
-    // Parameterized constructor
-    Account(int accNum, double initialBalance, string owner)
-        : accountNumber(accNum), balance(initialBalance), ownerName(owner) {
-        cout << "Account created for " << ownerName << endl;
-    }
-
-    // Deleted copy constructor and assignment operator
-    Account(const Account&) = delete;
-    Account& operator=(const Account&) = delete;
-
-    // Deposit money (uses this pointer for demonstration)
-    void deposit(double amount) {
-        if (amount > 0) {
-            this->balance += amount;  // Explicit use of this
-            cout << "Deposited: $" << amount << endl;
-        } else {
-            cout << "Invalid deposit amount" << endl;
-        }
-    }
-
-    // Withdraw money (ensures balance doesn't go negative)
-    void withdraw(double amount) {
-        if (amount > 0 && this->balance >= amount) {
-            this->balance -= amount;
-            cout << "Withdrawn: $" << amount << endl;
-        } else {
-            cout << "Invalid withdrawal or insufficient funds" << endl;
-        }
-    }
-
-    // Constant member functions (don't modify state)
-    double getBalance() const {
-        return balance;
-    }
-
-    int getAccountNumber() const {
-        return accountNumber;
-    }
-
-    string getOwnerName() const {
-        return ownerName;
-    }
-
-    // Virtual destructor for proper inheritance
-    virtual ~Account() {
-        cout << "Account destroyed for " << ownerName << endl;
-    }
-};
-
-class SavingsAccount : public Account {
-private:
-    double interestRate;  // Annual interest rate (e.g., 2.5 for 2.5%)
-
-public:
-    // Constructor delegating to base class
-    SavingsAccount(int accNum, double initialBalance, string owner, double rate)
-        : Account(accNum, initialBalance, owner), interestRate(rate) {
-        cout << "SavingsAccount created with " << interestRate << "% interest" << endl;
-    }
-
-    // Calculate and deposit interest
-    void calculateInterest() {
-        double interest = this->getBalance() * (interestRate / 100.0);
-        cout << "Calculating interest: $" << interest << endl;
-        this->deposit(interest);  // Use inherited deposit method
-    }
-
-    // Constant member function
-    double getInterestRate() const {
-        return interestRate;
-    }
-
-    ~SavingsAccount() {
-        cout << "SavingsAccount destroyed" << endl;
-    }
-};
-
-int main() {
-    cout << "=== Creating Savings Account ===" << endl;
-    SavingsAccount savings(123456, 1000.0, "John Doe", 2.5);
-
-    cout << "\n=== Initial State ===" << endl;
-    cout << "Account Number: " << savings.getAccountNumber() << endl;
-    cout << "Owner's Name: " << savings.getOwnerName() << endl;
-    cout << "Current Balance: $" << savings.getBalance() << endl;
-    cout << "Interest Rate: " << savings.getInterestRate() << "%" << endl;
-
-    cout << "\n=== Performing Transactions ===" << endl;
-    savings.deposit(500.0);
-    savings.withdraw(200.0);
-
-    cout << "\n=== After Transactions ===" << endl;
-    cout << "Current Balance: $" << savings.getBalance() << endl;
-
-    cout << "\n=== Calculating Interest ===" << endl;
-    savings.calculateInterest();
-
-    cout << "\n=== Final State ===" << endl;
-    cout << "Final Balance: $" << savings.getBalance() << endl;
-
-    // Attempting to copy would cause compile error
-    // SavingsAccount copy = savings;  // ERROR: copy constructor deleted
-    // Account acc2 = savings;         // ERROR: copy constructor deleted
-
-    cout << "\n=== Exiting (destructors called) ===" << endl;
-    return 0;
-}
-```
-
-**Output:**
-```
-=== Creating Savings Account ===
-Account created for John Doe
-SavingsAccount created with 2.5% interest
-
-=== Initial State ===
-Account Number: 123456
-Owner's Name: John Doe
-Current Balance: $1000
-Interest Rate: 2.5%
-
-=== Performing Transactions ===
-Deposited: $500
-Withdrawn: $200
-
-=== After Transactions ===
-Current Balance: $1300
-
-=== Calculating Interest ===
-Calculating interest: $32.5
-Deposited: $32.5
-
-=== Final State ===
-Final Balance: $1332.5
-
-=== Exiting (destructors called) ===
-SavingsAccount destroyed
-Account destroyed for John Doe
-```
-
-**Explanation:**
-
-1.  **Defaulted constructor:** `Account() = default` explicitly generates default constructor
-2.  **Deleted functions:** Copy constructor and assignment deleted to prevent account duplication
-3.  **this pointer:**
-    *   Used explicitly in `deposit()` and `withdraw()` for clarity
-    *   `this->balance` accesses member through pointer
-4.  **Constant member functions:**
-    *   `getBalance()`, `getAccountNumber()`, `getOwnerName()` marked const
-    *   Can be called on const Account objects
-    *   Promise not to modify object state
-5.  **Inheritance:**
-    *   `SavingsAccount` inherits from `Account`
-    *   Uses base class constructor in initializer list
-    *   Extends functionality with interest calculation
-6.  **Virtual destructor:**
-    *   Ensures proper cleanup when deleting through base pointer
-    *   Destructors called in reverse order (derived, then base)
-
-**Design decisions:**
-
-*   Accounts cannot be copied (unique resource)
-*   Balance can only be modified through deposit/withdraw (encapsulation)
-*   Const member functions allow reading state without modification risk
-*   Interest calculation uses existing deposit method (code reuse)
-
-**Answer:** Complete implementation demonstrating defaulted/deleted functions, this pointer usage, const correctness, proper initialization, and inheritance.
-
-</details>
-
-##### **3.11. Shape Hierarchy with Type Casting** (Lab 4, Task 2)
-
-Implement a shape hierarchy and demonstrate the four different cast types in practical scenarios.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Using the appropriate cast type for different scenarios in an inheritance hierarchy.
-
-```cpp
-#include <iostream>
-#include <cmath>
-using namespace std;
-
-class Shape {
-public:
-    virtual double area() const = 0;      // Pure virtual
-    virtual double perimeter() const = 0; // Pure virtual
-    virtual ~Shape() { }                  // Virtual destructor
-};
-
-class Rectangle : public Shape {
-private:
-    double width;
-    double height;
-
-public:
-    Rectangle(double w, double h) : width(w), height(h) { }
-
-    double area() const override {
-        return width * height;
-    }
-
-    double perimeter() const override {
-        return 2 * (width + height);
-    }
-
-    // Rectangle-specific method
-    double diagonal() const {
-        return sqrt(width * width + height * height);
-    }
-
-    double getWidth() const { return width; }
-    double getHeight() const { return height; }
-};
-
-class Circle : public Shape {
-private:
-    double radius;
-
-public:
-    Circle(double r) : radius(r) { }
-
-    double area() const override {
-        return M_PI * radius * radius;
-    }
-
-    double perimeter() const override {
-        return 2 * M_PI * radius;
-    }
-
-    // Circle-specific method
-    double diameter() const {
-        return 2 * radius;
-    }
-
-    double getRadius() const { return radius; }
-};
-
-int main() {
-    Rectangle rectangle(5.0, 3.0);
-    Circle circle(4.0);
-
-    Shape* shape = &rectangle;
-
-    cout << "=== Demonstrate static casting [1] ===" << endl;
-    // Static cast: Compile-time downcast (no runtime check)
-    // Safe here because we KNOW shape points to Rectangle
-    const Rectangle* rectPtr = static_cast<const Rectangle*>(shape);
-    cout << "Rectangle width: " << rectPtr->getWidth() << endl;
-    cout << "Rectangle height: " << rectPtr->getHeight() << endl;
-    cout << "Rectangle diagonal: " << rectPtr->diagonal() << endl;
-
-    cout << "\n=== Demonstrate dynamic casting [2] ===" << endl;
-    // Dynamic cast: Runtime type checking
-    // Check if shape is actually a Circle
-    if (const Circle* circPtr = dynamic_cast<const Circle*>(shape)) {
-        cout << "Shape is a Circle with radius: " << circPtr->getRadius() << endl;
-    } else {
-        cout << "Shape is NOT a Circle" << endl;
-    }
-
-    // Now point to circle and check again
-    shape = &circle;
-    if (const Circle* circPtr = dynamic_cast<const Circle*>(shape)) {
-        cout << "Shape is a Circle with radius: " << circPtr->getRadius() << endl;
-        cout << "Circle diameter: " << circPtr->diameter() << endl;
-    } else {
-        cout << "Shape is NOT a Circle" << endl;
-    }
-
-    cout << "\n=== Demonstrate const casting [3] ===" << endl;
-    // Const cast: Remove const qualifier
-    // WARNING: Only safe if the original object wasn't const
-    const Rectangle* constRectPtr = &rectangle;
-
-    // Need to modify through a const pointer (normally not allowed)
-    // Remove const to call non-const method
-    Rectangle* mutableRectPtr = const_cast<Rectangle*>(constRectPtr);
-
-    // Now can call non-const methods (if they existed)
-    cout << "Successfully removed const (use with caution!)" << endl;
-    cout << "Area: " << mutableRectPtr->area() << endl;
-
-    cout << "\n=== Demonstrate reinterpret casting [4] ===" << endl;
-    // Reinterpret cast: Low-level bit reinterpretation
-    int intValue = 42;
-
-    // Treat the integer's bits as if they were a double
-    // WARNING: This is just for demonstration - meaningless operation!
-    double* doublePtr = reinterpret_cast<double*>(&intValue);
-
-    cout << "Integer value: " << intValue << endl;
-    cout << "Integer address: " << &intValue << endl;
-    cout << "Reinterpreted as double pointer: " << doublePtr << endl;
-    // Don't dereference doublePtr - it doesn't point to a valid double!
-
-    // More practical use: store pointer as integer
-    Shape* shapePtr = &rectangle;
-    long ptrAsInt = reinterpret_cast<long>(shapePtr);
-    cout << "Pointer stored as integer: " << ptrAsInt << endl;
-
-    // Convert back
-    Shape* restoredPtr = reinterpret_cast<Shape*>(ptrAsInt);
-    cout << "Restored pointer area: " << restoredPtr->area() << endl;
-
-    cout << "\n=== Summary ===" << endl;
-    cout << "1. static_cast: Fast compile-time cast (use when type is known)" << endl;
-    cout << "2. dynamic_cast: Safe runtime cast (use when type is uncertain)" << endl;
-    cout << "3. const_cast: Remove const (use rarely, with caution)" << endl;
-    cout << "4. reinterpret_cast: Bit reinterpretation (use for low-level operations)" << endl;
-
-    return 0;
-}
-```
-
-**Output:**
-```
-=== Demonstrate static casting [1] ===
-Rectangle width: 5
-Rectangle height: 3
-Rectangle diagonal: 5.83095
-
-=== Demonstrate dynamic casting [2] ===
-Shape is NOT a Circle
-Shape is a Circle with radius: 4
-Circle diameter: 8
-
-=== Demonstrate const casting [3] ===
-Successfully removed const (use with caution!)
-Area: 15
-
-=== Demonstrate reinterpret casting [4] ===
-Integer value: 42
-Integer address: 0x7ffeefbff5ac
-Reinterpreted as double pointer: 0x7ffeefbff5ac
-Pointer stored as integer: 140732920755372
-Restored pointer area: 15
-
-=== Summary ===
-1. static_cast: Fast compile-time cast (use when type is known)
-2. dynamic_cast: Safe runtime cast (use when type is uncertain)
-3. const_cast: Remove const (use rarely, with caution)
-4. reinterpret_cast: Bit reinterpretation (use for low-level operations)
-```
-
-**Explanation:**
-
-1.  **static_cast [1]:**
-    *   Downcast from `Shape*` to `const Rectangle*`
-    *   Compile-time cast - no runtime checking
-    *   Safe here because we know `shape` points to `Rectangle`
-    *   Faster than `dynamic_cast` but requires programmer certainty
-2.  **dynamic_cast [2]:**
-    *   Runtime type checking
-    *   Returns `nullptr` if cast fails (object is not of target type)
-    *   First check fails (shape points to Rectangle, not Circle)
-    *   Second check succeeds (shape now points to Circle)
-    *   Safer but has runtime overhead
-3.  **const_cast [3]:**
-    *   Removes const qualification
-    *   Allows calling non-const methods through const pointer
-    *   Only safe if original object wasn't const
-    *   Use sparingly - indicates potential design issue
-4.  **reinterpret_cast [4]:**
-    *   Reinterprets bit pattern without conversion
-    *   Used to store pointer as integer and restore it
-    *   Most dangerous cast - bypasses type system
-    *   Use only for low-level operations
-
-**When to use each:**
-
-*   **Use `static_cast`** when you're certain of the type (performance-critical code)
-*   **Use `dynamic_cast`** when you need runtime safety (uncertain about type)
-*   **Use `const_cast`** when interfacing with legacy APIs (avoid if possible)
-*   **Use `reinterpret_cast`** for system programming only (almost never in application code)
-
-**Answer:** Demonstrated all four cast types in practical scenarios. `static_cast` for known-safe conversions, `dynamic_cast` for runtime-safe downcasts, `const_cast` for const removal, `reinterpret_cast` for low-level operations.
 
 </details>

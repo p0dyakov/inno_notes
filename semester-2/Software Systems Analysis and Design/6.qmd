@@ -746,6 +746,255 @@ for_each(numbers.begin(), numbers.end(), [&x](int num) {
 
 #### **3. Examples**
 
+##### **3.9. Standard Conversion and Its Prevention** (Lab 6, Task 1)
+
+Explain the output of the following program and the reason `spaceOf(arr)` gives different results in the two versions:
+
+**Version 1 — pass by value:**
+```cpp
+template <typename T>
+int spaceOf(T x) {
+    int bytes = sizeof(x);
+    return bytes / 4 + (bytes % 4 > 0);
+}
+
+int arr[10];
+cout << spaceOf(arr) << endl;        // Output: ?
+cout << spaceOf<int[10]>() << endl;  // This version takes no argument
+```
+
+**Version 2 — pass by reference:**
+```cpp
+template <typename T>
+int spaceOf(T& x) {
+    int bytes = sizeof(x);
+    return bytes / 4 + (bytes % 4 > 0);
+}
+
+int arr[10];
+cout << spaceOf(arr) << endl;        // Output: ?
+cout << spaceOf<int[10]>() << endl;  // This version takes no argument
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Arrays decay to pointers when passed by value. Passing by reference prevents this decay and preserves the array type.
+
+**Version 1 (pass by value):**
+
+*   `spaceOf(arr)`: The array `arr` decays to `int*` during argument passing. `T` is deduced as `int*`. `sizeof(int*)` is typically 8 bytes on a 64-bit system. Result: $8/4 + (8\%4 > 0) = 2 + 0 = 2$.
+*   The template with no argument `spaceOf<int[10]>()` uses the type directly: `sizeof(int[10]) = 40`. Result: $40/4 + (40\%4 > 0) = 10 + 0 = 10$.
+
+**Version 2 (pass by reference):**
+
+*   `spaceOf(arr)`: Passing by reference (`T& x`) prevents array-to-pointer decay. `T` is deduced as `int[10]`. `sizeof(int[10]) = 40`. Result: $40/4 + 0 = 10$.
+*   Same result as explicit `spaceOf<int[10]>()`.
+
+**Summary:**
+
+| Call | Version 1 (by value) | Version 2 (by reference) |
+|------|----------------------|--------------------------|
+| `spaceOf(arr)` | 2 (pointer size) | 10 (array size) |
+| `spaceOf<int[10]>()` | 10 | 10 |
+
+**Answer:** Version 1 outputs `2` for `spaceOf(arr)` because the array decays to a pointer. Version 2 outputs `10` because the reference prevents decay and `sizeof` measures the full array.
+
+</details>
+
+##### **3.10. Create a Wrapper Class Template with Explicit Specialization** (Lab 6, Task 2)
+
+Create a class template called `Wrapper` that wraps a single value of any type and provides a `getValue()` member function. Then, provide an explicit specialization for `const char*` where `getValue()` returns the **length** of the string instead of the string itself.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The generic template stores and returns the value. The explicit specialization for `const char*` overrides this behavior to return the string length.
+
+```cpp
+#include <iostream>
+#include <cstring>
+using namespace std;
+
+// Generic template: stores and returns any value
+template <typename T>
+class Wrapper {
+    T value;
+public:
+    Wrapper(T v) : value(v) { }
+    T getValue() const { return value; }
+};
+
+// Explicit specialization: for const char* return string length
+template <>
+class Wrapper<const char*> {
+    const char* value;
+public:
+    Wrapper(const char* v) : value(v) { }
+    size_t getValue() const { return strlen(value); }
+};
+
+int main() {
+    Wrapper<int>    wi(42);
+    Wrapper<double> wd(3.14);
+    Wrapper<const char*> ws("Hello");
+
+    cout << wi.getValue() << endl;  // 42
+    cout << wd.getValue() << endl;  // 3.14
+    cout << ws.getValue() << endl;  // 5 (length of "Hello")
+}
+```
+
+**Answer:** The generic `Wrapper<T>` stores and returns the value unchanged. `Wrapper<const char*>` stores the pointer but returns `strlen(value)` — the number of characters in the string.
+
+</details>
+
+##### **3.11. Implement a Dictionary Class Template with Partial Specialization** (Lab 6, Task 3)
+
+(a) Implement a `Dictionary<K, V>` class template with member functions `get(K key)`, `put(K key, V value)`, `remove(K key)`, and `size()`.
+
+(b) Add a partial specialization `Dictionary<K, int>` where `get(K key)` returns the **absolute value** of the stored integer, and `size()` returns the **sum** of all values.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The partial specialization `Dictionary<K, int>` covers all cases where `V = int`, regardless of `K`. It provides completely different semantics for `get` and `size`.
+
+```cpp
+#include <iostream>
+#include <map>
+#include <cstdlib>
+#include <numeric>
+using namespace std;
+
+// Generic Dictionary template
+template <typename K, typename V>
+class Dictionary {
+    map<K, V> data;
+public:
+    V get(K key) const {
+        return data.at(key);   // Throws if key not found
+    }
+    void put(K key, V value) {
+        data[key] = value;
+    }
+    void remove(K key) {
+        data.erase(key);
+    }
+    int size() const {
+        return data.size();
+    }
+};
+
+// Partial specialization for int values
+template <typename K>
+class Dictionary<K, int> {
+    map<K, int> data;
+public:
+    int get(K key) const {
+        return abs(data.at(key));   // Return absolute value
+    }
+    void put(K key, int value) {
+        data[key] = value;
+    }
+    void remove(K key) {
+        data.erase(key);
+    }
+    int size() const {
+        int sum = 0;
+        for (auto& pair : data)
+            sum += pair.second;
+        return sum;   // Return sum of all values
+    }
+};
+
+int main() {
+    // Generic version
+    Dictionary<string, double> d1;
+    d1.put("pi", 3.14);
+    d1.put("e", 2.71);
+    cout << d1.get("pi") << endl;   // 3.14
+    cout << d1.size() << endl;      // 2 (count)
+
+    // Partial specialization (K=string, V=int)
+    Dictionary<string, int> d2;
+    d2.put("x", -5);
+    d2.put("y", 3);
+    cout << d2.get("x") << endl;   // 5 (absolute value of -5)
+    cout << d2.size() << endl;     // -2 (sum: -5 + 3)
+}
+```
+
+**Answer:** The generic template provides standard map behavior. The partial specialization for `int` values overrides `get` to return `abs(value)` and `size` to return the sum of all stored integers.
+
+</details>
+
+##### **3.12. Implement Custom Map and Filter with Lambdas** (Lab 6, Task 4)
+
+Implement `customMap` and `customFilter` functions that accept a `vector<int>` and a callback function pointer. Then demonstrate them with lambda expressions.
+
+*   `customMap(vec, func)` applies `func` to each element and returns a new vector with results.
+*   `customFilter(vec, pred)` returns a new vector containing only elements for which `pred` returns `true`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Both functions take a function pointer. You can pass a lambda expression directly where a function pointer is expected (if the lambda has no captures).
+
+```cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+
+// Map: apply func to every element
+vector<int> customMap(const vector<int>& vec, int (*func)(int)) {
+    vector<int> result;
+    for (int elem : vec) {
+        result.push_back(func(elem));
+    }
+    return result;
+}
+
+// Filter: keep elements for which pred returns true
+vector<int> customFilter(const vector<int>& vec, bool (*pred)(int)) {
+    vector<int> result;
+    for (int elem : vec) {
+        if (pred(elem)) result.push_back(elem);
+    }
+    return result;
+}
+
+int main() {
+    vector<int> nums = {1, 2, 3, 4, 5};
+
+    // Map: square each element
+    auto squared = customMap(nums, [](int x) { return x * x; });
+    // squared = {1, 4, 9, 16, 25}
+
+    // Map: double each element
+    auto doubled = customMap(nums, [](int x) { return x * 2; });
+    // doubled = {2, 4, 6, 8, 10}
+
+    // Filter: keep only odd numbers
+    auto odds = customFilter(nums, [](int x) { return x % 2 != 0; });
+    // odds = {1, 3, 5}
+
+    // Filter: keep only even numbers
+    auto evens = customFilter(nums, [](int x) { return x % 2 == 0; });
+    // evens = {2, 4}
+
+    // Print results
+    for (int v : squared) cout << v << " ";  // 1 4 9 16 25
+    cout << endl;
+    for (int v : odds) cout << v << " ";     // 1 3 5
+    cout << endl;
+}
+```
+
+**Answer:** `customMap` builds a new vector by applying `func` to each element. `customFilter` builds a new vector of elements satisfying `pred`. Lambdas with no capture list `[]` are implicitly convertible to function pointers.
+
+</details>
+
 ##### **3.1. Analyze Default Template Argument Behavior** (Lecture 6, Example 1)
 
 Given the following template:
@@ -989,7 +1238,7 @@ bool result = cp.less(&a, &b);   // *(&a) < *(&b) → 3 < 5 → true
 
 </details>
 
-##### **3.6. Fibonacci Numbers with Explicit Specializations** (Lecture 6, Exercise 3)
+##### **3.6. Fibonacci Numbers with Explicit Specializations** (Lecture 6, Example 6)
 
 Implement a compile-time Fibonacci function using a function template with explicit specializations for the base cases:
 
@@ -1046,7 +1295,7 @@ All computation happens at compile time. The call `Fib<10>()` is replaced by the
 **Answer:** The primary template computes `Fib<N-1>() + Fib<N-2>()`. Explicit specializations for `N=1` and `N=2` return `1` and terminate the recursion.
 
 </details>
-##### **3.7. Functional Objects: Generic Find** (Tutorial 6, Problem 1)
+##### **3.7. Functional Objects: Generic Find** (Tutorial 6, Example 1)
 
 Given the `find3` function template:
 
@@ -1120,7 +1369,7 @@ int* q = find3(A, 100, Less<int, 0>());      // (b)
 
 </details>
 
-##### **3.8. Lambda Closures: Capture by Value vs. Reference** (Tutorial 6, Problem 2)
+##### **3.8. Lambda Closures: Capture by Value vs. Reference** (Tutorial 6, Example 2)
 
 Trace the output of the following program and explain each result:
 
@@ -1159,253 +1408,3 @@ cout << addMore2(10) << endl;  // (d)
 ```
 
 </details>
-
-##### **3.9. Standard Conversion and Its Prevention** (Lab 6, Problem 1)
-
-Explain the output of the following program and the reason `spaceOf(arr)` gives different results in the two versions:
-
-**Version 1 — pass by value:**
-```cpp
-template <typename T>
-int spaceOf(T x) {
-    int bytes = sizeof(x);
-    return bytes / 4 + (bytes % 4 > 0);
-}
-
-int arr[10];
-cout << spaceOf(arr) << endl;        // Output: ?
-cout << spaceOf<int[10]>() << endl;  // This version takes no argument
-```
-
-**Version 2 — pass by reference:**
-```cpp
-template <typename T>
-int spaceOf(T& x) {
-    int bytes = sizeof(x);
-    return bytes / 4 + (bytes % 4 > 0);
-}
-
-int arr[10];
-cout << spaceOf(arr) << endl;        // Output: ?
-cout << spaceOf<int[10]>() << endl;  // This version takes no argument
-```
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Arrays decay to pointers when passed by value. Passing by reference prevents this decay and preserves the array type.
-
-**Version 1 (pass by value):**
-
-*   `spaceOf(arr)`: The array `arr` decays to `int*` during argument passing. `T` is deduced as `int*`. `sizeof(int*)` is typically 8 bytes on a 64-bit system. Result: $8/4 + (8\%4 > 0) = 2 + 0 = 2$.
-*   The template with no argument `spaceOf<int[10]>()` uses the type directly: `sizeof(int[10]) = 40`. Result: $40/4 + (40\%4 > 0) = 10 + 0 = 10$.
-
-**Version 2 (pass by reference):**
-
-*   `spaceOf(arr)`: Passing by reference (`T& x`) prevents array-to-pointer decay. `T` is deduced as `int[10]`. `sizeof(int[10]) = 40`. Result: $40/4 + 0 = 10$.
-*   Same result as explicit `spaceOf<int[10]>()`.
-
-**Summary:**
-
-| Call | Version 1 (by value) | Version 2 (by reference) |
-|------|----------------------|--------------------------|
-| `spaceOf(arr)` | 2 (pointer size) | 10 (array size) |
-| `spaceOf<int[10]>()` | 10 | 10 |
-
-**Answer:** Version 1 outputs `2` for `spaceOf(arr)` because the array decays to a pointer. Version 2 outputs `10` because the reference prevents decay and `sizeof` measures the full array.
-
-</details>
-
-##### **3.10. Create a Wrapper Class Template with Explicit Specialization** (Lab 6, Task 1)
-
-Create a class template called `Wrapper` that wraps a single value of any type and provides a `getValue()` member function. Then, provide an explicit specialization for `const char*` where `getValue()` returns the **length** of the string instead of the string itself.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The generic template stores and returns the value. The explicit specialization for `const char*` overrides this behavior to return the string length.
-
-```cpp
-#include <iostream>
-#include <cstring>
-using namespace std;
-
-// Generic template: stores and returns any value
-template <typename T>
-class Wrapper {
-    T value;
-public:
-    Wrapper(T v) : value(v) { }
-    T getValue() const { return value; }
-};
-
-// Explicit specialization: for const char* return string length
-template <>
-class Wrapper<const char*> {
-    const char* value;
-public:
-    Wrapper(const char* v) : value(v) { }
-    size_t getValue() const { return strlen(value); }
-};
-
-int main() {
-    Wrapper<int>    wi(42);
-    Wrapper<double> wd(3.14);
-    Wrapper<const char*> ws("Hello");
-
-    cout << wi.getValue() << endl;  // 42
-    cout << wd.getValue() << endl;  // 3.14
-    cout << ws.getValue() << endl;  // 5 (length of "Hello")
-}
-```
-
-**Answer:** The generic `Wrapper<T>` stores and returns the value unchanged. `Wrapper<const char*>` stores the pointer but returns `strlen(value)` — the number of characters in the string.
-
-</details>
-
-##### **3.11. Implement a Dictionary Class Template with Partial Specialization** (Lab 6, Task 2)
-
-(a) Implement a `Dictionary<K, V>` class template with member functions `get(K key)`, `put(K key, V value)`, `remove(K key)`, and `size()`.
-
-(b) Add a partial specialization `Dictionary<K, int>` where `get(K key)` returns the **absolute value** of the stored integer, and `size()` returns the **sum** of all values.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The partial specialization `Dictionary<K, int>` covers all cases where `V = int`, regardless of `K`. It provides completely different semantics for `get` and `size`.
-
-```cpp
-#include <iostream>
-#include <map>
-#include <cstdlib>
-#include <numeric>
-using namespace std;
-
-// Generic Dictionary template
-template <typename K, typename V>
-class Dictionary {
-    map<K, V> data;
-public:
-    V get(K key) const {
-        return data.at(key);   // Throws if key not found
-    }
-    void put(K key, V value) {
-        data[key] = value;
-    }
-    void remove(K key) {
-        data.erase(key);
-    }
-    int size() const {
-        return data.size();
-    }
-};
-
-// Partial specialization for int values
-template <typename K>
-class Dictionary<K, int> {
-    map<K, int> data;
-public:
-    int get(K key) const {
-        return abs(data.at(key));   // Return absolute value
-    }
-    void put(K key, int value) {
-        data[key] = value;
-    }
-    void remove(K key) {
-        data.erase(key);
-    }
-    int size() const {
-        int sum = 0;
-        for (auto& pair : data)
-            sum += pair.second;
-        return sum;   // Return sum of all values
-    }
-};
-
-int main() {
-    // Generic version
-    Dictionary<string, double> d1;
-    d1.put("pi", 3.14);
-    d1.put("e", 2.71);
-    cout << d1.get("pi") << endl;   // 3.14
-    cout << d1.size() << endl;      // 2 (count)
-
-    // Partial specialization (K=string, V=int)
-    Dictionary<string, int> d2;
-    d2.put("x", -5);
-    d2.put("y", 3);
-    cout << d2.get("x") << endl;   // 5 (absolute value of -5)
-    cout << d2.size() << endl;     // -2 (sum: -5 + 3)
-}
-```
-
-**Answer:** The generic template provides standard map behavior. The partial specialization for `int` values overrides `get` to return `abs(value)` and `size` to return the sum of all stored integers.
-
-</details>
-
-##### **3.12. Implement Custom Map and Filter with Lambdas** (Lab 6, Task 3)
-
-Implement `customMap` and `customFilter` functions that accept a `vector<int>` and a callback function pointer. Then demonstrate them with lambda expressions.
-
-*   `customMap(vec, func)` applies `func` to each element and returns a new vector with results.
-*   `customFilter(vec, pred)` returns a new vector containing only elements for which `pred` returns `true`.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Both functions take a function pointer. You can pass a lambda expression directly where a function pointer is expected (if the lambda has no captures).
-
-```cpp
-#include <iostream>
-#include <vector>
-using namespace std;
-
-// Map: apply func to every element
-vector<int> customMap(const vector<int>& vec, int (*func)(int)) {
-    vector<int> result;
-    for (int elem : vec) {
-        result.push_back(func(elem));
-    }
-    return result;
-}
-
-// Filter: keep elements for which pred returns true
-vector<int> customFilter(const vector<int>& vec, bool (*pred)(int)) {
-    vector<int> result;
-    for (int elem : vec) {
-        if (pred(elem)) result.push_back(elem);
-    }
-    return result;
-}
-
-int main() {
-    vector<int> nums = {1, 2, 3, 4, 5};
-
-    // Map: square each element
-    auto squared = customMap(nums, [](int x) { return x * x; });
-    // squared = {1, 4, 9, 16, 25}
-
-    // Map: double each element
-    auto doubled = customMap(nums, [](int x) { return x * 2; });
-    // doubled = {2, 4, 6, 8, 10}
-
-    // Filter: keep only odd numbers
-    auto odds = customFilter(nums, [](int x) { return x % 2 != 0; });
-    // odds = {1, 3, 5}
-
-    // Filter: keep only even numbers
-    auto evens = customFilter(nums, [](int x) { return x % 2 == 0; });
-    // evens = {2, 4}
-
-    // Print results
-    for (int v : squared) cout << v << " ";  // 1 4 9 16 25
-    cout << endl;
-    for (int v : odds) cout << v << " ";     // 1 3 5
-    cout << endl;
-}
-```
-
-**Answer:** `customMap` builds a new vector by applying `func` to each element. `customFilter` builds a new vector of elements satisfying `pred`. Lambdas with no capture list `[]` are implicitly convertible to function pointers.
-
-</details>
-

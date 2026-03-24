@@ -556,258 +556,6 @@ $$1 \prec \log \log n \prec \log n \prec (\log n)^2 \prec \sqrt{n} \prec n \prec
 ***
 
 #### **4. Examples**
-##### **4.1. Compute Asymptotic Worst-Case Time Complexity** (Problem Set 1, Problem 1)
-
-Compute asymptotic worst-case time complexity of the following algorithm (see pseudocode conventions in [CLRS, §2.1]). Use $\Theta$-notation. Provide full justification, including execution cost and frequency count for each line, and the details for computing $T(n)$ for the worst case.
-
-```text
-/* A is a 1-indexed array,
- * n is the number of items in A */
-function secret(A, n)
-    r := n
-    while (2 * r > n)
-        k := n - r + 1
-        i := r
-        for j = k to r
-            if (A[j] < A[i])
-                i := j
-            if (A[j] > A[k])
-                k := j
-        exchange A[i] with A[r]
-        exchange A[k] with A[n - r + 1]
-        r := r - 1
-```
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** We analyze each line's cost and frequency, then sum to get $T(n)$.
-
-**1. Determine how many times the while-loop executes.**
-
-The variable $r$ starts at $n$ and decreases by 1 each iteration. The loop runs while $2r > n$, i.e., $r > n/2$. So $r$ goes from $n$ down to $\lceil n/2 \rceil + 1$ (approximately), giving roughly $\lfloor n/2 \rfloor$ iterations of the outer loop.
-
-**2. Determine how many times the for-loop executes per outer iteration.**
-
-In each outer iteration, $k = n - r + 1$ and the for-loop runs from $j = k$ to $j = r$. The number of iterations is $r - k + 1 = r - (n - r + 1) + 1 = 2r - n$.
-
-When $r = n$: the for-loop runs $2n - n = n$ times.
-When $r = \lceil n/2 \rceil + 1$: the for-loop runs about $2$ times.
-
-**3. Fill in the cost/frequency table.**
-
-| Line | Code | Cost | Frequency (worst case) |
-|:---|:---|:---|:---|
-| 4 | <code>r := n</code> | $c_4$ | $1$ |
-| 5 | `while (2 * r > n)` | $c_5$ | $\lfloor n/2 \rfloor + 1$ |
-| 6 | `k := n - r + 1` | $c_6$ | $\lfloor n/2 \rfloor$ |
-| 7 | `i := r` | $c_7$ | $\lfloor n/2 \rfloor$ |
-| 8 | `for j = k to r` | $c_8$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n + 1)$ |
-| 9 | `if (A[j] < A[i])` | $c_9$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n)$ |
-| 10 | `i := j` | $c_{10}$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n)$ (worst case) |
-| 11 | `if (A[j] > A[k])` | $c_{11}$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n)$ |
-| 12 | `k := j` | $c_{12}$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n)$ (worst case) |
-| 13 | `exchange A[i] with A[r]` | $c_{13}$ | $\lfloor n/2 \rfloor$ |
-| 14 | `exchange A[k] with A[n-r+1]` | $c_{14}$ | $\lfloor n/2 \rfloor$ |
-| 15 | <code>r := r - 1</code> | $c_{15}$ | $\lfloor n/2 \rfloor$ |
-
-**4. Compute the inner sum.**
-
-$$\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n) = \sum_{m=1}^{\lfloor n/2 \rfloor} 2m \quad \text{(substituting } m = r - \lceil n/2 \rceil\text{)}$$
-
-Adjusting properly: let $r$ range from $\lceil n/2 \rceil + 1$ to $n$. Then $2r - n$ ranges from $2$ to $n$ (in steps of $2$ if $n$ is even). The sum is:
-$$\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n) = 2 + 4 + \dots + n \approx \frac{n^2/4 + n/2}{1} = \Theta(n^2/4) = \Theta(n^2)$$
-
-More precisely, this sum equals $\frac{\lfloor n/2 \rfloor(\lfloor n/2 \rfloor + 1)}{1}$ which is $\Theta(n^2)$.
-
-**5. Compute $T(n)$.**
-
-$$T(n) = \Theta(1) + \Theta(n) + \Theta(n^2) = \Theta(n^2)$$
-
-**Answer:** $T(n) = \Theta(n^2)$
-
-</details>
-
-##### **4.2. Loop Invariant Proof for Reorder Algorithm** (Problem Set 1, Problem 2)
-
-The following algorithm manipulates elements in the input array. For example:
-
-Input: `[2, 1, 4, 3, 5, 8, 9]` $\Longrightarrow$ Output: `[2, 4, 5, 8, 9, 3, 1]`
-
-```text
-/* A is a 1-indexed array,
- * n is the number of items in A */
-function reorder(A, n)
-    k := 0
-    for i = 1 to (n - 1)
-        if A[i - k] < A[i + 1]
-            exchange A[i - k + 1] with A[i + 1]
-        else:
-            k := k + 1
-```
-
-Let $n > 0$. Is it true that the element at index $(n - k)$ in the output array is always the largest element of the input array? If yes — prove it using a loop invariant. If not — provide a counterexample.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** We need to analyze what the algorithm does and determine whether the claim holds for all inputs.
-
-**1. Trace through the example.**
-
-Input: $A = [2, 1, 4, 3, 5, 8, 9]$, $n = 7$.
-
-- $i=1, k=0$: $A[1]=2 < A[2]=1$? No. $k=1$.
-- $i=2, k=1$: $A[1]=2 < A[3]=4$? Yes. Exchange $A[2]$ and $A[3]$: $[2, 4, 1, 3, 5, 8, 9]$.
-- $i=3, k=1$: $A[2]=4 < A[4]=3$? No. $k=2$.
-- $i=4, k=2$: $A[2]=4 < A[5]=5$? Yes. Exchange $A[3]$ and $A[5]$: $[2, 4, 5, 3, 1, 8, 9]$.
-  Wait — let me re-read: exchange $A[i-k+1]$ with $A[i+1]$, so $A[4-2+1]=A[3]=5$ with $A[5]=1$... actually we need to be more careful.
-
-Let me re-trace more carefully.
-
-Input: $A = [2, 1, 4, 3, 5, 8, 9]$, $n = 7$, $k = 0$.
-
-- $i=1$: Compare $A[1-0]=A[1]=2$ with $A[2]=1$. $2 < 1$? No. $k = 1$.
-- $i=2$: Compare $A[2-1]=A[1]=2$ with $A[3]=4$. $2 < 4$? Yes. Exchange $A[2-1+1]=A[2]=1$ with $A[3]=4$. Array: $[2, 4, 1, 3, 5, 8, 9]$.
-- $i=3$: Compare $A[3-1]=A[2]=4$ with $A[4]=3$. $4 < 3$? No. $k = 2$.
-- $i=4$: Compare $A[4-2]=A[2]=4$ with $A[5]=5$. $4 < 5$? Yes. Exchange $A[4-2+1]=A[3]=1$ with $A[5]=5$. Array: $[2, 4, 5, 3, 1, 8, 9]$.
-- $i=5$: Compare $A[5-2]=A[3]=5$ with $A[6]=8$. $5 < 8$? Yes. Exchange $A[5-2+1]=A[4]=3$ with $A[6]=8$. Array: $[2, 4, 5, 8, 1, 3, 9]$.
-- $i=6$: Compare $A[6-2]=A[4]=8$ with $A[7]=9$. $8 < 9$? Yes. Exchange $A[6-2+1]=A[5]=1$ with $A[7]=9$. Array: $[2, 4, 5, 8, 9, 3, 1]$.
-
-Output: $[2, 4, 5, 8, 9, 3, 1]$, $k = 2$. Index $n - k = 7 - 2 = 5$. $A[5] = 9$, which is indeed the largest element.
-
-**2. Test a counterexample.**
-
-Consider $A = [3, 1, 2]$, $n = 3$, $k = 0$.
-
-- $i=1$: Compare $A[1]=3$ with $A[2]=1$. $3 < 1$? No. $k = 1$.
-- $i=2$: Compare $A[2-1]=A[1]=3$ with $A[3]=2$. $3 < 2$? No. $k = 2$.
-
-Output: $[3, 1, 2]$, $k = 2$. Index $n - k = 3 - 2 = 1$. $A[1] = 3$, which is the largest. Still works.
-
-Consider $A = [5, 3, 1, 2, 4]$, $n = 5$, $k = 0$.
-
-- $i=1$: $A[1]=5, A[2]=3$. $5<3$? No. $k=1$.
-- $i=2$: $A[1]=5, A[3]=1$. $5<1$? No. $k=2$.
-- $i=3$: $A[1]=5, A[4]=2$. $5<2$? No. $k=3$.
-- $i=4$: $A[1]=5, A[5]=4$. $5<4$? No. $k=4$.
-
-Output: $[5, 3, 1, 2, 4]$, $k=4$. Index $n-k=1$. $A[1]=5$. Correct again.
-
-Consider $A = [1, 3, 2]$, $n = 3$, $k = 0$.
-
-- $i=1$: $A[1]=1, A[2]=3$. $1<3$? Yes. Exchange $A[2]=3$ with $A[2]=3$. Wait: $A[i-k+1] = A[1-0+1] = A[2] = 3$ with $A[i+1] = A[2] = 3$. Array unchanged: $[1, 3, 2]$.
-- $i=2$: $A[2-0]=A[2]=3, A[3]=2$. $3<2$? No. $k=1$.
-
-Output: $[1, 3, 2]$, $k=1$. Index $n-k=2$. $A[2]=3$. Correct.
-
-Consider $A = [2, 3, 1]$, $n = 3$, $k = 0$.
-
-- $i=1$: $A[1]=2, A[2]=3$. $2<3$? Yes. Exchange $A[2]$ with $A[2]$: no change. Array: $[2, 3, 1]$.
-- $i=2$: $A[2]=3, A[3]=1$. $3<1$? No. $k=1$.
-
-Output: $[2, 3, 1]$, $k=1$. Index $n-k=2$. $A[2]=3$. Correct.
-
-The claim appears to hold. Let us prove it using a loop invariant.
-
-**3. Loop invariant proof.**
-
-**Loop invariant:** After iteration $i$, the element $A[i - k + 1]$ is the maximum of $\{A[1], A[2], \dots, A[i+1]\}$ (considering the original values), and it is located at index $i - k + 1$.
-
-More precisely: at the end of each iteration, $A[i+1-k]$ equals the maximum element among the first $i+1$ elements of the original array.
-
-**Initialization ($i = 0$, before the loop):** $k = 0$. We consider the subarray of the first 1 element: $\{A[1]\}$. The max is $A[1]$, located at index $1 = 1 - 0 + 0$. The invariant holds.
-
-**Maintenance:** Assume after iteration $i-1$, the max of $\{A[1], \dots, A[i]\}$ is at index $i - k$. In iteration $i$:
-
-- We compare $A[i - k]$ (the current max) with $A[i + 1]$ (the next element).
-- **Case 1:** $A[i-k] < A[i+1]$: The new max is $A[i+1]$. We swap $A[i-k+1]$ with $A[i+1]$, effectively moving the new maximum to position $i-k+1 = (i+1) - k$. The invariant holds (max is now at index $(i+1) - k$).
-- **Case 2:** $A[i-k] \ge A[i+1]$: The max remains $A[i-k]$. We increment $k$, so the max is now at index $i - k = i - (k+1) + 1 = (i+1) - (k+1)$. The invariant holds.
-
-**Termination:** The loop terminates when $i = n$. The invariant gives us that the max of $\{A[1], \dots, A[n]\}$ — i.e., the largest element — is at index $n - k$.
-
-**Answer:** Yes, the statement is true. The element at index $(n - k)$ in the output array is always the largest element of the input array.
-
-</details>
-
-##### **4.3. Asymptotic Notation: True or False** (Problem Set 1, Problem 3)
-
-For each of the following statements determine whether it is **TRUE** or **FALSE**. Provide full justification using formal definitions and/or known properties of asymptotic notation.
-
-1. Is it true that $n^4 - 20n^2 - 1 = \Theta(n^4)$?
-2. Is it true that $\log_2(\log_3 n) = O(\log_6 n)$?
-3. Is it true that $\min(\log n, \sqrt{n}) = \Omega(\log n + \sqrt{n})$?
-4. Is it true that $n 2^n = o(3^n)$?
-5. Is it true that $(n - 1)! = \Theta(n!)$?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**(1) Is $n^4 - 20n^2 - 1 = \Theta(n^4)$?**
-
-**TRUE.**
-
-By the polynomial rule, any polynomial of degree $d$ with positive leading coefficient is $\Theta(n^d)$. Here $f(n) = n^4 - 20n^2 - 1$ is a degree-4 polynomial with leading coefficient 1.
-
-Formally:
-
-- **$O$ bound:** $n^4 - 20n^2 - 1 \le n^4$. Set $c_2 = 1, n_0 = 1$.
-- **$\Omega$ bound:** $n^4 - 20n^2 - 1 \ge n^4 - 20n^2 \ge n^4 - 20n^4/n^2$. For $n \ge 7$: $20n^2 + 1 \le 20n^2 + n^2 = 21n^2 \le 21 \cdot \frac{n^4}{49} < \frac{n^4}{2}$. So $f(n) \ge \frac{n^4}{2}$. Set $c_1 = 1/2, n_0 = 7$.
-
-By Theorem 3.1, $f(n) = \Theta(n^4)$.
-
-**(2) Is $\log_2(\log_3 n) = O(\log_6 n)$?**
-
-**TRUE.**
-
-Note that $\log_3 n = \frac{\ln n}{\ln 3}$ and $\log_6 n = \frac{\ln n}{\ln 6}$. So $\log_6 n = \frac{\log_3 n}{\log_3 6}$.
-
-We have $\log_2(\log_3 n) = \frac{\ln(\log_3 n)}{\ln 2}$.
-
-For large $n$, $\log_3 n$ grows without bound, so $\log_2(\log_3 n)$ grows very slowly (it is the logarithm of a logarithm).
-
-Meanwhile, $\log_6 n = \Theta(\log n)$, which grows much faster than $\log \log n$.
-
-Since $\log_2(\log_3 n) = \Theta(\log \log n)$ and $\log_6 n = \Theta(\log n)$, and $\log \log n = o(\log n)$, we have $\log_2(\log_3 n) = O(\log_6 n)$.
-
-**(3) Is $\min(\log n, \sqrt{n}) = \Omega(\log n + \sqrt{n})$?**
-
-**FALSE.**
-
-For large $n$, $\log n < \sqrt{n}$ (since $\log n = o(\sqrt{n})$). Therefore, $\min(\log n, \sqrt{n}) = \log n$ for large $n$.
-
-Also, $\log n + \sqrt{n} \ge \sqrt{n}$ for all $n$.
-
-If $\min(\log n, \sqrt{n}) = \Omega(\log n + \sqrt{n})$, then there exist $c, n_0$ with $\log n \ge c(\log n + \sqrt{n}) \ge c\sqrt{n}$ for all $n \ge n_0$.
-
-But $\log n = o(\sqrt{n})$, meaning $\frac{\log n}{\sqrt{n}} \to 0$, so no such $c > 0$ exists. Contradiction.
-
-**(4) Is $n 2^n = o(3^n)$?**
-
-**TRUE.**
-
-We compute the limit:
-$$\lim_{n \to \infty} \frac{n \cdot 2^n}{3^n} = \lim_{n \to \infty} n \cdot \left(\frac{2}{3}\right)^n$$
-
-Since $\frac{2}{3} < 1$, the term $\left(\frac{2}{3}\right)^n$ decreases exponentially to 0. The factor $n$ grows only polynomially. Therefore:
-$$\lim_{n \to \infty} n \cdot \left(\frac{2}{3}\right)^n = 0$$
-
-By the limit characterization of $o$-notation, $n 2^n = o(3^n)$.
-
-**(5) Is $(n-1)! = \Theta(n!)$?**
-
-**FALSE.**
-
-We have $n! = n \cdot (n-1)!$, so $\frac{(n-1)!}{n!} = \frac{1}{n} \to 0$ as $n \to \infty$.
-
-This means $(n-1)! = o(n!)$, which implies $(n-1)! \ne \Theta(n!)$.
-
-More precisely: if $(n-1)! = \Omega(n!)$, there would exist $c > 0$ with $(n-1)! \ge c \cdot n!$ for large $n$, i.e., $\frac{1}{n} \ge c$, which fails for $n > 1/c$.
-
-**Answer:** (1) TRUE, (2) TRUE, (3) FALSE, (4) TRUE, (5) FALSE.
-
-</details>
-
 ##### **4.4. Prove $2^{n+1} = O(2^n)$** (Lecture 1, Exercise 1)
 
 Is $2^{n+1} = O(2^n)$? If yes, prove it.
@@ -1151,78 +899,254 @@ end
 
 </details>
 
-##### **4.15. Algorithm Design: Pi Approximation** (Coding Exercise A)
+##### **4.1. Compute Asymptotic Worst-Case Time Complexity** (Problem Set 1, Problem 1)
 
-Calculate an approximation of the number $\pi$ using the Leibniz formula:
+Compute asymptotic worst-case time complexity of the following algorithm (see pseudocode conventions in [CLRS, §2.1]). Use $\Theta$-notation. Provide full justification, including execution cost and frequency count for each line, and the details for computing $T(n)$ for the worst case.
 
-$$\frac{\pi}{4} = 1 - \frac{1}{3} + \frac{1}{5} - \frac{1}{7} + \frac{1}{9} - \dots$$
-
-**Input:** One number $N$ ($0 \le N \le 10^6$) — the number of iterations.
-
-**Output:** One number — the approximation of $\pi$ with six decimal places.
+```text
+/* A is a 1-indexed array,
+ * n is the number of items in A */
+function secret(A, n)
+    r := n
+    while (2 * r > n)
+        k := n - r + 1
+        i := r
+        for j = k to r
+            if (A[j] < A[i])
+                i := j
+            if (A[j] > A[k])
+                k := j
+        exchange A[i] with A[r]
+        exchange A[k] with A[n - r + 1]
+        r := r - 1
+```
 
 <details>
 <summary>Click to see the solution</summary>
 
-**Key Concept:** Sum the first $N$ terms of the Leibniz series and multiply by 4 to get $\pi$.
+**Key Concept:** We analyze each line's cost and frequency, then sum to get $T(n)$.
 
-1.  **Pseudocode:**
-```python
-function pi_approximation(N):
-    sum = 0.0
-    for i = 0 to N - 1:
-        sign = (-1) ^ i                # alternates: +1, -1, +1, -1, ...
-        denominator = 2 * i + 1       # 1, 3, 5, 7, 9, ...
-        term = sign / denominator
-        sum = sum + term
-    pi_approx = 4 * sum
-    return round(pi_approx, 6)        # round to 6 decimal places
-```
+**1. Determine how many times the while-loop executes.**
 
-2.  **Why it works:** The Leibniz formula expresses $\pi/4$ as an infinite series. The more terms we sum, the more accurate our approximation becomes.
-3.  **Time Complexity:** $O(N)$ — we iterate $N$ times and perform $O(1)$ arithmetic per iteration.
-4.  **Space Complexity:** $O(1)$ — only a constant amount of extra memory for variables.
+The variable $r$ starts at $n$ and decreases by 1 each iteration. The loop runs while $2r > n$, i.e., $r > n/2$. So $r$ goes from $n$ down to $\lceil n/2 \rceil + 1$ (approximately), giving roughly $\lfloor n/2 \rfloor$ iterations of the outer loop.
 
-**Answer:** Use the Leibniz formula with $N$ iterations. Time: $O(N)$, Space: $O(1)$.
+**2. Determine how many times the for-loop executes per outer iteration.**
+
+In each outer iteration, $k = n - r + 1$ and the for-loop runs from $j = k$ to $j = r$. The number of iterations is $r - k + 1 = r - (n - r + 1) + 1 = 2r - n$.
+
+When $r = n$: the for-loop runs $2n - n = n$ times.
+When $r = \lceil n/2 \rceil + 1$: the for-loop runs about $2$ times.
+
+**3. Fill in the cost/frequency table.**
+
+| Line | Code | Cost | Frequency (worst case) |
+|:---|:---|:---|:---|
+| 4 | <code>r := n</code> | $c_4$ | $1$ |
+| 5 | `while (2 * r > n)` | $c_5$ | $\lfloor n/2 \rfloor + 1$ |
+| 6 | `k := n - r + 1` | $c_6$ | $\lfloor n/2 \rfloor$ |
+| 7 | `i := r` | $c_7$ | $\lfloor n/2 \rfloor$ |
+| 8 | `for j = k to r` | $c_8$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n + 1)$ |
+| 9 | `if (A[j] < A[i])` | $c_9$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n)$ |
+| 10 | `i := j` | $c_{10}$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n)$ (worst case) |
+| 11 | `if (A[j] > A[k])` | $c_{11}$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n)$ |
+| 12 | `k := j` | $c_{12}$ | $\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n)$ (worst case) |
+| 13 | `exchange A[i] with A[r]` | $c_{13}$ | $\lfloor n/2 \rfloor$ |
+| 14 | `exchange A[k] with A[n-r+1]` | $c_{14}$ | $\lfloor n/2 \rfloor$ |
+| 15 | <code>r := r - 1</code> | $c_{15}$ | $\lfloor n/2 \rfloor$ |
+
+**4. Compute the inner sum.**
+
+$$\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n) = \sum_{m=1}^{\lfloor n/2 \rfloor} 2m \quad \text{(substituting } m = r - \lceil n/2 \rceil\text{)}$$
+
+Adjusting properly: let $r$ range from $\lceil n/2 \rceil + 1$ to $n$. Then $2r - n$ ranges from $2$ to $n$ (in steps of $2$ if $n$ is even). The sum is:
+$$\sum_{r=\lceil n/2\rceil+1}^{n}(2r - n) = 2 + 4 + \dots + n \approx \frac{n^2/4 + n/2}{1} = \Theta(n^2/4) = \Theta(n^2)$$
+
+More precisely, this sum equals $\frac{\lfloor n/2 \rfloor(\lfloor n/2 \rfloor + 1)}{1}$ which is $\Theta(n^2)$.
+
+**5. Compute $T(n)$.**
+
+$$T(n) = \Theta(1) + \Theta(n) + \Theta(n^2) = \Theta(n^2)$$
+
+**Answer:** $T(n) = \Theta(n^2)$
 
 </details>
 
-##### **4.16. Algorithm Design: Nearly Ordered Sequence** (Coding Exercise B)
+##### **4.2. Loop Invariant Proof for Reorder Algorithm** (Problem Set 1, Problem 2)
 
-You are given a sequence of numbers which is already nearly ordered. Can you sort it quickly?
+The following algorithm manipulates elements in the input array. For example:
 
-Implement a sorting algorithm as a separate function. The sorting function must accept an array as an argument and either return a new sorted array or sort the input array in place.
+Input: `[2, 1, 4, 3, 5, 8, 9]` $\Longrightarrow$ Output: `[2, 4, 5, 8, 9, 3, 1]`
 
-**Input:** First line contains an integer $N$ ($0 \le N \le 10^6$). Second line contains $N$ integers ($a_1, a_2, \dots, a_N$, where $-10^9 \le a_i \le 10^9$), separated by single spaces.
+```text
+/* A is a 1-indexed array,
+ * n is the number of items in A */
+function reorder(A, n)
+    k := 0
+    for i = 1 to (n - 1)
+        if A[i - k] < A[i + 1]
+            exchange A[i - k + 1] with A[i + 1]
+        else:
+            k := k + 1
+```
 
-**Output:** An ordered sequence of numbers separated by spaces.
+Let $n > 0$. Is it true that the element at index $(n - k)$ in the output array is always the largest element of the input array? If yes — prove it using a loop invariant. If not — provide a counterexample.
 
 <details>
 <summary>Click to see the solution</summary>
 
-**Key Concept:** A "nearly ordered" sequence has most elements close to their sorted position. Use **Insertion Sort**, which is efficient when the array is already nearly sorted.
+**Key Concept:** We need to analyze what the algorithm does and determine whether the claim holds for all inputs.
 
-1.  **Why Insertion Sort:** For a nearly sorted array, most elements require only a few comparisons and shifts. If each element is at most $k$ positions from its final position, Insertion Sort runs in $O(nk)$ time rather than $O(n^2)$.
-2.  **Pseudocode:**
-    
-```python
-function insertion_sort(A, n):
-    for i = 2 to n:
-        key = A[i]
-        j = i - 1
-        while j > 0 and A[j] > key:
-            A[j + 1] = A[j]
-            j = j - 1
-        A[j + 1] = key
-```
+**1. Trace through the example.**
 
-3.  **Explanation:**
-    - For each element starting from index 2, compare it with previous elements (working backward).
-    - Shift larger elements one position to the right.
-    - Insert the current element into its correct position.
-4.  **Time Complexity:** For a nearly sorted array where elements are within distance $k$ of their final position, $T(n) = O(nk)$. If $k$ is small (say, constant), this is $O(n)$ — linear time! Even in the worst case (completely reversed array), $T(n) = O(n^2)$.
-5.  **Space Complexity:** $O(1)$ — in-place sorting with no auxiliary data structures.
+Input: $A = [2, 1, 4, 3, 5, 8, 9]$, $n = 7$.
 
-**Answer:** Use Insertion Sort. For nearly sorted arrays with small displacement: $O(n)$ time. Worst case: $O(n^2)$ time, $O(1)$ space.
+- $i=1, k=0$: $A[1]=2 < A[2]=1$? No. $k=1$.
+- $i=2, k=1$: $A[1]=2 < A[3]=4$? Yes. Exchange $A[2]$ and $A[3]$: $[2, 4, 1, 3, 5, 8, 9]$.
+- $i=3, k=1$: $A[2]=4 < A[4]=3$? No. $k=2$.
+- $i=4, k=2$: $A[2]=4 < A[5]=5$? Yes. Exchange $A[3]$ and $A[5]$: $[2, 4, 5, 3, 1, 8, 9]$.
+  Wait — let me re-read: exchange $A[i-k+1]$ with $A[i+1]$, so $A[4-2+1]=A[3]=5$ with $A[5]=1$... actually we need to be more careful.
+
+Let me re-trace more carefully.
+
+Input: $A = [2, 1, 4, 3, 5, 8, 9]$, $n = 7$, $k = 0$.
+
+- $i=1$: Compare $A[1-0]=A[1]=2$ with $A[2]=1$. $2 < 1$? No. $k = 1$.
+- $i=2$: Compare $A[2-1]=A[1]=2$ with $A[3]=4$. $2 < 4$? Yes. Exchange $A[2-1+1]=A[2]=1$ with $A[3]=4$. Array: $[2, 4, 1, 3, 5, 8, 9]$.
+- $i=3$: Compare $A[3-1]=A[2]=4$ with $A[4]=3$. $4 < 3$? No. $k = 2$.
+- $i=4$: Compare $A[4-2]=A[2]=4$ with $A[5]=5$. $4 < 5$? Yes. Exchange $A[4-2+1]=A[3]=1$ with $A[5]=5$. Array: $[2, 4, 5, 3, 1, 8, 9]$.
+- $i=5$: Compare $A[5-2]=A[3]=5$ with $A[6]=8$. $5 < 8$? Yes. Exchange $A[5-2+1]=A[4]=3$ with $A[6]=8$. Array: $[2, 4, 5, 8, 1, 3, 9]$.
+- $i=6$: Compare $A[6-2]=A[4]=8$ with $A[7]=9$. $8 < 9$? Yes. Exchange $A[6-2+1]=A[5]=1$ with $A[7]=9$. Array: $[2, 4, 5, 8, 9, 3, 1]$.
+
+Output: $[2, 4, 5, 8, 9, 3, 1]$, $k = 2$. Index $n - k = 7 - 2 = 5$. $A[5] = 9$, which is indeed the largest element.
+
+**2. Test a counterexample.**
+
+Consider $A = [3, 1, 2]$, $n = 3$, $k = 0$.
+
+- $i=1$: Compare $A[1]=3$ with $A[2]=1$. $3 < 1$? No. $k = 1$.
+- $i=2$: Compare $A[2-1]=A[1]=3$ with $A[3]=2$. $3 < 2$? No. $k = 2$.
+
+Output: $[3, 1, 2]$, $k = 2$. Index $n - k = 3 - 2 = 1$. $A[1] = 3$, which is the largest. Still works.
+
+Consider $A = [5, 3, 1, 2, 4]$, $n = 5$, $k = 0$.
+
+- $i=1$: $A[1]=5, A[2]=3$. $5<3$? No. $k=1$.
+- $i=2$: $A[1]=5, A[3]=1$. $5<1$? No. $k=2$.
+- $i=3$: $A[1]=5, A[4]=2$. $5<2$? No. $k=3$.
+- $i=4$: $A[1]=5, A[5]=4$. $5<4$? No. $k=4$.
+
+Output: $[5, 3, 1, 2, 4]$, $k=4$. Index $n-k=1$. $A[1]=5$. Correct again.
+
+Consider $A = [1, 3, 2]$, $n = 3$, $k = 0$.
+
+- $i=1$: $A[1]=1, A[2]=3$. $1<3$? Yes. Exchange $A[2]=3$ with $A[2]=3$. Wait: $A[i-k+1] = A[1-0+1] = A[2] = 3$ with $A[i+1] = A[2] = 3$. Array unchanged: $[1, 3, 2]$.
+- $i=2$: $A[2-0]=A[2]=3, A[3]=2$. $3<2$? No. $k=1$.
+
+Output: $[1, 3, 2]$, $k=1$. Index $n-k=2$. $A[2]=3$. Correct.
+
+Consider $A = [2, 3, 1]$, $n = 3$, $k = 0$.
+
+- $i=1$: $A[1]=2, A[2]=3$. $2<3$? Yes. Exchange $A[2]$ with $A[2]$: no change. Array: $[2, 3, 1]$.
+- $i=2$: $A[2]=3, A[3]=1$. $3<1$? No. $k=1$.
+
+Output: $[2, 3, 1]$, $k=1$. Index $n-k=2$. $A[2]=3$. Correct.
+
+The claim appears to hold. Let us prove it using a loop invariant.
+
+**3. Loop invariant proof.**
+
+**Loop invariant:** After iteration $i$, the element $A[i - k + 1]$ is the maximum of $\{A[1], A[2], \dots, A[i+1]\}$ (considering the original values), and it is located at index $i - k + 1$.
+
+More precisely: at the end of each iteration, $A[i+1-k]$ equals the maximum element among the first $i+1$ elements of the original array.
+
+**Initialization ($i = 0$, before the loop):** $k = 0$. We consider the subarray of the first 1 element: $\{A[1]\}$. The max is $A[1]$, located at index $1 = 1 - 0 + 0$. The invariant holds.
+
+**Maintenance:** Assume after iteration $i-1$, the max of $\{A[1], \dots, A[i]\}$ is at index $i - k$. In iteration $i$:
+
+- We compare $A[i - k]$ (the current max) with $A[i + 1]$ (the next element).
+- **Case 1:** $A[i-k] < A[i+1]$: The new max is $A[i+1]$. We swap $A[i-k+1]$ with $A[i+1]$, effectively moving the new maximum to position $i-k+1 = (i+1) - k$. The invariant holds (max is now at index $(i+1) - k$).
+- **Case 2:** $A[i-k] \ge A[i+1]$: The max remains $A[i-k]$. We increment $k$, so the max is now at index $i - k = i - (k+1) + 1 = (i+1) - (k+1)$. The invariant holds.
+
+**Termination:** The loop terminates when $i = n$. The invariant gives us that the max of $\{A[1], \dots, A[n]\}$ — i.e., the largest element — is at index $n - k$.
+
+**Answer:** Yes, the statement is true. The element at index $(n - k)$ in the output array is always the largest element of the input array.
+
+</details>
+
+##### **4.3. Asymptotic Notation: True or False** (Problem Set 1, Problem 3)
+
+For each of the following statements determine whether it is **TRUE** or **FALSE**. Provide full justification using formal definitions and/or known properties of asymptotic notation.
+
+1. Is it true that $n^4 - 20n^2 - 1 = \Theta(n^4)$?
+2. Is it true that $\log_2(\log_3 n) = O(\log_6 n)$?
+3. Is it true that $\min(\log n, \sqrt{n}) = \Omega(\log n + \sqrt{n})$?
+4. Is it true that $n 2^n = o(3^n)$?
+5. Is it true that $(n - 1)! = \Theta(n!)$?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(1) Is $n^4 - 20n^2 - 1 = \Theta(n^4)$?**
+
+**TRUE.**
+
+By the polynomial rule, any polynomial of degree $d$ with positive leading coefficient is $\Theta(n^d)$. Here $f(n) = n^4 - 20n^2 - 1$ is a degree-4 polynomial with leading coefficient 1.
+
+Formally:
+
+- **$O$ bound:** $n^4 - 20n^2 - 1 \le n^4$. Set $c_2 = 1, n_0 = 1$.
+- **$\Omega$ bound:** $n^4 - 20n^2 - 1 \ge n^4 - 20n^2 \ge n^4 - 20n^4/n^2$. For $n \ge 7$: $20n^2 + 1 \le 20n^2 + n^2 = 21n^2 \le 21 \cdot \frac{n^4}{49} < \frac{n^4}{2}$. So $f(n) \ge \frac{n^4}{2}$. Set $c_1 = 1/2, n_0 = 7$.
+
+By Theorem 3.1, $f(n) = \Theta(n^4)$.
+
+**(2) Is $\log_2(\log_3 n) = O(\log_6 n)$?**
+
+**TRUE.**
+
+Note that $\log_3 n = \frac{\ln n}{\ln 3}$ and $\log_6 n = \frac{\ln n}{\ln 6}$. So $\log_6 n = \frac{\log_3 n}{\log_3 6}$.
+
+We have $\log_2(\log_3 n) = \frac{\ln(\log_3 n)}{\ln 2}$.
+
+For large $n$, $\log_3 n$ grows without bound, so $\log_2(\log_3 n)$ grows very slowly (it is the logarithm of a logarithm).
+
+Meanwhile, $\log_6 n = \Theta(\log n)$, which grows much faster than $\log \log n$.
+
+Since $\log_2(\log_3 n) = \Theta(\log \log n)$ and $\log_6 n = \Theta(\log n)$, and $\log \log n = o(\log n)$, we have $\log_2(\log_3 n) = O(\log_6 n)$.
+
+**(3) Is $\min(\log n, \sqrt{n}) = \Omega(\log n + \sqrt{n})$?**
+
+**FALSE.**
+
+For large $n$, $\log n < \sqrt{n}$ (since $\log n = o(\sqrt{n})$). Therefore, $\min(\log n, \sqrt{n}) = \log n$ for large $n$.
+
+Also, $\log n + \sqrt{n} \ge \sqrt{n}$ for all $n$.
+
+If $\min(\log n, \sqrt{n}) = \Omega(\log n + \sqrt{n})$, then there exist $c, n_0$ with $\log n \ge c(\log n + \sqrt{n}) \ge c\sqrt{n}$ for all $n \ge n_0$.
+
+But $\log n = o(\sqrt{n})$, meaning $\frac{\log n}{\sqrt{n}} \to 0$, so no such $c > 0$ exists. Contradiction.
+
+**(4) Is $n 2^n = o(3^n)$?**
+
+**TRUE.**
+
+We compute the limit:
+$$\lim_{n \to \infty} \frac{n \cdot 2^n}{3^n} = \lim_{n \to \infty} n \cdot \left(\frac{2}{3}\right)^n$$
+
+Since $\frac{2}{3} < 1$, the term $\left(\frac{2}{3}\right)^n$ decreases exponentially to 0. The factor $n$ grows only polynomially. Therefore:
+$$\lim_{n \to \infty} n \cdot \left(\frac{2}{3}\right)^n = 0$$
+
+By the limit characterization of $o$-notation, $n 2^n = o(3^n)$.
+
+**(5) Is $(n-1)! = \Theta(n!)$?**
+
+**FALSE.**
+
+We have $n! = n \cdot (n-1)!$, so $\frac{(n-1)!}{n!} = \frac{1}{n} \to 0$ as $n \to \infty$.
+
+This means $(n-1)! = o(n!)$, which implies $(n-1)! \ne \Theta(n!)$.
+
+More precisely: if $(n-1)! = \Omega(n!)$, there would exist $c > 0$ with $(n-1)! \ge c \cdot n!$ for large $n$, i.e., $\frac{1}{n} \ge c$, which fails for $n > 1/c$.
+
+**Answer:** (1) TRUE, (2) TRUE, (3) FALSE, (4) TRUE, (5) FALSE.
 
 </details>

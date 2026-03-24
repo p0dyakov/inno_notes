@@ -1,0 +1,957 @@
+---
+title: "W9. Turing Machines, Automata Theory, Alan Turing and the Historical Background of Computation"
+author: "Manuel Mazzara"
+date: "March 24, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Introduction to Automata Theory**
+
+###### **1.1.1 The Word "Automaton"**
+
+The word **automaton** (plural: *automata*) comes from the Greek *αὐτόματον*, meaning *self-moving* — something that acts on its own. It entered Latin and then modern European languages through this Latinization. Remarkably, the word was first used by **Homer** (circa 850 BCE), the ancient Greek poet believed to be the author of the *Iliad* and the *Odyssey* — the oldest known literary works in Europe. In the *Iliad*, Homer describes automatic doors opening by themselves, self-moving wheeled tripods, and animated statues. The concept of machines that act without human intervention is therefore as old as human imagination itself.
+
+###### **1.1.2 What is Automata Theory?**
+
+**Automata theory** is the branch of theoretical computer science concerned with:
+
+*   The study of **abstract mathematical machines** (automata) and their capabilities.
+*   The **computational problems** that can be solved by these machines.
+
+An automaton is a *finite* representation of a formal language that may be *infinite*. This is the core motivation: we need a compact description of something potentially unbounded.
+
+There are two main reasons to study automata theory:
+
+1.  **Theoretical models for computing machines** — automata provide clean mathematical objects that allow us to *prove* things about what is and is not computable.
+2.  **Practical applications** — automata underpin compilers, protocol verification, system design, and much more.
+
+##### **1.2 Models of Computation**
+
+A **model of computation** is a mathematical framework describing:
+
+*   How a set of *outputs are computed* given a set of inputs.
+*   How units of computation, memory, and communication are *organized*.
+
+Models of computation are studied in three layers:
+
+*   **Theory**: automata theory, computability, computational complexity.
+*   **Practice**: system specification, compiler construction.
+
+There are many different models. The main families are:
+
+*   **Sequential models** — execute one step at a time:
+    *   Finite State Automata (FSA)
+    *   Pushdown Automata (PDA)
+    *   Turing Machines (TM)
+*   **Functional models** — computation as mathematical function evaluation:
+    *   Lambda calculus (Alonzo Church, 1936)
+*   **Concurrent/Parallel models** — multiple processes running simultaneously:
+    *   Petri nets
+
+This list is not exhaustive; hundreds of other models exist.
+
+##### **1.3 The Chomsky Hierarchy: A Map of Languages**
+
+Different computational models can recognize different classes of languages. The **Chomsky hierarchy** organizes these classes from the weakest (most restricted) to the most powerful:
+
+<!-- DIAGRAM HERE -->
+
+```{dot}
+//| fig-cap: "The Chomsky hierarchy: nested classes of formal languages and their corresponding machine models"
+//| fig-width: 5.5
+digraph chomsky {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=ellipse, style=filled];
+  edge [style=invis];
+
+  re  [label="Recursively Enumerable\n(Turing Machines)\naⁿbⁿcⁿ, aⁿbⁿ ∪ aⁿb²ⁿ", fillcolor="#ffeaa7", width=4.5, height=1.4];
+  cfl [label="Context-Free Languages\n(Pushdown Automata)\naⁿbⁿ", fillcolor="#81ecec", width=3.2, height=1.0];
+  reg [label="Regular Languages\n(Finite State Automata)", fillcolor="#a29bfe", width=2.2, height=0.7];
+
+  re -> cfl -> reg;
+}
+```
+
+The key insight behind this diagram:
+
+*   **Regular languages** — recognized by FSAs. FSAs can only count to a *fixed* number (they have a finite number of states, so no generic $n$). They handle patterns like "all strings containing `ab`", but cannot handle $a^n b^n$.
+*   **Context-free languages** — recognized by PDAs. PDAs can handle $a^n b^n$ using the stack. However, PDAs are *not closed under intersection* in general: if the stack is prepared for one pattern, it cannot simultaneously check another. This is why $a^n b^n c^n$ is beyond PDAs — the stack memory is *destructive* (what is popped is lost).
+*   **Recursively enumerable languages** — recognized by Turing Machines. TMs can handle $a^n b^n c^n$ because their tape memory is *non-destructive*: written symbols remain and can be re-read as many times as needed.
+
+##### **1.4 Finite State Automata (FSA): A Recap**
+
+A **Finite State Automaton** is the simplest sequential model. Formally, a complete (deterministic) FSA is a 5-tuple:
+
+$$\langle Q, \Sigma, \delta, q_0, F \rangle$$
+
+where:
+
+*   $Q$ is a finite set of *states*;
+*   $\Sigma$ is a finite *input alphabet*;
+*   $\delta : Q \times \Sigma \rightarrow Q$ is the (total) *transition function*;
+*   $q_0 \in Q$ is the *initial state*;
+*   $F \subseteq Q$ is the set of *accepting states*.
+
+**Key limitation:** An FSA has only *fixed, finite* memory — the current state. It cannot count to an arbitrary $n$, so it cannot recognize languages like $a^n b^n$.
+
+**Applications of FSAs:**
+
+*   **Lexical analysis in compilers** — scanning source code for tokens (keywords, identifiers, numbers). This is the first phase of compilation.
+*   **Moore/Mealy machines** — model computer circuits and electronic devices. Mealy machines are *finite state transducers* with both input and output tape.
+*   **System design and verification** — UML state machines use the same notation for describing reactive systems (e.g., a temperature controller with Idle, Heating, Cooling, Error states).
+*   **Software Model Checking** — automatically verifying real programs by building *finite-state models* of them. This technique won the **Turing Award**.
+
+**Example — coin-operated turnstile:** A turnstile has two states: *Locked* and *Unlocked*. Inserting a coin transitions from Locked to Unlocked; pushing transitions from Unlocked back to Locked. Any other action (pushing when locked, inserting a coin when unlocked) produces a self-loop.
+
+```{dot}
+//| fig-cap: "FSA for a coin-operated turnstile"
+//| fig-width: 4
+digraph turnstile {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8"];
+  edge [fontname="Helvetica", fontsize=10];
+
+  start [shape=point, width=0.1, fillcolor=black];
+  Locked   [label="Locked"];
+  Unlocked [label="Unlocked", shape=doublecircle];
+
+  start    -> Locked;
+  Locked   -> Unlocked [label="Coin"];
+  Locked   -> Locked   [label="Push"];
+  Unlocked -> Locked   [label="Push"];
+  Unlocked -> Unlocked [label="Coin"];
+}
+```
+
+**FSA and program verification:** The *Program Verification Problem* — given a program $P$ and a specification $S$, does $P$ satisfy $S$? — is *undecidable* in general (a consequence of Rice's theorem, discussed in a later lecture). However, if we *restrict* the computational model from a full Turing Machine to an FSA, the verification problem *becomes decidable*. This is the idea behind **Model Checking**: trade expressiveness for decidability.
+
+##### **1.5 Pushdown Automata (PDA): A Recap**
+
+A **Pushdown Automaton** extends an FSA with a stack. Formally, a deterministic PDA is a 7-tuple:
+
+$$\langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$$
+
+where:
+
+*   $Q$ is a finite set of states;
+*   $I$ is the finite input alphabet;
+*   $\Gamma$ is the finite *stack alphabet*;
+*   $\delta : Q \times (I \cup \{\varepsilon\}) \times \Gamma \rightarrow Q \times \Gamma^*$ is the (partial) transition function;
+*   $q_0 \in Q$ is the initial state;
+*   $Z_0 \in \Gamma$ is the *initial stack symbol* (bottom-of-stack marker);
+*   $F \subseteq Q$ is the set of accepting states.
+
+PDAs recognize **context-free languages**, and they are the model underlying **syntax analysis** in compilers — the second phase, which checks whether the sequence of tokens forms a valid program according to the grammar.
+
+**Key limitation of PDAs:** The stack is *destructive* memory. Once a symbol is popped, it is gone. This means a PDA cannot simultaneously verify two independent counting constraints, which is why $a^n b^n c^n$ requires a Turing Machine.
+
+##### **1.6 The Turing Machine: Formal Definition**
+
+###### **1.6.1 Motivation**
+
+A **Turing Machine (TM)** is the most powerful sequential model of computation. It extends a PDA by replacing the destructive stack with a *read/write tape* — a potentially infinite sequence of cells, each containing a symbol, where the machine's head can move left, right, or stay in place and *rewrite* any cell. Unlike a stack (where only the top is accessible), a tape allows *non-destructive* re-reading of previously written symbols.
+
+The TM was conceived by Alan Turing in 1936 to give a precise mathematical definition of "what can be computed." It is deliberately simple — simple enough to reason about theoretically — yet powerful enough to simulate any modern programming language.
+
+###### **1.6.2 Formal Definition**
+
+A (deterministic) Turing Machine with $k$ memory tapes is a 7-tuple:
+
+$$T = \langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$$
+
+where:
+
+*   $Q$ is a finite set of **states**;
+*   $I$ is the **input alphabet** — the symbols that can appear on the input tape;
+*   $\Gamma$ is the **memory alphabet** — the symbols that can be written on the memory tapes (note: $\Gamma$ and $I$ may differ);
+*   $\delta$ is the **transition function** (see below);
+*   $q_0 \in Q$ is the **initial state**;
+*   $Z_0 \in \Gamma$ is the **initial memory symbol** — the symbol initially on each memory tape (also called the *bottom-of-stack* symbol by analogy with PDA);
+*   $F \subseteq Q$ is the set of **final (accepting) states**.
+
+**Comparing FSA, PDA, and TM definitions:**
+
+| Component | FSA | PDA | TM |
+|:----------|:----|:----|:---|
+| States $Q$ | ✓ | ✓ | ✓ |
+| Input alphabet | $\Sigma$ | $I$ | $I$ |
+| Extra memory alphabet | — | $\Gamma$ (stack) | $\Gamma$ (tape) |
+| Initial memory symbol | — | $Z_0$ | $Z_0$ |
+| Transition function | total | partial | partial |
+| Accepting states $F$ | ✓ | ✓ | ✓ |
+
+###### **1.6.3 The Transition Function**
+
+For a TM with $k$ memory tapes, the transition function is:
+
+$$\delta : (Q - F) \times (I \cup \{\_\}) \times (\Gamma \cup \{\_\})^k \rightarrow Q \times (\Gamma \cup \{\_\})^k \times \{R, L, S\}^{k+1}$$
+
+Breaking this down:
+
+*   **Domain:** The machine is in some state $q \notin F$ (not yet in a final state), has read one symbol from the input tape, and one symbol from each of the $k$ memory tapes.
+*   **Codomain:** The machine transitions to a new state, writes a new symbol on each of the $k$ memory tapes, and moves each of the $k+1$ heads (one input head + $k$ memory heads) in a direction.
+
+The three **head movement directions** are:
+
+*   $R$ — move the head one position to the **right**;
+*   $L$ — move the head one position to the **left**;
+*   $S$ — **stand still** (do not move).
+
+**Important remarks:**
+
+*   The transition function is *partial*: for some state-input combinations, no transition is defined. If the machine reaches a configuration with no applicable transition while not in a final state, it *rejects*.
+*   There are *no outgoing transitions* from final states: once a final state is reached, the machine halts.
+*   The symbol $\_ \notin \Gamma \cup I$ is a special **blank symbol** that represents empty tape cells. Tapes are conceptually infinite and filled with blanks beyond the written content.
+
+**For a single-tape TM** ($k = 1$), the transition function simplifies to:
+
+$$\delta : (Q - F) \times (I \cup \{\_\}) \times (\Gamma \cup \{\_\}) \rightarrow Q \times (\Gamma \cup \{\_\}) \times \{R, L, S\}^2$$
+
+###### **1.6.4 Transitions Graphically**
+
+A transition from state $q$ to state $q'$ is drawn as a labeled arrow:
+
+$$q \xrightarrow{i,\; \langle A_1, \ldots, A_k \rangle \;/\; \langle A'_1, \ldots, A'_k \rangle,\; \langle M_0, M_1, \ldots, M_k \rangle} q'$$
+
+where:
+
+*   $q \in Q - F$ and $q' \in Q$;
+*   $i$ is the **input symbol** read from the input tape;
+*   $A_j$ is the symbol **read** from the $j$-th memory tape;
+*   $A'_j$ is the symbol **written** to the $j$-th memory tape (replacing $A_j$);
+*   $M_0$ is the **movement direction** of the input tape head;
+*   $M_j$ is the **movement direction** of the $j$-th memory tape head;
+
+for $1 \leq j \leq k$.
+
+```{dot}
+//| fig-cap: "Graphical representation of a TM transition: reading input i, tape symbols A₁…Aₖ, writing A'₁…A'ₖ, moving heads M₀…Mₖ"
+//| fig-width: 5
+digraph tm_transition {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=12, shape=circle, style=filled, fillcolor="#e8f4f8"];
+  edge [fontname="Helvetica", fontsize=10];
+
+  q  [label="q"];
+  qp [label="q'"];
+
+  q -> qp [label="  i, ⟨A₁,…,Aₖ⟩ / ⟨A'₁,…,A'ₖ⟩, ⟨M₀,M₁,…,Mₖ⟩  "];
+}
+```
+
+###### **1.6.5 Configurations**
+
+A **configuration** (or *snapshot*) of a TM at a given moment captures everything needed to continue computation: the current state, the content of all tapes, and the position of each head.
+
+For a TM with $k$ memory tapes, a configuration $c$ is a $(k+2)$-tuple:
+
+$$c = \langle q,\; x \uparrow y,\; \alpha_1 \uparrow \beta_1,\; \ldots,\; \alpha_k \uparrow \beta_k \rangle$$
+
+where:
+
+*   $q \in Q$ is the current state;
+*   $x \uparrow y$ represents the input tape: $x$ is the content to the *left* of the head, and $y = y' \cdot \_$ with $y' \in I^*$ is the content to the *right* (and under) the head. The symbol $\uparrow$ marks the head position;
+*   $\alpha_r \uparrow \beta_r$ similarly represents the $r$-th memory tape;
+*   $\uparrow \notin I \cup \Gamma$ is a special marker symbol used *only* in the configuration notation (it is not a real tape symbol).
+
+**Why configurations matter:** By writing down the sequence of configurations $c_0 \vdash c_1 \vdash c_2 \vdash \ldots$, we can *trace* a TM's computation step by step. This is the standard way to explain and verify TM behavior.
+
+###### **1.6.6 Acceptance Condition**
+
+Given a TM $T = \langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$ and an input string $s \in I^*$, we say $s$ is **accepted** by $T$ if:
+
+$$c_0 \vdash^* c_F$$
+
+meaning the machine can reach a final configuration $c_F$ from the initial configuration $c_0$ in some finite number of steps.
+
+**Initial configuration** $c_0$:
+
+$$c_0 = \langle q_0,\; \uparrow s,\; \uparrow Z_0,\; \ldots,\; \uparrow Z_0 \rangle$$
+
+The input tape head starts at the beginning of $s$; each memory tape starts at the initial symbol $Z_0$.
+
+**Final configuration** $c_F$:
+
+$$c_F = \langle q,\; x \uparrow y,\; \alpha_1 \uparrow \beta_1,\; \ldots,\; \alpha_k \uparrow \beta_k \rangle \quad \text{where } q \in F$$
+
+A configuration is final if and only if the current state is in $F$.
+
+The **language accepted** by $T$ is:
+
+$$L(T) = \{s \in I^* \mid s \text{ is accepted by } T\}$$
+
+##### **1.7 Turing Machine Examples**
+
+###### **1.7.1 Example: Recognizing $A^nB^n = \{a^n b^n \mid n > 0\}$**
+
+This is a **1-tape TM** (so $k = 1$). The strategy is:
+
+1.  Use the memory tape as a *counter*: for each `a` on the input, push a marker `M` onto the memory tape.
+2.  When the input switches to `b`s, move the memory head back and pop one `M` for each `b`.
+3.  Accept if the input ends exactly when the tape returns to $Z_0$.
+
+**State diagram:**
+
+```{dot}
+//| fig-cap: "TM recognizing aⁿbⁿ (n > 0): states q₀, q₁, q₂, and final state qF"
+//| fig-width: 6
+digraph anbn {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8"];
+  edge [fontname="Helvetica", fontsize=9];
+
+  start [shape=point, width=0.1, fillcolor=black];
+  q0 [label="q₀"];
+  q1 [label="q₁"];
+  q2 [label="q₂"];
+  qF [label="qF", shape=doublecircle, fillcolor="#55efc4"];
+
+  start -> q0;
+  q0 -> q1  [label="a, Z₀/Z₀, ⟨S,R⟩"];
+  q1 -> q1  [label="a, _/M, ⟨R,R⟩"];
+  q1 -> q2  [label="b, _/_, ⟨S,L⟩"];
+  q2 -> q2  [label="b, M/M, ⟨R,L⟩"];
+  q2 -> qF  [label="_, Z₀/Z₀, ⟨S,S⟩"];
+}
+```
+
+**Trace for input `aabb`:**
+
+$$\langle q_0, \uparrow aabb, \uparrow Z_0 \rangle \vdash$$
+$$\langle q_1, \uparrow aabb, Z_0 \uparrow \rangle \vdash$$
+$$\langle q_1, a \uparrow abb, Z_0 M \uparrow \rangle \vdash$$
+$$\langle q_1, aa \uparrow bb, Z_0 MM \uparrow \rangle \vdash$$
+$$\langle q_2, aa \uparrow bb, Z_0 M \uparrow M \rangle \vdash$$
+$$\langle q_2, aab \uparrow b, Z_0 \uparrow MM \rangle \vdash$$
+$$\langle q_2, aabb \uparrow, \uparrow Z_0 MM \rangle \vdash$$
+$$\langle q_F, aabb \uparrow, \uparrow Z_0 MM \rangle$$
+
+We have $c_0 \vdash^* c_F$, so `aabb` is accepted.
+
+**Reading the trace:** In each configuration, the symbol immediately after $\uparrow$ on the input tape is the symbol *currently under the input head*. On the memory tape, the symbol immediately after $\uparrow$ is under the memory head. When the memory head reaches $Z_0$ after consuming all `M` markers, the machine transitions to $q_F$.
+
+###### **1.7.2 Example: Recognizing $A^nB^nC^n = \{a^n b^n c^n \mid n > 0\}$**
+
+This language *cannot* be recognized by a PDA (it is a classic context-sensitive language), but a TM can handle it. The strategy extends the previous one: we use the memory tape to count the `a`s, verify the same count of `b`s (consuming markers), then verify the same count of `c`s (re-reading and consuming the remaining markers).
+
+**State diagram:**
+
+```{dot}
+//| fig-cap: "TM recognizing aⁿbⁿcⁿ (n > 0): states q₀ through q₃, and final state qF"
+//| fig-width: 7
+digraph anbncn {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8"];
+  edge [fontname="Helvetica", fontsize=9];
+
+  start [shape=point, width=0.1, fillcolor=black];
+  q0 [label="q₀"];
+  q1 [label="q₁"];
+  q2 [label="q₂"];
+  q3 [label="q₃"];
+  qF [label="qF", shape=doublecircle, fillcolor="#55efc4"];
+
+  start -> q0;
+  q0 -> q1  [label="a, Z₀/Z₀, ⟨S,R⟩"];
+  q1 -> q1  [label="a, _/M, ⟨R,R⟩"];
+  q1 -> q2  [label="b, _/_, ⟨S,L⟩"];
+  q2 -> q2  [label="b, M/M, ⟨R,L⟩"];
+  q2 -> q3  [label="c, Z₀/Z₀, ⟨S,R⟩"];
+  q3 -> q3  [label="c, M/M, ⟨R,R⟩"];
+  q3 -> qF  [label="_, _/_, ⟨S,S⟩"];
+}
+```
+
+**Partial trace for input `aabbcc`** (starting from after the `b`-reading phase):
+
+$$\langle q_2, aa \uparrow bbcc, Z_0 M \uparrow M \rangle \vdash$$
+$$\langle q_2, aab \uparrow bcc, Z_0 \uparrow MM \rangle \vdash$$
+$$\langle q_2, aabb \uparrow cc, \uparrow Z_0 MM \rangle \vdash$$
+$$\langle q_3, aabb \uparrow cc, Z_0 \uparrow MM \rangle \vdash$$
+$$\langle q_3, aabbc \uparrow c, Z_0 M \uparrow M \rangle \vdash$$
+$$\langle q_3, aabbcc \uparrow, Z_0 MM \uparrow \rangle \vdash$$
+$$\langle q_F, aabbcc \uparrow, Z_0 MM \uparrow \rangle$$
+
+The input `aabbcc` is accepted.
+
+**Why the memory tape head moves right in $q_3$ (not left):** During the `a`-reading phase ($q_1$), the memory head moves *right*, writing one `M` per `a`. During the `b`-reading phase ($q_2$), the head moves *left*, consuming one `M` per `b`. When we enter $q_3$ (upon seeing the first `c`), the head is at $Z_0$ again. We then move *right* again, consuming one remaining `M` per `c`. This reuse of the tape is what makes TMs more powerful than PDAs.
+
+##### **1.8 The Church–Turing Thesis**
+
+The **Church–Turing thesis** (also called the *Turing thesis*) states:
+
+> *A function on the natural numbers can be calculated by an effective method if and only if it is computable by a Turing machine.*
+
+"Effective method" means an algorithm: a finite, deterministic, step-by-step procedure that always terminates with the correct answer. This thesis is *not a theorem* — it cannot be formally proved because "effective method" is an informal notion. But it has withstood over 80 years of scrutiny: every model of computation ever proposed (lambda calculus, recursive functions, modern CPUs, Python, Haskell, ...) has been shown to be equivalent in expressive power to Turing Machines.
+
+**Consequence for programming:** Any function that can be computed by a modern programming language can also be computed by a TM, and vice versa. TMs and high-level languages have the *same expressive power*. TMs are not meant for practical programming — they are meant for *proofs*, because their simplicity makes reasoning easier.
+
+##### **1.9 Alan Turing: Life and Legacy**
+
+Alan Turing (23 June 1912 – 7 June 1954) was a British mathematician, logician, and computer scientist. He made foundational contributions in four distinct fields:
+
+*   **Computability** — the Turing Machine and the answer to the Entscheidungsproblem.
+*   **Cryptography** — breaking the German Enigma cipher in World War II.
+*   **Artificial Intelligence** — the Turing Test.
+*   **Bioinformatics** — mathematical modelling of biological pattern formation.
+
+Turing lived and died in Wilmslow, near Manchester, UK, where a blue historical plaque commemorates his work: *"Founder of computer science and cryptographer, whose work was key to breaking the wartime Enigma codes."*
+
+###### **1.9.1 Computability and the Turing Machine**
+
+In 1936, Turing published *"On Computable Numbers, with an Application to the Entscheidungsproblem"* — one of the most important papers in the history of mathematics. In it, he introduced the Turing Machine as a mathematical model of computation and used it to show that Hilbert's decision problem has *no general algorithmic solution* (see Section 1.12).
+
+###### **1.9.2 Cryptography: Defeating Enigma**
+
+During World War II, Turing worked for the **Government Code and Cypher School (GC&CS)** at **Bletchley Park**, Britain's codebreaking centre. He led **Hut 8**, the section responsible for German naval cryptanalysis.
+
+The key points of this remarkable story:
+
+*   **Enigma** was a German electromechanical cipher machine. Each message was encrypted using a daily-changing key, producing what appeared to be random characters.
+*   **Polish mathematicians** had already worked out the basic principles of how to read Enigma messages and had shared this information with the British before the war.
+*   When war began, Germany *changed the cipher system daily*, making previous methods inadequate.
+*   **Alan Turing and Gordon Welchman** designed the **Bombe** — an electromechanical machine that could automatically search through possible Enigma settings. By mid-1940, German Air Force signals were being read regularly.
+
+An important lesson from this history: behind every major achievement there is *always a team*. As Dermot Turing (Alan's nephew) documents in his book *"X, Y and Z: The Real Story of How Enigma Was Broken"*, the credit belongs to a larger community — including the team of Polish mathematicians — not to a single genius working alone.
+
+###### **1.9.3 Artificial Intelligence: The Turing Test**
+
+In 1950, Turing published *"Computing Machinery and Intelligence"* in the journal *Mind*. It opens with the question:
+
+> *"I propose to consider the question, 'Can machines think?'"*
+
+Since "thinking" is too vague a concept to test directly, Turing proposed the **Imitation Game** (now called the **Turing Test**):
+
+*   A human **interrogator** (C) communicates via text with two hidden parties: a **computer** (A) and a **human** (B).
+*   The interrogator asks questions and tries to determine which is which.
+*   If the computer can consistently fool the interrogator into believing it is human, we say the machine is *intelligent*.
+
+```{dot}
+//| fig-cap: "The Turing Test (Imitation Game): interrogator C attempts to distinguish computer A from human B via text-only communication"
+//| fig-width: 5
+digraph turing_test {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, style=filled];
+  edge [fontname="Helvetica", fontsize=10];
+
+  A [label="Computer\n(A)", shape=box, fillcolor="#ffeaa7"];
+  B [label="Human\n(B)", shape=box, fillcolor="#81ecec"];
+  screen [label="Partition\n(text only)", shape=diamond, fillcolor="#dfe6e9"];
+  C [label="Interrogator\n(C)", shape=ellipse, fillcolor="#a29bfe"];
+
+  A -> screen [label="text"];
+  B -> screen [label="text"];
+  screen -> C [label="text"];
+}
+```
+
+Turing also addressed **Lady Lovelace's objection** — the idea that "the machine can only do what we tell it to do." He argued this objection deserves serious consideration but does not conclusively rule out machine intelligence.
+
+###### **1.9.4 Bioinformatics: Mathematical Morphogenesis**
+
+In 1952, Turing published *"The Chemical Basis of Morphogenesis"*, now considered a foundational paper in mathematical biology. He proposed that the complex patterns seen in biological organisms — stripes on zebras, spots on leopards, the arrangement of petals — can arise from a simple mathematical mechanism: **reaction-diffusion systems**.
+
+Two chemical substances (which he called **morphogens**) diffuse through tissue and react with each other. Under certain conditions, small random fluctuations spontaneously amplify into stable, periodic patterns. This was *bioinformatics before bioinformatics* — decades before the field had a name.
+
+##### **1.10 The Historical Background: From Human Computers to Stored-Program Machines**
+
+###### **1.10.1 Human Computers**
+
+Before electronic computers, the word "computer" referred to a *person* who performed calculations. In the 19th and early 20th centuries (until about 1946), large organizations employed rooms full of human computers:
+
+*   Scientific bureaus, artillery departments, and actuarial firms organized computation as an *industrial process* — what might be called **computing factories**.
+*   Workers were organized hierarchically, with lower-level workers performing arithmetic and higher-level workers checking and organizing results.
+*   Information was treated as an *industrial material*: standardized, processed, and passed along assembly-line fashion.
+
+This was the "pen and paper" industrialization of mathematics. The work was tedious and error-prone.
+
+###### **1.10.2 ENIAC and the First Computers**
+
+The breakthrough came in 1945 with **ENIAC** (Electronic Numerical Integrator and Computer) — the first programmable, electronic, *general-purpose* digital computer.
+
+*   ENIAC's input was via **punch cards** — physical cards with holes representing data.
+*   Early programs were entered by manually connecting cables (like a telephone switchboard).
+*   ENIAC's operators were a team of women who had previously been human computers; they became the world's first electronic computer programmers.
+
+###### **1.10.3 The Stored-Program Computer**
+
+The critical conceptual leap was the **stored-program computer**: a computer where *both program instructions and data are stored in the same memory*, and the program can be changed by modifying memory rather than rewiring hardware. Consider the contrast with the **Northrop Loom**, which always runs the same "loom program" baked into its physical structure.
+
+###### **1.10.4 Von Neumann Architecture**
+
+The **von Neumann architecture** (named after John von Neumann) is the dominant model for stored-program computers:
+
+*   A **Central Processing Unit (CPU)** containing:
+    *   **Control Unit** — fetches and decodes instructions from memory.
+    *   **Arithmetic/Logic Unit (ALU)** — performs arithmetic and logical operations.
+*   A **Memory Unit** — stores both data *and* program instructions in a single, shared address space.
+*   **Input devices** and **Output devices**.
+
+```{dot}
+//| fig-cap: "Von Neumann architecture: control unit and ALU share a common memory with program and data"
+//| fig-width: 4.5
+digraph vna {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, style=filled];
+  edge [fontname="Helvetica", fontsize=10];
+
+  cpu [label="Central Processing Unit\n(Control Unit + ALU)", shape=box, fillcolor="#ffeaa7", width=3.2];
+  mem [label="Memory Unit\n(programs + data)", shape=box, fillcolor="#81ecec", width=3.2];
+  inp [label="Input Device", shape=box, fillcolor="#dfe6e9"];
+  out [label="Output Device", shape=box, fillcolor="#dfe6e9"];
+
+  inp -> cpu;
+  cpu -> out;
+  cpu -> mem [dir=both];
+}
+```
+
+###### **1.10.5 Harvard Architecture**
+
+The **Harvard architecture** separates the storage and signal pathways for *instructions* and *data* into physically distinct memories:
+
+*   **Instruction memory** — stores program code; the CPU reads from this.
+*   **Data memory** — stores data values; the CPU reads and writes to this.
+*   **ALU**, **Control Unit**, and **I/O** are separate components with dedicated buses.
+
+```{dot}
+//| fig-cap: "Harvard architecture: physically separate memories for instructions and data"
+//| fig-width: 4.5
+digraph harvard {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, style=filled];
+  edge [fontname="Helvetica", fontsize=10];
+
+  ctrl [label="Control Unit", shape=ellipse, fillcolor="#a29bfe"];
+  alu  [label="ALU", shape=box, fillcolor="#ffeaa7"];
+  imem [label="Instruction\nMemory", shape=box, fillcolor="#81ecec"];
+  dmem [label="Data\nMemory", shape=box, fillcolor="#81ecec"];
+  io   [label="I/O", shape=box, fillcolor="#dfe6e9"];
+
+  ctrl -> alu  [dir=both];
+  ctrl -> imem [dir=both];
+  ctrl -> dmem [dir=both];
+  ctrl -> io   [dir=both];
+}
+```
+
+The key difference from von Neumann: in Harvard architecture, there is no risk of accidentally overwriting instructions with data (and vice versa), and the CPU can fetch an instruction and read data *simultaneously* on different buses. Modern microcontrollers and DSPs (Digital Signal Processors) commonly use this architecture.
+
+###### **1.10.6 TM vs. Von Neumann Machines**
+
+TMs and von Neumann machines (VNMs) are equivalent in *expressive power* — both can compute exactly the same set of functions. The difference lies in *memory access*:
+
+*   **TM**: sequential access — the head must move step by step along the tape.
+*   **VNM**: direct (random) access — any memory address can be accessed in one step.
+
+This difference does *not* change which problems are solvable. It may affect *computational complexity* (how many steps are needed), but not computability itself. A TM can simulate a VNM (and vice versa).
+
+**Why study TMs then?** Because their simplicity makes them ideal for *proofs*. It is much easier to reason about a single tape and a transition table than about a modern CPU with caches, pipelines, and interrupts.
+
+##### **1.11 The General Multi-Tape TM Model**
+
+The most general form of a TM has:
+
+*   **One input tape** — read-only, head moves left/right.
+*   **One output tape** — write-only, head moves right.
+*   **$k$ memory tapes** — read/write, heads move left/right/stay.
+
+All $k+2$ heads are controlled by the same finite state machine (the transition function $\delta$). This is the **standard theoretical model** used in complexity theory.
+
+For the purposes of this course, we primarily work with **1-memory-tape TMs**, for which the transition function is:
+
+$$\delta : (Q - F) \times (I \cup \{\_\}) \times (\Gamma \cup \{\_\}) \rightarrow Q \times (\Gamma \cup \{\_\}) \times \{R, L, S\}^2$$
+
+##### **1.12 Mathematical Logic and the Entscheidungsproblem**
+
+###### **1.12.1 Principia Mathematica and the Dream of Formalization**
+
+In the early 20th century, mathematicians sought to put all of mathematics on solid logical foundations. **Bertrand Russell** and **Alfred North Whitehead** published *Principia Mathematica* (1910–1913), a monumental 2000-page work attempting to:
+
+*   **Axiomatize** all of mathematics — derive every mathematical truth from a small set of logical axioms.
+*   Prove the system was **complete** (all true statements are provable) and **consistent** (no false statements are provable).
+
+The philosophy behind this is called **logicism**: the belief that mathematics is reducible to pure logic. The proof system was based on rigorous formal inference rules, with *Modus Ponens* as the primary rule. The work was so meticulous that proving $1 + 1 = 2$ required hundreds of pages of symbolic derivation — and the authors noted, with characteristic British understatement, that "the above proposition is occasionally useful."
+
+###### **1.12.2 Hilbert's Program and the Entscheidungsproblem**
+
+**David Hilbert** (1862–1943) was the most influential mathematician of his era. In 1900, he published **23 unsolved problems** — a roadmap for 20th-century mathematics. In 1928, he and Wilhelm Ackermann formulated the **Entscheidungsproblem** ("decision problem"):
+
+> *Find an algorithm to determine, given some sentences of first-order logic as premises and another sentence as a desired conclusion, whether that conclusion is provable from the premises using the rules of first-order logic.*
+
+In other words: is mathematics **complete, consistent, and decidable**? Hilbert was asking whether there exists a mechanical procedure that, given any mathematical statement, can determine in finite time whether it is true or false.
+
+```{dot}
+//| fig-cap: "The Entscheidungsproblem: does a universal algorithm exist that decides any mathematical truth?"
+//| fig-width: 4
+digraph decision {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, style=filled];
+  edge [fontname="Helvetica", fontsize=10];
+
+  inp  [label="Mathematical\nStatement", shape=box, fillcolor="#dfe6e9"];
+  alg  [label="Algorithm?", shape=ellipse, fillcolor="#ffeaa7"];
+  yes  [label="TRUE", shape=box, fillcolor="#55efc4"];
+  no   [label="FALSE", shape=box, fillcolor="#ff7675"];
+
+  inp -> alg;
+  alg -> yes;
+  alg -> no;
+}
+```
+
+###### **1.12.3 The Collapse: Gödel and Turing**
+
+The dream of a complete, consistent, decidable mathematics was shattered by two consecutive results:
+
+1.  **Kurt Gödel (1931) — Incompleteness Theorems:** Any logical system of sufficient complexity (able to express basic arithmetic) is *incomplete*: there exist true statements that *cannot be proved* within the system. Completeness and consistency cannot both hold. Mathematics cannot be fully axiomatized.
+
+    Turing himself acknowledged this connection, writing in his 1936 paper: *"Conclusions are reached which are superficially similar to those of Gödel."*
+2.  **Church and Turing (1936) — Undecidability of the Entscheidungsproblem:** Independently, **Alonzo Church** (using lambda calculus) and **Alan Turing** (using Turing Machines) proved that *no general algorithm for the decision problem exists*. Turing's proof works by constructing a specific problem — the **Halting Problem** — and showing it cannot be decided by any TM.
+
+**The connection to program verification:** This has direct consequences for software engineering. The **Program Verification Problem** — given a program $P$ and a specification $S$, does $P$ satisfy $S$? — is equivalent to asking whether a TM accepts a certain language. **Rice's Theorem** (to be covered later) formalizes this: *any non-trivial semantic property of programs is undecidable*.
+
+Formally:
+
+$$P \text{ (program)} \;\Updownarrow\; \text{TM}(P) \qquad S \text{ (specification)} \;\Updownarrow\; F(S) \text{ (first-order formula)}$$
+$$\text{Does } \text{TM}(P) \vDash F(S) \text{ hold? } \Rightarrow \textbf{UNDECIDABLE}$$
+
+However, by *restricting the computational model* from a full Turing Machine to a Finite State Automaton, the verification problem *becomes decidable*. This is the insight behind **Model Checking** — the technique that won the Turing Award.
+
+###### **1.12.4 Turing, Gödel, and the Infinite**
+
+Turing's ideas connect to deep questions about the nature of mathematics and mind. The debate about whether humans are "more than Turing Machines" remains open:
+
+*   *"If there is a single property, even a trivially unimportant one, that we have but Turing Machines do not have, then we cannot simply be Turing Machines."*
+
+This touches on the mathematical theory of infinite sets (Cantor's $\aleph$ numbers) and the philosophy of mind — questions that Turing's work raised but did not resolve, and which are still actively debated today.
+
+***
+
+#### **2. Definitions**
+
+*   **Automaton**: An abstract mathematical machine that processes input symbols and transitions between states according to a set of rules.
+*   **Automata Theory**: The branch of theoretical computer science studying abstract machines (automata) and the computational problems they can solve.
+*   **Turing Machine (TM)**: A mathematical model of computation consisting of a finite set of states, an input tape, one or more read/write memory tapes, and a transition function. It is the most powerful sequential model and defines the limits of what is algorithmically computable.
+*   **Finite State Automaton (FSA)**: A 5-tuple $\langle Q, \Sigma, \delta, q_0, F \rangle$ that recognizes regular languages using only finite, fixed memory (the current state). Cannot count to an arbitrary $n$.
+*   **Pushdown Automaton (PDA)**: A 7-tuple $\langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$ that extends an FSA with a LIFO stack, enabling it to recognize context-free languages.
+*   **Input Alphabet ($I$ or $\Sigma$)**: The finite set of symbols that can appear on the input tape.
+*   **Memory Alphabet ($\Gamma$)**: The finite set of symbols that can be written on the memory tape(s) of a TM or PDA. Distinct from the input alphabet.
+*   **Blank Symbol ($\_$)**: A special symbol ($\_ \notin \Gamma \cup I$) representing empty tape cells. Tapes are conceptually infinite, filled with blanks beyond the written content.
+*   **Initial Memory Symbol ($Z_0$)**: The symbol placed at the beginning of each memory tape when the TM starts. Serves as a bottom-of-tape marker.
+*   **Transition Function ($\delta$)**: The partial function defining the TM's behavior: given the current state and the symbols under all heads, it specifies the next state, the new symbols to write, and how to move each head.
+*   **Configuration (Snapshot)**: A $(k+2)$-tuple $\langle q, x \uparrow y, \alpha_1 \uparrow \beta_1, \ldots, \alpha_k \uparrow \beta_k \rangle$ capturing the complete state of a TM: current state, tape contents, and head positions.
+*   **Initial Configuration ($c_0$)**: The configuration at the start of computation: $\langle q_0, \uparrow s, \uparrow Z_0, \ldots, \uparrow Z_0 \rangle$ where $s$ is the input string.
+*   **Final Configuration ($c_F$)**: Any configuration whose state $q \in F$.
+*   **Acceptance**: A string $s$ is accepted by TM $T$ if $c_0 \vdash^* c_F$ — the machine can reach a final configuration in some finite number of steps.
+*   **$\vdash$ (Step relation)**: Denotes one computation step of the TM ($c \vdash c'$ means configuration $c$ transitions to $c'$ in one step).
+*   **$\vdash^*$ (Reflexive-transitive closure)**: Denotes zero or more computation steps.
+*   **Chomsky Hierarchy**: A classification of formal languages by expressive power: Regular languages (FSA) $\subset$ Context-free languages (PDA) $\subset$ Recursively enumerable languages (TM).
+*   **Church-Turing Thesis**: The informal claim that every effectively computable function is computable by a Turing Machine. Not a theorem (cannot be formally proved), but universally accepted.
+*   **Entscheidungsproblem**: Hilbert's 1928 decision problem: does there exist an algorithm to determine whether any given mathematical statement is provable from axioms? Answer: No (Church, Turing, 1936).
+*   **Gödel's Incompleteness Theorems**: Two results (1931) showing that any sufficiently powerful formal system is either incomplete (some truths cannot be proved) or inconsistent (some falsehoods can be proved).
+*   **Turing Test (Imitation Game)**: A test of machine intelligence proposed by Turing (1950): if a computer can fool a human interrogator into believing it is human, the machine is considered intelligent.
+*   **Model Checking**: A verification technique that automatically checks whether a finite-state model of a system satisfies a specification. Decidable (unlike general program verification) because it restricts to FSA-level models.
+*   **Von Neumann Architecture**: A computer architecture with a single shared memory for both program instructions and data, accessed by a CPU containing a Control Unit and ALU.
+*   **Harvard Architecture**: A computer architecture with *physically separate* storage and signal pathways for instructions and data, enabling simultaneous instruction fetch and data access.
+*   **Stored-Program Computer**: A computer in which program instructions reside in memory and can be changed, as opposed to hardware-wired programs.
+*   **Reaction-Diffusion System**: Turing's mathematical model (1952) for biological pattern formation: two chemical morphogens diffuse and react, spontaneously producing periodic spatial patterns (stripes, spots).
+
+***
+
+#### **3. Formulas**
+
+*   **TM Definition (k tapes)**: $T = \langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$
+*   **Transition Function (k memory tapes)**: $\delta : (Q - F) \times (I \cup \{\_\}) \times (\Gamma \cup \{\_\})^k \rightarrow Q \times (\Gamma \cup \{\_\})^k \times \{R, L, S\}^{k+1}$
+*   **Transition Function (1 memory tape)**: $\delta : (Q - F) \times (I \cup \{\_\}) \times (\Gamma \cup \{\_\}) \rightarrow Q \times (\Gamma \cup \{\_\}) \times \{R, L, S\}^2$
+*   **Configuration (k memory tapes)**: $c = \langle q, x \uparrow y, \alpha_1 \uparrow \beta_1, \ldots, \alpha_k \uparrow \beta_k \rangle$
+*   **Initial Configuration**: $c_0 = \langle q_0, \uparrow s, \uparrow Z_0, \ldots, \uparrow Z_0 \rangle$
+*   **Acceptance Condition**: $s \in L(T) \iff c_0 \vdash^* c_F$ where $c_F = \langle q, \ldots \rangle$ with $q \in F$
+*   **Language of a TM**: $L(T) = \{s \in I^* \mid s \text{ is accepted by } T\}$
+*   **FSA Definition**: $\langle Q, \Sigma, \delta, q_0, F \rangle$ with $\delta : Q \times \Sigma \rightarrow Q$
+*   **PDA Definition**: $\langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$ with $\delta : Q \times (I \cup \{\varepsilon\}) \times \Gamma \rightarrow Q \times \Gamma^*$
+
+***
+
+#### **4. Examples**
+
+##### **4.3. Design a TM for $L_1 = \{wcw \mid w \in \{a,b\}^+\}$** (Lab 7, Exercise 1)
+
+Design a Turing Machine that recognizes $L_1 = \{wcw \mid w \in \{a, b\}^+\}$. The language consists of strings where a non-empty word $w$ over $\{a, b\}$ is repeated, separated by `c`. Examples: `aca` ($w = a$), `abcab` ($w = ab$), `bcb` ($w = b$). Describe the strategy and key transitions.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** To check $wcw$, we copy the first half into memory, then compare the second half symbol by symbol against memory.
+
+**Strategy (1 memory tape):**
+
+1.  **Copy phase ($q_0$):** Read symbols before `c` from the input, writing each to the memory tape. Both heads advance right.
+2.  **Rewind phase ($q_1$):** When `c` is encountered, move the memory head back to $Z_0$ (rewind).
+3.  **Compare phase ($q_2$):** Walk both the input and memory forward, comparing symbol by symbol.
+4.  **Accept ($q_F$):** If both the input and memory reach blank simultaneously.
+
+**Key transitions:**
+
+*   $(q_0, a, \_) \rightarrow (q_0, a, \langle R, R \rangle)$ — copy `a` to memory.
+*   $(q_0, b, \_) \rightarrow (q_0, b, \langle R, R \rangle)$ — copy `b` to memory.
+*   $(q_0, c, \_) \rightarrow (q_1, \_, \langle R, L \rangle)$ — separator found; start rewinding memory.
+*   $(q_1, i, X) \rightarrow (q_1, X, \langle S, L \rangle)$ for $X \neq Z_0$ — rewind memory.
+*   $(q_1, i, Z_0) \rightarrow (q_2, Z_0, \langle S, R \rangle)$ — memory at start; begin comparing.
+*   $(q_2, a, a) \rightarrow (q_2, a, \langle R, R \rangle)$ — match `a`.
+*   $(q_2, b, b) \rightarrow (q_2, b, \langle R, R \rangle)$ — match `b`.
+*   $(q_2, \_, \_) \rightarrow (q_F, \_, \langle S, S \rangle)$ — both exhausted: accept.
+*   Any mismatch: no transition; reject.
+
+**Answer:** The TM reads the first half into memory, rewinds, then matches symbol by symbol. It accepts iff the string has the form $wcw$ with both halves identical.
+
+</details>
+
+##### **4.4. Design a TM for $L_2 = \{wcw^R \mid w \in \{a,b\}^+\}$** (Lab 7, Exercise 2)
+
+Design a Turing Machine that recognizes $L_2 = \{wcw^R \mid w \in \{a,b\}^+\}$, where $w^R$ is the reversal of $w$. Examples: `abcba` ($w = ab$), `bcb` ($w = b$). Describe the strategy and key transitions.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** $wcw^R$ is verified by copying $w$ into memory (left to right), then reading the second half while walking memory *right to left* — since $w^R$ reversed matches $w$ from the end.
+
+**Strategy (1 memory tape):**
+
+1.  **Copy phase ($q_0$):** Read symbols before `c`, write to memory (both heads advance right).
+2.  **On `c`:** Keep the memory head where it is (pointing just past the last symbol of $w$), advance input. Transition to compare phase.
+3.  **Compare phase ($q_1$):** Input advances right (reading $w^R$ left to right), memory retreats left (reading $w$ right to left). Compare at each step.
+4.  **Accept ($q_F$):** Input at blank, memory at $Z_0$.
+
+**Key transitions:**
+
+*   $(q_0, a, \_) \rightarrow (q_0, a, \langle R, R \rangle)$ — copy `a`.
+*   $(q_0, b, \_) \rightarrow (q_0, b, \langle R, R \rangle)$ — copy `b`.
+*   $(q_0, c, \_) \rightarrow (q_1, \_, \langle R, L \rangle)$ — `c` found; input advances past `c`, memory retreats one to last symbol of $w$.
+*   $(q_1, a, a) \rightarrow (q_1, a, \langle R, L \rangle)$ — `a` matches: input right, memory left.
+*   $(q_1, b, b) \rightarrow (q_1, b, \langle R, L \rangle)$ — `b` matches.
+*   $(q_1, \_, Z_0) \rightarrow (q_F, Z_0, \langle S, S \rangle)$ — both ends reached: accept.
+
+**Answer:** The TM stacks $w$ on the memory tape and matches the reversed half from top to bottom. It accepts iff the string has the form $wcw^R$.
+
+</details>
+
+##### **4.5. Design a TM for Palindromes** (Lab 7, Exercise 3)
+
+Design a Turing Machine that recognizes $L_3 = \{w \mid w \in \{a,b\}^*,\; w \text{ is a palindrome}\}$. A **palindrome** reads the same forwards and backwards. Examples: $\varepsilon$, `a`, `b`, `aba`, `abba`. Describe the strategy.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A palindrome satisfies $w = w^R$. We can reduce the palindrome check to the $wcw^R$ check by storing the string in memory and comparing it against its reverse.
+
+**Strategy (1 memory tape):**
+
+1.  **Copy phase ($q_0$):** Copy the entire input to the memory tape (both heads advance together).
+2.  **Rewind memory ($q_1$):** After the input is fully read, rewind the memory head to $Z_0$.
+3.  **Compare phase ($q_2$):** Walk the memory head forward and the *input head backward* simultaneously, comparing each position.
+4.  **Accept ($q_F$):** Both the input head and memory head meet in the middle (or reach $Z_0$ and blank simultaneously).
+
+*Note:* A TM can move its input head backward (left), unlike a standard FSA or PDA. This bidirectional access is part of what makes TMs more powerful.
+
+**Alternative approach** — two-pass comparison:
+
+1.  Find the center of the string (by walking forward and backward alternately).
+2.  Compare the first symbol with the last, the second with the second-to-last, etc.
+
+**Key insight:** The palindrome check on a string $w$ is equivalent to checking that $w$ equals $w^R$. Since TMs can re-read their tapes, this is straightforward. The memory tape holds $w$; after rewinding, it is read forward to produce a reversed comparison with the input.
+
+**Answer:** The TM accepts iff the input is a palindrome. The memory tape stores a copy of $w$, which is read forward while the input is compared in reverse order.
+
+</details>
+
+##### **4.6. Design a TM for $L_4 = \{a^n b^n \mid n \geq 0\} \cup \{a^n b^{2n} \mid n \geq 0\}$** (Lab 7, Exercise 4)
+
+Design a Turing Machine that recognizes $L_4 = \{a^n b^n \mid n \geq 0\} \cup \{a^n b^{2n} \mid n \geq 0\}$. Explain why this requires a TM (and cannot be easily handled by a single deterministic PDA), and describe the TM strategy.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The union $\{a^n b^n\} \cup \{a^n b^{2n}\}$ requires checking two different counting conditions. A deterministic PDA cannot handle this in one pass because the stack must be prepared differently for each alternative. A TM can re-read the tape, effectively trying both strategies sequentially.
+
+**Why a single deterministic PDA struggles:** After reading the `a`s and pushing $n$ markers, the PDA must decide whether to expect $n$ or $2n$ `b`s. In the deterministic case, this decision must be made without seeing the `b`s yet — impossible. A nondeterministic PDA could guess; a deterministic TM can try one and then the other.
+
+**TM Strategy:**
+
+**Phase 1: Check $a^n b^n$**
+
+1.  For each `a`, write one `M` on memory. Advance both.
+2.  For each `b`, consume one `M` (memory left). Advance input.
+3.  If input ends and memory is at $Z_0$: accept ($n = 0$ case: both blank immediately).
+4.  If input ends but memory still has `M`s (more `a`s than `b`s): reject.
+5.  If `b`s run out but memory still has `M`s: proceed to Phase 2 (but reset first).
+
+**Phase 2: Check $a^n b^{2n}$**
+
+1.  Reset: rewind memory to $Z_0$; rewind input head to beginning.
+2.  For each `a`, write one `M` on memory.
+3.  For each pair of `b`s, consume one `M`.
+4.  If input ends and memory is at $Z_0$ and `b`s consumed were even: accept.
+5.  Otherwise: reject.
+
+**Answer:** The TM's ability to re-read and rewind its tapes allows it to test multiple hypotheses. This is the power of non-destructive, bidirectional tape access — unavailable to PDAs with their destructive one-directional stacks.
+
+</details>
+
+##### **4.7. Design a TM for $L_5 = \{(ab)^n \mid n \geq 0\}$** (Lab 7, Homework 1)
+
+Design a Turing Machine that recognizes $L_5 = \{(ab)^n \mid n \geq 0\}$ — strings formed by repeating `ab` zero or more times: $\varepsilon$, `ab`, `abab`, `ababab`, ...
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** $L_5$ is actually a *regular language* — it can be recognized by a 3-state FSA. A TM can use the same finite-control logic. No memory tape is needed.
+
+**FSA intuition:**
+
+*   State $q_0$ (start, accepting): expects `a` or end of string.
+*   State $q_1$: just read `a`, now expects `b`.
+*   Any other symbol goes to a dead (rejecting) state.
+
+**TM Transitions (no memory tape needed, or memory tape ignored):**
+
+*   $(q_0, \_, Z_0/Z_0, \langle S, S \rangle) \rightarrow q_F$ — empty input: accept ($n = 0$).
+*   $(q_0, a, Z_0/Z_0, \langle R, S \rangle) \rightarrow q_1$ — read `a`, go to $q_1$.
+*   $(q_1, b, Z_0/Z_0, \langle R, S \rangle) \rightarrow q_0$ — read `b` after `a`, return to $q_0$.
+*   All other transitions: undefined (reject).
+
+When back in $q_0$ after reading `b`, if input is blank: accept. Otherwise continue.
+
+**Answer:** The TM alternates between expecting `a` (state $q_0$) and expecting `b` (state $q_1$). It accepts iff the input ends in state $q_0$ (all pairs complete). No memory tape is needed for this regular language.
+
+</details>
+
+##### **4.8. Design a TM for $L_6 = \{a^n b^{2n} c^{3n} \mid n \geq 0\}$** (Lab 7, Homework 2)
+
+Design a Turing Machine that recognizes $L_6 = \{a^n b^{2n} c^{3n} \mid n \geq 0\}$. Examples: $\varepsilon$ ($n=0$), `abbccc` ($n=1$), `aabbbbcccccc` ($n=2$). Describe the strategy in detail.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** This extends the $a^n b^n c^n$ idea but with ratio $1:2:3$. The TM encodes this ratio directly in the memory tape by writing different numbers of markers per `a`.
+
+**Strategy:**
+
+For each `a` on the input, write **2 B-markers** and **3 C-markers** to the memory tape. Then:
+
+*   Each `b` consumed pops one `B`-marker.
+*   Each `c` consumed pops one `C`-marker.
+*   Accept when input and memory are simultaneously exhausted.
+
+**Memory tape layout** after reading $n$ `a`s: $Z_0 \underbrace{BB \cdots B}_{2n} \underbrace{CC \cdots C}_{3n}$
+
+**Phases:**
+
+1.  **`a`-phase ($q_0$):** For each `a`, write `BB` + `CCC` to memory (5 memory steps per input symbol). Advance input.
+2.  **`b`-phase ($q_1$):** For each `b`, consume one `B` from memory (move memory right to next `B`, erase it).
+3.  **Transition to `c`-phase:** When memory head has consumed all `B`s (hits the first `C`), switch to $q_2$.
+4.  **`c`-phase ($q_2$):** For each `c`, consume one `C`.
+5.  **Accept ($q_F$):** Input blank and memory blank simultaneously.
+
+**Key transitions (schematic):**
+
+*   $(q_0, a, \_) \rightarrow$ write `B`, advance memory, write `B`, advance memory, write `C`, `C`, `C`; then advance input; return to $q_0$.
+*   $(q_0, b, B) \rightarrow (q_1, \_, \langle R, R \rangle)$ — first `b` found; begin consuming `B`s.
+*   $(q_1, b, B) \rightarrow (q_1, \_, \langle R, R \rangle)$ — consume next `B`.
+*   $(q_1, c, C) \rightarrow (q_2, \_, \langle R, R \rangle)$ — all `B`s consumed; begin consuming `C`s.
+*   $(q_2, c, C) \rightarrow (q_2, \_, \langle R, R \rangle)$ — consume next `C`.
+*   $(q_2, \_, Z_0) \rightarrow (q_F, Z_0, \langle S, S \rangle)$ — accept.
+
+**Answer:** The TM encodes the ratio $1:2:3$ directly in the memory layout. This technique generalizes to any fixed-ratio language $a^n b^{kn} c^{mn}$ by writing $k$ B-markers and $m$ C-markers per `a`.
+
+</details>
+
+##### **4.1. Trace a TM on $a^n b^n$** (Lecture 8, Example 1)
+
+Consider the TM $T$ recognizing $A^n B^n = \{a^n b^n \mid n > 0\}$ with the following transitions (1 memory tape):
+
+*   $q_0 \xrightarrow{a,\, Z_0/Z_0,\, \langle S,R \rangle} q_1$
+*   $q_1 \xrightarrow{a,\, \_/M,\, \langle R,R \rangle} q_1$ (self-loop)
+*   $q_1 \xrightarrow{b,\, \_/\_,\, \langle S,L \rangle} q_2$
+*   $q_2 \xrightarrow{b,\, M/M,\, \langle R,L \rangle} q_2$ (self-loop)
+*   $q_2 \xrightarrow{\_,\, Z_0/Z_0,\, \langle S,S \rangle} q_F$
+
+Trace the execution on input $s = aabb$. Write out all configurations $c_0 \vdash c_1 \vdash \ldots \vdash c_F$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** We use the memory tape to count `a`s by writing `M` markers. The $\uparrow$ symbol in each configuration marks the position of the tape head.
+
+1.  **Initial configuration:**
+    $$c_0 = \langle q_0,\; \uparrow aabb,\; \uparrow Z_0 \rangle$$
+2.  **$q_0$ reads `a`, memory reads $Z_0$: transition to $q_1$, memory head moves right, input head stays.**
+    $$c_1 = \langle q_1,\; \uparrow aabb,\; Z_0 \uparrow \rangle$$
+3.  **$q_1$ reads `a`, memory reads `_` (blank): write `M`, both heads move right.**
+    $$c_2 = \langle q_1,\; a \uparrow abb,\; Z_0 M \uparrow \rangle$$
+4.  **$q_1$ reads `a`, memory reads `_`: write `M`, both heads move right.**
+    $$c_3 = \langle q_1,\; aa \uparrow bb,\; Z_0 MM \uparrow \rangle$$
+5.  **$q_1$ reads `b`, memory reads `_`: input stays, memory head moves left. Transition to $q_2$.**
+    $$c_4 = \langle q_2,\; aa \uparrow bb,\; Z_0 M \uparrow M \rangle$$
+6.  **$q_2$ reads `b`, memory reads `M`: input moves right, memory head moves left.**
+    $$c_5 = \langle q_2,\; aab \uparrow b,\; Z_0 \uparrow MM \rangle$$
+7.  **$q_2$ reads `b`, memory moves left past $Z_0$.**
+    $$c_6 = \langle q_2,\; aabb \uparrow,\; \uparrow Z_0 MM \rangle$$
+8.  **$q_2$ reads `_` (end of input), memory reads $Z_0$: transition to $q_F$.**
+    $$c_7 = \langle q_F,\; aabb \uparrow,\; \uparrow Z_0 MM \rangle$$
+
+We have $c_0 \vdash^* c_F$.
+
+**Answer:** The string `aabb` is accepted. The machine wrote 2 `M` markers (one per `a`), consumed them while reading the 2 `b`s, and reached $q_F$ when the input was exhausted and the memory head returned to $Z_0$.
+
+</details>
+
+##### **4.2. Trace a TM on $a^n b^n c^n$** (Lecture 8, Example 2)
+
+Consider the TM $T$ recognizing $A^n B^n C^n = \{a^n b^n c^n \mid n > 0\}$ with transitions:
+
+*   $q_0 \xrightarrow{a,\, Z_0/Z_0,\, \langle S,R \rangle} q_1$
+*   $q_1 \xrightarrow{a,\, \_/M,\, \langle R,R \rangle} q_1$
+*   $q_1 \xrightarrow{b,\, \_/\_,\, \langle S,L \rangle} q_2$
+*   $q_2 \xrightarrow{b,\, M/M,\, \langle R,L \rangle} q_2$
+*   $q_2 \xrightarrow{c,\, Z_0/Z_0,\, \langle S,R \rangle} q_3$
+*   $q_3 \xrightarrow{c,\, M/M,\, \langle R,R \rangle} q_3$
+*   $q_3 \xrightarrow{\_,\, \_/\_,\, \langle S,S \rangle} q_F$
+
+Give the partial trace of execution on input $s = aabbcc$, starting from configuration $\langle q_2, aa \uparrow bbcc, Z_0 M \uparrow M \rangle$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** This extends the $a^n b^n$ machine with a third phase. After reading all `b`s and returning the memory head to $Z_0$, the machine enters $q_3$ and reads `c`s while moving the memory head rightward again — consuming the `M` markers a second time.
+
+Starting from $\langle q_2, aa \uparrow bbcc, Z_0 M \uparrow M \rangle$:
+
+1.  **$q_2$ reads `b`, memory reads `M`: input right, memory left.**
+    $$\langle q_2,\; aab \uparrow bcc,\; Z_0 \uparrow MM \rangle$$
+2.  **$q_2$ reads `b`, memory reads $Z_0$... memory has moved left to $Z_0$.**
+    $$\langle q_2,\; aabb \uparrow cc,\; \uparrow Z_0 MM \rangle$$
+3.  **$q_2$ reads `c`, memory reads $Z_0$: transition to $q_3$, both heads stay.**
+    $$\langle q_3,\; aabb \uparrow cc,\; Z_0 \uparrow MM \rangle$$
+4.  **$q_3$ reads `c`, memory reads `M`: input right, memory right.**
+    $$\langle q_3,\; aabbc \uparrow c,\; Z_0 M \uparrow M \rangle$$
+5.  **$q_3$ reads `c`, memory reads `M`: input right, memory right.**
+    $$\langle q_3,\; aabbcc \uparrow,\; Z_0 MM \uparrow \rangle$$
+6.  **$q_3$ reads `_`, memory reads `_`: transition to $q_F$.**
+    $$\langle q_F,\; aabbcc \uparrow,\; Z_0 MM \uparrow \rangle$$
+
+**Answer:** The string `aabbcc` is accepted. The memory tape $Z_0 MM$ records $n = 2$. The `M` markers are traversed once during the `b`-phase (right-to-left) and once during the `c`-phase (left-to-right). Both the input and the memory tape are exhausted simultaneously.
+
+</details>

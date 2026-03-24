@@ -456,169 +456,6 @@ The hierarchy of languages mirrors the hierarchy of machines:
 
 #### **4. Examples**
 
-##### **4.1. Prove That $L = \{a^n b^n c^n \mid n \in \mathbb{N}\}$ Is Not Context-Free** (Tutorial 6, Example 1)
-
-Use the Bar-Hillel Lemma (Pumping Lemma for context-free languages) to prove that $L = \{a^n b^n c^n \mid n \geq 0\}$ is not a context-free language.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** In $L$, the number of $a$'s, $b$'s, and $c$'s must all be equal. The Bar-Hillel Lemma pumps two segments simultaneously, but any two-segment window of size $\leq m$ in $a^m b^m c^m$ can cover at most two types of symbols. Pumping creates an imbalance in at least one count.
-
-1.  **Assume for contradiction** that $L$ is context-free. Let $m \geq 1$ be the pumping length given by the Bar-Hillel Lemma.
-2.  **Choose the word** $w = a^m b^m c^m \in L$. Note $|w| = 3m \geq m$.
-3.  **Consider any split** $w = x_1 x_2 x_3 x_4 x_5$ with $|x_2 x_4| > 0$ and $|x_2 x_3 x_4| \leq m$.
-4.  **Restrict where $x_2 x_3 x_4$ can lie:** The distance from the first $a$ to the last $c$ is $3m - 1$ characters. Since $|x_2 x_3 x_4| \leq m < 3m$, the window $x_2 x_3 x_4$ cannot span all three types of symbols simultaneously. It can cover:
-    *   Only $a$'s, or only $b$'s, or only $c$'s, or
-    *   $a$'s and $b$'s (but not $c$'s), or $b$'s and $c$'s (but not $a$'s)
-5.  **Pump with $i = 2$** (pump up):
-    Consider $x_1 x_2^2 x_3 x_4^2 x_5$. In every case:
-
-    *   If $x_2 x_4$ contains only $a$'s: pumping adds $a$'s but no $b$'s or $c$'s. The result has more $a$'s than $b$'s and $c$'s. $\notin L$.
-    *   If $x_2 x_4$ contains only $b$'s: pumping adds $b$'s but no $a$'s or $c$'s. $\notin L$.
-    *   If $x_2 x_4$ contains only $c$'s: pumping adds $c$'s but no $a$'s or $b$'s. $\notin L$.
-    *   If $x_2 x_4$ spans $a$'s and $b$'s: pumping adds more $a$'s and $b$'s but no extra $c$'s. $\notin L$.
-    *   If $x_2 x_4$ spans $b$'s and $c$'s: pumping adds more $b$'s and $c$'s but no extra $a$'s. $\notin L$.
-6.  **Conclusion:** In every case, $x_1 x_2^2 x_3 x_4^2 x_5 \notin L$. The Bar-Hillel Lemma is violated. Therefore $L$ is not context-free. $\square$
-
-**Answer:** $L = \{a^n b^n c^n \mid n \geq 0\}$ is not a context-free language.
-
-</details>
-
-##### **4.2. Construct a DPDA for $L_1 = \{a^n b^n \mid n \geq 1\}$** (Tutorial 6, Example 2)
-
-Construct a Deterministic Pushdown Automaton (DPDA) that recognizes $L_1 = \{a^n b^n \mid n \geq 1\}$, and trace the computation on the input $"aabb"$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Use the stack to count $a$'s: push one $A$ per $a$ read, then pop one $A$ per $b$ read. If the stack holds only $Z_0$ exactly when all $b$'s are consumed, the counts matched.
-
-1.  **PDA specification:**
-    *   States: $p_0$ (start), $p_1$ (reading $a$'s), $p_2$ (reading $b$'s), $p_3$ (accepting)
-    *   Stack alphabet: $\Gamma = \{Z_0, A\}$
-    *   Input alphabet: $I = \{a, b\}$
-2.  **Transitions:**
-
-    | Transition | Notation | Meaning |
-    |:-----------|:---------|:--------|
-    | $p_0 \to p_1$ | $a,\, Z_0 / AZ_0$ | Read first $a$; push $A$ on top of $Z_0$ |
-    | $p_1 \circlearrowleft$ | $a,\, A / AA$ | Read additional $a$'s; push $A$ each time |
-    | $p_1 \to p_2$ | $b,\, A / \varepsilon$ | Read first $b$; pop one $A$ |
-    | $p_2 \circlearrowleft$ | $b,\, A / \varepsilon$ | Read additional $b$'s; pop one $A$ each time |
-    | $p_2 \to p_3$ | $\varepsilon,\, Z_0 / Z_0$ | Input exhausted; $Z_0$ on top means all $A$'s were matched; accept |
-3.  **Verification that this is a DPDA:**
-    *   Each $\delta$ entry has exactly one output: condition 1 satisfied.
-    *   The $\varepsilon$-transition $\delta(p_2, \varepsilon, Z_0) = (p_3, Z_0)$ uses stack top $Z_0$. No input-reading transition from $p_2$ has $Z_0$ on top: condition 2 satisfied.
-4.  **Trace for input $"aabb"$:**
-
-    | Step | State | Remaining Input | Stack | Rule |
-    |:----:|:-----:|:---------------:|:-----:|:-----|
-    | 1 | $p_0$ | $\mathbf{a}abb$ | $Z_0$ | $a,\,Z_0/AZ_0$: push $A$ |
-    | 2 | $p_1$ | $\mathbf{a}bb$ | $A, Z_0$ | $a,\,A/AA$: push $A$ |
-    | 3 | $p_1$ | $\mathbf{b}b$ | $A, A, Z_0$ | $b,\,A/\varepsilon$: pop $A$ |
-    | 4 | $p_2$ | $\mathbf{b}$ | $A, Z_0$ | $b,\,A/\varepsilon$: pop $A$ |
-    | 5 | $p_2$ | $\varepsilon$ | $Z_0$ | $\varepsilon,\,Z_0/Z_0$: accept |
-    | 6 | $p_3$ | $\varepsilon$ | $Z_0$ | **ACCEPT** $\checkmark$ |
-
-    Full configuration sequence:
-    $$(p_0, aabb, Z_0) \vdash (p_1, abb, AZ_0) \vdash (p_1, bb, AAZ_0) \vdash (p_2, b, AZ_0) \vdash (p_2, \varepsilon, Z_0) \vdash (p_3, \varepsilon, Z_0)$$
-
-**Answer:** The DPDA with states $p_0, p_1, p_2, p_3$ (accepting) and the transitions above recognizes $L_1 = \{a^n b^n \mid n \geq 1\}$.
-
-</details>
-
-##### **4.3. Construct a DPDA for $L_2 = \{a^n b a^n \mid n \in \mathbb{N}^+\}$** (Tutorial 6, Example 3)
-
-Construct a DPDA that recognizes $L_2 = \{a^n b a^n \mid n \geq 1\}$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Push one $A$ per $a$ before the $b$. The single $b$ is a pivot — it signals to switch from push mode to pop mode. After the $b$, pop one $A$ per $a$ on the right side. Equal stacks before and after $b$ means equal $a$-counts.
-
-1.  **PDA specification:**
-    *   States: $q_0$ (start, push phase), $q_1$ (pop phase, after $b$), $q_2$ (accepting)
-    *   Stack alphabet: $\Gamma = \{Z_0, A\}$
-2.  **Transitions:**
-
-    | Transition | Notation | Meaning |
-    |:-----------|:---------|:--------|
-    | $q_0 \circlearrowleft$ | $a,\, Z_0 / AZ_0$ | First $a$ before $b$: push $A$ |
-    | $q_0 \circlearrowleft$ | $a,\, A / AA$ | Each subsequent $a$ before $b$: push $A$ |
-    | $q_0 \to q_1$ | $b,\, A / A$ | Read the $b$: keep stack unchanged, switch to pop phase |
-    | $q_1 \circlearrowleft$ | $a,\, A / \varepsilon$ | Each $a$ after $b$: pop one $A$ |
-    | $q_1 \to q_2$ | $\varepsilon,\, Z_0 / Z_0$ | All $A$'s matched; accept |
-3.  **Trace for input $"aba"$:**
-    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
-    *   $q_0 \xrightarrow{b,\,A/A} q_1$: stack = $A, Z_0$ (unchanged)
-    *   $q_1 \xrightarrow{a,\,A/\varepsilon} q_1$: stack = $Z_0$
-    *   $q_1 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_2$: **ACCEPT** $\checkmark$
-4.  **Trace for input $"aabaa"$:**
-    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
-    *   $q_0 \xrightarrow{a,\,A/AA} q_0$: stack = $A, A, Z_0$
-    *   $q_0 \xrightarrow{b,\,A/A} q_1$: stack = $A, A, Z_0$
-    *   $q_1 \xrightarrow{a,\,A/\varepsilon} q_1$: stack = $A, Z_0$
-    *   $q_1 \xrightarrow{a,\,A/\varepsilon} q_1$: stack = $Z_0$
-    *   $q_1 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_2$: **ACCEPT** $\checkmark$
-
-**Answer:** The DPDA with states $q_0, q_1, q_2$ (accepting) and the transitions above recognizes $L_2 = \{a^n b a^n \mid n \geq 1\}$.
-
-</details>
-
-##### **4.4. Construct a DPDA for $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$** (Tutorial 6, Example 4)
-
-Construct a DPDA that recognizes $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$, where $v^R$ denotes the reverse of $v$ and $c$ is a special separator symbol. The input alphabet is $I = \{a, b, c\}$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Push every symbol of $v$ onto the stack (using distinct symbols $A$ for $a$ and $B$ for $b$). When the center $c$ is seen, switch to pop mode. Then match each symbol of $v^R$ against the stack. Since $v^R$ is the reverse of $v$, the stack contents should match $v^R$ from top to bottom.
-
-1.  **PDA specification:**
-    *   States: $q_0$ (push phase), $q_1$ (pop phase), $q_2$ (accepting)
-    *   Stack alphabet: $\Gamma = \{Z_0, A, B\}$ where $A$ represents $a$ and $B$ represents $b$
-2.  **Transitions:**
-
-    *Push phase* ($q_0$, self-loops — push symbols of $v$):
-
-    | Notation | Meaning |
-    |:---------|:--------|
-    | $a,\, Z_0 / AZ_0$ | First $a$: push $A$ |
-    | $b,\, Z_0 / BZ_0$ | First $b$: push $B$ |
-    | $a,\, A / AA$ | Subsequent $a$ with $A$ on top: push $A$ |
-    | $a,\, B / AB$ | Subsequent $a$ with $B$ on top: push $A$ |
-    | $b,\, A / BA$ | Subsequent $b$ with $A$ on top: push $B$ |
-    | $b,\, B / BB$ | Subsequent $b$ with $B$ on top: push $B$ |
-
-    *Pivot* (on reading $c$, move $q_0 \to q_1$, keep stack unchanged):
-
-    | Notation | Meaning |
-    |:---------|:--------|
-    | $c,\, Z_0 / Z_0$ | $v$ was empty: switch to pop mode |
-    | $c,\, A / A$ | $c$ seen with $A$ on top: switch to pop mode |
-    | $c,\, B / B$ | $c$ seen with $B$ on top: switch to pop mode |
-
-    *Pop phase* ($q_1$, self-loops — match $v^R$):
-
-    | Notation | Meaning |
-    |:---------|:--------|
-    | $a,\, A / \varepsilon$ | Read $a$, top is $A$: match, pop $A$ |
-    | $b,\, B / \varepsilon$ | Read $b$, top is $B$: match, pop $B$ |
-
-    *Accept*: $q_1 \to q_2$: $\varepsilon,\, Z_0 / Z_0$ — all matched, accept.
-3.  **Trace for input $"abcba"$** (so $v = "ab"$, $v^R = "ba"$):
-    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
-    *   $q_0 \xrightarrow{b,\,A/BA} q_0$: stack = $B, A, Z_0$
-    *   $q_0 \xrightarrow{c,\,B/B} q_1$: stack = $B, A, Z_0$ (unchanged)
-    *   $q_1 \xrightarrow{b,\,B/\varepsilon} q_1$: stack = $A, Z_0$
-    *   $q_1 \xrightarrow{a,\,A/\varepsilon} q_1$: stack = $Z_0$
-    *   $q_1 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_2$: **ACCEPT** $\checkmark$
-
-**Answer:** The DPDA with states $q_0, q_1, q_2$ (accepting) and the transitions above recognizes $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$.
-
-</details>
-
 ##### **4.5. Construct a DPDA for $L = \{a^n b^{2n} \mid n \geq 1\}$** (Lab 5, Problem 1)
 
 Build a DPDA that recognizes the language $L = \{a^n b^{2n} \mid n \geq 1\}$ — strings of $n$ $a$'s followed by exactly $2n$ $b$'s.
@@ -886,5 +723,168 @@ For a simple DPDA approach tracking only parenthesis balance:
     *   $q_0 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_1$: **ACCEPT** $\checkmark$
 
 **Answer:** The DPDA tracks parenthesis balance via the stack, accepting when all parentheses are matched and the input is fully consumed.
+
+</details>
+
+##### **4.1. Prove That $L = \{a^n b^n c^n \mid n \in \mathbb{N}\}$ Is Not Context-Free** (Tutorial 6, Example 1)
+
+Use the Bar-Hillel Lemma (Pumping Lemma for context-free languages) to prove that $L = \{a^n b^n c^n \mid n \geq 0\}$ is not a context-free language.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** In $L$, the number of $a$'s, $b$'s, and $c$'s must all be equal. The Bar-Hillel Lemma pumps two segments simultaneously, but any two-segment window of size $\leq m$ in $a^m b^m c^m$ can cover at most two types of symbols. Pumping creates an imbalance in at least one count.
+
+1.  **Assume for contradiction** that $L$ is context-free. Let $m \geq 1$ be the pumping length given by the Bar-Hillel Lemma.
+2.  **Choose the word** $w = a^m b^m c^m \in L$. Note $|w| = 3m \geq m$.
+3.  **Consider any split** $w = x_1 x_2 x_3 x_4 x_5$ with $|x_2 x_4| > 0$ and $|x_2 x_3 x_4| \leq m$.
+4.  **Restrict where $x_2 x_3 x_4$ can lie:** The distance from the first $a$ to the last $c$ is $3m - 1$ characters. Since $|x_2 x_3 x_4| \leq m < 3m$, the window $x_2 x_3 x_4$ cannot span all three types of symbols simultaneously. It can cover:
+    *   Only $a$'s, or only $b$'s, or only $c$'s, or
+    *   $a$'s and $b$'s (but not $c$'s), or $b$'s and $c$'s (but not $a$'s)
+5.  **Pump with $i = 2$** (pump up):
+    Consider $x_1 x_2^2 x_3 x_4^2 x_5$. In every case:
+
+    *   If $x_2 x_4$ contains only $a$'s: pumping adds $a$'s but no $b$'s or $c$'s. The result has more $a$'s than $b$'s and $c$'s. $\notin L$.
+    *   If $x_2 x_4$ contains only $b$'s: pumping adds $b$'s but no $a$'s or $c$'s. $\notin L$.
+    *   If $x_2 x_4$ contains only $c$'s: pumping adds $c$'s but no $a$'s or $b$'s. $\notin L$.
+    *   If $x_2 x_4$ spans $a$'s and $b$'s: pumping adds more $a$'s and $b$'s but no extra $c$'s. $\notin L$.
+    *   If $x_2 x_4$ spans $b$'s and $c$'s: pumping adds more $b$'s and $c$'s but no extra $a$'s. $\notin L$.
+6.  **Conclusion:** In every case, $x_1 x_2^2 x_3 x_4^2 x_5 \notin L$. The Bar-Hillel Lemma is violated. Therefore $L$ is not context-free. $\square$
+
+**Answer:** $L = \{a^n b^n c^n \mid n \geq 0\}$ is not a context-free language.
+
+</details>
+
+##### **4.2. Construct a DPDA for $L_1 = \{a^n b^n \mid n \geq 1\}$** (Tutorial 6, Example 2)
+
+Construct a Deterministic Pushdown Automaton (DPDA) that recognizes $L_1 = \{a^n b^n \mid n \geq 1\}$, and trace the computation on the input $"aabb"$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the stack to count $a$'s: push one $A$ per $a$ read, then pop one $A$ per $b$ read. If the stack holds only $Z_0$ exactly when all $b$'s are consumed, the counts matched.
+
+1.  **PDA specification:**
+    *   States: $p_0$ (start), $p_1$ (reading $a$'s), $p_2$ (reading $b$'s), $p_3$ (accepting)
+    *   Stack alphabet: $\Gamma = \{Z_0, A\}$
+    *   Input alphabet: $I = \{a, b\}$
+2.  **Transitions:**
+
+    | Transition | Notation | Meaning |
+    |:-----------|:---------|:--------|
+    | $p_0 \to p_1$ | $a,\, Z_0 / AZ_0$ | Read first $a$; push $A$ on top of $Z_0$ |
+    | $p_1 \circlearrowleft$ | $a,\, A / AA$ | Read additional $a$'s; push $A$ each time |
+    | $p_1 \to p_2$ | $b,\, A / \varepsilon$ | Read first $b$; pop one $A$ |
+    | $p_2 \circlearrowleft$ | $b,\, A / \varepsilon$ | Read additional $b$'s; pop one $A$ each time |
+    | $p_2 \to p_3$ | $\varepsilon,\, Z_0 / Z_0$ | Input exhausted; $Z_0$ on top means all $A$'s were matched; accept |
+3.  **Verification that this is a DPDA:**
+    *   Each $\delta$ entry has exactly one output: condition 1 satisfied.
+    *   The $\varepsilon$-transition $\delta(p_2, \varepsilon, Z_0) = (p_3, Z_0)$ uses stack top $Z_0$. No input-reading transition from $p_2$ has $Z_0$ on top: condition 2 satisfied.
+4.  **Trace for input $"aabb"$:**
+
+    | Step | State | Remaining Input | Stack | Rule |
+    |:----:|:-----:|:---------------:|:-----:|:-----|
+    | 1 | $p_0$ | $\mathbf{a}abb$ | $Z_0$ | $a,\,Z_0/AZ_0$: push $A$ |
+    | 2 | $p_1$ | $\mathbf{a}bb$ | $A, Z_0$ | $a,\,A/AA$: push $A$ |
+    | 3 | $p_1$ | $\mathbf{b}b$ | $A, A, Z_0$ | $b,\,A/\varepsilon$: pop $A$ |
+    | 4 | $p_2$ | $\mathbf{b}$ | $A, Z_0$ | $b,\,A/\varepsilon$: pop $A$ |
+    | 5 | $p_2$ | $\varepsilon$ | $Z_0$ | $\varepsilon,\,Z_0/Z_0$: accept |
+    | 6 | $p_3$ | $\varepsilon$ | $Z_0$ | **ACCEPT** $\checkmark$ |
+
+    Full configuration sequence:
+    $$(p_0, aabb, Z_0) \vdash (p_1, abb, AZ_0) \vdash (p_1, bb, AAZ_0) \vdash (p_2, b, AZ_0) \vdash (p_2, \varepsilon, Z_0) \vdash (p_3, \varepsilon, Z_0)$$
+
+**Answer:** The DPDA with states $p_0, p_1, p_2, p_3$ (accepting) and the transitions above recognizes $L_1 = \{a^n b^n \mid n \geq 1\}$.
+
+</details>
+
+##### **4.3. Construct a DPDA for $L_2 = \{a^n b a^n \mid n \in \mathbb{N}^+\}$** (Tutorial 6, Example 3)
+
+Construct a DPDA that recognizes $L_2 = \{a^n b a^n \mid n \geq 1\}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Push one $A$ per $a$ before the $b$. The single $b$ is a pivot — it signals to switch from push mode to pop mode. After the $b$, pop one $A$ per $a$ on the right side. Equal stacks before and after $b$ means equal $a$-counts.
+
+1.  **PDA specification:**
+    *   States: $q_0$ (start, push phase), $q_1$ (pop phase, after $b$), $q_2$ (accepting)
+    *   Stack alphabet: $\Gamma = \{Z_0, A\}$
+2.  **Transitions:**
+
+    | Transition | Notation | Meaning |
+    |:-----------|:---------|:--------|
+    | $q_0 \circlearrowleft$ | $a,\, Z_0 / AZ_0$ | First $a$ before $b$: push $A$ |
+    | $q_0 \circlearrowleft$ | $a,\, A / AA$ | Each subsequent $a$ before $b$: push $A$ |
+    | $q_0 \to q_1$ | $b,\, A / A$ | Read the $b$: keep stack unchanged, switch to pop phase |
+    | $q_1 \circlearrowleft$ | $a,\, A / \varepsilon$ | Each $a$ after $b$: pop one $A$ |
+    | $q_1 \to q_2$ | $\varepsilon,\, Z_0 / Z_0$ | All $A$'s matched; accept |
+3.  **Trace for input $"aba"$:**
+    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
+    *   $q_0 \xrightarrow{b,\,A/A} q_1$: stack = $A, Z_0$ (unchanged)
+    *   $q_1 \xrightarrow{a,\,A/\varepsilon} q_1$: stack = $Z_0$
+    *   $q_1 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_2$: **ACCEPT** $\checkmark$
+4.  **Trace for input $"aabaa"$:**
+    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
+    *   $q_0 \xrightarrow{a,\,A/AA} q_0$: stack = $A, A, Z_0$
+    *   $q_0 \xrightarrow{b,\,A/A} q_1$: stack = $A, A, Z_0$
+    *   $q_1 \xrightarrow{a,\,A/\varepsilon} q_1$: stack = $A, Z_0$
+    *   $q_1 \xrightarrow{a,\,A/\varepsilon} q_1$: stack = $Z_0$
+    *   $q_1 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_2$: **ACCEPT** $\checkmark$
+
+**Answer:** The DPDA with states $q_0, q_1, q_2$ (accepting) and the transitions above recognizes $L_2 = \{a^n b a^n \mid n \geq 1\}$.
+
+</details>
+
+##### **4.4. Construct a DPDA for $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$** (Tutorial 6, Example 4)
+
+Construct a DPDA that recognizes $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$, where $v^R$ denotes the reverse of $v$ and $c$ is a special separator symbol. The input alphabet is $I = \{a, b, c\}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Push every symbol of $v$ onto the stack (using distinct symbols $A$ for $a$ and $B$ for $b$). When the center $c$ is seen, switch to pop mode. Then match each symbol of $v^R$ against the stack. Since $v^R$ is the reverse of $v$, the stack contents should match $v^R$ from top to bottom.
+
+1.  **PDA specification:**
+    *   States: $q_0$ (push phase), $q_1$ (pop phase), $q_2$ (accepting)
+    *   Stack alphabet: $\Gamma = \{Z_0, A, B\}$ where $A$ represents $a$ and $B$ represents $b$
+2.  **Transitions:**
+
+    *Push phase* ($q_0$, self-loops — push symbols of $v$):
+
+    | Notation | Meaning |
+    |:---------|:--------|
+    | $a,\, Z_0 / AZ_0$ | First $a$: push $A$ |
+    | $b,\, Z_0 / BZ_0$ | First $b$: push $B$ |
+    | $a,\, A / AA$ | Subsequent $a$ with $A$ on top: push $A$ |
+    | $a,\, B / AB$ | Subsequent $a$ with $B$ on top: push $A$ |
+    | $b,\, A / BA$ | Subsequent $b$ with $A$ on top: push $B$ |
+    | $b,\, B / BB$ | Subsequent $b$ with $B$ on top: push $B$ |
+
+    *Pivot* (on reading $c$, move $q_0 \to q_1$, keep stack unchanged):
+
+    | Notation | Meaning |
+    |:---------|:--------|
+    | $c,\, Z_0 / Z_0$ | $v$ was empty: switch to pop mode |
+    | $c,\, A / A$ | $c$ seen with $A$ on top: switch to pop mode |
+    | $c,\, B / B$ | $c$ seen with $B$ on top: switch to pop mode |
+
+    *Pop phase* ($q_1$, self-loops — match $v^R$):
+
+    | Notation | Meaning |
+    |:---------|:--------|
+    | $a,\, A / \varepsilon$ | Read $a$, top is $A$: match, pop $A$ |
+    | $b,\, B / \varepsilon$ | Read $b$, top is $B$: match, pop $B$ |
+
+    *Accept*: $q_1 \to q_2$: $\varepsilon,\, Z_0 / Z_0$ — all matched, accept.
+3.  **Trace for input $"abcba"$** (so $v = "ab"$, $v^R = "ba"$):
+    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
+    *   $q_0 \xrightarrow{b,\,A/BA} q_0$: stack = $B, A, Z_0$
+    *   $q_0 \xrightarrow{c,\,B/B} q_1$: stack = $B, A, Z_0$ (unchanged)
+    *   $q_1 \xrightarrow{b,\,B/\varepsilon} q_1$: stack = $A, Z_0$
+    *   $q_1 \xrightarrow{a,\,A/\varepsilon} q_1$: stack = $Z_0$
+    *   $q_1 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_2$: **ACCEPT** $\checkmark$
+
+**Answer:** The DPDA with states $q_0, q_1, q_2$ (accepting) and the transitions above recognizes $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$.
 
 </details>

@@ -853,564 +853,6 @@ void fun() {
 
 #### **3. Examples**
 
-##### **3.1. Max Function Template: Find the Maximum of Two Values** (Lecture 5, Example 1)
-
-Write a function template `Max` that returns the maximum of two values of any type that supports the `>` operator. Demonstrate its use with `int`, `double`, and a user-defined class.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** A function template is written once with a type placeholder `T`. The compiler generates concrete versions (`Max_int`, `Max_double`, etc.) on demand based on the argument types at each call site.
-
-```cpp
-#include <iostream>
-using namespace std;
-
-// Function template: works for any type T that has operator>
-template <typename T>
-T Max(T a, T b) {
-    return a > b ? a : b;
-}
-
-// A user-defined class that satisfies the template requirement (has operator>)
-class Temperature {
-    double celsius;
-public:
-    Temperature(double c) : celsius(c) { }
-    bool operator>(const Temperature& t) const { return celsius > t.celsius; }
-    double value() const { return celsius; }
-};
-
-int main() {
-    // Implicit instantiation for int (compiler generates Max_int)
-    cout << Max(3, 7) << endl;           // 7
-
-    // Implicit instantiation for double (compiler generates Max_double)
-    cout << Max(3.14, 2.71) << endl;     // 3.14
-
-    // Implicit instantiation for Temperature (compiler generates Max_Temperature)
-    Temperature t1(36.6), t2(38.2);
-    cout << Max(t1, t2).value() << endl; // 38.2
-
-    return 0;
-}
-```
-
-1.  **Template declaration:** `template <typename T>` introduces type parameter `T`. The body `return a > b ? a : b;` uses `T` wherever a type is needed.
-2.  **Implicit instantiation:** When the compiler sees `Max(3, 7)`, it deduces `T = int` from the argument types and generates `int Max_int(int a, int b)` internally.
-3.  **Type requirement:** `Temperature` must have `operator>` — without it, the compiler reports an error inside the generated `Max_Temperature` function.
-4.  **Separate instantiations:** `Max_int`, `Max_double`, and `Max_Temperature` are three distinct functions in the compiled output.
-
-**Answer:** The template generates three functions from one definition. Output: `7`, `3.14`, `38.2`.
-
-</details>
-
-##### **3.2. alignArray: Converting a Specific Function to a Template** (Lecture 5, Exercise 1)
-
-Given the following integer-specific function, convert it into a function template that works with arrays of any numeric type. Declare a class that satisfies the template's requirements, then demonstrate the template with an array of that class.
-
-```cpp
-void alignArray(int* array, int size, int barrier) {
-    for (int i = 0; i < size; i++) {
-        if      (array[i] < barrier) array[i] += 2;
-        else if (array[i] > barrier) array[i] -= 2;
-    }
-}
-```
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Identify which operations the function applies to the element type, then make those the requirements on the template type parameter.
-
-1.  **Identify operations used on elements:** `<`, `>`, `+=`, `-=`. The type `T` must support all four.
-2.  **Write the template:**
-
-```cpp
-#include <iostream>
-using namespace std;
-
-template <typename T>
-void alignArray(T* array, int size, T barrier) {
-    for (int i = 0; i < size; i++) {
-        if      (array[i] < barrier) array[i] += 2;
-        else if (array[i] > barrier) array[i] -= 2;
-    }
-}
-```
-
-3.  **Declare a class satisfying requirements:**
-
-```cpp
-class Score {
-    int val;
-public:
-    Score(int v = 0) : val(v) { }
-    bool operator<(const Score& s) const { return val < s.val; }
-    bool operator>(const Score& s) const { return val > s.val; }
-    Score& operator+=(int n) { val += n; return *this; }
-    Score& operator-=(int n) { val -= n; return *this; }
-    int value() const { return val; }
-};
-```
-
-4.  **Demonstrate with the class:**
-
-```cpp
-int main() {
-    // Demo with int
-    int intArr[] = {1, 5, 10, 3, 7};
-    alignArray(intArr, 5, 5);
-    for (int x : intArr) cout << x << " ";  // 3 5 8 5 5
-    cout << endl;
-
-    // Demo with Score
-    Score scores[] = {Score(1), Score(8), Score(5), Score(3)};
-    alignArray(scores, 4, Score(5));
-    for (auto& s : scores) cout << s.value() << " ";  // 3 6 5 5
-    cout << endl;
-
-    return 0;
-}
-```
-
-**Answer:** The template parameterizes both the element type and the barrier type as `T`. Any type supporting `<`, `>`, `+=`, `-=` satisfies the requirements.
-
-</details>
-
-##### **3.3. Stack Class Template with Non-type Size Parameter** (Lecture 5, Example 2)
-
-Implement a generic `Stack` class template parameterized by both the element type `T` and the maximum size `N`. Demonstrate creating stacks of different types and sizes.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Non-type template parameters allow compile-time configuration of class dimensions. `Stack<int,10>` and `Stack<int,50>` are *different types*.
-
-```cpp
-#include <iostream>
-#include <stdexcept>
-using namespace std;
-
-template <typename T, int N>
-class Stack {
-    int top;
-    T S[N];          // Array size N is a compile-time constant
-public:
-    Stack() : top(-1) { }
-
-    void push(const T& V) {
-        if (top >= N - 1) throw overflow_error("Stack is full");
-        S[++top] = V;
-    }
-
-    T pop() {
-        if (top < 0) throw underflow_error("Stack is empty");
-        return S[top--];
-    }
-
-    T peek() const {
-        if (top < 0) throw underflow_error("Stack is empty");
-        return S[top];
-    }
-
-    bool isEmpty() const { return top < 0; }
-    bool isFull()  const { return top >= N - 1; }
-};
-
-int main() {
-    Stack<int, 10> intStack;
-    intStack.push(1);
-    intStack.push(2);
-    intStack.push(3);
-    cout << intStack.pop() << endl;  // 3 (LIFO order)
-    cout << intStack.pop() << endl;  // 2
-
-    Stack<string, 5> strStack;
-    strStack.push("hello");
-    strStack.push("world");
-    cout << strStack.pop() << endl;  // "world"
-
-    // Stack<int, 10> and Stack<int, 50> are DIFFERENT types:
-    // Stack<int, 50> bigStack = intStack;  // COMPILE ERROR
-
-    return 0;
-}
-```
-
-1.  **Template declaration:** `template <typename T, int N>` — two parameters: element type and capacity.
-2.  **Array:** `T S[N]` — N is evaluated at compile time; valid as an array size.
-3.  **LIFO semantics:** `push` increments `top` before writing; `pop` reads at `top` then decrements.
-4.  **Bounds checking:** Throws standard exceptions on overflow/underflow.
-
-**Answer:** `Stack<int,10>` and `Stack<string,5>` are independent types generated from the same template. Output: `3`, `2`, `world`.
-
-</details>
-
-##### **3.4. spaceOf: Explicit Function Template Instantiation** (Lecture 5, Example 3)
-
-Write a function template `spaceOf<T>()` that calculates how many 32-bit words (each 4 bytes) are needed to store a value of type `T`. Demonstrate explicit instantiation for several types.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** When a function template has no arguments from which the compiler can deduce `T`, you must provide the type explicitly using `<T>` at the call site.
-
-```cpp
-#include <iostream>
-using namespace std;
-
-template <typename T>
-int spaceOf() {
-    int bytes = sizeof(T);
-    // Number of 32-bit words: ceiling division by 4
-    return bytes / 4 + (bytes % 4 > 0 ? 1 : 0);
-}
-
-class MyData {
-    double x, y, z;    // 3 doubles = 24 bytes
-    int flag;          // 4 bytes
-    // Total: 28 bytes = 7 × 4-byte words
-};
-
-int main() {
-    // Cannot call spaceOf() without explicit type — no arguments to deduce from
-    cout << spaceOf<int>()    << endl;    // 4 bytes  → 1 word
-    cout << spaceOf<double>() << endl;    // 8 bytes  → 2 words
-    cout << spaceOf<char>()   << endl;    // 1 byte   → 1 word (ceiling)
-    cout << spaceOf<MyData>() << endl;    // 28+ bytes → 7+ words (depends on padding)
-
-    // The compiler optimizes: sizeof(int)=4 is a compile-time constant,
-    // so spaceOf<int>() is likely inlined to the constant 1.
-    return 0;
-}
-```
-
-1.  **No deducible argument:** `spaceOf()` takes no arguments, so the compiler cannot infer `T`.
-2.  **Explicit syntax:** `spaceOf<int>()` — the `<int>` tells the compiler to instantiate with `T = int`.
-3.  **Compile-time optimization:** Since `sizeof(T)` is a compile-time constant, the entire function can be optimized away, leaving just the constant result.
-4.  **Ceiling division formula:** `bytes/4 + (bytes%4 > 0 ? 1 : 0)` computes $\lceil \text{bytes}/4 \rceil$.
-
-**Answer:** `spaceOf<int>()` = 1, `spaceOf<double>()` = 2, `spaceOf<char>()` = 1.
-
-</details>
-
-
-##### **3.5. RANGE Template: Complete Implementation** (Tutorial 5, Exercise 1)
-
-Write a complete implementation of the `RANGE` template providing:
-
-*   Constructor(s) and destructor
-*   Arithmetic and relational operators (`+=`, `-=`, `+`, `-`, `==`, `!=`, `<`, `>`)
-*   Increment and decrement operators
-*   Conversion function `RANGE → long`
-*   A checking and exception-handling mechanism
-
-Show two realistic examples of using the `RANGE` template.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Non-type template parameters make the range boundaries part of the *type*, not the *value*. This means `RANGE<1,12>` and `RANGE<1,31>` are incompatible types — the compiler will flag any mix-up.
-
-```cpp
-#include <iostream>
-#include <stdexcept>
-using namespace std;
-
-template <int L, int R>
-class RANGE {
-    int value;
-
-    void check() const {
-        if (value < L || value > R)
-            throw out_of_range("RANGE value " + to_string(value)
-                               + " out of [" + to_string(L) + "," + to_string(R) + "]");
-    }
-
-public:
-    // Constructor from int
-    explicit RANGE(int v) : value(v) { check(); }
-
-    // Copy constructor
-    RANGE(const RANGE& r) : value(r.value) { }
-
-    // Destructor (trivial)
-    ~RANGE() = default;
-
-    // --- Assignment ---
-    RANGE& operator=(const RANGE& r) { value = r.value; return *this; }
-    RANGE& operator=(int v)          { value = v; check(); return *this; }
-
-    // --- Compound arithmetic ---
-    RANGE& operator+=(int n) { value += n; check(); return *this; }
-    RANGE& operator-=(int n) { value -= n; check(); return *this; }
-
-    // --- Binary arithmetic (return plain int for flexibility) ---
-    int operator+(int n)          const { return value + n; }
-    int operator-(int n)          const { return value - n; }
-    int operator+(const RANGE& r) const { return value + r.value; }
-    int operator-(const RANGE& r) const { return value - r.value; }
-
-    // --- Increment / Decrement ---
-    RANGE& operator++()    { value++; check(); return *this; }  // pre-increment
-    RANGE  operator++(int) { RANGE tmp(*this); ++(*this); return tmp; } // post-increment
-    RANGE& operator--()    { value--; check(); return *this; }  // pre-decrement
-    RANGE  operator--(int) { RANGE tmp(*this); --(*this); return tmp; } // post-decrement
-
-    // --- Relational ---
-    bool operator==(const RANGE& r) const { return value == r.value; }
-    bool operator!=(const RANGE& r) const { return value != r.value; }
-    bool operator< (const RANGE& r) const { return value <  r.value; }
-    bool operator> (const RANGE& r) const { return value >  r.value; }
-
-    // --- Conversion to long ---
-    operator long() const { return (long)value; }
-};
-
-// ---- Practical Examples ----
-
-using DayOfMonth = RANGE<1, 31>;
-using MonthOfYear = RANGE<1, 12>;
-
-int main() {
-    // Example 1: Calendar date arithmetic
-    DayOfMonth   day(15);
-    MonthOfYear  month(6);
-
-    cout << "Day: "   << (long)day   << endl;  // 15
-    cout << "Month: " << (long)month << endl;  // 6
-
-    ++day;
-    cout << "Next day: " << (long)day << endl;  // 16
-
-    try {
-        day = 32;  // out of range!
-    } catch (const out_of_range& e) {
-        cout << "Error: " << e.what() << endl;
-    }
-
-    // day = month;  // COMPILE ERROR: incompatible types — safety guaranteed!
-
-    // Example 2: Traffic light phase (0=Red, 1=Yellow, 2=Green)
-    using Phase = RANGE<0, 2>;
-    Phase light(0);
-    for (int i = 0; i < 4; i++) {
-        cout << "Light phase: " << (long)light << endl;
-        try { ++light; } catch (...) { light = Phase(0); }  // wrap around on overflow
-    }
-
-    return 0;
-}
-```
-
-1.  **Template parameters as type identity:** `DayOfMonth` (alias for `RANGE<1,31>`) and `MonthOfYear` (`RANGE<1,12>`) are *different types* — mixing them is a compile error.
-2.  **`check()` called on every mutation:** constructor, `operator=`, `operator+=`, `operator++`, etc.
-3.  **Conversion to `long`:** Allows printing and using the value in arithmetic expressions without explicit casts.
-4.  **Post-increment:** Requires saving a copy before incrementing, returning the old value.
-
-**Answer:** See complete implementation above. The key insight is that boundary enforcement happens at compile time (type system) and at runtime (exception).
-
-</details>
-
-##### **3.6. ARRAY Template with RANGE-based Boundaries** (Tutorial 5, Exercise 2)
-
-Design and implement an `ARRAY` template where the valid index range is specified as template parameters (using ideas from the `RANGE` template). The array should support arbitrary index boundaries (not necessarily starting at 0). Implement an indexing operator with bounds checking. Demonstrate with a practical example.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Just like `RANGE` makes the value boundaries part of the type, `ARRAY` can make the index boundaries part of the type. `ARRAY<int,1,12>` is an array of 12 integers indexed from 1 to 12 — a "1-based array".
-
-```cpp
-#include <iostream>
-#include <stdexcept>
-#include <string>
-using namespace std;
-
-// ARRAY<T, Low, High>: an array of type T with indices in [Low, High]
-template <typename T, int Low, int High>
-class ARRAY {
-    static_assert(Low <= High, "ARRAY: Low must be <= High");
-    static const int SIZE = High - Low + 1;
-    T data[SIZE];
-
-    void checkIndex(int idx) const {
-        if (idx < Low || idx > High)
-            throw out_of_range("ARRAY index " + to_string(idx)
-                               + " out of [" + to_string(Low) + "," + to_string(High) + "]");
-    }
-
-public:
-    ARRAY() = default;
-
-    // Non-const indexing (allows modification)
-    T& operator[](int idx) {
-        checkIndex(idx);
-        return data[idx - Low];   // Shift: external index → internal 0-based index
-    }
-
-    // Const indexing (for read-only access)
-    const T& operator[](int idx) const {
-        checkIndex(idx);
-        return data[idx - Low];
-    }
-
-    int low()  const { return Low;  }
-    int high() const { return High; }
-    int size() const { return SIZE; }
-};
-
-int main() {
-    // 1-based array of month names (indices 1..12)
-    ARRAY<string, 1, 12> monthNames;
-    monthNames[1]  = "January";
-    monthNames[2]  = "February";
-    monthNames[3]  = "March";
-    // ... (fill remaining)
-    monthNames[12] = "December";
-
-    cout << monthNames[1]  << endl;  // "January"
-    cout << monthNames[12] << endl;  // "December"
-
-    try {
-        monthNames[0];   // Index 0 is out of range [1, 12]
-    } catch (const out_of_range& e) {
-        cout << "Error: " << e.what() << endl;
-    }
-
-    // 2D array using ARRAY of ARRAYs:
-    ARRAY<ARRAY<int, 1, 3>, 1, 3> matrix;
-    for (int i = 1; i <= 3; i++)
-        for (int j = 1; j <= 3; j++)
-            matrix[i][j] = i * 10 + j;
-
-    cout << matrix[2][3] << endl;  // 23
-
-    return 0;
-}
-```
-
-1.  **Index shifting:** The internal storage is 0-based (`data[0..SIZE-1]`). The public interface uses `[Low..High]`. The translation is `data[idx - Low]`.
-2.  **`static_assert`:** A compile-time assertion that catches invalid template arguments (e.g., `ARRAY<int, 10, 5>` would fail to compile with a clear message).
-3.  **Two `operator[]` overloads:** One for mutable access (returns `T&`), one for read-only access on `const` arrays (returns `const T&`).
-4.  **2D array:** Nesting `ARRAY` inside `ARRAY` gives a 2D structure with full bounds checking on both indices.
-
-**Answer:** The index shift `data[idx - Low]` is the key trick. Any index range can be used, and out-of-bounds access is detected at runtime.
-
-</details>
-
-##### **3.7. Generic Smart Pointer: RAII Implementation** (Tutorial 5, Problem 1)
-
-Implement a simple generic smart pointer class template `smart_pointer<T>` that:
-
-*   Takes ownership of a raw pointer passed to its constructor
-*   Automatically deletes the object when the smart pointer goes out of scope
-*   Supports `->` and `*` operators for pointer-like usage
-*   Add operators that make it look as similar to a raw pointer as possible
-*   Write a test showing the advantage over raw pointers
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The RAII pattern guarantees that the destructor is called when the object leaves scope — even if an exception is thrown. This is the foundation of all smart pointers.
-
-```cpp
-#include <iostream>
-#include <stdexcept>
-using namespace std;
-
-template <typename T>
-class smart_pointer {
-    T* obj;
-
-public:
-    // Constructor: acquire ownership
-    explicit smart_pointer(T* o = nullptr) : obj(o) { }
-
-    // Destructor: release ownership (RAII core)
-    ~smart_pointer() {
-        delete obj;
-        cout << "[smart_pointer: object deleted]" << endl;
-    }
-
-    // Prevent copying (like unique_ptr)
-    smart_pointer(const smart_pointer&) = delete;
-    smart_pointer& operator=(const smart_pointer&) = delete;
-
-    // Pointer-like operators
-    T* operator->() { return obj; }
-    T& operator*()  { return *obj; }
-
-    // Conversion to raw pointer (read-only)
-    T* get() const { return obj; }
-
-    // Boolean check: is the pointer non-null?
-    explicit operator bool() const { return obj != nullptr; }
-
-    // Comparison with nullptr
-    bool operator==(nullptr_t) const { return obj == nullptr; }
-    bool operator!=(nullptr_t) const { return obj != nullptr; }
-};
-
-// A sample class to manage
-class Resource {
-    int id;
-public:
-    Resource(int i) : id(i) { cout << "Resource " << id << " created\n"; }
-    ~Resource()              { cout << "Resource " << id << " destroyed\n"; }
-    void use()               { cout << "Using Resource " << id << "\n"; }
-};
-
-void demonstrateAdvantage() {
-    // With raw pointers: must remember to delete!
-    // Resource* raw = new Resource(99);
-    // raw->use();
-    // if (someCondition) return;  // MEMORY LEAK if we forget delete here
-    // delete raw;
-
-    // With smart_pointer: automatic cleanup, even on early return
-    smart_pointer<Resource> sp(new Resource(1));
-    sp->use();      // Works like a raw pointer
-    (*sp).use();    // Also works
-
-    if (sp) {
-        cout << "Pointer is valid\n";
-    }
-
-    cout << "Leaving scope...\n";
-}   // smart_pointer destructor called automatically here — no delete needed!
-
-int main() {
-    demonstrateAdvantage();
-    cout << "After scope exit\n";
-    return 0;
-}
-```
-
-**Output:**
-```
-Resource 1 created
-Using Resource 1
-Using Resource 1
-Pointer is valid
-Leaving scope...
-[smart_pointer: object deleted]
-Resource 1 destroyed
-After scope exit
-```
-
-1.  **RAII:** `~smart_pointer()` calls `delete obj` — guaranteed to run when the smart pointer goes out of scope or an exception unwinds the stack.
-2.  **Deleted copy:** Prevents two `smart_pointer` instances from owning the same object (would cause double-delete).
-3.  **`operator->`:** Returns the raw pointer, enabling `sp->use()` syntax.
-4.  **`operator bool()`:** Allows `if (sp)` checks.
-5.  **Advantage over raw:** Even if `demonstrateAdvantage` returned early (e.g., exception), the destructor would still run — no memory leak.
-
-**Answer:** The RAII destructor is the critical mechanism. See output above for the automatic cleanup sequence.
-
-</details>
-
-
 ##### **3.8. Generic Stack with Specialized StringStack** (Lab 5, Task 1)
 
 Implement a generic `GenericStack<T>` class template that supports `push()`, `pop()`, and `peek()`. The stack should resize dynamically. Then create a `StringStack` subclass that:
@@ -1699,3 +1141,561 @@ Object is gone — weak_ptr is safe to use (returns null)
 **Answer:** See complete implementation above demonstrating all three smart pointer types and their lifetime semantics.
 
 </details>
+
+##### **3.1. Max Function Template: Find the Maximum of Two Values** (Lecture 5, Example 1)
+
+Write a function template `Max` that returns the maximum of two values of any type that supports the `>` operator. Demonstrate its use with `int`, `double`, and a user-defined class.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A function template is written once with a type placeholder `T`. The compiler generates concrete versions (`Max_int`, `Max_double`, etc.) on demand based on the argument types at each call site.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+// Function template: works for any type T that has operator>
+template <typename T>
+T Max(T a, T b) {
+    return a > b ? a : b;
+}
+
+// A user-defined class that satisfies the template requirement (has operator>)
+class Temperature {
+    double celsius;
+public:
+    Temperature(double c) : celsius(c) { }
+    bool operator>(const Temperature& t) const { return celsius > t.celsius; }
+    double value() const { return celsius; }
+};
+
+int main() {
+    // Implicit instantiation for int (compiler generates Max_int)
+    cout << Max(3, 7) << endl;           // 7
+
+    // Implicit instantiation for double (compiler generates Max_double)
+    cout << Max(3.14, 2.71) << endl;     // 3.14
+
+    // Implicit instantiation for Temperature (compiler generates Max_Temperature)
+    Temperature t1(36.6), t2(38.2);
+    cout << Max(t1, t2).value() << endl; // 38.2
+
+    return 0;
+}
+```
+
+1.  **Template declaration:** `template <typename T>` introduces type parameter `T`. The body `return a > b ? a : b;` uses `T` wherever a type is needed.
+2.  **Implicit instantiation:** When the compiler sees `Max(3, 7)`, it deduces `T = int` from the argument types and generates `int Max_int(int a, int b)` internally.
+3.  **Type requirement:** `Temperature` must have `operator>` — without it, the compiler reports an error inside the generated `Max_Temperature` function.
+4.  **Separate instantiations:** `Max_int`, `Max_double`, and `Max_Temperature` are three distinct functions in the compiled output.
+
+**Answer:** The template generates three functions from one definition. Output: `7`, `3.14`, `38.2`.
+
+</details>
+
+##### **3.2. alignArray: Converting a Specific Function to a Template** (Lecture 5, Example 2)
+
+Given the following integer-specific function, convert it into a function template that works with arrays of any numeric type. Declare a class that satisfies the template's requirements, then demonstrate the template with an array of that class.
+
+```cpp
+void alignArray(int* array, int size, int barrier) {
+    for (int i = 0; i < size; i++) {
+        if      (array[i] < barrier) array[i] += 2;
+        else if (array[i] > barrier) array[i] -= 2;
+    }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Identify which operations the function applies to the element type, then make those the requirements on the template type parameter.
+
+1.  **Identify operations used on elements:** `<`, `>`, `+=`, `-=`. The type `T` must support all four.
+2.  **Write the template:**
+
+```cpp
+#include <iostream>
+using namespace std;
+
+template <typename T>
+void alignArray(T* array, int size, T barrier) {
+    for (int i = 0; i < size; i++) {
+        if      (array[i] < barrier) array[i] += 2;
+        else if (array[i] > barrier) array[i] -= 2;
+    }
+}
+```
+
+3.  **Declare a class satisfying requirements:**
+
+```cpp
+class Score {
+    int val;
+public:
+    Score(int v = 0) : val(v) { }
+    bool operator<(const Score& s) const { return val < s.val; }
+    bool operator>(const Score& s) const { return val > s.val; }
+    Score& operator+=(int n) { val += n; return *this; }
+    Score& operator-=(int n) { val -= n; return *this; }
+    int value() const { return val; }
+};
+```
+
+4.  **Demonstrate with the class:**
+
+```cpp
+int main() {
+    // Demo with int
+    int intArr[] = {1, 5, 10, 3, 7};
+    alignArray(intArr, 5, 5);
+    for (int x : intArr) cout << x << " ";  // 3 5 8 5 5
+    cout << endl;
+
+    // Demo with Score
+    Score scores[] = {Score(1), Score(8), Score(5), Score(3)};
+    alignArray(scores, 4, Score(5));
+    for (auto& s : scores) cout << s.value() << " ";  // 3 6 5 5
+    cout << endl;
+
+    return 0;
+}
+```
+
+**Answer:** The template parameterizes both the element type and the barrier type as `T`. Any type supporting `<`, `>`, `+=`, `-=` satisfies the requirements.
+
+</details>
+
+##### **3.3. Stack Class Template with Non-type Size Parameter** (Lecture 5, Example 3)
+
+Implement a generic `Stack` class template parameterized by both the element type `T` and the maximum size `N`. Demonstrate creating stacks of different types and sizes.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Non-type template parameters allow compile-time configuration of class dimensions. `Stack<int,10>` and `Stack<int,50>` are *different types*.
+
+```cpp
+#include <iostream>
+#include <stdexcept>
+using namespace std;
+
+template <typename T, int N>
+class Stack {
+    int top;
+    T S[N];          // Array size N is a compile-time constant
+public:
+    Stack() : top(-1) { }
+
+    void push(const T& V) {
+        if (top >= N - 1) throw overflow_error("Stack is full");
+        S[++top] = V;
+    }
+
+    T pop() {
+        if (top < 0) throw underflow_error("Stack is empty");
+        return S[top--];
+    }
+
+    T peek() const {
+        if (top < 0) throw underflow_error("Stack is empty");
+        return S[top];
+    }
+
+    bool isEmpty() const { return top < 0; }
+    bool isFull()  const { return top >= N - 1; }
+};
+
+int main() {
+    Stack<int, 10> intStack;
+    intStack.push(1);
+    intStack.push(2);
+    intStack.push(3);
+    cout << intStack.pop() << endl;  // 3 (LIFO order)
+    cout << intStack.pop() << endl;  // 2
+
+    Stack<string, 5> strStack;
+    strStack.push("hello");
+    strStack.push("world");
+    cout << strStack.pop() << endl;  // "world"
+
+    // Stack<int, 10> and Stack<int, 50> are DIFFERENT types:
+    // Stack<int, 50> bigStack = intStack;  // COMPILE ERROR
+
+    return 0;
+}
+```
+
+1.  **Template declaration:** `template <typename T, int N>` — two parameters: element type and capacity.
+2.  **Array:** `T S[N]` — N is evaluated at compile time; valid as an array size.
+3.  **LIFO semantics:** `push` increments `top` before writing; `pop` reads at `top` then decrements.
+4.  **Bounds checking:** Throws standard exceptions on overflow/underflow.
+
+**Answer:** `Stack<int,10>` and `Stack<string,5>` are independent types generated from the same template. Output: `3`, `2`, `world`.
+
+</details>
+
+##### **3.4. spaceOf: Explicit Function Template Instantiation** (Lecture 5, Example 4)
+
+Write a function template `spaceOf<T>()` that calculates how many 32-bit words (each 4 bytes) are needed to store a value of type `T`. Demonstrate explicit instantiation for several types.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** When a function template has no arguments from which the compiler can deduce `T`, you must provide the type explicitly using `<T>` at the call site.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+template <typename T>
+int spaceOf() {
+    int bytes = sizeof(T);
+    // Number of 32-bit words: ceiling division by 4
+    return bytes / 4 + (bytes % 4 > 0 ? 1 : 0);
+}
+
+class MyData {
+    double x, y, z;    // 3 doubles = 24 bytes
+    int flag;          // 4 bytes
+    // Total: 28 bytes = 7 × 4-byte words
+};
+
+int main() {
+    // Cannot call spaceOf() without explicit type — no arguments to deduce from
+    cout << spaceOf<int>()    << endl;    // 4 bytes  → 1 word
+    cout << spaceOf<double>() << endl;    // 8 bytes  → 2 words
+    cout << spaceOf<char>()   << endl;    // 1 byte   → 1 word (ceiling)
+    cout << spaceOf<MyData>() << endl;    // 28+ bytes → 7+ words (depends on padding)
+
+    // The compiler optimizes: sizeof(int)=4 is a compile-time constant,
+    // so spaceOf<int>() is likely inlined to the constant 1.
+    return 0;
+}
+```
+
+1.  **No deducible argument:** `spaceOf()` takes no arguments, so the compiler cannot infer `T`.
+2.  **Explicit syntax:** `spaceOf<int>()` — the `<int>` tells the compiler to instantiate with `T = int`.
+3.  **Compile-time optimization:** Since `sizeof(T)` is a compile-time constant, the entire function can be optimized away, leaving just the constant result.
+4.  **Ceiling division formula:** `bytes/4 + (bytes%4 > 0 ? 1 : 0)` computes $\lceil \text{bytes}/4 \rceil$.
+
+**Answer:** `spaceOf<int>()` = 1, `spaceOf<double>()` = 2, `spaceOf<char>()` = 1.
+
+</details>
+
+
+##### **3.5. RANGE Template: Complete Implementation** (Tutorial 5, Example 1)
+
+Write a complete implementation of the `RANGE` template providing:
+
+*   Constructor(s) and destructor
+*   Arithmetic and relational operators (`+=`, `-=`, `+`, `-`, `==`, `!=`, `<`, `>`)
+*   Increment and decrement operators
+*   Conversion function `RANGE → long`
+*   A checking and exception-handling mechanism
+
+Show two realistic examples of using the `RANGE` template.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Non-type template parameters make the range boundaries part of the *type*, not the *value*. This means `RANGE<1,12>` and `RANGE<1,31>` are incompatible types — the compiler will flag any mix-up.
+
+```cpp
+#include <iostream>
+#include <stdexcept>
+using namespace std;
+
+template <int L, int R>
+class RANGE {
+    int value;
+
+    void check() const {
+        if (value < L || value > R)
+            throw out_of_range("RANGE value " + to_string(value)
+                               + " out of [" + to_string(L) + "," + to_string(R) + "]");
+    }
+
+public:
+    // Constructor from int
+    explicit RANGE(int v) : value(v) { check(); }
+
+    // Copy constructor
+    RANGE(const RANGE& r) : value(r.value) { }
+
+    // Destructor (trivial)
+    ~RANGE() = default;
+
+    // --- Assignment ---
+    RANGE& operator=(const RANGE& r) { value = r.value; return *this; }
+    RANGE& operator=(int v)          { value = v; check(); return *this; }
+
+    // --- Compound arithmetic ---
+    RANGE& operator+=(int n) { value += n; check(); return *this; }
+    RANGE& operator-=(int n) { value -= n; check(); return *this; }
+
+    // --- Binary arithmetic (return plain int for flexibility) ---
+    int operator+(int n)          const { return value + n; }
+    int operator-(int n)          const { return value - n; }
+    int operator+(const RANGE& r) const { return value + r.value; }
+    int operator-(const RANGE& r) const { return value - r.value; }
+
+    // --- Increment / Decrement ---
+    RANGE& operator++()    { value++; check(); return *this; }  // pre-increment
+    RANGE  operator++(int) { RANGE tmp(*this); ++(*this); return tmp; } // post-increment
+    RANGE& operator--()    { value--; check(); return *this; }  // pre-decrement
+    RANGE  operator--(int) { RANGE tmp(*this); --(*this); return tmp; } // post-decrement
+
+    // --- Relational ---
+    bool operator==(const RANGE& r) const { return value == r.value; }
+    bool operator!=(const RANGE& r) const { return value != r.value; }
+    bool operator< (const RANGE& r) const { return value <  r.value; }
+    bool operator> (const RANGE& r) const { return value >  r.value; }
+
+    // --- Conversion to long ---
+    operator long() const { return (long)value; }
+};
+
+// ---- Practical Examples ----
+
+using DayOfMonth = RANGE<1, 31>;
+using MonthOfYear = RANGE<1, 12>;
+
+int main() {
+    // Example 1: Calendar date arithmetic
+    DayOfMonth   day(15);
+    MonthOfYear  month(6);
+
+    cout << "Day: "   << (long)day   << endl;  // 15
+    cout << "Month: " << (long)month << endl;  // 6
+
+    ++day;
+    cout << "Next day: " << (long)day << endl;  // 16
+
+    try {
+        day = 32;  // out of range!
+    } catch (const out_of_range& e) {
+        cout << "Error: " << e.what() << endl;
+    }
+
+    // day = month;  // COMPILE ERROR: incompatible types — safety guaranteed!
+
+    // Example 2: Traffic light phase (0=Red, 1=Yellow, 2=Green)
+    using Phase = RANGE<0, 2>;
+    Phase light(0);
+    for (int i = 0; i < 4; i++) {
+        cout << "Light phase: " << (long)light << endl;
+        try { ++light; } catch (...) { light = Phase(0); }  // wrap around on overflow
+    }
+
+    return 0;
+}
+```
+
+1.  **Template parameters as type identity:** `DayOfMonth` (alias for `RANGE<1,31>`) and `MonthOfYear` (`RANGE<1,12>`) are *different types* — mixing them is a compile error.
+2.  **`check()` called on every mutation:** constructor, `operator=`, `operator+=`, `operator++`, etc.
+3.  **Conversion to `long`:** Allows printing and using the value in arithmetic expressions without explicit casts.
+4.  **Post-increment:** Requires saving a copy before incrementing, returning the old value.
+
+**Answer:** See complete implementation above. The key insight is that boundary enforcement happens at compile time (type system) and at runtime (exception).
+
+</details>
+
+##### **3.6. ARRAY Template with RANGE-based Boundaries** (Tutorial 5, Example 2)
+
+Design and implement an `ARRAY` template where the valid index range is specified as template parameters (using ideas from the `RANGE` template). The array should support arbitrary index boundaries (not necessarily starting at 0). Implement an indexing operator with bounds checking. Demonstrate with a practical example.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Just like `RANGE` makes the value boundaries part of the type, `ARRAY` can make the index boundaries part of the type. `ARRAY<int,1,12>` is an array of 12 integers indexed from 1 to 12 — a "1-based array".
+
+```cpp
+#include <iostream>
+#include <stdexcept>
+#include <string>
+using namespace std;
+
+// ARRAY<T, Low, High>: an array of type T with indices in [Low, High]
+template <typename T, int Low, int High>
+class ARRAY {
+    static_assert(Low <= High, "ARRAY: Low must be <= High");
+    static const int SIZE = High - Low + 1;
+    T data[SIZE];
+
+    void checkIndex(int idx) const {
+        if (idx < Low || idx > High)
+            throw out_of_range("ARRAY index " + to_string(idx)
+                               + " out of [" + to_string(Low) + "," + to_string(High) + "]");
+    }
+
+public:
+    ARRAY() = default;
+
+    // Non-const indexing (allows modification)
+    T& operator[](int idx) {
+        checkIndex(idx);
+        return data[idx - Low];   // Shift: external index → internal 0-based index
+    }
+
+    // Const indexing (for read-only access)
+    const T& operator[](int idx) const {
+        checkIndex(idx);
+        return data[idx - Low];
+    }
+
+    int low()  const { return Low;  }
+    int high() const { return High; }
+    int size() const { return SIZE; }
+};
+
+int main() {
+    // 1-based array of month names (indices 1..12)
+    ARRAY<string, 1, 12> monthNames;
+    monthNames[1]  = "January";
+    monthNames[2]  = "February";
+    monthNames[3]  = "March";
+    // ... (fill remaining)
+    monthNames[12] = "December";
+
+    cout << monthNames[1]  << endl;  // "January"
+    cout << monthNames[12] << endl;  // "December"
+
+    try {
+        monthNames[0];   // Index 0 is out of range [1, 12]
+    } catch (const out_of_range& e) {
+        cout << "Error: " << e.what() << endl;
+    }
+
+    // 2D array using ARRAY of ARRAYs:
+    ARRAY<ARRAY<int, 1, 3>, 1, 3> matrix;
+    for (int i = 1; i <= 3; i++)
+        for (int j = 1; j <= 3; j++)
+            matrix[i][j] = i * 10 + j;
+
+    cout << matrix[2][3] << endl;  // 23
+
+    return 0;
+}
+```
+
+1.  **Index shifting:** The internal storage is 0-based (`data[0..SIZE-1]`). The public interface uses `[Low..High]`. The translation is `data[idx - Low]`.
+2.  **`static_assert`:** A compile-time assertion that catches invalid template arguments (e.g., `ARRAY<int, 10, 5>` would fail to compile with a clear message).
+3.  **Two `operator[]` overloads:** One for mutable access (returns `T&`), one for read-only access on `const` arrays (returns `const T&`).
+4.  **2D array:** Nesting `ARRAY` inside `ARRAY` gives a 2D structure with full bounds checking on both indices.
+
+**Answer:** The index shift `data[idx - Low]` is the key trick. Any index range can be used, and out-of-bounds access is detected at runtime.
+
+</details>
+
+##### **3.7. Generic Smart Pointer: RAII Implementation** (Tutorial 5, Example 3)
+
+Implement a simple generic smart pointer class template `smart_pointer<T>` that:
+
+*   Takes ownership of a raw pointer passed to its constructor
+*   Automatically deletes the object when the smart pointer goes out of scope
+*   Supports `->` and `*` operators for pointer-like usage
+*   Add operators that make it look as similar to a raw pointer as possible
+*   Write a test showing the advantage over raw pointers
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The RAII pattern guarantees that the destructor is called when the object leaves scope — even if an exception is thrown. This is the foundation of all smart pointers.
+
+```cpp
+#include <iostream>
+#include <stdexcept>
+using namespace std;
+
+template <typename T>
+class smart_pointer {
+    T* obj;
+
+public:
+    // Constructor: acquire ownership
+    explicit smart_pointer(T* o = nullptr) : obj(o) { }
+
+    // Destructor: release ownership (RAII core)
+    ~smart_pointer() {
+        delete obj;
+        cout << "[smart_pointer: object deleted]" << endl;
+    }
+
+    // Prevent copying (like unique_ptr)
+    smart_pointer(const smart_pointer&) = delete;
+    smart_pointer& operator=(const smart_pointer&) = delete;
+
+    // Pointer-like operators
+    T* operator->() { return obj; }
+    T& operator*()  { return *obj; }
+
+    // Conversion to raw pointer (read-only)
+    T* get() const { return obj; }
+
+    // Boolean check: is the pointer non-null?
+    explicit operator bool() const { return obj != nullptr; }
+
+    // Comparison with nullptr
+    bool operator==(nullptr_t) const { return obj == nullptr; }
+    bool operator!=(nullptr_t) const { return obj != nullptr; }
+};
+
+// A sample class to manage
+class Resource {
+    int id;
+public:
+    Resource(int i) : id(i) { cout << "Resource " << id << " created\n"; }
+    ~Resource()              { cout << "Resource " << id << " destroyed\n"; }
+    void use()               { cout << "Using Resource " << id << "\n"; }
+};
+
+void demonstrateAdvantage() {
+    // With raw pointers: must remember to delete!
+    // Resource* raw = new Resource(99);
+    // raw->use();
+    // if (someCondition) return;  // MEMORY LEAK if we forget delete here
+    // delete raw;
+
+    // With smart_pointer: automatic cleanup, even on early return
+    smart_pointer<Resource> sp(new Resource(1));
+    sp->use();      // Works like a raw pointer
+    (*sp).use();    // Also works
+
+    if (sp) {
+        cout << "Pointer is valid\n";
+    }
+
+    cout << "Leaving scope...\n";
+}   // smart_pointer destructor called automatically here — no delete needed!
+
+int main() {
+    demonstrateAdvantage();
+    cout << "After scope exit\n";
+    return 0;
+}
+```
+
+**Output:**
+```
+Resource 1 created
+Using Resource 1
+Using Resource 1
+Pointer is valid
+Leaving scope...
+[smart_pointer: object deleted]
+Resource 1 destroyed
+After scope exit
+```
+
+1.  **RAII:** `~smart_pointer()` calls `delete obj` — guaranteed to run when the smart pointer goes out of scope or an exception unwinds the stack.
+2.  **Deleted copy:** Prevents two `smart_pointer` instances from owning the same object (would cause double-delete).
+3.  **`operator->`:** Returns the raw pointer, enabling `sp->use()` syntax.
+4.  **`operator bool()`:** Allows `if (sp)` checks.
+5.  **Advantage over raw:** Even if `demonstrateAdvantage` returned early (e.g., exception), the destructor would still run — no memory leak.
+
+**Answer:** The RAII destructor is the critical mechanism. See output above for the automatic cleanup sequence.
+
+</details>
+

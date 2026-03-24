@@ -804,6 +804,176 @@ The second version can be tested with a mock `Saver`, can switch from PDF to DOC
 
 #### **3. Examples**
 
+##### **3.4. Identify Iterator Categories for STL Containers** (Lab 7, Task 1)
+
+For each STL container listed below, state the category of iterator it provides and give one algorithm that can be used with it but *not* with a weaker iterator category.
+
+**(a)** `std::vector<int>`
+**(b)** `std::list<int>`
+**(c)** `std::forward_list<int>`
+**(d)** `std::istream_iterator<int>`
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) `std::vector<int>`:**
+
+*   Iterator category: **Random Access Iterator**
+*   Algorithm requiring this: `std::sort` (requires random access for efficient partitioning: `i + n`, `i[n]`, `i < j`).
+
+**(b) `std::list<int>`:**
+
+*   Iterator category: **Bidirectional Iterator**
+*   Algorithm requiring this: `std::reverse` (requires `--i` to move backward).
+
+**(c) `std::forward_list<int>`:**
+
+*   Iterator category: **Forward Iterator**
+*   Algorithm requiring this: `std::find` (requires only `++i` and `*i`); `std::sort` cannot be used directly on `forward_list`.
+
+**(d) `std::istream_iterator<int>`:**
+
+*   Iterator category: **Input Iterator**
+*   Algorithm: `std::find` (read-only, single-pass). Cannot be used with `std::reverse` (needs bidirectional) or `std::sort` (needs random access).
+
+**Answer:**
+
+| Container | Iterator Category | Exclusive Algorithm |
+|-----------|------------------|---------------------|
+| `vector` | Random Access | `sort` |
+| `list` | Bidirectional | `reverse` |
+| `forward_list` | Forward | `find` |
+| `istream_iterator` | Input | `find` (read-only pass) |
+
+</details>
+
+##### **3.5. Circular Buffer with Custom Forward Iterator** (Lab 7, Task 2)
+
+Build a **circular buffer** as a template class with a custom forward iterator.
+
+**Requirements:**
+
+*   The class must support: `push(value)`, `pop()` (returns the value), `empty()`, `size()`.
+*   Use `std::vector` for internal storage.
+*   The iterator must iterate over the buffer elements in **circular fashion**: after reaching the last element, it wraps around and continues from the first.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A circular buffer uses modular arithmetic (`%`) to wrap indices. The forward iterator tracks how many elements it has visited so that it knows when a full circle is complete.
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <stdexcept>
+
+template <typename T>
+class CircularBuffer {
+    std::vector<T> data_;   // underlying storage
+    size_t head_;           // index of the oldest element (front)
+    size_t tail_;           // index where the next push will go
+    size_t count_;          // number of elements currently stored
+    size_t capacity_;       // total capacity
+
+public:
+    CircularBuffer(size_t capacity)
+        : data_(capacity), head_(0), tail_(0),
+          count_(0), capacity_(capacity) { }
+
+    // Add an element at the back
+    void push(const T& value) {
+        if (count_ == capacity_)
+            throw std::overflow_error("Buffer is full");
+        data_[tail_] = value;
+        tail_ = (tail_ + 1) % capacity_;
+        ++count_;
+    }
+
+    // Remove and return the front element
+    T pop() {
+        if (count_ == 0)
+            throw std::underflow_error("Buffer is empty");
+        T value = data_[head_];
+        head_ = (head_ + 1) % capacity_;
+        --count_;
+        return value;
+    }
+
+    bool   empty()    const { return count_ == 0; }
+    size_t size()     const { return count_; }
+    size_t capacity() const { return capacity_; }
+
+    // ---- Forward Iterator ----
+    class iterator {
+        const CircularBuffer* buf_;   // the buffer being iterated
+        size_t index_;                // physical index in data_
+        size_t visited_;              // how many elements we have visited
+
+    public:
+        iterator(const CircularBuffer* buf, size_t start, size_t visited)
+            : buf_(buf), index_(start), visited_(visited) { }
+
+        T operator*() const {
+            return buf_->data_[index_];
+        }
+
+        iterator& operator++() {
+            index_ = (index_ + 1) % buf_->capacity_;
+            ++visited_;
+            return *this;
+        }
+
+        bool operator!=(const iterator& other) const {
+            return visited_ != other.visited_;
+        }
+    };
+
+    // begin(): start at head, 0 elements visited
+    iterator begin() const {
+        return iterator(this, head_, 0);
+    }
+
+    // end(): same position, count_ elements visited (signals "done")
+    iterator end() const {
+        return iterator(this, head_, count_);
+    }
+};
+
+int main() {
+    CircularBuffer<int> buf(5);
+    buf.push(10);
+    buf.push(20);
+    buf.push(30);
+    buf.push(40);
+    buf.push(50);
+
+    std::cout << "Forward pass: ";
+    for (auto it = buf.begin(); it != buf.end(); ++it)
+        std::cout << *it << " ";   // 10 20 30 40 50
+    std::cout << std::endl;
+
+    buf.pop();  // removes 10
+    buf.push(60);
+
+    std::cout << "After pop + push: ";
+    for (int val : buf)
+        std::cout << val << " ";   // 20 30 40 50 60
+    std::cout << std::endl;
+
+    return 0;
+}
+```
+
+**How the circular wrapping works:**
+
+*   `push` stores at `tail_` and advances `tail_ = (tail_ + 1) % capacity_`.
+*   `pop` reads from `head_` and advances `head_ = (head_ + 1) % capacity_`.
+*   The iterator advances via `index_ = (index_ + 1) % capacity_` and compares using `visited_` count rather than a physical index, because the "end" and "begin" physical positions coincide in a full buffer.
+
+**Answer:** The iterator counts visited elements (0 to `count_`) to determine termination, using modular arithmetic to wrap around the physical storage.
+
+</details>
+
 ##### **3.1. Trace the `find5` Derivation Steps** (Lecture 7, Example 1)
 
 Starting from the concrete `find0` function below, explain each of the five generalization steps that lead to the generic `find5` algorithm. For each step, state what was changed and why.
@@ -964,177 +1134,7 @@ NODE::iterator result = find5<int>(
 
 </details>
 
-##### **3.4. Identify Iterator Categories for STL Containers** (Lab 7, Exercise 1)
-
-For each STL container listed below, state the category of iterator it provides and give one algorithm that can be used with it but *not* with a weaker iterator category.
-
-**(a)** `std::vector<int>`
-**(b)** `std::list<int>`
-**(c)** `std::forward_list<int>`
-**(d)** `std::istream_iterator<int>`
-
-<details>
-<summary>Click to see the solution</summary>
-
-**(a) `std::vector<int>`:**
-
-*   Iterator category: **Random Access Iterator**
-*   Algorithm requiring this: `std::sort` (requires random access for efficient partitioning: `i + n`, `i[n]`, `i < j`).
-
-**(b) `std::list<int>`:**
-
-*   Iterator category: **Bidirectional Iterator**
-*   Algorithm requiring this: `std::reverse` (requires `--i` to move backward).
-
-**(c) `std::forward_list<int>`:**
-
-*   Iterator category: **Forward Iterator**
-*   Algorithm requiring this: `std::find` (requires only `++i` and `*i`); `std::sort` cannot be used directly on `forward_list`.
-
-**(d) `std::istream_iterator<int>`:**
-
-*   Iterator category: **Input Iterator**
-*   Algorithm: `std::find` (read-only, single-pass). Cannot be used with `std::reverse` (needs bidirectional) or `std::sort` (needs random access).
-
-**Answer:**
-
-| Container | Iterator Category | Exclusive Algorithm |
-|-----------|------------------|---------------------|
-| `vector` | Random Access | `sort` |
-| `list` | Bidirectional | `reverse` |
-| `forward_list` | Forward | `find` |
-| `istream_iterator` | Input | `find` (read-only pass) |
-
-</details>
-
-##### **3.5. Circular Buffer with Custom Forward Iterator** (Lab 7, Exercise 2)
-
-Build a **circular buffer** as a template class with a custom forward iterator.
-
-**Requirements:**
-
-*   The class must support: `push(value)`, `pop()` (returns the value), `empty()`, `size()`.
-*   Use `std::vector` for internal storage.
-*   The iterator must iterate over the buffer elements in **circular fashion**: after reaching the last element, it wraps around and continues from the first.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** A circular buffer uses modular arithmetic (`%`) to wrap indices. The forward iterator tracks how many elements it has visited so that it knows when a full circle is complete.
-
-```cpp
-#include <iostream>
-#include <vector>
-#include <stdexcept>
-
-template <typename T>
-class CircularBuffer {
-    std::vector<T> data_;   // underlying storage
-    size_t head_;           // index of the oldest element (front)
-    size_t tail_;           // index where the next push will go
-    size_t count_;          // number of elements currently stored
-    size_t capacity_;       // total capacity
-
-public:
-    CircularBuffer(size_t capacity)
-        : data_(capacity), head_(0), tail_(0),
-          count_(0), capacity_(capacity) { }
-
-    // Add an element at the back
-    void push(const T& value) {
-        if (count_ == capacity_)
-            throw std::overflow_error("Buffer is full");
-        data_[tail_] = value;
-        tail_ = (tail_ + 1) % capacity_;
-        ++count_;
-    }
-
-    // Remove and return the front element
-    T pop() {
-        if (count_ == 0)
-            throw std::underflow_error("Buffer is empty");
-        T value = data_[head_];
-        head_ = (head_ + 1) % capacity_;
-        --count_;
-        return value;
-    }
-
-    bool   empty()    const { return count_ == 0; }
-    size_t size()     const { return count_; }
-    size_t capacity() const { return capacity_; }
-
-    // ---- Forward Iterator ----
-    class iterator {
-        const CircularBuffer* buf_;   // the buffer being iterated
-        size_t index_;                // physical index in data_
-        size_t visited_;              // how many elements we have visited
-
-    public:
-        iterator(const CircularBuffer* buf, size_t start, size_t visited)
-            : buf_(buf), index_(start), visited_(visited) { }
-
-        T operator*() const {
-            return buf_->data_[index_];
-        }
-
-        iterator& operator++() {
-            index_ = (index_ + 1) % buf_->capacity_;
-            ++visited_;
-            return *this;
-        }
-
-        bool operator!=(const iterator& other) const {
-            return visited_ != other.visited_;
-        }
-    };
-
-    // begin(): start at head, 0 elements visited
-    iterator begin() const {
-        return iterator(this, head_, 0);
-    }
-
-    // end(): same position, count_ elements visited (signals "done")
-    iterator end() const {
-        return iterator(this, head_, count_);
-    }
-};
-
-int main() {
-    CircularBuffer<int> buf(5);
-    buf.push(10);
-    buf.push(20);
-    buf.push(30);
-    buf.push(40);
-    buf.push(50);
-
-    std::cout << "Forward pass: ";
-    for (auto it = buf.begin(); it != buf.end(); ++it)
-        std::cout << *it << " ";   // 10 20 30 40 50
-    std::cout << std::endl;
-
-    buf.pop();  // removes 10
-    buf.push(60);
-
-    std::cout << "After pop + push: ";
-    for (int val : buf)
-        std::cout << val << " ";   // 20 30 40 50 60
-    std::cout << std::endl;
-
-    return 0;
-}
-```
-
-**How the circular wrapping works:**
-
-*   `push` stores at `tail_` and advances `tail_ = (tail_ + 1) % capacity_`.
-*   `pop` reads from `head_` and advances `head_ = (head_ + 1) % capacity_`.
-*   The iterator advances via `index_ = (index_ + 1) % capacity_` and compares using `visited_` count rather than a physical index, because the "end" and "begin" physical positions coincide in a full buffer.
-
-**Answer:** The iterator counts visited elements (0 to `count_`) to determine termination, using modular arithmetic to wrap around the physical storage.
-
-</details>
-
-##### **3.6. SRP Violation — Identify and Fix** (Tutorial 7, Problem 1)
+##### **3.6. SRP Violation — Identify and Fix** (Tutorial 7, Example 1)
 
 The Java code below violates the Single Responsibility Principle. Identify the violation and refactor the code to comply with SRP.
 
@@ -1248,7 +1248,7 @@ public class Main {
 
 </details>
 
-##### **3.7. OCP Violation — Identify and Fix** (Tutorial 7, Problem 2)
+##### **3.7. OCP Violation — Identify and Fix** (Tutorial 7, Example 2)
 
 The Java code below violates the Open/Closed Principle. Identify the violation and refactor it to comply with OCP.
 
@@ -1383,7 +1383,7 @@ public class Main {
 
 </details>
 
-##### **3.8. LSP Violation — Identify and Fix** (Tutorial 7, Problem 3)
+##### **3.8. LSP Violation — Identify and Fix** (Tutorial 7, Example 3)
 
 The Java code below violates the Liskov Substitution Principle. Identify the violation and explain its impact.
 

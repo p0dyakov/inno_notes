@@ -955,7 +955,405 @@ Both Builder and Prototype are creational patterns, but they solve different pro
 
 #### **3. Examples**
 
-##### **3.1. Implement the Singleton Pattern in C#** (Lecture 9, Exercise 1)
+##### **3.7. Lecture Recap: Design Patterns Review** (Lab 8, Task 1)
+
+Answer the following recap questions:
+
+**(a)** What are design patterns? Why do we need them?
+
+**(b)** What are the three types of design patterns? How are they different?
+
+**(c)** Give three examples for each design pattern type.
+
+**(d)** Which design pattern prohibits the creation of multiple objects from a class?
+
+**(e)** True or False: The State pattern encapsulates the behavior for each state in an object.
+
+**(f)** When to use the Prototype pattern, and what advantage can it provide?
+
+**(g)** What are the differences between the Builder and the Prototype patterns?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) What are design patterns? Why do we need them?**
+
+A **design pattern** is an architectural scheme — a standardized organization of classes, objects, and methods — that provides a reusable solution to a recurring design problem in OOP.
+
+We need them because:
+
+*   Experienced designers produce better designs by recognizing and applying recurring patterns.
+*   They provide a **shared vocabulary** for communicating design decisions.
+*   They make OO software more **flexible, elegant, and reusable**.
+*   Without them, developers repeatedly solve the same problems from scratch, often poorly.
+
+**(b) Three types of design patterns and their differences:**
+
+*   **Creational** — deal with the best way to *create instances* of objects. They abstract the instantiation process.
+*   **Structural** — describe how classes and objects can be *combined* to form larger structures (composition, adaptation, wrapping).
+*   **Behavioral** — concerned with the *assignment of responsibilities* between objects; encapsulating behavior and delegating requests.
+
+**(c) Three examples for each type:**
+
+*   **Creational:** Singleton, Builder, Prototype (also: Abstract Factory, Factory Method)
+*   **Structural:** Adapter, Composite, Facade (also: Bridge, Decorator, Flyweight, Proxy)
+*   **Behavioral:** State, Observer, Strategy (also: Command, Iterator, Chain of Responsibility, Memento, Template Method, Visitor, Mediator, Interpreter)
+
+**(d) Which pattern prohibits multiple instances?**
+
+The **Singleton** pattern — it ensures a class has only one instance by making the constructor private and providing a single static access point (`getInstance()`).
+
+**(e) True or False: The State pattern encapsulates the behavior for each state in an object.**
+
+**True.** The State pattern encapsulates the behavior for each state in a dedicated class (state object). The context object delegates all state-dependent actions to the current state object, and behavior changes by swapping the state object.
+
+**(f) When to use Prototype, and what advantage does it provide?**
+
+Use Prototype when:
+
+*   The type of object to create should be determined dynamically at runtime.
+*   Creating a new object from scratch is complex or expensive — cloning a pre-configured prototype is cheaper.
+*   You want to avoid coupling client code to concrete classes.
+
+**Advantage:** You can create new objects without knowing their concrete class — just call `clone()` on a prototype. You can also eliminate repeated initialization by keeping ready-made prototype objects.
+
+**(g) Differences between Builder and Prototype:**
+
+| | **Prototype** | **Builder** |
+|---|---|---|
+| **Purpose** | Copy an existing configured object | Assemble a new object step by step |
+| **Input** | An existing prototype instance | A sequence of construction method calls |
+| **Result** | A copy with the same structure/fields as the original | A new object possibly very different from any prior object |
+| **Best for** | When initialization is expensive and objects share structure | When objects have many optional parts or multiple valid representations |
+| **Key mechanism** | `clone()` / copy constructor | `buildStepX()` methods + `build()` / `getResult()` |
+
+**Answer:** All answers provided above.
+
+</details>
+
+##### **3.8. Smart Document Editor** (Lab 8, Task 2)
+
+Implement a "Smart Document Editor" system in C++ demonstrating **Singleton**, **State**, and **Prototype** patterns working together.
+
+**Requirements:**
+
+*   **Part 1 — Singleton Logger:** A `Logger` class ensuring only one instance exists. Provides `log(const std::string& message)` printing to the console.
+*   **Part 2 — State Pattern:** An abstract `DocumentState` class with `virtual void handleInput(const std::string& input)`. Concrete states: `DraftState`, `ReviewState`, `FinalState`. A `Document` class holding a `DocumentState*` with `changeState(DocumentState* newState)`.
+*   **Part 3 — Prototype Pattern:** An abstract `DocumentPrototype` class with `clone()`. Concrete classes: `ReportType` and `InvoiceType`. Demonstrate cloning and log cloning events via the Singleton Logger.
+*   **Part 4 — Main function:** Show document creation, state transitions, and cloning with all significant events logged.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each pattern plays a distinct role: Singleton centralizes logging, State manages document lifecycle without `if`-chains, Prototype enables cheap document creation from templates.
+
+```cpp
+#include <iostream>
+#include <string>
+
+// ===== PART 1: Singleton Logger =====
+
+class Logger {
+private:
+    static Logger* instance;
+    Logger() {}  // private constructor
+
+public:
+    static Logger* getInstance() {
+        if (instance == nullptr) {
+            instance = new Logger();
+        }
+        return instance;
+    }
+
+    void log(const std::string& message) {
+        std::cout << "[LOG] " << message << std::endl;
+    }
+};
+
+Logger* Logger::instance = nullptr;
+
+// ===== PART 2: State Pattern =====
+
+// Forward declaration needed because states reference Document
+class Document;
+
+// Abstract state
+class DocumentState {
+public:
+    virtual void handleInput(Document* doc, const std::string& input) = 0;
+    virtual std::string getName() const = 0;
+    virtual ~DocumentState() = default;
+};
+
+// Document class — holds current state, delegates behavior to it
+class Document {
+private:
+    DocumentState* state;
+
+public:
+    Document(DocumentState* initialState) : state(initialState) {}
+
+    void changeState(DocumentState* newState) {
+        Logger::getInstance()->log(
+            "State changed from " + state->getName() +
+            " to " + newState->getName()
+        );
+        delete state;
+        state = newState;
+    }
+
+    void handleInput(const std::string& input) {
+        state->handleInput(this, input);
+    }
+
+    std::string getStateName() const { return state->getName(); }
+
+    ~Document() { delete state; }
+};
+
+// Concrete states
+class DraftState : public DocumentState {
+public:
+    void handleInput(Document* doc, const std::string& input) override {
+        Logger::getInstance()->log("DraftState: received input '" + input + "'");
+    }
+    std::string getName() const override { return "Draft"; }
+};
+
+class ReviewState : public DocumentState {
+public:
+    void handleInput(Document* doc, const std::string& input) override {
+        Logger::getInstance()->log("ReviewState: reviewing '" + input + "'");
+    }
+    std::string getName() const override { return "Review"; }
+};
+
+class FinalState : public DocumentState {
+public:
+    void handleInput(Document* doc, const std::string& input) override {
+        Logger::getInstance()->log(
+            "FinalState: document is finalized. No edits allowed.");
+    }
+    std::string getName() const override { return "Final"; }
+};
+
+// ===== PART 3: Prototype Pattern =====
+
+class DocumentPrototype {
+public:
+    virtual DocumentPrototype* clone() const = 0;
+    virtual void describe() const = 0;
+    virtual ~DocumentPrototype() = default;
+};
+
+class ReportType : public DocumentPrototype {
+    std::string defaultHeader;
+public:
+    ReportType(const std::string& header = "Default Report Header")
+        : defaultHeader(header) {}
+
+    DocumentPrototype* clone() const override {
+        Logger::getInstance()->log("Cloning ReportType prototype");
+        return new ReportType(*this); // copy constructor
+    }
+
+    void describe() const override {
+        std::cout << "ReportType | header: " << defaultHeader << std::endl;
+    }
+};
+
+class InvoiceType : public DocumentPrototype {
+    std::string defaultFooter;
+public:
+    InvoiceType(const std::string& footer = "Default Invoice Footer")
+        : defaultFooter(footer) {}
+
+    DocumentPrototype* clone() const override {
+        Logger::getInstance()->log("Cloning InvoiceType prototype");
+        return new InvoiceType(*this);
+    }
+
+    void describe() const override {
+        std::cout << "InvoiceType | footer: " << defaultFooter << std::endl;
+    }
+};
+
+// ===== PART 4: Main =====
+
+int main() {
+    Logger* logger = Logger::getInstance();
+    logger->log("System started");
+
+    // --- Prototype: create prototypes and clone them ---
+    ReportType*  reportProto  = new ReportType("Q1 Financial Report");
+    InvoiceType* invoiceProto = new InvoiceType("Invoice #2026-001");
+
+    DocumentPrototype* report1  = reportProto->clone();
+    DocumentPrototype* invoice1 = invoiceProto->clone();
+
+    report1->describe();
+    invoice1->describe();
+
+    // --- State: demonstrate state transitions ---
+    Document doc(new DraftState());
+    doc.handleInput("initial text");       // DraftState handles it
+
+    doc.changeState(new ReviewState());
+    doc.handleInput("review comment");     // ReviewState handles it
+
+    doc.changeState(new FinalState());
+    doc.handleInput("attempt to edit");    // FinalState: no edits allowed
+
+    // Cleanup
+    delete report1; delete invoice1;
+    delete reportProto; delete invoiceProto;
+
+    logger->log("System shut down");
+    return 0;
+}
+```
+
+**Expected output:**
+
+```
+[LOG] System started
+[LOG] Cloning ReportType prototype
+[LOG] Cloning InvoiceType prototype
+ReportType | header: Q1 Financial Report
+InvoiceType | footer: Invoice #2026-001
+[LOG] DraftState: received input 'initial text'
+[LOG] State changed from Draft to Review
+[LOG] ReviewState: reviewing 'review comment'
+[LOG] State changed from Review to Final
+[LOG] FinalState: document is finalized. No edits allowed.
+[LOG] System shut down
+```
+
+**Answer:** Singleton Logger provides one unified log stream. State pattern enables clean transitions — `Document` has no `if`-chains. Prototype pattern creates documents from pre-configured templates with a single `clone()` call.
+
+</details>
+
+##### **3.9. Document Builder** (Lab 8, Task 3)
+
+Implement the Builder pattern in C++ for a `Document` with `header`, `body`, and `footer` sections. Include:
+
+*   A `Document` class with three private `std::string` members, setters, and `print()`.
+*   An abstract `DocumentBuilder` class with pure virtual functions for building each section.
+*   A concrete `ReportBuilder` implementing the abstract class with report-specific content.
+*   A `Director` class with a `make()` function that uses `ReportBuilder` to incrementally construct the document.
+*   A `main()` function demonstrating the system.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The Director orchestrates the build sequence; the ConcreteBuilder supplies the content. The client sees only the final product — construction logic is fully isolated.
+
+```cpp
+#include <iostream>
+#include <string>
+
+// ===== Product =====
+class Document {
+private:
+    std::string header;
+    std::string body;
+    std::string footer;
+
+public:
+    void setHeader(const std::string& h) { header = h; }
+    void setBody(const std::string& b)   { body   = b; }
+    void setFooter(const std::string& f) { footer = f; }
+
+    void print() const {
+        std::cout << "=== DOCUMENT ===" << std::endl;
+        std::cout << "Header: " << header << std::endl;
+        std::cout << "Body:   " << body   << std::endl;
+        std::cout << "Footer: " << footer << std::endl;
+        std::cout << "================" << std::endl;
+    }
+};
+
+// ===== Abstract Builder =====
+class DocumentBuilder {
+protected:
+    Document doc;  // the product being built
+
+public:
+    virtual ~DocumentBuilder() = default;
+
+    virtual void buildHeader()  = 0;
+    virtual void buildBody()    = 0;
+    virtual void buildFooter()  = 0;
+
+    Document getResult() { return doc; }
+};
+
+// ===== Concrete Builder =====
+class ReportBuilder : public DocumentBuilder {
+public:
+    void buildHeader() override {
+        doc.setHeader("Quarterly Financial Report — Q1 2026");
+    }
+
+    void buildBody() override {
+        doc.setBody(
+            "Total Revenue: $1,250,000 | "
+            "Total Expenses: $870,000 | "
+            "Net Profit: $380,000"
+        );
+    }
+
+    void buildFooter() override {
+        doc.setFooter("Prepared by Finance Dept. | Confidential");
+    }
+};
+
+// ===== Director =====
+class Director {
+public:
+    // make() encapsulates the correct construction order
+    Document make(DocumentBuilder& builder) {
+        builder.buildHeader();
+        builder.buildBody();
+        builder.buildFooter();
+        return builder.getResult();
+    }
+};
+
+// ===== Main =====
+int main() {
+    Director      director;
+    ReportBuilder reportBuilder;
+
+    Document report = director.make(reportBuilder);
+    report.print();
+
+    return 0;
+}
+```
+
+**Expected output:**
+
+```
+=== DOCUMENT ===
+Header: Quarterly Financial Report — Q1 2026
+Body:   Total Revenue: $1,250,000 | Total Expenses: $870,000 | Net Profit: $380,000
+Footer: Prepared by Finance Dept. | Confidential
+================
+```
+
+1.  **`Document`** holds the data — knows nothing about how it was built.
+2.  **`DocumentBuilder`** declares what steps exist and stores the product being built.
+3.  **`ReportBuilder`** fills in report-specific content for each step.
+4.  **`Director.make()`** calls steps in the correct order. A different ConcreteBuilder (e.g., `InvoiceBuilder`) could produce a completely different document using the same Director.
+5.  The client only interacts with the Director and receives the finished `Document`.
+
+**Answer:** The Builder pattern cleanly separates *what a document is* (`Document`), *how to build it* (`ReportBuilder`), and *in what order* (`Director`).
+
+</details>
+
+##### **3.1. Implement the Singleton Pattern in C#** (Lecture 9, Example 1)
 
 Implement the Singleton design pattern in C#.
 
@@ -1010,7 +1408,7 @@ class Program
 
 </details>
 
-##### **3.2. Implement the Singleton Pattern in C++** (Lecture 9, Exercise 2)
+##### **3.2. Implement the Singleton Pattern in C++** (Lecture 9, Example 2)
 
 Implement the Singleton design pattern in C++.
 
@@ -1064,7 +1462,7 @@ int main() {
 
 </details>
 
-##### **3.3. Thread Safety in Singleton** (Lecture 9, Exercises 3–4)
+##### **3.3. Thread Safety in Singleton** (Lecture 9, Example 3–4)
 
 **(a)** Explain why the basic Singleton implementation is incomplete. **(b)** Illustrate the race condition. **(c)** Propose an industrial-strength solution.
 
@@ -1281,403 +1679,5 @@ Car [chassis=Sporty Chassis, body=Sporty Body, paint=Sporty Torch Red Paint]
 **If `ClassicCarBuilder` were used instead:** The same sequence of prints would occur, but each line would say "classical model" instead of "sports model", and the final car would show "Classic Chassis", "Classic Body", "Classic White Paint". *Same Director, different ConcreteBuilder, different product* — this is the core value of the Builder pattern.
 
 **Answer:** Each step prints its assembly message in sequence; `build()` verifies quality and returns the complete car. Swapping `SportsCarBuilder` for `ClassicCarBuilder` produces a different car with no changes to the Director.
-
-</details>
-
-##### **3.7. Lecture Recap: Design Patterns Review** (Lab 8, Exercise 1)
-
-Answer the following recap questions:
-
-**(a)** What are design patterns? Why do we need them?
-
-**(b)** What are the three types of design patterns? How are they different?
-
-**(c)** Give three examples for each design pattern type.
-
-**(d)** Which design pattern prohibits the creation of multiple objects from a class?
-
-**(e)** True or False: The State pattern encapsulates the behavior for each state in an object.
-
-**(f)** When to use the Prototype pattern, and what advantage can it provide?
-
-**(g)** What are the differences between the Builder and the Prototype patterns?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**(a) What are design patterns? Why do we need them?**
-
-A **design pattern** is an architectural scheme — a standardized organization of classes, objects, and methods — that provides a reusable solution to a recurring design problem in OOP.
-
-We need them because:
-
-*   Experienced designers produce better designs by recognizing and applying recurring patterns.
-*   They provide a **shared vocabulary** for communicating design decisions.
-*   They make OO software more **flexible, elegant, and reusable**.
-*   Without them, developers repeatedly solve the same problems from scratch, often poorly.
-
-**(b) Three types of design patterns and their differences:**
-
-*   **Creational** — deal with the best way to *create instances* of objects. They abstract the instantiation process.
-*   **Structural** — describe how classes and objects can be *combined* to form larger structures (composition, adaptation, wrapping).
-*   **Behavioral** — concerned with the *assignment of responsibilities* between objects; encapsulating behavior and delegating requests.
-
-**(c) Three examples for each type:**
-
-*   **Creational:** Singleton, Builder, Prototype (also: Abstract Factory, Factory Method)
-*   **Structural:** Adapter, Composite, Facade (also: Bridge, Decorator, Flyweight, Proxy)
-*   **Behavioral:** State, Observer, Strategy (also: Command, Iterator, Chain of Responsibility, Memento, Template Method, Visitor, Mediator, Interpreter)
-
-**(d) Which pattern prohibits multiple instances?**
-
-The **Singleton** pattern — it ensures a class has only one instance by making the constructor private and providing a single static access point (`getInstance()`).
-
-**(e) True or False: The State pattern encapsulates the behavior for each state in an object.**
-
-**True.** The State pattern encapsulates the behavior for each state in a dedicated class (state object). The context object delegates all state-dependent actions to the current state object, and behavior changes by swapping the state object.
-
-**(f) When to use Prototype, and what advantage does it provide?**
-
-Use Prototype when:
-
-*   The type of object to create should be determined dynamically at runtime.
-*   Creating a new object from scratch is complex or expensive — cloning a pre-configured prototype is cheaper.
-*   You want to avoid coupling client code to concrete classes.
-
-**Advantage:** You can create new objects without knowing their concrete class — just call `clone()` on a prototype. You can also eliminate repeated initialization by keeping ready-made prototype objects.
-
-**(g) Differences between Builder and Prototype:**
-
-| | **Prototype** | **Builder** |
-|---|---|---|
-| **Purpose** | Copy an existing configured object | Assemble a new object step by step |
-| **Input** | An existing prototype instance | A sequence of construction method calls |
-| **Result** | A copy with the same structure/fields as the original | A new object possibly very different from any prior object |
-| **Best for** | When initialization is expensive and objects share structure | When objects have many optional parts or multiple valid representations |
-| **Key mechanism** | `clone()` / copy constructor | `buildStepX()` methods + `build()` / `getResult()` |
-
-**Answer:** All answers provided above.
-
-</details>
-
-##### **3.8. Task 1: Smart Document Editor** (Lab 8, Task 1)
-
-Implement a "Smart Document Editor" system in C++ demonstrating **Singleton**, **State**, and **Prototype** patterns working together.
-
-**Requirements:**
-
-*   **Part 1 — Singleton Logger:** A `Logger` class ensuring only one instance exists. Provides `log(const std::string& message)` printing to the console.
-*   **Part 2 — State Pattern:** An abstract `DocumentState` class with `virtual void handleInput(const std::string& input)`. Concrete states: `DraftState`, `ReviewState`, `FinalState`. A `Document` class holding a `DocumentState*` with `changeState(DocumentState* newState)`.
-*   **Part 3 — Prototype Pattern:** An abstract `DocumentPrototype` class with `clone()`. Concrete classes: `ReportType` and `InvoiceType`. Demonstrate cloning and log cloning events via the Singleton Logger.
-*   **Part 4 — Main function:** Show document creation, state transitions, and cloning with all significant events logged.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Each pattern plays a distinct role: Singleton centralizes logging, State manages document lifecycle without `if`-chains, Prototype enables cheap document creation from templates.
-
-```cpp
-#include <iostream>
-#include <string>
-
-// ===== PART 1: Singleton Logger =====
-
-class Logger {
-private:
-    static Logger* instance;
-    Logger() {}  // private constructor
-
-public:
-    static Logger* getInstance() {
-        if (instance == nullptr) {
-            instance = new Logger();
-        }
-        return instance;
-    }
-
-    void log(const std::string& message) {
-        std::cout << "[LOG] " << message << std::endl;
-    }
-};
-
-Logger* Logger::instance = nullptr;
-
-// ===== PART 2: State Pattern =====
-
-// Forward declaration needed because states reference Document
-class Document;
-
-// Abstract state
-class DocumentState {
-public:
-    virtual void handleInput(Document* doc, const std::string& input) = 0;
-    virtual std::string getName() const = 0;
-    virtual ~DocumentState() = default;
-};
-
-// Document class — holds current state, delegates behavior to it
-class Document {
-private:
-    DocumentState* state;
-
-public:
-    Document(DocumentState* initialState) : state(initialState) {}
-
-    void changeState(DocumentState* newState) {
-        Logger::getInstance()->log(
-            "State changed from " + state->getName() +
-            " to " + newState->getName()
-        );
-        delete state;
-        state = newState;
-    }
-
-    void handleInput(const std::string& input) {
-        state->handleInput(this, input);
-    }
-
-    std::string getStateName() const { return state->getName(); }
-
-    ~Document() { delete state; }
-};
-
-// Concrete states
-class DraftState : public DocumentState {
-public:
-    void handleInput(Document* doc, const std::string& input) override {
-        Logger::getInstance()->log("DraftState: received input '" + input + "'");
-    }
-    std::string getName() const override { return "Draft"; }
-};
-
-class ReviewState : public DocumentState {
-public:
-    void handleInput(Document* doc, const std::string& input) override {
-        Logger::getInstance()->log("ReviewState: reviewing '" + input + "'");
-    }
-    std::string getName() const override { return "Review"; }
-};
-
-class FinalState : public DocumentState {
-public:
-    void handleInput(Document* doc, const std::string& input) override {
-        Logger::getInstance()->log(
-            "FinalState: document is finalized. No edits allowed.");
-    }
-    std::string getName() const override { return "Final"; }
-};
-
-// ===== PART 3: Prototype Pattern =====
-
-class DocumentPrototype {
-public:
-    virtual DocumentPrototype* clone() const = 0;
-    virtual void describe() const = 0;
-    virtual ~DocumentPrototype() = default;
-};
-
-class ReportType : public DocumentPrototype {
-    std::string defaultHeader;
-public:
-    ReportType(const std::string& header = "Default Report Header")
-        : defaultHeader(header) {}
-
-    DocumentPrototype* clone() const override {
-        Logger::getInstance()->log("Cloning ReportType prototype");
-        return new ReportType(*this); // copy constructor
-    }
-
-    void describe() const override {
-        std::cout << "ReportType | header: " << defaultHeader << std::endl;
-    }
-};
-
-class InvoiceType : public DocumentPrototype {
-    std::string defaultFooter;
-public:
-    InvoiceType(const std::string& footer = "Default Invoice Footer")
-        : defaultFooter(footer) {}
-
-    DocumentPrototype* clone() const override {
-        Logger::getInstance()->log("Cloning InvoiceType prototype");
-        return new InvoiceType(*this);
-    }
-
-    void describe() const override {
-        std::cout << "InvoiceType | footer: " << defaultFooter << std::endl;
-    }
-};
-
-// ===== PART 4: Main =====
-
-int main() {
-    Logger* logger = Logger::getInstance();
-    logger->log("System started");
-
-    // --- Prototype: create prototypes and clone them ---
-    ReportType*  reportProto  = new ReportType("Q1 Financial Report");
-    InvoiceType* invoiceProto = new InvoiceType("Invoice #2026-001");
-
-    DocumentPrototype* report1  = reportProto->clone();
-    DocumentPrototype* invoice1 = invoiceProto->clone();
-
-    report1->describe();
-    invoice1->describe();
-
-    // --- State: demonstrate state transitions ---
-    Document doc(new DraftState());
-    doc.handleInput("initial text");       // DraftState handles it
-
-    doc.changeState(new ReviewState());
-    doc.handleInput("review comment");     // ReviewState handles it
-
-    doc.changeState(new FinalState());
-    doc.handleInput("attempt to edit");    // FinalState: no edits allowed
-
-    // Cleanup
-    delete report1; delete invoice1;
-    delete reportProto; delete invoiceProto;
-
-    logger->log("System shut down");
-    return 0;
-}
-```
-
-**Expected output:**
-
-```
-[LOG] System started
-[LOG] Cloning ReportType prototype
-[LOG] Cloning InvoiceType prototype
-ReportType | header: Q1 Financial Report
-InvoiceType | footer: Invoice #2026-001
-[LOG] DraftState: received input 'initial text'
-[LOG] State changed from Draft to Review
-[LOG] ReviewState: reviewing 'review comment'
-[LOG] State changed from Review to Final
-[LOG] FinalState: document is finalized. No edits allowed.
-[LOG] System shut down
-```
-
-**Answer:** Singleton Logger provides one unified log stream. State pattern enables clean transitions — `Document` has no `if`-chains. Prototype pattern creates documents from pre-configured templates with a single `clone()` call.
-
-</details>
-
-##### **3.9. Task 2: Document Builder** (Lab 8, Task 2)
-
-Implement the Builder pattern in C++ for a `Document` with `header`, `body`, and `footer` sections. Include:
-
-*   A `Document` class with three private `std::string` members, setters, and `print()`.
-*   An abstract `DocumentBuilder` class with pure virtual functions for building each section.
-*   A concrete `ReportBuilder` implementing the abstract class with report-specific content.
-*   A `Director` class with a `make()` function that uses `ReportBuilder` to incrementally construct the document.
-*   A `main()` function demonstrating the system.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The Director orchestrates the build sequence; the ConcreteBuilder supplies the content. The client sees only the final product — construction logic is fully isolated.
-
-```cpp
-#include <iostream>
-#include <string>
-
-// ===== Product =====
-class Document {
-private:
-    std::string header;
-    std::string body;
-    std::string footer;
-
-public:
-    void setHeader(const std::string& h) { header = h; }
-    void setBody(const std::string& b)   { body   = b; }
-    void setFooter(const std::string& f) { footer = f; }
-
-    void print() const {
-        std::cout << "=== DOCUMENT ===" << std::endl;
-        std::cout << "Header: " << header << std::endl;
-        std::cout << "Body:   " << body   << std::endl;
-        std::cout << "Footer: " << footer << std::endl;
-        std::cout << "================" << std::endl;
-    }
-};
-
-// ===== Abstract Builder =====
-class DocumentBuilder {
-protected:
-    Document doc;  // the product being built
-
-public:
-    virtual ~DocumentBuilder() = default;
-
-    virtual void buildHeader()  = 0;
-    virtual void buildBody()    = 0;
-    virtual void buildFooter()  = 0;
-
-    Document getResult() { return doc; }
-};
-
-// ===== Concrete Builder =====
-class ReportBuilder : public DocumentBuilder {
-public:
-    void buildHeader() override {
-        doc.setHeader("Quarterly Financial Report — Q1 2026");
-    }
-
-    void buildBody() override {
-        doc.setBody(
-            "Total Revenue: $1,250,000 | "
-            "Total Expenses: $870,000 | "
-            "Net Profit: $380,000"
-        );
-    }
-
-    void buildFooter() override {
-        doc.setFooter("Prepared by Finance Dept. | Confidential");
-    }
-};
-
-// ===== Director =====
-class Director {
-public:
-    // make() encapsulates the correct construction order
-    Document make(DocumentBuilder& builder) {
-        builder.buildHeader();
-        builder.buildBody();
-        builder.buildFooter();
-        return builder.getResult();
-    }
-};
-
-// ===== Main =====
-int main() {
-    Director      director;
-    ReportBuilder reportBuilder;
-
-    Document report = director.make(reportBuilder);
-    report.print();
-
-    return 0;
-}
-```
-
-**Expected output:**
-
-```
-=== DOCUMENT ===
-Header: Quarterly Financial Report — Q1 2026
-Body:   Total Revenue: $1,250,000 | Total Expenses: $870,000 | Net Profit: $380,000
-Footer: Prepared by Finance Dept. | Confidential
-================
-```
-
-1.  **`Document`** holds the data — knows nothing about how it was built.
-2.  **`DocumentBuilder`** declares what steps exist and stores the product being built.
-3.  **`ReportBuilder`** fills in report-specific content for each step.
-4.  **`Director.make()`** calls steps in the correct order. A different ConcreteBuilder (e.g., `InvoiceBuilder`) could produce a completely different document using the same Director.
-5.  The client only interacts with the Director and receives the finished `Document`.
-
-**Answer:** The Builder pattern cleanly separates *what a document is* (`Document`), *how to build it* (`ReportBuilder`), and *in what order* (`Director`).
 
 </details>
