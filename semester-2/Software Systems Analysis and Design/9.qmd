@@ -1,0 +1,1672 @@
+---
+title: "W10. Design Patterns: Strategy, Adapter, Composite"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "March 24, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Introduction to Design Patterns**
+
+###### **1.1.1 What Is a Design Pattern?**
+
+A **design pattern** is an **architectural scheme** — a certain organization of classes, objects, and methods — that provides applications with a standardized, reusable solution to a recurring design problem. The concept was popularized by the so-called **"Gang of Four" (GoF)**: Erich Gamma, Richard Helm, Ralph Johnson, and John Vlissides in their landmark 1994 book *Design Patterns: Elements of Reusable Object-Oriented Software* (Addison-Wesley).
+
+The defining description from the GoF: *"Each pattern describes a problem that occurs over and over again in our environment, and then describes the core of the solution to that problem in such a way that you can use this solution a million times over, without ever doing it the same way twice."*
+
+> **Important note:** There is no strong formal theory behind design patterns. Rather, patterns summarize vast practical experience from real-world OOP applications. All design patterns exploit the **OOP paradigm** — they are almost completely about object-oriented design.
+
+###### **1.1.2 Taxonomy of GoF Patterns**
+
+The GoF classified 23 patterns into three families based on their purpose:
+
+*   **Creational Patterns** — deal with the best way to *create instances* of objects. They abstract the instantiation process, making it easier to introduce new kinds of objects or control how many instances exist. Examples: Abstract Factory, Factory Method, Singleton, Builder, Prototype.
+*   **Structural Patterns** — describe how classes and objects can be *combined* to form larger, more complex structures. Examples: **Adapter**, Bridge, **Composite**, Decorator, Facade, Flyweight, Proxy.
+*   **Behavioral Patterns** — are concerned with the *assignment of responsibilities* between objects, and with encapsulating behavior in an object and delegating requests to it. Examples: Chain of Responsibility, Command (undo/redo), Interpreter, Iterator, Mediator, **Strategy**, Visitor, Observer, State, Memento, Template Method.
+
+<!-- DIAGRAM HERE -->
+
+This week covers two structural patterns — **Adapter** and **Composite** — and one behavioral pattern: **Strategy**.
+
+---
+
+##### **1.2 Strategy**
+
+###### **1.2.1 Motivation: The Duck Lake Simulator**
+
+To understand *why* the Strategy pattern exists, consider a classic thought experiment. Imagine you are building a **Duck Lake Simulator** — a program that simulates various kinds of ducks swimming on a lake.
+
+**Step 1 — Initial design.** You create a base class `Duck` with common behavior: all ducks can quack, swim, and display themselves. Concrete subclasses like `MallardDuck` and `RedheadDuck` inherit and override the `display()` method to look different.
+
+```cpp
+class Duck {
+public:
+    quack()
+    swim()
+    display()   // each kind looks differently
+};
+
+class MallardDuck : Duck {
+public:
+    display() { /* looks like a mallard */ }
+};
+```
+
+This is clean, simple inheritance — it works fine so far.
+
+**Step 2 — Adding flight.** The simulator needs to evolve: ducks should be able to fly. The naive solution: add a `fly()` method to the base class `Duck`.
+
+```cpp
+class Duck {
+public:
+    quack()
+    swim()
+    display()
+    fly()   // added to all ducks
+};
+```
+
+This seems convenient — all existing subclasses automatically gain `fly()`. But wait: what happens when you introduce a **rubber duck** (`RubberDuck`)?
+
+**Step 3 — The rubber duck problem.**
+
+```cpp
+class RubberDuck : Duck {
+public:
+    quack()    // squeaks, not quacks
+    swim()
+    display()
+    fly()      // Rubber ducks fly!? — THIS IS A BUG
+};
+```
+
+The inheritance-based addition of `fly()` to the base class caused a **non-local side effect**: every existing and future subclass inherited behavior that may be inappropriate for it. A local change to one class (adding `fly()` to `Duck`) silently broke the semantics of all its descendants.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.2 Why Simple Solutions Fail**
+
+**Solution 1 — Override per subclass.** Override `fly()` in every subclass that should not fly (leave it empty or throw an exception). This *works*, but:
+
+*   For every new kind of duck you add, you must remember to inspect and potentially override every behavior.
+*   This leads to **massive maintenance overhead** and **strong coupling** between base and derived classes.
+*   Inheritance was supposed to remove duplication, but now you are writing and duplicating override code in many places.
+
+**Solution 2 — Use interfaces (`Flyable`, `Quackable`).** Remove `fly()` and `quack()` from the base class; declare them as interfaces that only interested subclasses implement.
+
+```cpp
+interface Flyable  { fly() }
+interface Quackable { quack() }
+
+class MallardDuck : Duck, Flyable, Quackable {
+    quack() { /* real quack */ }
+    fly()   { /* real flight */ }
+};
+
+class RubberDuck : Duck, Quackable {
+    quack() { /* squeaks */ }
+    // no fly — correct!
+};
+```
+
+This solves the *wrong-behavior* problem, but creates a new one: **interfaces cannot contain implementation**. Every class that flies must implement `fly()` from scratch. If 20 duck subclasses can fly and you need to fix a bug in the flight logic, you must update all 20 classes. **Code reuse is destroyed.**
+
+###### **1.2.3 The Right Solution: Separating Stable from Volatile**
+
+The key architectural insight behind almost all design patterns is:
+
+> **Identify the aspects of your application that vary and separate them from what stays the same.**
+
+In our example:
+
+*   **Stable** — the fact that ducks swim and have a visual appearance.
+*   **Volatile** — *how* a duck flies, *how* a duck quacks.
+
+Instead of encoding these behaviors directly in the class hierarchy (via inheritance), we extract them into **separate behavior hierarchies** and use **composition**:
+
+```cpp
+// Fly behavior hierarchy
+interface FlyBehavior {
+    fly()
+}
+
+class FlyWithWings : FlyBehavior {
+    fly() { /* flaps wings and soars */ }
+}
+
+class FlyNoWay : FlyBehavior {
+    fly() { /* does nothing */ }
+}
+
+// Quack behavior hierarchy
+interface QuackBehavior {
+    quack()
+}
+
+class Quack : QuackBehavior {
+    quack() { /* real quack */ }
+}
+
+class Squeak : QuackBehavior {
+    quack() { /* rubber squeak */ }
+}
+
+class MuteSqueak : QuackBehavior {
+    quack() { /* silence */ }
+}
+```
+
+The `Duck` class now **holds references** to behavior objects and **delegates** the actual work to them:
+
+```cpp
+class Duck {
+public:
+    FlyBehavior flyBehavior;
+    QuackBehavior quackBehavior;
+
+    doFly()   { flyBehavior.fly(); }     // delegates to behavior object
+    doQuack() { quackBehavior.quack(); } // delegates to behavior object
+
+    display()   // still abstract — each duck looks different
+};
+
+class MallardDuck : Duck {
+public:
+    MallardDuck() {
+        flyBehavior = new FlyWithWings();
+        quackBehavior = new Quack();
+    }
+    display() { /* looks like a mallard */ }
+};
+```
+
+A `RubberDuck` simply sets `flyBehavior = new FlyNoWay()` — no overriding needed, no empty method bodies.
+
+**The crucial bonus — runtime behavior change.** Because behaviors are objects held in fields, you can *swap them at runtime* using a setter:
+
+```cpp
+void setFlyBehavior(FlyBehavior fb) {
+    flyBehavior = fb;
+}
+```
+
+A duck can change how it flies without changing any class definition. This is impossible with pure inheritance.
+
+**The design principle:** *Prefer composition over inheritance.*
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.4 Strategy Pattern: Formal Definition**
+
+This is exactly the **Strategy** pattern:
+
+> **Strategy** — define a family of algorithms, encapsulate each one, and make them interchangeable. Strategy lets the algorithm vary independently from clients that use it.
+
+The pattern has three key participants:
+
+*   **Context** — the class that needs to perform some operation (like `Duck`). It holds a reference to a `Strategy` object and delegates work to it via the strategy's interface. It never knows *how* the work is done.
+*   **Strategy** — the common interface for all concrete strategies (like `FlyBehavior`). Declares the method that the context calls.
+*   **ConcreteStrategies** — actual implementations of the algorithm (like `FlyWithWings`, `FlyNoWay`).
+*   **Client** — creates a specific strategy and passes it to the context (or sets it via a setter).
+
+The client code looks like this:
+
+```java
+Strategy str = new SomeStrategy();
+context.setStrategy(str);
+context.doSomething();
+// ...
+Strategy other = new OtherStrategy();
+context.setStrategy(other);
+context.doSomething();
+```
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.5 When to Use Strategy**
+
+*   When you want to use different variants of an algorithm within an object and be able to **switch algorithms during runtime**.
+*   When your class has a **massive conditional statement** (`if`/`switch`) that selects among different variants of the same algorithm — extract each branch into its own concrete strategy.
+*   When you want to **isolate business logic** from the implementation details of algorithms.
+*   When you want to **reduce subclasses** that only differ in how they initialize their behavior (replace subclass explosion with a handful of strategy objects).
+
+###### **1.2.6 Strategy: Pros and Cons**
+
+**Pros:**
+
+*   You can swap algorithms used inside an object **at runtime**.
+*   You can isolate the implementation details of an algorithm from the code that uses it.
+*   You can **replace inheritance with composition**, avoiding fragile inheritance hierarchies.
+*   *Open/Closed Principle* — introduce new strategies without changing the context.
+
+**Cons:**
+
+*   If you only have a couple of algorithms and they rarely change, the extra classes and interfaces add unnecessary complexity.
+*   Clients must be aware of the differences between strategies in order to pick an appropriate one.
+*   Modern languages support **anonymous functions (lambdas)**, which can achieve the same effect without creating separate strategy classes.
+
+###### **1.2.7 How to Implement Strategy (Step by Step)**
+
+1.  In the context class, **identify an algorithm** that is prone to frequent changes, or a massive conditional that selects among algorithm variants.
+2.  **Declare the strategy interface** common to all variants of the algorithm.
+3.  One by one, **extract all algorithms** into their own classes. Each class must implement the strategy interface.
+4.  In the context class, **add a field** for storing a reference to a strategy object. Provide a **setter** for replacing the strategy. The context should work with strategy objects only via the strategy interface.
+5.  **Clients** of the context must associate it with a suitable strategy that matches their expectations.
+
+---
+
+##### **1.3 Adapter**
+
+###### **1.3.1 What Problem Does Adapter Solve?**
+
+You have a useful class — perhaps a third-party library, a legacy service, or simply code you cannot modify. Its interface does not match what the rest of your system expects. You cannot change the service class. You cannot change the client code either (or doing so would be too costly). The **Adapter** pattern bridges this gap.
+
+> **Adapter** (also known as **Wrapper**) — convert the interface of a class into another interface clients expect. Adapter lets classes work together that could not otherwise because of incompatible interfaces.
+
+A physical analogy: a travel power adapter converts between different socket shapes and voltages. The device (client) expects one kind of plug; the wall outlet (service) provides another. The adapter sits in between, making them compatible — neither the device nor the wall is modified.
+
+###### **1.3.2 The Duck Simulator Example**
+
+Returning to our simulator: now it contains not only ducks but also **turkeys**. Ducks and turkeys have similar but incompatible interfaces:
+
+```cpp
+class Duck {
+public:
+    virtual void quack() = 0;
+    virtual void fly() = 0;
+};
+
+class MallardDuck : public Duck {
+public:
+    void quack() override { /* real quack */ }
+    void fly() override   { /* real flight */ }
+};
+```
+
+```cpp
+class Turkey {
+public:
+    virtual void gobble() = 0;  // turkeys gobble, not quack
+    virtual void fly() = 0;     // turkeys fly very short distances
+};
+
+class WildTurkey : public Turkey {
+public:
+    void gobble() override { /* gobble gobble */ }
+    void fly() override    { /* short hops */ }
+};
+```
+
+The rest of the program works with `Duck` objects. How can we treat a turkey as a duck? Write a **TurkeyAdapter**:
+
+```cpp
+class TurkeyAdapter : public Duck {
+public:
+    TurkeyAdapter(Turkey t) : turkey(t) { }
+
+    void quack() override {
+        turkey.gobble();     // map quack → gobble
+    }
+
+    void fly() override {
+        for (int i = 1; i < 5; i++)
+            turkey.fly();    // 5 short hops ≈ one long duck flight
+    }
+
+private:
+    Turkey turkey;           // holds the adaptee internally
+};
+```
+
+The adapter **looks like** a duck (implements `Duck`'s interface), but **works like** a turkey internally (delegates to the turkey object). The client code is unchanged:
+
+```cpp
+void testDuck(Duck duck) {
+    duck.quack();
+    duck.fly();
+}
+
+MallardDuck duck;
+WildTurkey turkey;
+
+TurkeyAdapter ta(turkey);
+
+testDuck(duck);   // works — duck is a Duck
+testDuck(ta);     // works — TurkeyAdapter is also a Duck
+```
+
+<!-- DIAGRAM HERE -->
+
+###### **1.3.3 Object Adapter vs. Class Adapter**
+
+There are two variants of the Adapter pattern:
+
+**Object Adapter** (the more common version, shown above): The adapter **holds a reference** to the service object (adaptee) in a private field. This uses *composition*. Works in any language.
+
+```cpp
+class TurkeyAdapter : public Duck {
+private:
+    Turkey turkey;  // composition: holds the adaptee
+    ...
+};
+```
+
+**Class Adapter** (requires multiple inheritance): The adapter **inherits from both** the client interface and the service class. It inherits the service's implementation directly:
+
+```cpp
+class TurkeyAdapter : public Duck, private Turkey {
+public:
+    void quack() override {
+        Turkey::gobble();    // call inherited turkey method
+    }
+    void fly() override {
+        for (int i = 1; i < 5; i++)
+            Turkey::fly();
+    }
+};
+```
+
+The private inheritance from `Turkey` means the adapter *has* Turkey's implementation but does not expose Turkey's interface. Note that many languages (Java, C#) do not support multiple inheritance, making the object adapter the only option in those environments.
+
+###### **1.3.4 General Adapter Structure**
+
+In general form, the Adapter pattern involves:
+
+*   **Client** — existing code that uses the `Client Interface`.
+*   **Client Interface** — the interface the client expects.
+*   **Adapter** — implements the `Client Interface`, holds a reference to the `Service` object, and translates calls.
+*   **Service** — the incompatible class (third-party, legacy) whose interface differs.
+
+The adapter's core logic:
+
+```java
+// Inside Adapter.method(data):
+specialData = convertToServiceFormat(data)
+return adaptee.serviceMethod(specialData)
+```
+
+###### **1.3.5 When to Use Adapter**
+
+*   When you want to use **an existing class** but its interface is incompatible with the rest of your code.
+*   When you want to **reuse several existing subclasses** that lack some common functionality that cannot be added to the superclass.
+
+###### **1.3.6 Adapter: Pros and Cons**
+
+**Pros:**
+
+*   *Single Responsibility Principle* — you can separate the interface/data conversion code from the primary business logic.
+*   *Open/Closed Principle* — you can introduce new adapters without breaking existing client code.
+
+**Cons:**
+
+*   The overall complexity of the code increases because you introduce new interfaces and classes. Sometimes it is simpler just to change the service class so it matches the rest of your code.
+
+###### **1.3.7 How to Implement Adapter (Step by Step)**
+
+1.  **Identify the incompatibility**: you have at least two classes — a useful service (that you cannot change) and a client that would benefit from using it.
+2.  **Declare the client interface** that describes how clients communicate with the service.
+3.  **Create the adapter class** that implements the client interface. Leave all methods empty for now.
+4.  **Add a field** to the adapter to store a reference to the service object. Initialize it via the constructor.
+5.  **Implement all client interface methods** in the adapter. Each method should delegate to the service object, handling only the interface or data format conversion.
+6.  **Use the adapter via the client interface.** Clients never talk to the service directly.
+
+---
+
+##### **1.4 Composite**
+
+###### **1.4.1 The Problem: Atomic and Composite Objects**
+
+In many domains, you need to work with objects that form a **tree structure** — where some elements are simple (atomic) and others are composed of other elements (containers). The challenge: you want to treat both *simple* and *composite* elements **uniformly**, without having to check the type of each object before calling operations on it.
+
+Real-world examples of atomic/composite pairs:
+
+| Domain | Atomic ("leaf") | Composite |
+|:---|:---|:---|
+| Graphics | Line, circle, rectangle | Picture (group of shapes) |
+| Type system | `int`, `float`, `char`, `bool` | `struct`, `class`, `array` |
+| Cooking | Pepper, salt, meat, oil | Dish (combination of ingredients) |
+| Shipping | Individual product | Box containing products or other boxes |
+| File system | File | Directory |
+
+A concrete shipping example: a FEDEX order contains a large box. Inside that box are two smaller boxes and a receipt. One smaller box contains a hammer and a phone; the other contains headphones and a charger. To compute the total price of the order, you need to sum all items — but items are nested arbitrarily deep.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.4.2 The Composite Pattern: Structure**
+
+> **Composite** — compose objects into tree structures and then work with these structures as if they were individual objects.
+
+The pattern has three participants:
+
+*   **Component** — the base class or interface that declares the common operation (e.g., `execute()` or `calculatePrice()`). Both leaves and composites implement it.
+*   **Leaf** — represents a simple element with no children. A leaf actually does the work.
+*   **Composite** — represents a complex element (container) that can have children. It stores a list of child `Component` objects (which can be either leaves or other composites) and implements the operation by **delegating to all its children** and aggregating results.
+
+The program structure at runtime forms an inverted tree:
+
+```
+aComposite (root)
+├── aLeaf
+├── aLeaf
+├── aComposite
+│   ├── aLeaf
+│   ├── aLeaf
+│   └── aLeaf
+└── aLeaf
+```
+
+<!-- DIAGRAM HERE -->
+
+###### **1.4.3 Two Implementation Variants**
+
+**Version 1 — Safe architecture.** The `add`/`remove`/`getChildren` methods are declared *only* in the `Composite` class, not in the `Component` base.
+
+```java
+class Component {
+    Component parent;
+}
+
+class Composite extends Component {
+    public Component get() { ... }
+    public void add(Component c) { ... }
+    public Component remove() { ... }
+
+    private List<Component> components;
+}
+
+class Leaf extends Component { ... }
+```
+
+*Advantage:* A `Leaf` never has `add`/`remove` — it is impossible to call them on a leaf by mistake.
+
+*Disadvantage:* Client code must check at runtime whether an object is a `Composite` before calling these methods, which requires downcasting. This is less transparent and couples the client to the concrete types.
+
+**Version 2 — Maximized interface (transparent architecture).** The `add`/`remove`/`get` methods are moved into the base `Component` class as abstract methods.
+
+```java
+class Component {
+    Component parent;
+
+    abstract public Component get();
+    abstract public void add(Component c);
+    abstract public Component remove();
+}
+
+class Composite extends Component {
+    @Override public Component get() { ... }
+    @Override public void add(Component c) { ... }
+    @Override public Component remove() { ... }
+
+    private List<Component> components;
+}
+
+class Leaf extends Component {
+    @Override public Component get() { return this; }  // trivial
+    @Override public void add(Component c) { }         // empty — no children
+    @Override public Component remove() { return null; } // empty
+}
+```
+
+*Advantage:* Clients can call `add`/`remove` on *any* component without knowing its concrete type — maximum **transparency**.
+
+*Disadvantage:* The `Leaf` class is forced to implement methods that do not logically apply to it (empty body for `add`, `remove`). This violates the **Interface Segregation Principle (ISP)** — clients should not be forced to depend on methods they do not use.
+
+Both versions are used in practice; the choice depends on whether you prioritize type safety or interface transparency.
+
+###### **1.4.4 When to Use Composite**
+
+*   When you need to implement a **tree-like object structure**.
+*   When you want client code to **treat both simple and complex elements uniformly** — without knowing whether it is dealing with a leaf or a composite.
+
+###### **1.4.5 Composite: Pros and Cons**
+
+**Pros:**
+
+*   You can work with complex tree structures conveniently using **polymorphism and recursion**.
+*   *Open/Closed Principle* — you can introduce new element types (new `Leaf` or `Composite` subclasses) without breaking existing client code.
+
+**Cons:**
+
+*   It might be difficult to provide a common interface for classes whose functionality differs *too* much. You risk **overgeneralizing** the component interface, making it harder to understand.
+*   Version 2 of the implementation can violate the **Interface Segregation Principle** — leaves are forced to implement child management methods that are meaningless for them.
+
+###### **1.4.6 How to Implement Composite (Step by Step)**
+
+1.  Make sure the core model of your application **can be represented as a tree structure**. Break it down into simple elements (leaves) and containers (composites). Containers must be able to hold both simple elements and other containers.
+2.  **Declare the component interface** with operations that make sense for both simple and complex components.
+3.  **Create a leaf class** to represent simple elements. A program may have multiple different leaf classes.
+4.  **Create a container (composite) class** with an array/list field for storing references to child components. The list type must be the `Component` interface (so it can hold both leaves and composites). When implementing operations, the container delegates most work to sub-elements.
+5.  **Define methods for adding and removing child elements** in the container class (either on the container itself, or on the base component interface — see Version 1 vs. Version 2).
+
+---
+
+#### **2. Definitions**
+
+*   **Design Pattern**: An architectural scheme — a certain organization of classes, objects, and methods — that provides a standardized, reusable solution to a recurring OOP design problem.
+*   **Gang of Four (GoF)**: Erich Gamma, Richard Helm, Ralph Johnson, and John Vlissides — authors of the landmark 1994 book that catalogued 23 design patterns.
+*   **Creational Patterns**: Patterns that deal with the best way to create instances of objects (e.g., Singleton, Factory Method, Prototype, Builder).
+*   **Structural Patterns**: Patterns that describe how classes and objects can be combined to form larger structures (e.g., Adapter, Composite, Decorator).
+*   **Behavioral Patterns**: Patterns that deal with the assignment of responsibilities between objects and the encapsulation of behavior (e.g., Strategy, Observer, State).
+*   **Strategy Pattern**: A behavioral pattern that defines a family of algorithms, encapsulates each one, and makes them interchangeable so that the algorithm can vary independently from clients that use it.
+*   **Context**: In the Strategy pattern, the class that holds a reference to a `Strategy` object and delegates algorithm execution to it.
+*   **Strategy Interface**: The common interface declaring the algorithm method that all concrete strategies must implement.
+*   **Concrete Strategy**: A specific implementation of the strategy interface, providing one variant of the algorithm.
+*   **Composition over Inheritance**: A design principle advocating that objects should achieve behavior reuse by containing instances of classes that implement desired functionality (composition) rather than by inheriting from a parent class.
+*   **Adapter Pattern**: A structural pattern that converts the interface of a class into another interface clients expect, allowing incompatible classes to work together. Also known as **Wrapper**.
+*   **Adaptee (Service)**: In the Adapter pattern, the class with an incompatible interface that needs to be adapted.
+*   **Object Adapter**: An adapter that holds a reference to the adaptee object via composition.
+*   **Class Adapter**: An adapter that inherits from both the client interface and the adaptee class using multiple inheritance.
+*   **Composite Pattern**: A structural pattern that lets you compose objects into tree structures and work with these structures as if they were individual objects.
+*   **Component**: In the Composite pattern, the base class or interface common to both leaves and composites.
+*   **Leaf**: In the Composite pattern, a simple element that has no children and performs the actual work.
+*   **Composite (class)**: In the Composite pattern, a container element that can have child components (leaves or other composites) and delegates work to them.
+*   **Open/Closed Principle**: A SOLID design principle stating that software entities should be open for extension but closed for modification.
+*   **Single Responsibility Principle**: A SOLID design principle stating that a class should have only one reason to change.
+*   **Interface Segregation Principle (ISP)**: A SOLID design principle stating that clients should not be forced to depend on interfaces they do not use.
+
+---
+
+#### **3. Examples**
+
+##### **3.1. Implement the Duck Lake Simulator** (Lecture 10, Exercise 1)
+
+Implement the Duck Lake Simulator using the Strategy pattern (as described in the lecture) in Java, C#, or C++. The model must include:
+
+*   An abstract `Duck` class with `FlyBehavior` and `QuackBehavior` fields, `doFly()` and `doQuack()` delegation methods, and an abstract `display()` method.
+*   At least the following behavior implementations: `FlyWithWings`, `FlyNoWay`, `Quack`, `Squeak`, `MuteSqueak`.
+*   At least two concrete duck classes (e.g., `MallardDuck`, `RubberDuck`) that set their behaviors in the constructor.
+
+Verify that the model works correctly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The Strategy pattern separates *what* a duck is from *how* it behaves. Behaviors are extracted into their own class hierarchies and injected into the `Duck` via composition. The `Duck` class delegates actual work to the behavior objects — it does not implement `fly()` or `quack()` itself.
+
+**Behavior interfaces and their implementations:**
+
+```java
+// FlyBehavior.java — Strategy interface for flying
+public interface FlyBehavior {
+    void fly();
+}
+
+// FlyWithWings.java — Concrete Strategy
+public class FlyWithWings implements FlyBehavior {
+    @Override
+    public void fly() {
+        System.out.println("I'm flying with wings!");
+    }
+}
+
+// FlyNoWay.java — Concrete Strategy
+public class FlyNoWay implements FlyBehavior {
+    @Override
+    public void fly() {
+        System.out.println("I can't fly.");
+    }
+}
+
+// QuackBehavior.java — Strategy interface for quacking
+public interface QuackBehavior {
+    void quack();
+}
+
+// Quack.java — Concrete Strategy
+public class Quack implements QuackBehavior {
+    @Override
+    public void quack() {
+        System.out.println("Quack!");
+    }
+}
+
+// Squeak.java — Concrete Strategy
+public class Squeak implements QuackBehavior {
+    @Override
+    public void quack() {
+        System.out.println("Squeak!");
+    }
+}
+
+// MuteSqueak.java — Concrete Strategy
+public class MuteSqueak implements QuackBehavior {
+    @Override
+    public void quack() {
+        System.out.println("...(silence)...");
+    }
+}
+```
+
+**The Duck context class:**
+
+```java
+// Duck.java — Context class
+public abstract class Duck {
+    // Strategy references — the core of the pattern
+    protected FlyBehavior flyBehavior;
+    protected QuackBehavior quackBehavior;
+
+    // Delegate to fly strategy
+    public void doFly() {
+        flyBehavior.fly();
+    }
+
+    // Delegate to quack strategy
+    public void doQuack() {
+        quackBehavior.quack();
+    }
+
+    // Allow runtime strategy swap
+    public void setFlyBehavior(FlyBehavior fb) {
+        flyBehavior = fb;
+    }
+
+    public void setQuackBehavior(QuackBehavior qb) {
+        quackBehavior = qb;
+    }
+
+    // Each duck looks different — subclasses must implement this
+    public abstract void display();
+}
+```
+
+**Concrete duck subclasses:**
+
+```java
+// MallardDuck.java — sets real flying and quacking in constructor
+public class MallardDuck extends Duck {
+    public MallardDuck() {
+        flyBehavior = new FlyWithWings();
+        quackBehavior = new Quack();
+    }
+
+    @Override
+    public void display() {
+        System.out.println("I'm a Mallard Duck.");
+    }
+}
+
+// RubberDuck.java — sets no-fly and squeak in constructor
+public class RubberDuck extends Duck {
+    public RubberDuck() {
+        flyBehavior = new FlyNoWay();
+        quackBehavior = new Squeak();
+    }
+
+    @Override
+    public void display() {
+        System.out.println("I'm a Rubber Duck.");
+    }
+}
+```
+
+**Client / main:**
+
+```java
+// Main.java
+public class Main {
+    public static void main(String[] args) {
+        Duck mallard = new MallardDuck();
+        mallard.display();
+        mallard.doFly();
+        mallard.doQuack();
+
+        System.out.println("---");
+
+        Duck rubberDuck = new RubberDuck();
+        rubberDuck.display();
+        rubberDuck.doFly();
+        rubberDuck.doQuack();
+
+        System.out.println("--- Runtime behavior change ---");
+        // Give the rubber duck a jetpack at runtime!
+        rubberDuck.setFlyBehavior(new FlyWithWings());
+        rubberDuck.doFly();
+    }
+}
+```
+
+**Expected output:**
+
+```
+I'm a Mallard Duck.
+I'm flying with wings!
+Quack!
+---
+I'm a Rubber Duck.
+I can't fly.
+Squeak!
+--- Runtime behavior change ---
+I'm flying with wings!
+```
+
+**Answer:** The key observation is that `MallardDuck` and `RubberDuck` never define `fly()` or `quack()` themselves. Adding a new behavior (e.g., `FlyWithRocketBooster`) requires creating one new class — no existing classes are changed. This satisfies the Open/Closed Principle.
+
+</details>
+
+---
+
+##### **3.2. Extend the Duck Simulator with DiveBehavior** (Lecture 10, Exercise 2)
+
+Extend the Duck Lake Simulator from the previous exercise:
+
+*   Add a new behavior: a `DiveBehavior` interface with at least two implementations — `DiveDeep` and `DiveNone`.
+*   Add a new kind of duck (e.g., `DivingDuck`) that can dive but cannot quack.
+*   Verify that adding this new behavior does not require changing *any* existing class.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** This exercise demonstrates the **Open/Closed Principle** directly. If the Strategy pattern is applied correctly, you can add entirely new behavioral dimensions (like diving) by only *adding* new code — no modification of existing classes is needed.
+
+```java
+// DiveBehavior.java — new Strategy interface
+public interface DiveBehavior {
+    void dive();
+}
+
+// DiveDeep.java — new Concrete Strategy
+public class DiveDeep implements DiveBehavior {
+    @Override
+    public void dive() {
+        System.out.println("Diving deep underwater!");
+    }
+}
+
+// DiveNone.java — new Concrete Strategy
+public class DiveNone implements DiveBehavior {
+    @Override
+    public void dive() {
+        System.out.println("I can't dive.");
+    }
+}
+```
+
+Add `diveBehavior` to the `Duck` class (or create a subclass — here we extend `Duck`):
+
+```java
+// Duck.java — updated with dive behavior
+public abstract class Duck {
+    protected FlyBehavior flyBehavior;
+    protected QuackBehavior quackBehavior;
+    protected DiveBehavior diveBehavior;  // new behavior added
+
+    public void doFly()   { flyBehavior.fly(); }
+    public void doQuack() { quackBehavior.quack(); }
+    public void doDive()  { diveBehavior.dive(); }  // new delegation
+
+    public void setFlyBehavior(FlyBehavior fb)   { flyBehavior = fb; }
+    public void setQuackBehavior(QuackBehavior qb){ quackBehavior = qb; }
+    public void setDiveBehavior(DiveBehavior db) { diveBehavior = db; }
+
+    public abstract void display();
+}
+
+// DivingDuck.java — new concrete duck
+public class DivingDuck extends Duck {
+    public DivingDuck() {
+        flyBehavior  = new FlyWithWings();
+        quackBehavior = new MuteSqueak();  // cannot quack — stays silent
+        diveBehavior  = new DiveDeep();    // dives deep
+    }
+
+    @Override
+    public void display() {
+        System.out.println("I'm a Diving Duck.");
+    }
+}
+```
+
+**Verification in main:**
+
+```java
+Duck diver = new DivingDuck();
+diver.display();
+diver.doFly();
+diver.doQuack();
+diver.doDive();
+```
+
+**Expected output:**
+
+```
+I'm a Diving Duck.
+I'm flying with wings!
+...(silence)...
+Diving deep underwater!
+```
+
+**Answer:** Notice that `MallardDuck`, `RubberDuck`, `FlyWithWings`, `Quack`, and all other existing classes were **not modified at all**. Only new classes were created. The Strategy pattern delivers on the Open/Closed Principle.
+
+</details>
+
+---
+
+##### **3.3. Implement the TurkeyAdapter Without Multiple Inheritance** (Lecture 10, Exercise 3)
+
+In the lecture, a `TurkeyAdapter` was shown using multiple inheritance (`class TurkeyAdapter : public Duck, private Turkey`). Implement the same adapter *without* multiple inheritance — using composition (the object adapter approach).
+
+The interfaces and classes are:
+
+```java
+// Duck.java
+public interface Duck {
+    void quack();
+    void fly();
+}
+
+// Turkey.java
+public interface Turkey {
+    void gobble();
+    void fly();
+}
+
+// WildTurkey.java
+public class WildTurkey implements Turkey {
+    @Override
+    public void gobble() { System.out.println("Gobble gobble!"); }
+    @Override
+    public void fly()    { System.out.println("I'm flying a short distance"); }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** An *object adapter* holds the adaptee (turkey) as a private field via composition. This avoids multiple inheritance entirely and works in any language. The adapter implements the *target* interface (`Duck`) and translates each method call to the appropriate call on the adaptee.
+
+```java
+// TurkeyAdapter.java — Object Adapter (no multiple inheritance)
+public class TurkeyAdapter implements Duck {
+
+    // Composition: holds the adaptee as a private field
+    private Turkey turkey;
+
+    public TurkeyAdapter(Turkey turkey) {
+        this.turkey = turkey;
+    }
+
+    // Translate quack → gobble
+    @Override
+    public void quack() {
+        turkey.gobble();
+    }
+
+    // Translate fly: turkey needs 5 short hops to match one duck flight
+    @Override
+    public void fly() {
+        for (int i = 0; i < 5; i++) {
+            turkey.fly();
+        }
+    }
+}
+```
+
+**Using the adapter in client code:**
+
+```java
+public class Main {
+    // This function only knows about Duck — it doesn't know about Turkey at all
+    static void testDuck(Duck duck) {
+        duck.quack();
+        duck.fly();
+    }
+
+    public static void main(String[] args) {
+        WildTurkey turkey = new WildTurkey();
+        Duck turkeyAdapter = new TurkeyAdapter(turkey);
+
+        System.out.println("Testing turkey adapted as duck:");
+        testDuck(turkeyAdapter);
+    }
+}
+```
+
+**Expected output:**
+
+```
+Testing turkey adapted as duck:
+Gobble gobble!
+I'm flying a short distance
+I'm flying a short distance
+I'm flying a short distance
+I'm flying a short distance
+I'm flying a short distance
+```
+
+**Answer:** The `TurkeyAdapter` implements `Duck` (so it passes type-checking as a Duck) but internally uses a `Turkey` object to do all the work. The client function `testDuck` is completely unaware that it received a turkey — the adapter makes the turkey "look like" a duck.
+
+</details>
+
+---
+
+##### **3.4. USB Card Reader Adapter** (Lecture 10, Example)
+
+Study the following code, which demonstrates the Adapter pattern in a USB card reader scenario. Explain the role of each class and trace the execution.
+
+```java
+// Usb.java — Client Interface
+public interface Usb {
+    void connectWithUsbCable();
+    void extract();
+    void erase();
+}
+
+// MemoryCard.java — Service class (adaptee)
+public class MemoryCard {
+    public void insert()     { System.out.println("Memory card inserted"); }
+    public void copyData()   { System.out.println("Data is copied to computer"); }
+    public void extract()    { System.out.println("Memory card extracted"); }
+    public void eraseData()  { System.out.println("Data is erased from the memory card"); }
+}
+
+// CardReader.java — Adapter class
+public class CardReader implements Usb {
+    private MemoryCard memoryCard;
+
+    public CardReader(MemoryCard memoryCard) {
+        this.memoryCard = memoryCard;
+    }
+
+    @Override
+    public void connectWithUsbCable() {
+        memoryCard.insert();
+        memoryCard.copyData();
+    }
+
+    @Override
+    public void extract() {
+        memoryCard.extract();
+    }
+
+    @Override
+    public void erase() {
+        memoryCard.eraseData();
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        Usb cardReader = new CardReader(new MemoryCard());
+        cardReader.connectWithUsbCable();
+    }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The `MemoryCard` class has a different interface from what the computer's USB system (`Usb`) expects. The `CardReader` adapts the memory card's interface to the `Usb` interface, so the client (`Main`) works only with `Usb` and never touches `MemoryCard` directly.
+
+1.  **`Usb` (Client Interface):** Declares the interface the system expects — `connectWithUsbCable()`, `extract()`, `erase()`. This is what the "computer" (client) knows how to talk to.
+2.  **`MemoryCard` (Service / Adaptee):** The actual device with its own interface: `insert()`, `copyData()`, `extract()`, `eraseData()`. It cannot be changed (it is the "third-party" device).
+3.  **`CardReader` (Adapter):** Implements `Usb` so the client sees it as a USB device. Internally, it holds a `MemoryCard` and translates each USB method call:
+    *   `connectWithUsbCable()` → calls `insert()` then `copyData()` on the card
+    *   `extract()` → calls `extract()` on the card (same name, direct delegation)
+    *   `erase()` → calls `eraseData()` on the card (name mismatch — adapter translates it)
+4.  **`Main` (Client):** Creates a `CardReader` wrapping a `MemoryCard` and uses it as a `Usb`. It never calls any `MemoryCard` methods directly.
+
+**Execution trace of `cardReader.connectWithUsbCable()`:**
+
+```
+Main calls cardReader.connectWithUsbCable()
+  → CardReader.connectWithUsbCable() runs:
+      memoryCard.insert()   → prints "Memory card inserted"
+      memoryCard.copyData() → prints "Data is copied to computer"
+```
+
+**Expected output:**
+
+```
+Memory card inserted
+Data is copied to computer
+```
+
+**Answer:** The `CardReader` is the Adapter; the `MemoryCard` is the Adaptee (Service); the `Usb` interface is the Client Interface. The client `Main` only ever interacts with the `Usb` interface — it is completely decoupled from `MemoryCard`'s specific method names.
+
+</details>
+
+---
+
+##### **3.5. Order Box Price Calculator** (Lecture 10, Example)
+
+Study the following Composite pattern implementation for calculating the total price of a shipping box. Trace the execution and explain how the recursive price calculation works.
+
+```java
+// PackageComponent.java — Component interface
+public interface PackageComponent {
+    int calculatePrice();
+}
+
+// AtomicItem.java — Abstract Leaf
+public abstract class AtomicItem implements PackageComponent {
+    private int price;
+
+    public AtomicItem(int price) { this.price = price; }
+
+    @Override
+    public int calculatePrice() { return price; }
+}
+
+// CokeCan.java and IPhone.java — Concrete Leaves
+public class CokeCan extends AtomicItem {
+    public CokeCan(int price) { super(price); }
+}
+
+public class IPhone extends AtomicItem {
+    public IPhone(int price) { super(price); }
+}
+
+// BoxContainer.java — Composite
+public class BoxContainer implements PackageComponent {
+    private final List<PackageComponent> childrenComponents;
+
+    public BoxContainer(List<PackageComponent> childrenComponents) {
+        this.childrenComponents = childrenComponents;
+    }
+
+    @Override
+    public int calculatePrice() {
+        return childrenComponents.stream()
+                .map(PackageComponent::calculatePrice)
+                .mapToInt(Integer::intValue).sum();
+    }
+
+    public void add(PackageComponent c)    { childrenComponents.add(c); }
+    public void remove(PackageComponent c) { childrenComponents.remove(c); }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        PackageComponent box1 = new BoxContainer(List.of(new CokeCan(100)));
+        PackageComponent box2 = new BoxContainer(List.of(new CokeCan(200)));
+        PackageComponent box3 = new BoxContainer(List.of(new IPhone(50000), box2));
+        PackageComponent box4 = new BoxContainer(List.of(box1, box3));
+
+        System.out.println("box4 price is " + box4.calculatePrice());
+    }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The `calculatePrice()` method is defined on the `PackageComponent` interface, so *both* leaves and composites implement it. When a `BoxContainer` calls `calculatePrice()`, it simply calls `calculatePrice()` on each of its children — and if a child is itself a `BoxContainer`, it recursively does the same. This is the power of the Composite pattern: the client code never needs to know whether it is dealing with a leaf or a container.
+
+**Tree structure:**
+
+```
+box4 (BoxContainer)
+├── box1 (BoxContainer)
+│   └── CokeCan(100)          → price: 100
+└── box3 (BoxContainer)
+    ├── IPhone(50000)          → price: 50000
+    └── box2 (BoxContainer)
+        └── CokeCan(200)       → price: 200
+```
+
+**Recursive price calculation:**
+
+1.  `box4.calculatePrice()` iterates over `[box1, box3]`:
+    *   Calls `box1.calculatePrice()`:
+        *   Iterates over `[CokeCan(100)]`
+        *   Returns `100`
+    *   Calls `box3.calculatePrice()`:
+        *   Iterates over `[IPhone(50000), box2]`
+        *   Calls `IPhone(50000).calculatePrice()` → returns `50000`
+        *   Calls `box2.calculatePrice()`:
+            *   Iterates over `[CokeCan(200)]`
+            *   Returns `200`
+        *   Returns `50000 + 200 = 50200`
+    *   Returns `100 + 50200 = 50300`
+
+**Expected output:**
+
+```
+box4 price is 50300
+```
+
+**Answer:** `50300`. The beauty of the Composite pattern is that `Main` simply calls `box4.calculatePrice()` — it does not traverse the tree manually or check whether elements are leaves or containers. The pattern makes the tree structure completely transparent to the client.
+
+</details>
+
+---
+
+##### **3.6. Attack Game — Strategy Pattern** (Tutorial 10, Problem 1)
+
+Design and implement an "Attack Game" using the Strategy design pattern. The requirements:
+
+*   There is a **team of characters** (players), each with a **name** and an interchangeable **attack strategy**.
+*   Possible attack styles: at least three different strategies (e.g., sword, bow, magic).
+*   There is an **Enemy** class with a `name` field, a `strength` (health) level, a method to display current strength, and a method to decrease strength on attack.
+*   The player may **switch attack styles during battle**.
+*   Show a UML class diagram of your solution.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The Strategy pattern lets each character hold an `AttackStrategy` object that can be swapped at any time. The `Character` class is the *Context*; `AttackStrategy` is the *Strategy interface*; concrete attack classes are the *Concrete Strategies*. The `Enemy` class acts as a shared mutable target that concrete strategies affect.
+
+**UML class diagram (described):**
+
+```
+«interface»
+AttackStrategy
+────────────
++ attack(Enemy): void
+       ▲
+       │ implements
+┌──────┴──────┬─────────────┐
+SwordAttack  BowAttack  MagicAttack
+(damage: 30) (damage: 20) (damage: 50)
+```
+
+```
+Character ──────────────► «interface» AttackStrategy
+- name: String          strategy field
+- strategy: AttackStrategy
++ setStrategy(AttackStrategy)
++ performAttack(Enemy)
+```
+
+```
+Enemy
+- name: String
+- strength: int
++ displayStrength()
++ takeDamage(int)
+```
+
+**Full implementation:**
+
+```java
+// AttackStrategy.java — Strategy interface
+public interface AttackStrategy {
+    void attack(Enemy enemy);
+}
+
+// SwordAttack.java — Concrete Strategy
+public class SwordAttack implements AttackStrategy {
+    @Override
+    public void attack(Enemy enemy) {
+        System.out.println("Slashing with a sword!");
+        enemy.takeDamage(30);
+    }
+}
+
+// BowAttack.java — Concrete Strategy
+public class BowAttack implements AttackStrategy {
+    @Override
+    public void attack(Enemy enemy) {
+        System.out.println("Shooting an arrow!");
+        enemy.takeDamage(20);
+    }
+}
+
+// MagicAttack.java — Concrete Strategy
+public class MagicAttack implements AttackStrategy {
+    @Override
+    public void attack(Enemy enemy) {
+        System.out.println("Casting a fire spell!");
+        enemy.takeDamage(50);
+    }
+}
+
+// Enemy.java
+public class Enemy {
+    private String name;
+    private int strength;
+
+    public Enemy(String name, int strength) {
+        this.name = name;
+        this.strength = strength;
+    }
+
+    public void displayStrength() {
+        System.out.println(name + " has " + strength + " HP remaining.");
+    }
+
+    public void takeDamage(int damage) {
+        strength -= damage;
+        System.out.println(name + " took " + damage + " damage. HP: " + strength);
+    }
+}
+
+// Character.java — Context
+public class Character {
+    private String name;
+    private AttackStrategy strategy;
+
+    public Character(String name, AttackStrategy strategy) {
+        this.name = name;
+        this.strategy = strategy;
+    }
+
+    public void setStrategy(AttackStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public void performAttack(Enemy enemy) {
+        System.out.println(name + " attacks!");
+        strategy.attack(enemy);
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        Enemy dragon = new Enemy("Dragon", 200);
+        dragon.displayStrength();
+
+        Character warrior = new Character("Aragorn", new SwordAttack());
+        Character archer  = new Character("Legolas", new BowAttack());
+
+        warrior.performAttack(dragon);
+        archer.performAttack(dragon);
+
+        // Switch strategy at runtime — warrior picks up a magic staff
+        System.out.println("Aragorn switches to magic!");
+        warrior.setStrategy(new MagicAttack());
+        warrior.performAttack(dragon);
+
+        dragon.displayStrength();
+    }
+}
+```
+
+**Expected output:**
+
+```
+Dragon has 200 HP remaining.
+Aragorn attacks!
+Slashing with a sword!
+Dragon took 30 damage. HP: 170
+Legolas attacks!
+Shooting an arrow!
+Dragon took 20 damage. HP: 150
+Aragorn switches to magic!
+Aragorn attacks!
+Casting a fire spell!
+Dragon took 50 damage. HP: 100
+Dragon has 100 HP remaining.
+```
+
+**Answer:** The Strategy pattern allows `Aragorn` to switch from a sword to magic at runtime — no subclasses needed, no `if`/`switch` chain in `Character`. Adding a new attack type requires only a new class implementing `AttackStrategy`.
+
+</details>
+
+---
+
+##### **3.7. Payment Gateway — Adapter Pattern** (Tutorial 10, Problem 2)
+
+Build a payment gateway system that integrates multiple international payment providers (PayPal and Stripe) using the Adapter pattern.
+
+Requirements:
+
+1.  Create a **uniform interface** for all payment providers. The interface must include methods for: processing a payment, handling a refund, and verifying payment information.
+2.  Create an **adapter class for each provider** (PayPal and Stripe) that translates the uniform interface into each provider's specific API.
+3.  Create a **PaymentGateway class** that accepts payment requests and delegates them to the appropriate adapter based on the provider selected by the user.
+4.  Show a UML class diagram of your solution.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** PayPal and Stripe each have their own proprietary API (different method names, different data formats). Rather than littering the application code with `if (provider == PAYPAL) ... else if (provider == STRIPE) ...`, we define a uniform `PaymentProvider` interface and create one adapter per provider. The `PaymentGateway` only ever works with the `PaymentProvider` interface.
+
+**UML (described):**
+
+```
+«interface»
+PaymentProvider
+────────────────────────────
++ processPayment(amount): boolean
++ refund(transactionId): boolean
++ verifyPayment(paymentInfo): boolean
+        ▲
+        │ implements
+┌───────┴─────────┐
+PayPalAdapter   StripeAdapter
+─ paypal: PayPalService   ─ stripe: StripeService
+```
+
+```
+PaymentGateway
+─ provider: PaymentProvider
++ pay(amount)
++ refund(transactionId)
+```
+
+**Implementation:**
+
+```java
+// PaymentProvider.java — Client Interface (uniform interface)
+public interface PaymentProvider {
+    boolean processPayment(double amount);
+    boolean refund(String transactionId);
+    boolean verifyPayment(String paymentInfo);
+}
+
+// --- PayPal side (external / incompatible API) ---
+
+// PayPalService.java — Adaptee (cannot modify)
+public class PayPalService {
+    public void sendPayment(double amount) {
+        System.out.println("PayPal: Sending payment of $" + amount);
+    }
+    public void initiateRefund(String txId) {
+        System.out.println("PayPal: Initiating refund for transaction " + txId);
+    }
+    public boolean checkPayment(String info) {
+        System.out.println("PayPal: Checking payment info: " + info);
+        return true;
+    }
+}
+
+// PayPalAdapter.java — Adapter for PayPal
+public class PayPalAdapter implements PaymentProvider {
+    private PayPalService paypal;
+
+    public PayPalAdapter(PayPalService paypal) {
+        this.paypal = paypal;
+    }
+
+    @Override
+    public boolean processPayment(double amount) {
+        paypal.sendPayment(amount);
+        return true;
+    }
+
+    @Override
+    public boolean refund(String transactionId) {
+        paypal.initiateRefund(transactionId);
+        return true;
+    }
+
+    @Override
+    public boolean verifyPayment(String paymentInfo) {
+        return paypal.checkPayment(paymentInfo);
+    }
+}
+
+// --- Stripe side (external / incompatible API) ---
+
+// StripeService.java — Adaptee (cannot modify)
+public class StripeService {
+    public void charge(double amountInCents) {
+        System.out.println("Stripe: Charging " + amountInCents + " cents");
+    }
+    public void reverseCharge(String chargeId) {
+        System.out.println("Stripe: Reversing charge " + chargeId);
+    }
+    public boolean validateCard(String cardToken) {
+        System.out.println("Stripe: Validating card token: " + cardToken);
+        return true;
+    }
+}
+
+// StripeAdapter.java — Adapter for Stripe
+public class StripeAdapter implements PaymentProvider {
+    private StripeService stripe;
+
+    public StripeAdapter(StripeService stripe) {
+        this.stripe = stripe;
+    }
+
+    @Override
+    public boolean processPayment(double amount) {
+        stripe.charge(amount * 100);   // Stripe uses cents
+        return true;
+    }
+
+    @Override
+    public boolean refund(String transactionId) {
+        stripe.reverseCharge(transactionId);
+        return true;
+    }
+
+    @Override
+    public boolean verifyPayment(String paymentInfo) {
+        return stripe.validateCard(paymentInfo);
+    }
+}
+
+// PaymentGateway.java — Context that uses the uniform interface
+public class PaymentGateway {
+    private PaymentProvider provider;
+
+    public PaymentGateway(PaymentProvider provider) {
+        this.provider = provider;
+    }
+
+    public void pay(double amount) {
+        if (provider.processPayment(amount)) {
+            System.out.println("Payment successful.");
+        }
+    }
+
+    public void refund(String transactionId) {
+        if (provider.refund(transactionId)) {
+            System.out.println("Refund processed.");
+        }
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("=== Paying with PayPal ===");
+        PaymentGateway gatewayPP = new PaymentGateway(
+            new PayPalAdapter(new PayPalService()));
+        gatewayPP.pay(99.99);
+        gatewayPP.refund("TXN-001");
+
+        System.out.println("\n=== Paying with Stripe ===");
+        PaymentGateway gatewayStripe = new PaymentGateway(
+            new StripeAdapter(new StripeService()));
+        gatewayStripe.pay(49.95);
+        gatewayStripe.refund("CHG-456");
+    }
+}
+```
+
+**Expected output:**
+
+```
+=== Paying with PayPal ===
+PayPal: Sending payment of $99.99
+Payment successful.
+PayPal: Initiating refund for transaction TXN-001
+Refund processed.
+
+=== Paying with Stripe ===
+Stripe: Charging 4995.0 cents
+Payment successful.
+Stripe: Reversing charge CHG-456
+Refund processed.
+```
+
+**Answer:** `PaymentGateway` only talks to `PaymentProvider`. It has no knowledge of PayPal or Stripe internals. To add a new provider (e.g., Apple Pay), you only need to write a new adapter class — `PaymentGateway` remains unchanged.
+
+</details>
+
+---
+
+##### **3.8. File System — Composite Pattern** (Tutorial 10, Problem 3)
+
+Design a file system program using the Composite pattern. Requirements:
+
+*   A **file** is an atomic element with a name. It has no children.
+*   A **directory** can contain both files and subdirectories. It has a name and a list of components.
+*   The directory class should support adding and removing components.
+*   Print to the console the name of **every directory and file** in the file system, starting from the root (use indentation to show depth).
+*   Show a UML class diagram of your solution.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Both `File` and `Directory` implement the same `FileSystemComponent` interface with a `print(String indent)` method. When `Directory.print()` is called, it prints its own name and then calls `print()` on each child — this recursion automatically handles any depth of nesting without the client knowing anything about the tree structure.
+
+**UML (described):**
+
+```
+«interface»
+FileSystemComponent
+──────────────────
++ print(indent: String): void
+        ▲
+        │ implements
+┌───────┴────────┐
+File          Directory
+─ name: String   ─ name: String
++ print(indent)  ─ children: List<FileSystemComponent>
+                 + add(FileSystemComponent)
+                 + remove(FileSystemComponent)
+                 + print(indent)
+```
+
+**Implementation:**
+
+```java
+// FileSystemComponent.java — Component interface
+public interface FileSystemComponent {
+    void print(String indent);
+}
+
+// File.java — Leaf
+public class File implements FileSystemComponent {
+    private String name;
+
+    public File(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public void print(String indent) {
+        System.out.println(indent + "📄 " + name);
+    }
+}
+
+// Directory.java — Composite
+import java.util.ArrayList;
+import java.util.List;
+
+public class Directory implements FileSystemComponent {
+    private String name;
+    private List<FileSystemComponent> children = new ArrayList<>();
+
+    public Directory(String name) {
+        this.name = name;
+    }
+
+    public void add(FileSystemComponent component) {
+        children.add(component);
+    }
+
+    public void remove(FileSystemComponent component) {
+        children.remove(component);
+    }
+
+    @Override
+    public void print(String indent) {
+        System.out.println(indent + "📁 " + name);
+        // Recursively print all children with deeper indentation
+        for (FileSystemComponent child : children) {
+            child.print(indent + "  ");
+        }
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        // Build the file system tree
+        Directory root = new Directory("root");
+
+        Directory home = new Directory("home");
+        Directory user = new Directory("user");
+        user.add(new File("resume.pdf"));
+        user.add(new File("photo.jpg"));
+        home.add(user);
+
+        Directory etc = new Directory("etc");
+        etc.add(new File("config.yaml"));
+        etc.add(new File("hosts"));
+
+        Directory tmp = new Directory("tmp");
+        tmp.add(new File("session_data.tmp"));
+
+        root.add(home);
+        root.add(etc);
+        root.add(tmp);
+        root.add(new File("README.txt"));
+
+        // Print from root — client calls print() once, recursion handles the rest
+        root.print("");
+    }
+}
+```
+
+**Expected output:**
+
+```
+📁 root
+  📁 home
+    📁 user
+      📄 resume.pdf
+      📄 photo.jpg
+  📁 etc
+    📄 config.yaml
+    📄 hosts
+  📁 tmp
+    📄 session_data.tmp
+  📄 README.txt
+```
+
+**Answer:** The client calls `root.print("")` exactly once. The Composite pattern handles the recursion transparently — no manual tree traversal, no `instanceof` checks. Adding a new `SymbolicLink` leaf class requires zero changes to `Directory` or `Main`.
+
+</details>
+
+---
+
+##### **3.9. Lecture Recap — Theory Questions** (Lab 9, Recap)
+
+Answer the following six questions to check your understanding of the three patterns covered in this week's material.
+
+**(a)** What is the purpose of the **Strategy** design pattern? Which problem does it solve?
+
+**(b)** Describe a real-world scenario where the **Strategy** pattern could be beneficial.
+
+**(c)** What is the purpose of the **Adapter** design pattern?
+
+**(d)** Describe a real-world scenario where the **Adapter** pattern could be beneficial.
+
+**(e)** What is the purpose of the **Composite** design pattern?
+
+**(f)** Describe a real-world scenario where the **Composite** pattern could be beneficial.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Purpose of Strategy:**
+The Strategy pattern solves the problem of *algorithm selection*. When a class needs to perform an operation that can be done in multiple different ways (e.g., sorting, routing, compression), naively encoding all variants as a big `switch`/`if` statement in the class itself makes the code rigid and hard to extend. Strategy extracts each variant into its own class (a *concrete strategy*) behind a common interface. The context class holds a reference to a strategy object and delegates the operation to it, without knowing which variant it uses. This allows the algorithm to be swapped at runtime and new algorithms to be added without changing the context.
+
+**(b) Real-world scenario for Strategy:**
+A **navigation app** (like Google Maps) can compute routes using different algorithms: driving by road, walking, cycling, or taking public transport. Without Strategy, the routing code would be one giant method full of `if/else` branches. With Strategy, each routing mode (`RoadStrategy`, `WalkingStrategy`, `PublicTransportStrategy`) implements a common `RouteStrategy` interface. The `Navigator` context simply calls `strategy.buildRoute(A, B)` — it does not care which algorithm is active. The user can switch modes freely.
+
+**(c) Purpose of Adapter:**
+The Adapter pattern solves the problem of *interface incompatibility*. When you have a useful class (a third-party library, a legacy system, or a class with many dependents) whose interface does not match what your code expects, you cannot simply change either side. The Adapter introduces a wrapper class that implements the expected interface and translates each call to the corresponding operation on the incompatible class. Neither the client nor the service is modified.
+
+**(d) Real-world scenario for Adapter:**
+A software system that logs to the console using a `Logger` interface with `log(String message)`. A new requirement arrives to also log to a cloud service SDK that exposes `sendEvent(Map<String, Object> payload)`. Rather than changing every call site or rewriting the logging subsystem, you write a `CloudLoggerAdapter` that implements `Logger` and internally converts each `log(message)` call into a `sendEvent(...)` call. The rest of the code is unchanged.
+
+**(e) Purpose of Composite:**
+The Composite pattern solves the problem of *uniform treatment of individual and composed objects*. When objects form a tree (leaves and containers), client code that must operate on the whole tree (e.g., compute a total, render, print) would normally need to distinguish between leaf and composite nodes, adding complexity. Composite defines a common interface for both; composites delegate to children recursively. The client calls one method on the root and the entire tree is processed — no type checks needed.
+
+**(f) Real-world scenario for Composite:**
+A **GUI framework** where all UI elements implement a `Widget` interface with a `render()` method. A `Button` (leaf) renders itself directly. A `Panel` (composite) renders each of its contained widgets. A `Window` (another composite) renders each of its panels. The application calls `window.render()` and the entire UI hierarchy is rendered recursively without the application knowing the internal structure.
+
+</details>

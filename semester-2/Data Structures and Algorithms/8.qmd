@@ -1,0 +1,847 @@
+---
+title: "W10. Hash Tables, Chaining, Open Addressing, Hash Functions"
+author: "Nikolai Kudasov"
+date: "March 24, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Dictionaries and Sets**
+
+###### **1.1.1 The Dictionary Abstract Data Type**
+
+A **dictionary** (also called a **map**) is one of the most important and frequently used abstract data types in computer science. It stores a collection of **key–value pairs**, where each key is associated with exactly one value. You can think of a dictionary just like a real dictionary: you look up a word (the key) and get its definition (the value).
+
+The three fundamental operations of a dictionary are:
+
+- **`put(k, v)`** — insert a key–value pair into the dictionary. If the key $k$ already exists, its old value is replaced by $v$.
+- **`get(k)`** — retrieve the value associated with key $k$. Returns `NIL` (null) if $k$ is not found.
+- **`remove(k)`** — remove the entry with key $k$ from the dictionary.
+
+**Critical property:** for each key the dictionary stores **at most one** value. This is what distinguishes a dictionary from, say, a multimap.
+
+###### **1.1.2 Dictionary via Doubly Linked List**
+
+The simplest implementation stores all key–value pairs as nodes in a **doubly linked list**. For example, the dictionary $\{\langle A,1\rangle, \langle C,3\rangle, \langle B,2\rangle, \langle D,3\rangle\}$ can be stored as a chain of nodes.
+
+<!-- DIAGRAM HERE -->
+
+However, all operations on this implementation require scanning the entire list in the worst case:
+
+- **`get(k)`:** $\mathcal{O}(n)$ — must traverse the list to find the key.
+- **`put(k, v)`:** $\mathcal{O}(n)$ — must check for duplicates before inserting.
+- **`remove(k)`:** $\mathcal{O}(n)$ — must find the node first; $\mathcal{O}(1)$ if given a direct reference.
+
+This is too slow for large dictionaries. We need something better.
+
+###### **1.1.3 Dictionary via Array (Direct-Address Table)**
+
+If the keys happen to be **integers in the range $0$ to $n-1$**, we can use an array of size $n$ as the dictionary: simply set `array[k] = v`. This is called a **direct-address table**.
+
+<!-- DIAGRAM HERE -->
+
+With a direct-address table, all three operations become $\mathcal{O}(1)$ worst case:
+
+- **`get(k)`:** $\mathcal{O}(1)$ — index directly into the array.
+- **`put(k, v)`:** $\mathcal{O}(1)$ — assign `array[k] = v`.
+- **`remove(k)`:** $\mathcal{O}(1)$ — set `array[k] = NIL`.
+
+The limitation is obvious: if the **universe of keys** $U$ is very large (e.g., all possible strings, or all 64-bit integers), allocating an array indexed by every possible key is completely impractical. The solution is to use a **hash function** to compress the key universe into a manageable range.
+
+##### **1.2 Hash Tables: Core Ideas**
+
+###### **1.2.1 What Is a Hash Table?**
+
+A **hash table** combines the speed of an array with the flexibility of general keys. The key idea is:
+
+1. Allocate an array $T$ of size $m$ (much smaller than $|U|$).
+2. Use a **hash function** $h : U \to \{0, 1, \dots, m-1\}$ to map each key to an index.
+3. Store the key–value pair at index $h(k)$ in the array.
+
+<!-- DIAGRAM HERE -->
+
+The main appeal: when things go well, all operations run in $\mathcal{O}(1)$ *on average*. The catch: two distinct keys may map to the same index — this is called a **collision** — and we need a strategy to handle it.
+
+###### **1.2.2 Hash Functions**
+
+A **hash function** is a mapping:
+
+$$h : U \to \{0, 1, \dots, m - 1\}$$
+
+where $U$ is the universe of possible keys and $m$ is the table size. The value $h(k)$ is called the **hash** of key $k$.
+
+**Examples:**
+
+$$h_1 : \mathbb{N} \to \{0, 1, \dots, 15\}, \quad h_1(n) = (n + 7) \bmod 16$$
+
+$$h_2 : \text{String} \to \{0, 1, \dots, 255\}, \quad h_2(s) = \left(\sum_{i=0}^{|s|-1} \text{ord}(s[i])\right) \bmod 256$$
+
+where $\text{ord}(c)$ is the ASCII code of character $c$.
+
+###### **1.2.3 Collisions**
+
+A **collision** occurs when $h(k_1) = h(k_2)$ for two distinct keys $k_1 \neq k_2$. For example:
+
+- $h_1(3) = h_1(35) = 10$ (since $(3+7) \bmod 16 = 10$ and $(35+7) \bmod 16 = 10$)
+- $h_2(\text{"Hello"}) = h_2(\text{"Goodbye+"}) = 244$
+
+When the universe $|U|$ is larger than the table size $m$, collisions are unavoidable by the **pigeonhole principle**. We cannot eliminate them — we can only manage them. Two main strategies exist:
+
+1. **Chaining** — store a list of all key–value pairs that hash to the same slot.
+2. **Open addressing** — find an alternative empty slot in the array itself.
+
+##### **1.3 Chaining**
+
+###### **1.3.1 How Chaining Works**
+
+In **chaining**, each slot of the hash table array stores a **linked list** (typically doubly linked) of all entries whose keys hash to that slot. When we insert a new key $k$:
+
+1. Compute $h(k)$.
+2. Prepend the new entry to the linked list at slot $h(k)$.
+
+<!-- DIAGRAM HERE -->
+
+For example, if $k_2$ and $k_5$ both hash to slot $j$, then $T[j]$ points to a list containing both entries.
+
+###### **1.3.2 Complexity of Chaining**
+
+**Worst-case complexity:** All $n$ keys could hash to the same slot, creating one chain of length $n$:
+
+- **`put(k, v)`:** $\mathcal{O}(1)$ (if keys are distinct — prepend to the front); $\mathcal{O}(n)$ in the absolute worst case (if we must check for duplicates).
+- **`get(k)`:** $\mathcal{O}(n)$ — may need to scan the entire chain.
+- **`remove(entry)`:** $\mathcal{O}(1)$ — with doubly linked lists, given a pointer to the entry, removal is a constant-time pointer operation.
+
+**Average-case complexity** is much better. It is parameterized by the **load factor**:
+
+$$\alpha = \frac{n}{m}$$
+
+where $n$ is the number of keys stored and $m$ is the table size. The load factor measures how full the table is. Under the assumption of **simple uniform hashing** (each key is equally likely to hash to any slot, independently), the average chain length at any slot is exactly $\alpha = n/m$.
+
+Average-case complexities:
+
+- **`put(k, v)`:** $\mathcal{O}(1 + \alpha)$
+- **`get(k)`:** $\mathcal{O}(1 + \alpha)$
+- **`remove(entry)`:** $\mathcal{O}(1)$
+
+If $\alpha$ is kept bounded by a constant (i.e., we resize the table when $\alpha$ grows too large), all operations are effectively $\mathcal{O}(1)$.
+
+Note that for chaining, $\alpha$ can be **any non-negative value** — there is no upper bound of 1. If $\alpha > 1$, the table is "overfull" but still works; it just means some chains have length greater than 1.
+
+##### **1.4 Open Addressing**
+
+###### **1.4.1 The Concept**
+
+In **open addressing**, the hash table array holds at most one key–value pair per slot. Instead of a separate list for collisions, when a collision occurs we **probe** the array for an alternative empty slot.
+
+For each key $k$, the hash function defines a **probe sequence**:
+
+$$h(k, 0), \; h(k, 1), \; h(k, 2), \; \dots, \; h(k, m-1)$$
+
+Each probe sequence is a permutation of $\{0, 1, \dots, m-1\}$ — it visits every slot exactly once. We insert $k$ into the first slot in the sequence that is empty.
+
+**Important:** since each slot holds at most one element, the load factor is bounded: $\alpha = n/m \le 1$.
+
+###### **1.4.2 Linear Probing**
+
+In **linear probing**, after an initial hash $h_1(k)$, we step through the table one slot at a time:
+
+$$h(k, i) = (h_1(k) + i) \bmod m$$
+
+The probe sequence starting at $h_1(k)$ visits $h_1(k), h_1(k)+1, h_1(k)+2, \dots$ (wrapping around).
+
+**Advantage:** simple and cache-friendly (accesses consecutive memory locations).
+
+**Disadvantage:** **primary clustering** — long runs of occupied slots form clusters, making future insertions and lookups slower as the table fills up.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.4.3 Double Hashing**
+
+In **double hashing**, after a collision at $h_1(k)$, we use a second hash function $h_2(k)$ as the step size:
+
+$$h(k, i) = (h_1(k) + i \cdot h_2(k)) \bmod m$$
+
+The probe sequence visits slots $h_1(k),\; h_1(k)+h_2(k),\; h_1(k)+2h_2(k), \dots$ (all modulo $m$).
+
+For the probe sequence to cover all $m$ slots, $h_2(k)$ must be **coprime** to $m$ for every key $k$. A common choice: if $m$ is a prime $p$, set $h_2(k) = 1 + (k \bmod (p-1))$, which guarantees $h_2(k) \in \{1, \dots, p-1\}$ and thus is always coprime to $p$.
+
+**Advantage:** eliminates primary clustering; the step size varies per key, spreading entries more uniformly.
+
+###### **1.4.4 Insertion, Search, and Deletion**
+
+**Insertion** follows the probe sequence until an empty slot is found:
+
+```text
+HASH-INSERT(T, k)
+1  i = 0
+2  repeat
+3      q = h(k, i)
+4      if T[q] == NIL
+5          T[q] = k
+6          return q
+7      else i = i + 1
+8  until i == m
+9  error "hash table overflow"
+```
+
+**Search** follows the same probe sequence, stopping at either the key or an empty slot:
+
+```text
+HASH-SEARCH(T, k)
+1  i = 0
+2  repeat
+3      q = h(k, i)
+4      if T[q] == k
+5          return q
+6      i = i + 1
+7  until T[q] == NIL or i == m
+8  return NIL
+```
+
+**Why searching stops at NIL:** When we inserted key $k$, we placed it in the first empty slot of its probe sequence. If the search reaches an empty slot before finding $k$, then $k$ was never inserted (it would have been placed there or earlier). So we can safely conclude $k$ is absent.
+
+**Deletion** is tricky. If we simply clear the slot, we may break the probe sequence for other keys: a later key $k'$ whose probe sequence passed through this slot would not be found anymore. The standard solution:
+
+- Replace the deleted entry with a special **DELETED** marker.
+- During search, treat DELETED slots as occupied (keep probing), but during insertion treat them as empty (can insert here).
+
+The downside: DELETED markers accumulate and do not reduce the probe count. Over time, this degrades performance. For linear probing specifically, a more sophisticated deletion without markers is possible (see Cormen et al. 2022, §11.5.1), but this does not generalize to arbitrary probing strategies.
+
+###### **1.4.5 Complexity of Open Addressing**
+
+The load factor for open addressing is always $\alpha = n/m \le 1$. Under the assumption of **uniform hashing** (each key's probe sequence is equally likely to be any of the $m!$ permutations, independently), the average-case complexities are:
+
+- **`put(k, v)`:** $\mathcal{O}\!\left(\dfrac{1}{1-\alpha}\right)$ on average
+- **`get(k)`:** $\mathcal{O}\!\left(\dfrac{1}{1-\alpha}\right)$ on average
+- **`remove(k)`:** hard to characterize (depends on the deletion strategy)
+
+When $\alpha$ is bounded away from 1 — for example $\alpha < 0.5$ — all operations are effectively $\mathcal{O}(1)$. As $\alpha \to 1$, performance degrades rapidly; at $\alpha = 1$ the table is completely full and insertion fails.
+
+###### **1.4.6 Comparison: Linked List vs. Chaining vs. Open Addressing**
+
+| Operation | Doubly linked list | Chaining | Open addressing |
+|:---|:---|:---|:---|
+| **`put(k, v)`** | $\mathcal{O}(1)$ or $\mathcal{O}(n)$ | $\mathcal{O}(1 + \alpha)$ avg. | $\mathcal{O}\!\left(\frac{1}{1-\alpha}\right)$ avg. |
+| **`get(k)`** | $\mathcal{O}(n)$ | $\mathcal{O}(1 + \alpha)$ avg. | $\mathcal{O}\!\left(\frac{1}{1-\alpha}\right)$ avg. |
+| **`remove(entry)`** | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ | depends on strategy |
+| Load factor $\alpha$ | — | $0 \le \alpha < \infty$ | $0 \le \alpha \le 1$ |
+
+##### **1.5 Hash Functions in Depth**
+
+###### **1.5.1 Two-Stage Hashing**
+
+In practice, hashing is often implemented in **two stages**:
+
+$$h(k) = \text{compress}(\text{hashCode}(k))$$
+
+1. **Hash code**: $\text{hashCode} : U \to \mathbb{Z}$ — maps the key to an integer (possibly very large or negative).
+2. **Compression**: $\text{compress} : \mathbb{Z} \to \{0, 1, \dots, m-1\}$ — maps the integer to a valid table index.
+
+<!-- DIAGRAM HERE -->
+
+This separation is natural because the hash code can be defined per data type (e.g., in a class's `hashCode()` method in Java), while the compression function is part of the hash table implementation and depends on the table size $m$.
+
+###### **1.5.2 Hash Code Strategies**
+
+**1. Object address in memory**
+
+Use the object's memory address as the hash code.
+
+- **Pro:** Fast — no computation needed beyond reading the pointer.
+- **Con:** Two logically equal objects at different memory addresses get different hash codes. For example, two distinct `String` objects both containing `"Ivan"` would hash differently, breaking the expectation that equal keys map to the same slot.
+
+**2. Cast to integer**
+
+Reinterpret the bits of the key as an integer.
+
+- **Pro:** Equal values always give equal hash codes.
+- **Con:** For large keys (e.g., long strings), the resulting integer is impractically large and does not fit in a standard integer type.
+
+**3. Sum of components**
+
+Break the key into parts (e.g., bytes or words) and sum them.
+
+$$\text{hashCode}(k) = \sum_{i} k_i$$
+
+- **Pro:** Equal values always give equal hash codes. Practical to compute.
+- **Con:** Permutations of the same components produce identical hash codes. For example, `"abc"` and `"bca"` and `"cab"` all have the same sum of character codes. This causes many collisions for sets of keys that are permutations of each other.
+
+**4. Polynomial in components (polynomial rolling hash)**
+
+Treat the key components as coefficients of a polynomial evaluated at some constant $a$:
+
+$$\text{hashCode}(k) = k_0 + k_1 a + k_2 a^2 + \dots + k_{n-1} a^{n-1}$$
+
+- **Pro:** Equal values always give equal codes. Different orderings almost never collide (different polynomials evaluated at $a$). Can be computed efficiently using Horner's method: $k_0 + a(k_1 + a(k_2 + \dots))$.
+- **Con:** Slightly more expensive to compute than a simple sum, but still $\mathcal{O}(n)$ for a key of length $n$.
+
+The polynomial hash is used in practice (e.g., Java's `String.hashCode()`) and also appears in the Rabin–Karp string matching algorithm.
+
+###### **1.5.3 Compression Functions**
+
+**1. Division method**
+
+$$h(k) = k \bmod m$$
+
+- Simple and fast.
+- Works well when $m$ is a prime not close to a power of 2 or 10. Avoid $m = 2^p$ (only uses the $p$ least significant bits) or $m = 10^p$ (only uses the last $p$ decimal digits), as these cause systematic clustering.
+
+**2. Multiplication method**
+
+$$h(k) = \left\lfloor m \cdot (k A \bmod 1) \right\rfloor$$
+
+where $A \in (0, 1)$ is a constant (Knuth suggests $A \approx (\sqrt{5}-1)/2 \approx 0.618$), and $kA \bmod 1$ denotes the fractional part of $kA$.
+
+- Works for any $m$.
+- Slightly more expensive to compute.
+- The value of $m$ is less critical — often chosen as a power of 2 for efficient bit-shifting implementation.
+
+###### **1.5.4 Properties of an Ideal Hash Function**
+
+A good hash function for a hash table of size $m$ should satisfy:
+
+1. **Uniformity:** Keys from $U$ hash uniformly into $\{0, 1, \dots, m-1\}$, meaning each slot is equally likely to be chosen.
+2. **Determinism:** Equal keys always produce the same hash value.
+3. **Speed:** Runs in $\mathcal{O}(1)$ or close to it.
+
+**Note:** Hash functions for hash tables do *not* need to be one-way (hard to invert). Cryptographic hash functions (like SHA-256) are designed to be one-way, but this comes at a significant speed cost. Using a cryptographic hash in a hash table is wasteful and unnecessary.
+
+##### **1.6 Mathematical Analysis of Complexity**
+
+###### **1.6.1 Chaining: Assumptions and Setup**
+
+For the mathematical analysis we assume:
+
+1. Hash table $T$ has $m$ slots and stores $n$ key–value pairs.
+2. Load factor $\alpha = n/m$.
+3. **Simple uniform hashing:** any key is equally likely to hash into any of the $m$ slots, independently of all other keys. That is, $\Pr\{h(k) = i\} = 1/m$ for every key $k$ and every slot $i$.
+4. Expected time to evaluate the hash function is $\mathcal{O}(1)$.
+
+Let $n_i$ denote the length of the chain at slot $i$. Then $n = n_0 + n_1 + \dots + n_{m-1}$.
+
+Under simple uniform hashing, the expected chain length at any slot is:
+
+$$E[n_i] = E\!\left[\sum_{j=1}^n I\{h(k_j) = i\}\right] = \sum_{j=1}^n \Pr\{h(k_j) = i\} = \sum_{j=1}^n \frac{1}{m} = \frac{n}{m} = \alpha$$
+
+###### **1.6.2 Chaining: Unsuccessful Search**
+
+**Theorem (Cormen et al. 2022, Theorem 11.1).**
+*In a hash table resolving collisions by chaining, an unsuccessful search takes expected time $\Theta(1 + \alpha)$ under simple uniform hashing.*
+
+**Proof.** An unsuccessful search for key $k$ computes $h(k)$ (cost $\mathcal{O}(1)$) and scans the entire chain at slot $h(k)$, which has length $n_{h(k)}$. The cost is:
+
+$$T(n, k) = 1 + n_{h(k)}$$
+
+Taking expectations:
+
+$$E[T(n, k)] = 1 + E[n_{h(k)}] = 1 + \alpha \qquad \square$$
+
+###### **1.6.3 Chaining: Successful Search**
+
+**Theorem (Cormen et al. 2022, Theorem 11.2).**
+*In a hash table resolving collisions by chaining, a successful search takes expected time $\Theta(1 + \alpha)$ under simple uniform hashing.*
+
+**Proof.** Assume the $n$ keys $k_1, k_2, \dots, k_n$ were inserted in this order and each is equally likely to be the search target (probability $1/n$ each).
+
+When searching for key $k_i$, we traverse the chain at slot $h(k_i)$ until we find $k_i$. We must pass all keys $k_j$ with $j > i$ (inserted after $k_i$, placed before it in the chain) that hash to the same slot.
+
+Define indicator variables:
+
+$$X_{ij} = I\{j > i \text{ and } h(k_j) = h(k_i)\}$$
+
+The expected number of elements examined during the search (beyond $k_i$ itself) is:
+
+$$E\!\left[\frac{1}{n}\sum_{i=1}^n\sum_{j=i+1}^n X_{ij}\right] = \frac{1}{n}\sum_{i=1}^n\sum_{j=i+1}^n \Pr\{h(k_j) = h(k_i)\} = \frac{1}{n}\sum_{i=1}^n\sum_{j=i+1}^n \frac{1}{m}$$
+
+$$= \frac{1}{nm}\cdot\frac{n(n-1)}{2} = \frac{n-1}{2m} = \frac{\alpha}{2} - \frac{1}{2n}$$
+
+Including the cost of computing the hash and examining $k_i$ itself, the total expected search time is:
+
+$$1 + \frac{\alpha}{2} - \frac{1}{2n} = \Theta(1 + \alpha) \qquad \square$$
+
+###### **1.6.4 Open Addressing: Assumptions**
+
+For open addressing analysis we assume:
+
+1. Hash table $T$ has $m$ slots and stores $n$ key–value pairs.
+2. Load factor $\alpha = n/m \le 1$.
+3. **Uniform hashing:** for each key $k$, the probe sequence $\langle h(k,0), h(k,1), \dots, h(k,m-1)\rangle$ is equally likely to be any one of the $m!$ permutations of $\{0, 1, \dots, m-1\}$, independently of other keys.
+4. Expected time to evaluate the hash function is $\mathcal{O}(1)$.
+
+###### **1.6.5 Open Addressing: Unsuccessful Search**
+
+**Theorem (Cormen et al. 2022, Theorem 11.6).**
+*The expected number of probes in an unsuccessful search is at most $\dfrac{1}{1-\alpha}$.*
+
+**Proof.** Let $X$ be the number of probes in an unsuccessful search. For an unsuccessful search to make at least $i$ probes, the first $i-1$ slots examined must all be occupied. Under uniform hashing:
+
+$$\Pr\{X \ge i\} = \frac{n}{m} \cdot \frac{n-1}{m-1} \cdots \frac{n-i+2}{m-i+2} \le \left(\frac{n}{m}\right)^{i-1} = \alpha^{i-1}$$
+
+The inequality uses the fact that $n \le m$ implies $\frac{n-k}{m-k} \le \frac{n}{m}$ for $k \ge 0$.
+
+Using the formula $E[X] = \sum_{i=1}^\infty \Pr\{X \ge i\}$:
+
+$$E[X] \le \sum_{i=1}^\infty \alpha^{i-1} = \sum_{i=0}^\infty \alpha^i = \frac{1}{1-\alpha} \qquad \square$$
+
+**Intuition:** The formula $\frac{1}{1-\alpha}$ is essentially the expected number of trials to get a success in a geometric distribution with success probability $1 - \alpha$ (the fraction of empty slots). For example, if $\alpha = 0.5$, we expect at most 2 probes; if $\alpha = 0.9$, we expect at most 10 probes.
+
+###### **1.6.6 Open Addressing: Successful Search**
+
+**Theorem (Cormen et al. 2022, Theorem 11.8).**
+*The expected number of probes in a successful search is at most $\dfrac{1}{\alpha} \ln \dfrac{1}{1-\alpha}$.*
+
+**Proof.** Searching for key $k_i$ (the $(i+1)$-th key inserted, $i = 0, 1, \dots, n-1$) retraces the same probe sequence used when $k_i$ was inserted. At the time of insertion, the table had $i$ occupied slots, so the load factor was $i/m$ and the expected number of probes was at most $\frac{1}{1 - i/m} = \frac{m}{m-i}$.
+
+Averaging uniformly over all $n$ stored keys:
+
+$$E[\text{probes}] \le \frac{1}{n}\sum_{i=0}^{n-1}\frac{m}{m-i} = \frac{m}{n}\sum_{i=0}^{n-1}\frac{1}{m-i} = \frac{1}{\alpha}\sum_{k=m-n+1}^{m}\frac{1}{k}$$
+
+We bound the sum by an integral:
+
+$$\sum_{k=m-n+1}^{m}\frac{1}{k} \le \int_{m-n}^{m}\frac{1}{x}\,dx = \ln m - \ln(m-n) = \ln\frac{m}{m-n} = \ln\frac{1}{1-\alpha}$$
+
+Therefore:
+
+$$E[\text{probes}] \le \frac{1}{\alpha}\ln\frac{1}{1-\alpha} \qquad \square$$
+
+---
+
+#### **2. Definitions**
+
+- **Dictionary (Map):** An abstract data type that stores a collection of key–value pairs, supporting `put(k,v)`, `get(k)`, and `remove(k)`. Each key maps to at most one value.
+- **Hash table:** A data structure implementing a dictionary using an array $T$ of size $m$ together with a hash function $h$ to map keys to array indices.
+- **Hash function:** A function $h : U \to \{0, 1, \dots, m-1\}$ mapping keys from universe $U$ to array indices. The value $h(k)$ is the **hash** of key $k$.
+- **Collision:** The situation where two distinct keys $k_1 \neq k_2$ hash to the same index: $h(k_1) = h(k_2)$.
+- **Load factor ($\alpha$):** The ratio $\alpha = n/m$ of the number of stored entries $n$ to the table size $m$. Measures how full the table is.
+- **Chaining:** A collision resolution strategy where each table slot holds a linked list of all entries mapping to that slot.
+- **Open addressing:** A collision resolution strategy where each slot holds at most one entry; collisions are resolved by probing for another empty slot using a probe sequence.
+- **Probe sequence:** The sequence of slots $h(k,0), h(k,1), \dots, h(k,m-1)$ that open addressing examines for key $k$. Each probe sequence is a permutation of $\{0, 1, \dots, m-1\}$.
+- **Linear probing:** An open addressing strategy with $h(k,i) = (h_1(k) + i) \bmod m$.
+- **Double hashing:** An open addressing strategy with $h(k,i) = (h_1(k) + i \cdot h_2(k)) \bmod m$.
+- **Primary clustering:** A phenomenon in linear probing where occupied slots form long consecutive runs, degrading performance.
+- **DELETED marker:** A special sentinel value placed in a slot when its entry is deleted from an open-address hash table, allowing search to continue probing past the deleted slot.
+- **Hash code:** The first stage of two-stage hashing: $\text{hashCode} : U \to \mathbb{Z}$ maps a key to an arbitrary integer.
+- **Compression function:** The second stage of two-stage hashing: $\text{compress} : \mathbb{Z} \to \{0, \dots, m-1\}$ maps the integer hash code to a valid table index.
+- **Simple uniform hashing:** An assumption that each key is equally likely to hash to any slot, independently of all other keys.
+- **Uniform hashing:** A stronger assumption used for open addressing analysis: each key's probe sequence is equally likely to be any of the $m!$ permutations of slots, independently.
+- **Direct-address table:** A special case of a hash table where keys are integers in $\{0, 1, \dots, m-1\}$ and $h(k) = k$ (identity function). Provides $\mathcal{O}(1)$ worst-case for all operations when feasible.
+
+---
+
+#### **3. Formulas**
+
+- **Load factor:** $\alpha = \dfrac{n}{m}$, where $n$ = number of stored keys, $m$ = table size.
+- **Expected chain length (chaining):** $E[n_i] = \alpha$ for each slot $i$, under simple uniform hashing.
+- **Chaining — unsuccessful search:** $\Theta(1 + \alpha)$ expected time.
+- **Chaining — successful search:** $\Theta(1 + \alpha)$ expected time.
+- **Open addressing probe formula (linear probing):** $h(k, i) = (h_1(k) + i) \bmod m$
+- **Open addressing probe formula (double hashing):** $h(k, i) = (h_1(k) + i \cdot h_2(k)) \bmod m$
+- **Open addressing — unsuccessful search:** expected probes $\le \dfrac{1}{1 - \alpha}$
+- **Open addressing — successful search:** expected probes $\le \dfrac{1}{\alpha} \ln \dfrac{1}{1-\alpha}$
+- **Division method (compression):** $h(k) = k \bmod m$
+- **Multiplication method (compression):** $h(k) = \lfloor m (kA \bmod 1) \rfloor$, where $A \in (0,1)$
+- **Polynomial hash code:** $\text{hashCode}(k) = k_0 + k_1 a + k_2 a^2 + \dots + k_{n-1} a^{n-1}$
+- **Geometric series identity (used in proofs):** $\sum_{i=0}^\infty \alpha^i = \dfrac{1}{1-\alpha}$ for $|\alpha| < 1$
+
+---
+
+#### **4. Examples**
+
+##### **4.1. Hash Table with Chaining** (Lecture 8, Exercise 8.1)
+
+Insert keys $5, 28, 19, 15, 20, 33, 12, 17, 10$ into a hash table of size 9 using chaining with $h(k) = k \bmod 9$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For each key, compute $h(k) = k \bmod 9$ and prepend the key to the linked list at that slot. Multiple keys at the same slot form a chain.
+
+1. **Compute hash values:**
+
+    | Key $k$ | $k \bmod 9$ | Slot |
+    |:---:|:---:|:---:|
+    | 5 | 5 | 5 |
+    | 28 | 1 | 1 |
+    | 19 | 1 | 1 |
+    | 15 | 6 | 6 |
+    | 20 | 2 | 2 |
+    | 33 | 6 | 6 |
+    | 12 | 3 | 3 |
+    | 17 | 8 | 8 |
+    | 10 | 1 | 1 |
+2. **Build the chains** (new elements are prepended, so the last inserted appears at the head):
+    - Slot 0: empty
+    - Slot 1: $10 \to 19 \to 28$
+    - Slot 2: $20$
+    - Slot 3: $12$
+    - Slot 4: empty
+    - Slot 5: $5$
+    - Slot 6: $33 \to 15$
+    - Slot 7: empty
+    - Slot 8: $17$
+
+**Answer:** The hash table has chains at slots 1, 2, 3, 5, 6, 8. Slot 1 has the longest chain: $[10 \to 19 \to 28]$.
+
+</details>
+
+##### **4.2. Hash Table with Double Hashing** (Lecture 8, Exercise 8.2)
+
+Insert keys $50, 6, 3, 17, 8, 5, 12, 34$ into a hash table of size 11 using double hashing with $h_1(k) = (k+1) \bmod 11$ and $h_2(k) = 1 + (k \bmod 5)$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Compute the initial slot $h(k,0) = h_1(k)$. On collision, the next probe is at $(h_1(k) + h_2(k)) \bmod 11$, then $(h_1(k) + 2 \cdot h_2(k)) \bmod 11$, etc.
+
+1. **Compute $h_1(k)$, $h_2(k)$, and initial slot $h(k,0) = h_1(k) \bmod 11$:**
+
+    | $k$ | $h_1(k) = (k+1)\bmod 11$ | $h_2(k) = 1 + (k \bmod 5)$ | $h(k,0)$ |
+    |:---:|:---:|:---:|:---:|
+    | 50 | $(51)\bmod 11 = 7$ | $1 + (0) = 1$ | 7 |
+    | 6 | $(7)\bmod 11 = 7$ | $1 + (1) = 2$ | 7 |
+    | 3 | $(4)\bmod 11 = 4$ | $1 + (3) = 4$ | 4 |
+    | 17 | $(18)\bmod 11 = 7$ | $1 + (2) = 3$ | 7 |
+    | 8 | $(9)\bmod 11 = 9$ | $1 + (3) = 4$ | 9 |
+    | 5 | $(6)\bmod 11 = 6$ | $1 + (0) = 1$ | 6 |
+    | 12 | $(13)\bmod 11 = 2$ | $1 + (2) = 3$ | 2 |
+    | 34 | $(35)\bmod 11 = 2$ | $1 + (4) = 5$ | 2 |
+2. **Insert each key:**
+    - $k=50$: slot 7 is empty → place at 7.
+    - $k=6$: slot 7 occupied ($h_2=2$) → probe $7+2=9$; slot 9 empty → place at 9.
+    - $k=3$: slot 4 is empty → place at 4.
+    - $k=17$: slot 7 occupied ($h_2=3$) → probe $7+3=10$; slot 10 empty → place at 10.
+    - $k=8$: slot 9 occupied ($h_2=4$) → probe $9+4=13\bmod 11=2$; slot 2 empty → place at 2.
+    - $k=5$: slot 6 is empty → place at 6.
+    - $k=12$: slot 2 occupied ($h_2=3$) → probe $2+3=5$; slot 5 empty → place at 5.
+    - $k=34$: slot 2 occupied ($h_2=5$) → probe $2+5=7$; slot 7 occupied → probe $7+5=12\bmod 11=1$; slot 1 empty → place at 1.
+3. **Final table state:**
+
+    | Index | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+    |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+    | Key | — | 34 | 8 | — | 3 | 12 | 5 | 50 | — | 6 | 17 |
+
+**Answer:** Final table as shown above. No slot required more than 3 probes.
+
+</details>
+
+##### **4.3. Hash Table with Linear Probing** (Lecture 8, Exercise 8.3)
+
+Insert keys $50, 6, 3, 17, 8, 5, 12, 34$ into a hash table of size 11 using linear probing with $h_1(k) = (k+1) \bmod 11$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Compute $h(k,0) = h_1(k)$. On collision, probe $h(k,0)+1$, $h(k,0)+2$, etc. (modulo 11), until an empty slot is found.
+
+1. **Compute initial slots:**
+
+    | $k$ | $h_1(k) = (k+1)\bmod 11$ |
+    |:---:|:---:|
+    | 50 | 7 |
+    | 6 | 7 |
+    | 3 | 4 |
+    | 17 | 7 |
+    | 8 | 9 |
+    | 5 | 6 |
+    | 12 | 2 |
+    | 34 | 2 |
+2. **Insert each key (linear probing +1 on collision):**
+    - $k=50$: slot 7 empty → place at 7.
+    - $k=6$: slot 7 occupied → try 8; empty → place at 8.
+    - $k=3$: slot 4 empty → place at 4.
+    - $k=17$: slot 7 occupied → try 8 (occupied) → try 9; empty → place at 9.
+    - $k=8$: slot 9 occupied → try 10; empty → place at 10.
+    - $k=5$: slot 6 empty → place at 6.
+    - $k=12$: slot 2 empty → place at 2.
+    - $k=34$: slot 2 occupied → try 3; empty → place at 3.
+3. **Final table state:**
+
+    | Index | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+    |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+    | Key | — | — | 12 | 34 | 3 | — | 5 | 50 | 6 | 17 | 8 |
+
+**Answer:** Final table as shown. Notice that $k=6,17,8$ all required extra probes due to a cluster forming around index 7.
+
+</details>
+
+##### **4.4. Effect of Sorted Chains on Complexity** (Lecture 8, Exercise 8.4)
+
+How do worst-case and average-case key-search complexity change for a chained hash table if each chain is a **sorted array** and we perform a **binary search** within the array?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The standard chaining implementation uses linked lists, giving $\mathcal{O}(1)$ insertion (prepend) and $\mathcal{O}(\ell)$ search in a chain of length $\ell$. Switching to sorted arrays changes both operations.
+
+**(a) Worst case:**
+
+In the worst case all $n$ keys hash to the same slot, giving a single chain (array) of length $n$.
+
+- **Standard chaining (linked list):** worst-case search is $\mathcal{O}(n)$ (linear scan).
+- **Sorted array + binary search:** worst-case search is $\mathcal{O}(\log n)$ — we can binary search the sorted array.
+
+So the worst-case search improves from $\mathcal{O}(n)$ to $\mathcal{O}(\log n)$.
+
+**(b) Average case (under simple uniform hashing):**
+
+Under simple uniform hashing, the expected chain length is $\alpha = n/m$. A linear scan costs $\mathcal{O}(\alpha)$; binary search costs $\mathcal{O}(\log \alpha)$. Including the $\mathcal{O}(1)$ hash computation:
+
+- **Standard chaining:** $\mathcal{O}(1 + \alpha)$ on average.
+- **Sorted array + binary search:** $\mathcal{O}(1 + \log \alpha)$ on average.
+
+If $\alpha$ is bounded by a constant (the usual practical goal), both are $\mathcal{O}(1)$ and the asymptotic difference disappears.
+
+**(c) Cost of insertion:**
+
+There is a trade-off: maintaining a sorted array requires finding the correct insertion position ($\mathcal{O}(\log \alpha)$ via binary search) plus shifting elements ($\mathcal{O}(\alpha)$ in the worst case). So `put(k, v)` becomes $\mathcal{O}(\alpha)$ on average — worse than the $\mathcal{O}(1)$ prepend with a linked list.
+
+**Answer:** Worst-case search improves from $\mathcal{O}(n)$ to $\mathcal{O}(\log n)$. Average-case search improves from $\mathcal{O}(1+\alpha)$ to $\mathcal{O}(1+\log\alpha)$. However, insertion worsens from $\mathcal{O}(1)$ to $\mathcal{O}(\alpha)$ due to the cost of maintaining sorted order.
+
+</details>
+
+##### **4.5. Open Addressing: Bounds on Number of Probes** (Lecture 8, Exercise 8.6)
+
+Compute upper bounds on the expected number of probes for unsuccessful and successful search in an open-address hash table when:
+
+**(a)** $\alpha = \dfrac{3}{4}$
+
+**(b)** $\alpha = \dfrac{7}{8}$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the two theorems:
+
+- Unsuccessful search: $\le \dfrac{1}{1-\alpha}$
+- Successful search: $\le \dfrac{1}{\alpha} \ln \dfrac{1}{1-\alpha}$
+
+**(a) $\alpha = 3/4$:**
+
+- **Unsuccessful:** $\dfrac{1}{1 - 3/4} = \dfrac{1}{1/4} = 4$ probes.
+- **Successful:** $\dfrac{1}{3/4} \cdot \ln\!\dfrac{1}{1/4} = \dfrac{4}{3} \cdot \ln 4 = \dfrac{4}{3} \cdot 2\ln 2 \approx \dfrac{4}{3} \cdot 1.386 \approx 1.85$ probes.
+
+**(b) $\alpha = 7/8$:**
+
+- **Unsuccessful:** $\dfrac{1}{1 - 7/8} = \dfrac{1}{1/8} = 8$ probes.
+- **Successful:** $\dfrac{1}{7/8} \cdot \ln\!\dfrac{1}{1/8} = \dfrac{8}{7} \cdot \ln 8 = \dfrac{8}{7} \cdot 3\ln 2 \approx \dfrac{8}{7} \cdot 2.079 \approx 2.38$ probes.
+
+**Answer:**
+
+| $\alpha$ | Unsuccessful (upper bound) | Successful (upper bound) |
+|:---:|:---:|:---:|
+| $3/4$ | 4 | $\approx 1.85$ |
+| $7/8$ | 8 | $\approx 2.38$ |
+
+Note that doubling the "fullness" (going from $1-3/4 = 1/4$ free space to $1-7/8 = 1/8$ free space) doubles the unsuccessful search bound, while successful search grows much more slowly due to the logarithm.
+
+</details>
+
+##### **4.6. Linear Probing with Quadratic Hash Function** (Homework 8, Problem 8.1)
+
+Consider a hash table with 11 slots (indices $0, \dots, 10$) and primary hash function:
+
+$$h(k) = (k^2 + 5k + 4) \bmod 11$$
+
+Insert the following keys in the given order using **linear probing** to resolve collisions:
+
+$$4, \; 19, \; 27, \; 8, \; 15, \; 11, \; 23, \; 6, \; 31, \; 14, \; 2$$
+
+**(a)** Show the final state of the hash table.
+
+**(b)** For key 31, list the sequence of indices probed until 31 is placed (including the final slot).
+
+**(c)** After all insertions, what is the maximum number of probes an unsuccessful search can make?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** First compute $h(k)$ for each key; then apply linear probing $h(k,i) = (h(k) + i) \bmod 11$.
+
+1. **Compute $h(k) = (k^2 + 5k + 4) \bmod 11$ for each key:**
+
+    | $k$ | $k^2 + 5k + 4$ | $\bmod 11$ |
+    |:---:|:---:|:---:|
+    | 4 | $16 + 20 + 4 = 40$ | 7 |
+    | 19 | $361 + 95 + 4 = 460$ | $460 \bmod 11 = 9$ |
+    | 27 | $729 + 135 + 4 = 868$ | $868 \bmod 11 = 10$ |
+    | 8 | $64 + 40 + 4 = 108$ | $108 \bmod 11 = 9$ |
+    | 15 | $225 + 75 + 4 = 304$ | $304 \bmod 11 = 7$ |
+    | 11 | $121 + 55 + 4 = 180$ | $180 \bmod 11 = 4$ |
+    | 23 | $529 + 115 + 4 = 648$ | $648 \bmod 11 = 9$ |
+    | 6 | $36 + 30 + 4 = 70$ | $70 \bmod 11 = 4$ |
+    | 31 | $961 + 155 + 4 = 1120$ | $1120 \bmod 11 = 9$ |
+    | 14 | $196 + 70 + 4 = 270$ | $270 \bmod 11 = 6$ |
+    | 2 | $4 + 10 + 4 = 18$ | $18 \bmod 11 = 7$ |
+2. **Insert each key with linear probing:**
+    - $k=4$: $h=7$, slot 7 empty → place at **7**.
+    - $k=19$: $h=9$, slot 9 empty → place at **9**.
+    - $k=27$: $h=10$, slot 10 empty → place at **10**.
+    - $k=8$: $h=9$, slot 9 occupied → try 10 (occupied) → try $0$; empty → place at **0**.
+    - $k=15$: $h=7$, slot 7 occupied → try 8; empty → place at **8**.
+    - $k=11$: $h=4$, slot 4 empty → place at **4**.
+    - $k=23$: $h=9$, slot 9 occupied → try 10 (occupied) → try 0 (occupied) → try 1; empty → place at **1**.
+    - $k=6$: $h=4$, slot 4 occupied → try 5; empty → place at **5**.
+    - $k=31$: $h=9$, slot 9 occupied → try 10 (occupied) → try 0 (occupied) → try 1 (occupied) → try 2; empty → place at **2**.
+    - $k=14$: $h=6$, slot 6 empty → place at **6**.
+    - $k=2$: $h=7$, slot 7 occupied → try 8 (occupied) → try 9 (occupied) → try 10 (occupied) → try 0 (occupied) → try 1 (occupied) → try 2 (occupied) → try 3; empty → place at **3**.
+3. **Final table state:**
+
+    | Index | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+    |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+    | Key | 8 | 23 | 31 | 2 | 11 | 6 | 14 | 4 | 15 | 19 | 27 |
+
+**(b) Probe sequence for $k = 31$:**
+
+$h(31) = 9$ → probe 9 (occupied by 19) → probe 10 (occupied by 27) → probe 0 (occupied by 8) → probe 1 (occupied by 23) → probe **2** (empty, place here).
+
+Probe sequence: $9 \to 10 \to 0 \to 1 \to 2$.
+
+**(c) Maximum probes for unsuccessful search:**
+
+The table is completely full (all 11 slots occupied). An unsuccessful search for a key $k$ probes all slots in its probe sequence before concluding the key is absent. In the worst case (when all $m=11$ slots are occupied and the key is not present), the search examines all 11 slots before wrapping back to a NIL — but since the table is full with no NIL slots, the search probes all 11 slots.
+
+**Answer:**
+
+**(a)** Final table as shown in step 3.
+
+**(b)** Probe sequence for 31: indices $9, 10, 0, 1, 2$.
+
+**(c)** Maximum unsuccessful probes = **11** (the entire table is full, so the search exhausts all slots before finding no match).
+
+</details>
+
+##### **4.7. Dictionary of Dictionaries: Complexity Analysis** (Homework 8, Problem 8.2)
+
+Consider a dictionary $D$ where keys are pairs (integer, short string) and values are floating-point numbers. It is implemented as a **dictionary of dictionaries**: $D$ is a dictionary (method $A$) with integer keys; each value $D.\mathsf{get}(k)$ is a dictionary (method $B$) with string keys.
+
+Assume the outer dictionary has $n$ distinct integer keys and load factor $\alpha$; each inner dictionary has expected $m$ string keys and expected load factor $\beta$.
+
+**(a)** Fill in the following tables with asymptotic expected times for unsuccessful and successful search in $D$. Use $\Theta$-notation in terms of $\alpha$, $\beta$, $n$, $m$.
+
+**(b)** With $\alpha = \beta = 1/2$, which combination $(A, B)$ minimizes expected successful search time?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Searching for pair $(k, s)$ in $D$ requires two steps: (1) search for integer key $k$ in the outer dictionary $A$, and (2) search for string key $s$ in the inner dictionary $B$ returned by step 1. The total cost is the sum of both steps.
+
+Recall the expected search times for each implementation:
+
+| Method | Unsuccessful | Successful |
+|:---|:---:|:---:|
+| Chaining | $\Theta(1 + \alpha)$ | $\Theta(1 + \alpha)$ |
+| Open addressing | $\Theta\!\left(\frac{1}{1-\alpha}\right)$ | $\Theta\!\left(\frac{1}{\alpha}\ln\frac{1}{1-\alpha}\right)$ |
+| AVL tree | $\Theta(\log n)$ | $\Theta(\log n)$ |
+
+For the outer dictionary $A$ the parameter is $\alpha$ (and size $n$); for the inner dictionary $B$ the parameter is $\beta$ (and size $m$).
+
+**(a) Unsuccessful search** (key $(k,s)$ not in $D$, meaning either $k$ is absent or $s$ is absent in $D[k]$):
+
+An unsuccessful search fails at either step: we search for $k$ in $A$ (may fail) and, if $k$ is found, search for $s$ in $B$ (may fail). In the worst case we do both. The total expected cost is the sum of the costs of one $A$-lookup and one $B$-lookup.
+
+| $A \backslash B$ | Chaining | Open addr. | AVL tree |
+|:---|:---:|:---:|:---:|
+| **Chaining** | $\Theta(1+\alpha) + \Theta(1+\beta)$ | $\Theta(1+\alpha) + \Theta\!\left(\frac{1}{1-\beta}\right)$ | $\Theta(1+\alpha) + \Theta(\log m)$ |
+| **Open addr.** | $\Theta\!\left(\frac{1}{1-\alpha}\right) + \Theta(1+\beta)$ | $\Theta\!\left(\frac{1}{1-\alpha}\right) + \Theta\!\left(\frac{1}{1-\beta}\right)$ | $\Theta\!\left(\frac{1}{1-\alpha}\right) + \Theta(\log m)$ |
+| **AVL tree** | $\Theta(\log n) + \Theta(1+\beta)$ | $\Theta(\log n) + \Theta\!\left(\frac{1}{1-\beta}\right)$ | $\Theta(\log n) + \Theta(\log m)$ |
+
+**Successful search** (key $(k,s)$ is present):
+
+| $A \backslash B$ | Chaining | Open addr. | AVL tree |
+|:---|:---:|:---:|:---:|
+| **Chaining** | $\Theta(1+\alpha) + \Theta(1+\beta)$ | $\Theta(1+\alpha) + \Theta\!\left(\frac{1}{\beta}\ln\frac{1}{1-\beta}\right)$ | $\Theta(1+\alpha) + \Theta(\log m)$ |
+| **Open addr.** | $\Theta\!\left(\frac{1}{\alpha}\ln\frac{1}{1-\alpha}\right) + \Theta(1+\beta)$ | $\Theta\!\left(\frac{1}{\alpha}\ln\frac{1}{1-\alpha}\right) + \Theta\!\left(\frac{1}{\beta}\ln\frac{1}{1-\beta}\right)$ | $\Theta\!\left(\frac{1}{\alpha}\ln\frac{1}{1-\alpha}\right) + \Theta(\log m)$ |
+| **AVL tree** | $\Theta(\log n) + \Theta(1+\beta)$ | $\Theta(\log n) + \Theta\!\left(\frac{1}{\beta}\ln\frac{1}{1-\beta}\right)$ | $\Theta(\log n) + \Theta(\log m)$ |
+
+**(b) With $\alpha = \beta = 1/2$:**
+
+Compute the successful search cost for each cell:
+
+- **Chaining** with $\alpha = 1/2$: $\Theta(1 + 1/2) = \Theta(1)$ (constant).
+- **Open addressing** with $\alpha = 1/2$: $\frac{1}{1/2}\ln\frac{1}{1/2} = 2\ln 2 \approx 1.386$, so $\Theta(1)$ (also constant, slightly more than chaining).
+- **AVL tree**: $\Theta(\log n)$ or $\Theta(\log m)$ — grows with table size.
+
+The minimum is achieved by any combination using chaining for both $A$ and $B$, giving:
+
+$$\Theta(1 + 1/2) + \Theta(1 + 1/2) = \Theta(1)$$
+
+Open addressing also gives $\Theta(1)$ at $\alpha = \beta = 1/2$ but with a slightly larger constant. The combinations with AVL trees grow logarithmically.
+
+**Answer:** Any $(A, B)$ combination with both $A$ and $B$ as either chaining or open addressing minimizes expected successful search to $\Theta(1)$ when $\alpha = \beta = 1/2$. Among these, chaining (A=Chaining, B=Chaining) has the smallest constant factor.
+
+</details>
+
+##### **4.8. Hash Function Analysis** (Homework 8, Problem 8.3)
+
+Let $h(k) = 2k \bmod 7$. Consider the key set:
+
+$$S = \{2, 3, 5, 7, 10, 12, 17, 19, 23, 31\}$$
+
+**(a)** For each slot $j \in \{0, 1, \dots, 6\}$, determine which keys from $S$ map to $j$. List the slots that are **never** hit by any key from $S$.
+
+**(b)** Exhibit two distinct keys in $S$ that collide under $h$.
+
+**(c)** With chaining and table size 7, what is the **largest possible** chain after inserting all 10 keys?
+
+**(d)** Find an integer $m' \le 10$ such that $h'(k) = k \bmod m'$ is **injective** on $S$ (all ten keys map to distinct slots), or prove no such $m'$ exists.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Compute $2k \bmod 7$ for all keys to find slot assignments. For injectivity, check whether $k \bmod m'$ produces distinct values for all ten keys.
+
+**(a) Slot assignments for $h(k) = 2k \bmod 7$:**
+
+| $k$ | $2k$ | $2k \bmod 7$ |
+|:---:|:---:|:---:|
+| 2 | 4 | 4 |
+| 3 | 6 | 6 |
+| 5 | 10 | 3 |
+| 7 | 14 | 0 |
+| 10 | 20 | 6 |
+| 12 | 24 | 3 |
+| 17 | 34 | 6 |
+| 19 | 38 | 3 |
+| 23 | 46 | 4 |
+| 31 | 62 | 6 |
+
+Slots used: $\{0, 3, 4, 6\}$. Slots **never hit**: $\mathbf{\{1, 2, 5\}}$.
+
+**(b) Colliding pairs:**
+
+Many pairs collide. For example:
+
+- $h(5) = h(12) = h(19) = 3$ — keys $5$ and $12$ collide at slot 3.
+- $h(3) = h(10) = h(17) = h(31) = 6$ — keys $3$ and $10$ collide at slot 6.
+
+**(c) Largest possible chain:**
+
+Slot 6 receives keys $3, 10, 17, 31$ — that is **4 keys**. This is the largest chain regardless of insertion order (the set of keys mapping to each slot is fixed by the hash function; order only affects the arrangement within the chain, not its length).
+
+**(d) Injectivity of $h'(k) = k \bmod m'$:**
+
+We need all 10 values $\{k \bmod m' : k \in S\}$ to be distinct. Since $|S| = 10$, we need $m' \ge 10$. But we are restricted to $m' \le 10$, so we need exactly $m' = 10$.
+
+Check $m' = 10$: compute $k \bmod 10$ for each $k \in S$:
+
+| $k$ | 2 | 3 | 5 | 7 | 10 | 12 | 17 | 19 | 23 | 31 |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| $k \bmod 10$ | 2 | 3 | 5 | 7 | **0** | **2** | 7 | 9 | 3 | 1 |
+
+We already see collisions: $2 \bmod 10 = 2$ and $12 \bmod 10 = 2$; $7 \bmod 10 = 7$ and $17 \bmod 10 = 7$; etc. So $m' = 10$ does not work.
+
+Since we need $m' \ge 10$ for injectivity but $m' = 10$ fails, **no such $m' \le 10$ exists**.
+
+**Answer:**
+
+**(a)** Slots never hit by any key: $\{1, 2, 5\}$.
+
+**(b)** Example collision: $h(5) = h(12) = 3$.
+
+**(c)** Largest possible chain: **4** (slot 6 receives keys 3, 10, 17, 31).
+
+**(d)** No such $m' \le 10$ exists. The key set $S$ has 10 elements, requiring $m' \ge 10$ for injectivity, but $m' = 10$ already produces collisions (e.g., $2 \bmod 10 = 12 \bmod 10 = 2$).
+
+</details>
