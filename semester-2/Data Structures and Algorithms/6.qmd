@@ -1586,22 +1586,7 @@ Recurrence: $r[j] = \max_{1 \le i \le j}(p[i] + r[j-i])$, $r[0] = 0$.
 | 7 | $\max(2+18,3+14,9+12,12+9,13+4,13+2,14+0) = \max(20,17,21,21,17,15,14)$ | **21** | cut 3+4 or 4+3 |
 | 8 | $\max(2+21,3+18,9+14,12+12,13+9,13+4,...,24+0) = \max(23,21,23,24,22,...,24)$ | **24** | cut 4+4 or 8 |
 | 9 | $\max(2+24,3+21,...,9+12,12+9,...,25+0)$. Check $p[3]+r[6]=9+18=27$, $p[3]+r[6]=27$, $p[6]+r[3]=13+9=22$. Also $p[9]=25$. Best: $\max(26,25,27,23,...,25)$ | **27** | cut 3+3+3 |
-| 10 | $\max(2+27, 3+24, 9+18, 12+14, 13+12, 13+9, 14+9, 24+4, 25+2, 28+0)$ $= \max(29,27,27,26,25,22,23,28,27,28)$ | **30** | cut 3+3+4 or no cut (28<30) |
-
-Wait, let me recompute $r[10]$ carefully:
-
-- $p[1]+r[9] = 2+27 = 29$
-- $p[2]+r[8] = 3+24 = 27$
-- $p[3]+r[7] = 9+21 = 30$ ✓
-- $p[4]+r[6] = 12+18 = 30$ ✓
-- $p[5]+r[5] = 13+14 = 27$
-- $p[6]+r[4] = 13+12 = 25$
-- $p[7]+r[3] = 14+9 = 23$
-- $p[8]+r[2] = 24+4 = 28$
-- $p[9]+r[1] = 25+2 = 27$
-- $p[10]+r[0] = 28+0 = 28$
-
-Maximum: **30**, achieved by cutting into pieces of length 3+7 or 4+6.
+| 10 | $\max(p[3]+r[7], p[4]+r[6], \ldots) = \max(9{+}21, 12{+}18, \ldots) = 30$ | **30** | cut 3+7 or 4+6 |
 
 **Part 4 — At most $k$ cuts:**
 
@@ -2018,10 +2003,7 @@ Process input from right to left:
 | 7  | 4 | E | 12 | pos 12 | 11 |
 | 6  | 1 | A | 5  | pos 5  | 4  |
 | 5  | 2 | S | 8  | pos 8  | 7  |
-| 4  | 2 | D | 7  | pos 7  | 6  |  *(wait — recount)*
-| ... | | | | | |
-
-Let me redo carefully. Input (1-indexed):
+Input (1-indexed):
 
 | pos | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
 |-----|---|---|---|---|---|---|---|---|---|----|----|----|
@@ -2178,16 +2160,6 @@ Index 12: 11 (right child of 10, at 2*5+2=12)
 **Part 1: Insert 20, 5, 17**
 
 *Insert 20:* 20 > 8 → right (12) → 20 > 12 → right of 12 (index 6). Place 20 at index 6.
-
-*Insert 5:* 5 < 8 → left (4) → 5 > 4 → right (6) → 5 < 6 → left of 6. Left of 6 is index 13. Place 5 at index 13.
-
-*Insert 17:* 17 > 8 → right (12) → 17 > 12 → right (20 at idx 6) → 17 < 20 → left of 20. Left of 20 is index 13... wait, index 6 is 20, left child = 2*6+1=13, right = 2*6+2=14.
-
-But we placed 5 at index 13 already — conflict! Let me re-examine.
-
-Actually index 13 is the left child of node at index 6. After inserting 20 at index 6, node 20's left child would be at index 13. But we also placed 5 at index 13 when inserting 5 (going 8→4→6→left=13). These are different subtrees: index 13 as child of node at index 4 (key=6) is left child of 6, while index 13 as child of node at index 6 (key=20) is left child of 20. **They cannot both be index 13 — this is a conflict in the array representation.**
-
-This means the array representation runs out of indices for certain insertions. In a flat array of size 16 with BFS indexing, some insertions may exceed the allocated space.
 
 *Insert 5:* Path: 8→4→6→left. Left child of 6 (index 4) is index $2 \times 4 + 1 = 9$. Place 5 at index **9**.
 
@@ -2567,13 +2539,7 @@ A hybrid sorting algorithm: run QUICK-SORT but stop when the subarray size is $\
 
 **Part 1: General complexity**
 
-**QUICK-SORT phase:** QUICK-SORT worst case produces $O(n/k)$ subarrays of size $\le k$ (since each level of recursion splits until size $\le k$). The QUICK-SORT phase itself takes $O(n^2/k)$ in the worst case (since we do $O(n)$ work per level and can have $O(n/k)$ levels with bad pivots... more carefully):
-
-- Worst case of QUICK-SORT on $n$ elements until subarrays reach size $k$: $O(n^2)$ in absolute worst case (QUICK-SORT can degenerate even before reaching $k$). But more precisely, the partial QUICK-SORT that stops at size $k$ does $O(n^2/k) \cdot O(k) = O(n^2)$ comparisons in the absolute worst case.
-
-Actually, let's think carefully. QUICK-SORT running until subarray size $\le k$: the recursion tree has $O(n/k)$ leaves. In the worst case (always worst pivot), the total work is $O(n \cdot n/k) = O(n^2/k)$... No.
-
-The standard QUICK-SORT worst case is $O(n^2)$ regardless of cutoff $k$ (because with bad pivots, the first $n - k$ levels of recursion each do $O(n)$ work). So the QUICK-SORT phase is $O(n^2)$ worst case.
+**QUICK-SORT phase:** The standard QUICK-SORT worst case is $O(n^2)$ regardless of cutoff $k$ (with bad pivots, each of the first $n - k$ levels does $O(n)$ work). So the QUICK-SORT phase is $O(n^2)$ worst case.
 
 **COUNTING-SORT phase:** There are $O(n/k)$ subarrays of size at most $k$. Each COUNTING-SORT on a subarray of size $s \le k$ with keys in $[0, R]$ takes $O(s + R)$. Total: $O(n + (n/k) \cdot R)$.
 
@@ -2977,17 +2943,6 @@ Full tree after rotation:
          /   \
         4     9
        / \   / \
-      1→2  5 8  10
-     /
-    (2 is now child of 4's left)
-```
-
-Wait — let me re-express. Node 1 was the left child of 4. After left rotation at 1:
-```
-           7
-         /   \
-        4     9
-       / \   / \
       2   5 8  10
      / \
     1   3
@@ -3115,96 +3070,7 @@ The minimum AVL tree of height $h$ is built recursively: the root has one subtre
 ```
 where $T3$ = min AVL of height 3 (7 nodes) and $T2$ = min AVL of height 2 (4 nodes).
 
-Assign keys for clarity (keys chosen to satisfy BST property):
-
-```
-                   8
-                 /   \
-               4       12
-              / \      / \
-             2   6   10   –
-            / \ / \  / \
-           1  3 5 7 9  11
-```
-
-Wait — that's a full tree. Let me draw the actual minimum structure with 12 nodes:
-
-```
-              8
-            /   \
-           4     12
-          / \    /
-         2   6  10
-        /   / \   \
-       1   5   7   11
-          /
-         (none)
-```
-
-Actually let me be precise. Min AVL of height 4:
-
-- Root
-- Left subtree: min AVL of height 3 (7 nodes)
-- Right subtree: min AVL of height 2 (4 nodes)
-
-Min AVL of height 3: root + left (h=2, 4 nodes) + right (h=1, 2 nodes)
-Min AVL of height 2: root + left (h=1, 2 nodes) + right (h=0, 1 node)
-Min AVL of height 1: root + left (h=0, 1 node)
-Min AVL of height 0: single node
-
-Drawing with abstract keys (using label = node number in BFS):
-
-```
-                   1
-                 /   \
-               2       3
-              / \      /
-             4   5    6
-            /   /    / \
-           7   8    9   (none? no — h=2 right subtree)
-```
-
-More carefully, min AVL of height 4 = 12 nodes:
-
-```
-                  ●
-                /   \
-              ●       ●         ← h=3 left, h=2 right
-             / \      /
-            ●   ●    ●          ← h=2 left&right of h=3; h=1 left of h=2 right
-           /   / \   / \
-          ●   ●   ●  ●   ●      ← filling out
-         /
-        ●
-```
-
-Total: 1 + 2 + 3 + 4 + 2 = 12 ✓
-
-A concrete example with keys satisfying BST property:
-
-```
-                   7
-                 /   \
-               3      11
-              / \     /
-             2   5   9
-            /   / \   \
-           1   4   6   10
-          /
-         (impossible — would add node)
-```
-
-Hmm, let me just draw the abstract shape:
-
-```
-Level 0:          [r]
-Level 1:      [L]       [R]
-Level 2:   [LL] [LR]  [RL]
-Level 3: [LLL][LRL][LRR]
-Level 4: [LLLL]
-```
-
-Total: 1+2+3+4+2 = 12 nodes (with [LLLL] being the deepest node at height 4 path, and [R] subtree being min AVL of h=2 with 4 nodes: [R],[RL],[RL.left],[RL.right])
+Min AVL of height 4 has 12 nodes: root + left subtree (min AVL h=3, 7 nodes) + right subtree (min AVL h=2, 4 nodes). Total: $N(4) = 1 + N(3) + N(2) = 1 + 7 + 4 = 12$ ✓
 
 **Concrete AVL tree of height 4 with 12 nodes:**
 

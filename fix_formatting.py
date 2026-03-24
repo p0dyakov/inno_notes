@@ -14,7 +14,7 @@ from pathlib import Path
 AI_PATTERNS = [
     # hesitation / thinking aloud
     r'(?i)^(uh|um|erm)[,.]?\s',
-    r'(?i)^(hmm+|mmm+)[,.]?\s',
+    r'(?i)^(hmm+|mmm+|hm)[,.]?\s',
     r'(?i)^well[,.]?\s',
     r'(?i)^okay[,.]?\s',
     r'(?i)^alright[,.]?\s',
@@ -31,6 +31,8 @@ AI_PATTERNS = [
 
     # meta reasoning / narration
     r'(?i)^let me (explain|walk you through|break this down)',
+    r'(?i)^let me',
+    r'(?i)^wait',
     r'(?i)^here’s how I (think about|approach) this',
     r'(?i)^the key point (is|here is)',
     r'(?i)^the important thing (is|to note)',
