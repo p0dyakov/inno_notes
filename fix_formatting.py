@@ -299,42 +299,42 @@ for fp in qmd_files:
         print()
 
 # === Create review folder structure (disabled) ===
-# if all_examples_map or all_artifacts:
-#     print(f"{'=' * 70}")
-#     print(f"Creating review folder: {REVIEW_FOLDER}/")
-#     print(f"{'=' * 70}\n")
-#
-#     Path(REVIEW_FOLDER).mkdir(exist_ok=True)
-#
-#     for file_path in set(list(all_examples_map.keys()) + list(all_artifacts.keys())):
-#         review_file = Path(REVIEW_FOLDER) / file_path
-#         review_file.parent.mkdir(parents=True, exist_ok=True)
-#
-#         examples = all_examples_map.get(file_path, [])
-#         artifacts = all_artifacts.get(file_path, [])
-#         artifact_lines = {a['line_num'] for a in artifacts}
-#
-#         review_content = f"# All Examples: {file_path}\n\n"
-#         review_content += f"Total examples: {len(examples)}\n"
-#         if artifacts:
-#             review_content += f"Examples with AI artifacts: {len([a for a in artifacts if a['line_num'] in artifact_lines])}\n\n"
-#         review_content += "---\n\n"
-#
-#         for example in examples:
-#             has_artifact = any(
-#                 artifact['line_num'] >= example['line_num'] and
-#                 artifact['line_num'] <= example['line_num'] + 50
-#                 for artifact in artifacts
-#             )
-#             marker = "⚠️ " if has_artifact else ""
-#             review_content += f"{marker}{example['text']}\n\n"
-#
-#         with open(review_file, 'w') as f:
-#             f.write(review_content)
-#
-#         print(f"  ✓ Created: {review_file}")
-#
-#     print(f"\n{'=' * 70}\n")
+if all_examples_map or all_artifacts:
+    print(f"{'=' * 70}")
+    print(f"Creating review folder: {REVIEW_FOLDER}/")
+    print(f"{'=' * 70}\n")
+
+    Path(REVIEW_FOLDER).mkdir(exist_ok=True)
+
+    for file_path in set(list(all_examples_map.keys()) + list(all_artifacts.keys())):
+        review_file = Path(REVIEW_FOLDER) / file_path
+        review_file.parent.mkdir(parents=True, exist_ok=True)
+
+        examples = all_examples_map.get(file_path, [])
+        artifacts = all_artifacts.get(file_path, [])
+        artifact_lines = {a['line_num'] for a in artifacts}
+
+        review_content = f"# All Examples: {file_path}\n\n"
+        review_content += f"Total examples: {len(examples)}\n"
+        if artifacts:
+            review_content += f"Examples with AI artifacts: {len([a for a in artifacts if a['line_num'] in artifact_lines])}\n\n"
+        review_content += "---\n\n"
+
+        for example in examples:
+            has_artifact = any(
+                artifact['line_num'] >= example['line_num'] and
+                artifact['line_num'] <= example['line_num'] + 50
+                for artifact in artifacts
+            )
+            marker = "⚠️ " if has_artifact else ""
+            review_content += f"{marker}{example['text']}\n\n"
+
+        with open(review_file, 'w') as f:
+            f.write(review_content)
+
+        print(f"  ✓ Created: {review_file}")
+
+    print(f"\n{'=' * 70}\n")
 
 print(f"{'=' * 70}")
 print(f"SUMMARY:")
