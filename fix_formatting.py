@@ -138,8 +138,22 @@ def process_file(filepath):
     # === Extract all examples ===
     all_examples = get_all_examples(lines)
 
-    # === Detect AI artifacts (disabled) ===
+    # === Detect AI artifacts ===
     ai_found = []
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        for pattern in AI_PATTERNS:
+            if re.match(pattern, stripped):
+                section = get_section_header(lines, i)
+                ai_found.append({
+                    'line_num': i + 1,
+                    'line': line,
+                    'text': stripped[:120],
+                    'section': section,
+                })
+                break
 
     # === Pass 1: Remove blank lines within lists ===
     result = []
