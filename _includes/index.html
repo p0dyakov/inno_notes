@@ -1,6 +1,11 @@
 <script>
-// Patch WebSocket BEFORE quarto-preview.js runs so its reload messages
-// don't interfere with our navigation (window._innNavigating flag suppresses them).
+// Patch WebSocket BEFORE quarto-preview.js so its messages don't interfere
+// with SPA navigation. quarto-preview sends three relevant message types:
+//   render:start  – shows render overlay
+//   render:stop   – hides render overlay
+//   reload        – reloads / replaces location
+// All three are suppressed while window._innNavigating is true.
+// onclose (socket disconnect) is also suppressed to prevent spurious reload.
 (function () {
 	if (!window.WebSocket) return;
 	var Orig = window.WebSocket;
@@ -13,7 +18,9 @@
 			set: function (fn) {
 				_om = fn;
 				ws.addEventListener('message', function (e) {
-					if (window._innNavigating && typeof e.data === 'string' && e.data.startsWith('reload')) return;
+					if (window._innNavigating &&
+						typeof e.data === 'string' &&
+						(e.data.startsWith('reload') || e.data.startsWith('render:'))) return;
 					fn.call(ws, e);
 				});
 			}
@@ -169,8 +176,9 @@
 	}
 
 	.inn-pill--read.is-active {
-		background: var(--inn-read-soft);
-		color: var(--inn-read);
+		background: var(--inn-read-soft) !important;
+		color: var(--inn-read) !important;
+		border-color: transparent !important;
 	}
 
 	@media (prefers-color-scheme: dark) {
@@ -197,41 +205,42 @@
 		}
 
 		.inn-pill--read.is-active {
-			background: rgba(110, 168, 255, 0.16);
-			border-color: rgba(13, 110, 253, 0.34);
-			color: var(--inn-read);
+			background: rgba(110, 168, 255, 0.16) !important;
+			border-color: rgba(13, 110, 253, 0.34) !important;
+			color: var(--inn-read) !important;
 		}
 	}
 
 	.inn-pill--read.is-active .inn-pill__icon {
-		background: rgba(13, 110, 253, 0.1);
-		color: var(--inn-accent);
-		border-color: transparent;
+		background: rgba(13, 110, 253, 0.1) !important;
+		color: var(--inn-accent) !important;
+		border-color: transparent !important;
 	}
 
 	.inn-pill--solved.is-active {
-		background: var(--inn-success-soft);
-		color: var(--inn-success);
+		background: var(--inn-read-soft) !important;
+		color: var(--inn-read) !important;
+		border-color: transparent !important;
 	}
 
 	@media (prefers-color-scheme: dark) {
 		.inn-pill--solved.is-active {
-			background: rgba(110, 168, 255, 0.16);
-			border-color: rgba(13, 110, 253, 0.34);
-			color: var(--inn-success);
+			background: rgba(110, 168, 255, 0.16) !important;
+			border-color: rgba(13, 110, 253, 0.34) !important;
+			color: var(--inn-read) !important;
 		}
 	}
 
 	.inn-pill--solved.is-active .inn-pill__icon {
-		background: rgba(13, 110, 253, 0.1);
-		color: var(--inn-accent);
-		border-color: transparent;
+		background: rgba(13, 110, 253, 0.1) !important;
+		color: var(--inn-accent) !important;
+		border-color: transparent !important;
 	}
 
 	.inn-read-title {
 		text-decoration: line-through;
 		text-decoration-thickness: 1.8px;
-		text-decoration-color: rgba(107, 114, 128, 0.78);
+		text-decoration-color: rgba(107, 114, 128, 0.78) !important;
 		color: color-mix(in srgb, currentColor 64%, transparent);
 		opacity: 1;
 		transition: color 220ms ease, text-decoration-color 220ms ease;
@@ -239,7 +248,7 @@
 
 	@media (prefers-color-scheme: dark) {
 		.inn-read-title {
-			text-decoration-color: rgba(156, 163, 175, 0.82);
+			text-decoration-color: rgba(156, 163, 175, 0.82) !important;
 			color: color-mix(in srgb, currentColor 72%, transparent);
 		}
 	}
@@ -273,7 +282,7 @@
 		top: 50%;
 		height: 2.5px;
 		border-radius: 999px;
-		background: color-mix(in srgb, var(--inn-success) 82%, transparent);
+		background: rgba(107, 114, 128, 0.78);
 		transform-origin: left center;
 		transform: translateY(-50%) scaleX(0);
 		opacity: 0;
@@ -290,6 +299,10 @@
 		.problem-heading.is-solved .problem-title-text {
 			color: color-mix(in srgb, currentColor 78%, transparent);
 			opacity: 0.74;
+		}
+
+		.problem-heading .problem-title-text::after {
+			background: rgba(156, 163, 175, 0.82);
 		}
 	}
 
@@ -2004,6 +2017,7 @@
 			};
 
 			const navigateInternal = async (href, { replace = false } = {}) => {
+				window._innNavigating = true;
 				const url = new URL(href, window.location.href);
 				closeMobileNav();
 				closeMobileSearch();
