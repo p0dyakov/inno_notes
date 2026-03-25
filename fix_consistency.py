@@ -52,13 +52,17 @@ SECTION_ORDER = [
     "Assignment",
     "Problem Set",
     "Lecture",
-    "Tutorial",
     "Chapter",
-    "Test I Recap",
-    "Test",
+    "Tutorial",
+    "Test Recap",
     "Midterm Recap",
+    "Final Recap",
+    "Mock Test",
+    "Mock Midterm",
+    "Mock Final",
+    "Test",
     "Midterm",
-    "Mock",
+    "Final",
 ]
 # Within a section: Example type before Task type
 ITEM_TYPE_ORDER = {"Example": 0, "Concept": 1, "Practice Problem": 1}
