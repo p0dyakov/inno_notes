@@ -1,344 +1,401 @@
-## **Task Overview**
+You are writing a Quarto study article (`.qmd`) from raw source transcripts. Your output must match the established style of this repository as closely as possible and must be optimized for students who study independently.
 
-You will transform source material (presentations transcript) into a complete Quarto document (.qmd). Your output MUST:
-- Cover ALL topics from the source material
-- Be fully understandable for students who did NOT attend the lecture
-- Explain concepts from scratch with sufficient context and detail
-- Follow the exact structure and formatting specified below
+## 1. Mission
 
-**Work incrementally but comprehensively:** Write the document in logical parts to prevent errors, but ensure you cover ALL material in total.
+Create one complete study article from the provided input. The article must:
 
----
+- cover all topics from the input
+- be understandable from zero, without attending the original classes
+- explain enough theory for the reader to solve all included practice tasks
+- preserve the real source order and source identity
+- match the local style of existing articles in the same folder
 
-## **Document Structure Requirements**
+Treat this as textbook writing, not note-taking.
 
-### **YAML Header** (REQUIRED)
+Write in clear professional English.
+
+## 2. Inputs You Receive
+
+The input will contain:
+
+- the full table of contents at the very top
+- transcripts from all relevant source files
+- source names such as `Lecture`, `Lab`, `Tutorial`, `Homework`, `Assignment`, `Quiz`, `Test`, `Midterm`, `Final`, `Exercises`
+
+The table of contents is authoritative. Use it as a coverage checklist so that no topic is omitted from the Summary.
+
+## 3. Mandatory Preflight
+
+Before writing, analyze at least 3 existing `.qmd` articles from the same target folder.
+
+From those files, extract and follow:
+
+- title style
+- heading depth and numbering style
+- author and date conventions
+- paragraph density and explanation style
+- whether the folder usually includes `Definitions` and `Formulas`
+- how examples are titled and ordered
+- how source labels are written in parentheses
+- how diagrams are placed and styled
+
+Use local folder conventions unless they conflict with the hard rules below. If local files vary, choose the dominant pattern and keep it consistent through the whole new article.
+
+## 4. Hard Output Structure
+
+Keep the structure simple and stable.
+
+### YAML
+
+Use:
 
 ```yaml
 ---
 title: "W[X]. [Topic 1], [Topic 2], [Topic 3]"
-author: "[Author of course]"
-date: "[Current date in 'MMMM D, YYYY' format]"
+author: "[course author]"
+date: "[Month D, YYYY]"
 format: html
 engine: knitr
 ---
 ```
 
-**Rules:**
-- Title MUST be a comma-separated list of main topics
-- Date MUST use full month name (e.g., "November 6, 2025")
+Rules:
 
----
+- the title must follow the local folder style
+- topic names in the title must reflect the real content
+- use the correct course author from the repository convention
+- do not invent extra YAML fields unless local files in that folder consistently use them
 
-### **Section 1: Summary** (REQUIRED)
+### Section order
 
-Start with: `#### **1. Summary**`
+Use this order unless the local folder has a stronger established convention:
 
-#### **Heading Structure**
-- Use `#####` for main subsections: `##### **1.1 Topic Name**`
-- Use `######` for nested subsections: `###### **1.1.1 Subtopic**`
-- Make headings **concise, descriptive titles** (e.g., `##### **1.1 Vectors**`), NOT questions
-- Do NOT format this heading as a list item
-
-#### **Content Requirements**
-1. **Explain for absolute beginners:** Write as if the reader has never encountered this topic
-2. **Define key terms comprehensively:**
-   - Provide clear, concise definitions
-   - Add sufficient context, details, and analogies
-   - Explain WHY concepts matter, not just WHAT they are
-   - Avoid jargon without first explaining it
-3. **Use formatting for emphasis:**
-   - **Bold** for key terms on first introduction
-   - *Italics* for important concepts or emphasis
-4. **Include diagrams where helpful:**
-   - Insert `<!-- DIAGRAM HERE -->` comment where a visual would aid understanding
-   - Do NOT mention the diagram in surrounding text
-   - The comment should appear on its own line with blank lines above and below
-5. **Mathematical expressions:**
-   - Use LaTeX: `$...$` for inline math, `$$...$$` for display math
-   - NEVER use single backticks for math (even single variables)
-6. **Correct errors and enhance clarity:**
-   - Fix any mistakes in source material
-   - Add missing formulas where needed
-   - Restructure for better pedagogical flow if necessary
-
-#### **Lists in Summary**
-- ALWAYS precede lists with a blank line
-- Keep list items concise but complete
-
----
-
-### **Section 2: Definitions** (REQUIRED)
-
-Start with: `#### **2. Definitions**`
-
-Provide a bulleted list of essential terms with concise, precise definitions:
-```
-*   **Term**: Clear, complete definition.
-*   **Another Term**: Definition with necessary context.
-```
-
-**Rules:**
-- Include ALL key terms introduced in the summary
-- Definitions should be self-contained (understandable without reading the summary)
-- Bold the term name only
-
----
-
-### **Section 3: Formulas** (REQUIRED FOR MATH)
-
-Start with: `#### **3. Formulas**`
-
-Provide a bulleted list of formulas relevant for problem-solving:
-```
-*   **Formula Name**: $formula$ (with conditions if applicable)
-*   **Another Formula**: $$display\_formula$$
-```
-
-**Critical Rules:**
-- Write GENERAL formulas useful for exams, not example-specific formulas
-- Include all formulas a student would need to memorize/reference
-- Provide formula names or descriptions
-- Include domain restrictions or conditions where applicable
-
----
-
-### **Section 4: Examples** (REQUIRED) (SECTION 3 IF FORMULAS MISSING)
-
-Start with: `#### **4. Examples**`
-
-#### **Problem Selection**
-You MUST include:
-1. ALL explicit problems/exercises from source material
-2. Examples that appear as demonstrations (reformulate as problems)
-3. Lecture examples, tutorial problems, lab exercises, and any additional tasks
-
-#### **Organization**
-Sort problems in this order:
-1. Lecture examples
-2. Tutorial problems
-3. Lab exercises
-4. Other additional tasks
-
-Within each category, sort in ascending numerical order.
-
-#### **Format for Each Example**
-
-```markdown
-##### **4.[N]. [Problem Title]** ([Source], [Location])
-
-[Clear problem statement exactly as in source]
-
-<details>
-<summary>Click to see the solution</summary>
-
-[Optional: **Key Concept:** Brief explanation of the main idea or technique]
-
-[Solution with clear step-by-step explanation]
-
-1.  **Step Name:** Explanation and calculation
-2.  **Next Step:** Continue with numbered steps
-    *   Use sub-bullets for details within a step
-    *   Show all work clearly
-
-[For problems with multiple parts, use **(a)**, **(b)**, etc.]
-
-**Answer:** [Final answer clearly stated]
-
-</details>
-```
-
-#### **Example Source Attribution Format**
-- `(Lecture [N], Example [M])`
-- `(Tutorial [N], Problem [M])`
-- `(Lab [N], Problem [M])`
-- `(Lab [N], Exercise [M])`
-
-#### **Solution Requirements**
-1. **Start with context:** If helpful, provide a "Key Concept" section explaining the approach
-2. **Number steps clearly:** Use sequential numbering for main steps
-3. **Show all work:** Don't skip algebraic steps or logical reasoning
-4. **Explain as you go:** Each step should include WHY you're doing it, not just WHAT
-5. **Format final answers clearly:** Use bold "**Answer:**" followed by the result
-6. **For code examples:**
-   - Include complete, runnable code
-   - Add detailed comments explaining each section
-   - Use proper language tags in code blocks (e.g., ```java, ```c, ```python)
-
----
-
-## **Formatting Rules**
-
-### **Mathematics**
-- **Inline math:** Use `$expression$` (e.g., `$x^2 + 1$`)
-- **Display math:** Use `$$expression$$` for centered formulas
-- **NEVER** use single backticks for math expressions, even single characters
-
-### **Code**
-- Use single backticks **only** for: inline code, variables, functions, file paths
-- Use code blocks with language tags for full code examples:
-  ````
-  ```language
-  code here
-  ```
-  ````
-
-### **Lists**
-- ALWAYS precede lists with a blank line
-- This applies to bulleted lists, numbered lists, and nested lists
-
-### **Spacing**
-- Do NOT add unnecessary blank lines between headings
-- DO add blank lines before lists and code blocks
-- Add blank lines around `<!-- DIAGRAM HERE -->` comments
-
-### **Images** (if applicable)
-- Reference images with: `![](filename.png){width=80%}`
-- Use relative paths only
-
----
-
-## **Complete Example**
-
-```qmd
----
-title: "W8-W9. Vector Addition, Scalar Multiplication"
-author: "Zakhar Podyakov"
-date: "September 18, 2025"
-format: html
-engine: knitr
----
-
-{{< video 8.mp4 >}}
-
-[Quiz](https://example.com/quiz) | [Flashcards](https://example.com/flashcards)
-
+```md
 #### **1. Summary**
-##### **1.1 Introduction to Vectors**
-A **vector** is a mathematical object possessing both magnitude (length) and direction. Unlike a **scalar**, which is just a number (like temperature: 20°C), a vector tells you both "how much" and "which way." Think of a vector as an instruction: "move 5 meters north" contains both a distance (magnitude) and a direction.
-
-###### **1.1.1 Geometric Representation**
-Visually, we represent a vector as an arrow. The arrow's length represents the vector's magnitude, and the direction the arrow points represents its direction.
-
-<!-- DIAGRAM HERE -->
-
-###### **1.1.2 Algebraic Representation**
-Mathematically, we write vectors as ordered lists of numbers called **components**. In 2D space (denoted $\mathbb{R}^2$), a vector has two components:
-$$ \vec{v} = \begin{pmatrix} x \\ y \end{pmatrix} $$
-
-##### **1.2 Vector Operations**
-We can perform arithmetic operations on vectors.
-
-###### **1.2.1 Vector Addition**
-To add two vectors, add their corresponding components:
-$$ \vec{u} + \vec{v} = \begin{pmatrix} u_1 + v_1 \\ u_2 + v_2 \end{pmatrix} $$
-
-Geometrically, use the **tip-to-tail method**: place the tail of the second vector at the tip of the first. The result goes from the tail of the first to the tip of the second.
-
-<!-- DIAGRAM HERE -->
-
-###### **1.2.2 Scalar Multiplication**
-To multiply a vector by a scalar (number), multiply each component:
-$$ c\vec{v} = \begin{pmatrix} cv_1 \\ cv_2 \end{pmatrix} $$
-
-This **scales** the vector: if $c = 2$, the vector doubles in length. If $c = -1$, it flips direction.
-
 #### **2. Definitions**
-*   **Vector**: A mathematical object with both magnitude and direction.
-*   **Scalar**: A quantity described by a single number, with magnitude but no direction.
-*   **Components**: The numerical values that define a vector's position in each dimension.
-*   **Magnitude (Norm)**: The length of a vector, calculated as $||\vec{v}|| = \sqrt{v_1^2 + v_2^2 + \dots + v_n^2}$.
-
-#### **3. Formulas**
-*   **Vector Addition**: $\vec{u} + \vec{v} = \begin{pmatrix} u_1 + v_1 \\ u_2 + v_2 \end{pmatrix}$
-*   **Scalar Multiplication**: $c\vec{v} = \begin{pmatrix} cv_1 \\ cv_2 \end{pmatrix}$
-*   **Vector Subtraction**: $\vec{u} - \vec{v} = \begin{pmatrix} u_1 - v_1 \\ u_2 - v_2 \end{pmatrix}$
-*   **Norm of a Vector**: $||\vec{v}|| = \sqrt{v_1^2 + v_2^2 + \dots + v_n^2}$
-*   **Unit Vector**: $\hat{v} = \frac{\vec{v}}{||\vec{v}||}$
-
-#### **4. Examples**
-##### **4.1. Find the Sum of Two Vectors** (Lecture 8, Example 1)
-Given $\vec{u} = \begin{pmatrix} 3 \\ -2 \end{pmatrix}$ and $\vec{v} = \begin{pmatrix} 1 \\ 4 \end{pmatrix}$, find $\vec{u} + \vec{v}$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** To add vectors, add corresponding components.
-
-1.  **Add the first components:** $3 + 1 = 4$
-2.  **Add the second components:** $-2 + 4 = 2$
-3.  **Form the result vector:**
-    $$ \vec{u} + \vec{v} = \begin{pmatrix} 4 \\ 2 \end{pmatrix} $$
-
-**Answer:** $\begin{pmatrix} 4 \\ 2 \end{pmatrix}$
-
-</details>
-
-##### **4.2. Calculate Vector Magnitude** (Tutorial 8, Problem 3)
-Find the magnitude of $\vec{w} = \begin{pmatrix} -3 \\ 4 \end{pmatrix}$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-1.  **Apply the magnitude formula:** $||\vec{w}|| = \sqrt{w_1^2 + w_2^2}$
-2.  **Substitute values:** $||\vec{w}|| = \sqrt{(-3)^2 + 4^2}$
-3.  **Calculate:**
-    *   $||\vec{w}|| = \sqrt{9 + 16} = \sqrt{25} = 5$
-
-**Answer:** 5
-
-</details>
-
-##### **4.3. Scalar Multiplication and Direction** (Lab 9, Exercise 2)
-Given $\vec{a} = \begin{pmatrix} 2 \\ 1 \end{pmatrix}$, find:
-
-a) $3\vec{a}$
-b) $-2\vec{a}$
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Scalar multiplication scales the vector. Positive scalars keep the direction; negative scalars reverse it.
-
-**(a) $3\vec{a}$:**
-1.  **Multiply each component by 3:**
-    $$ 3\vec{a} = \begin{pmatrix} 3(2) \\ 3(1) \end{pmatrix} = \begin{pmatrix} 6 \\ 3 \end{pmatrix} $$
-
-**(b) $-2\vec{a}$:**
-1.  **Multiply each component by -2:**
-    $$ -2\vec{a} = \begin{pmatrix} -2(2) \\ -2(1) \end{pmatrix} = \begin{pmatrix} -4 \\ -2 \end{pmatrix} $$
-
-**Answer:**
-
-a) $\begin{pmatrix} 6 \\ 3 \end{pmatrix}$
-b) $\begin{pmatrix} -4 \\ -2 \end{pmatrix}$
-
-</details>
+#### **3. Formulas**        # only when truly useful, usually for math-heavy articles
+#### **4. Examples**        # or Section 3 if Formulas are omitted
 ```
 
----
+Do not invent extra top-level sections unless clearly required by the folder style.
 
-## **After Completion**
+## 5. Summary Rules
 
-**For mathematics courses ONLY:** After generating the guide, update the `0.qmd` file in the same folder:
-1. Add all new general formulas from your guide's "Section 3: Formulas"
-2. Organize them under appropriate category headings
-3. Follow the same formatting style as existing entries in `0.qmd`
+The Summary is the most important part.
 
-**For non-mathematics courses:** No action needed.
+- It must teach from zero.
+- It must cover every topic from the table of contents and all important transcript sections.
+- It must be pedagogically ordered, not transcript-dumped.
+- It must explain what a concept is, why it matters, how it is used, and what typical pitfalls exist.
+- It must define terminology before using it.
+- It must correct transcript errors and fill in missing logical links.
+- It must include enough explanation so a student can later solve the Tasks section.
 
----
+Heading rules:
 
-## **Key Principles**
+- top-level summary subsections: `##### **1.1 ...**`
+- nested subsections: `###### **1.1.1 ...**`
+- headings must be concise noun phrases or short descriptive titles, not questions
 
-1. **Completeness:** Cover EVERY topic from source material
-2. **Clarity:** Write for students learning independently
-3. **Structure:** Follow the exact format specified
-4. **Accuracy:** Correct errors, verify formulas, ensure mathematical rigor
-5. **Pedagogical quality:** Explain WHY, not just WHAT
-6. **Consistency:** Maintain formatting throughout the entire document
+Style rules:
 
----
+- write in full paragraphs
+- use bullets only when they genuinely improve clarity
+- use **bold** for first introduction of key terms
+- use *italics* sparingly for emphasis
+- use LaTeX for mathematics
+- never use backticks for math
+
+## 6. Definitions Rules
+
+The Definitions section is a compact glossary.
+
+- Include every core term introduced in the Summary.
+- Definitions must be self-contained.
+- Keep each definition concise, precise, and readable.
+
+Format:
+
+```md
+*   **Term**: Definition.
+```
+
+## 7. Formulas Rules
+
+Include `Formulas` only when the article is mathematical or formula-heavy enough to justify it.
+
+- Include general reusable formulas, not one-off substitutions from worked examples.
+- Include conditions, domains, and restrictions when relevant.
+- Do not create a fake formulas section for non-math material.
+
+Format:
+
+```md
+*   **Formula Name**: $...$
+```
+
+## 8. Examples and Tasks
+
+This distinction is mandatory:
+
+- `Example` = something the instructor demonstrates or solves
+- `Task` = something students are expected to solve themselves
+
+Model the article around that distinction.
+
+### Core rule
+
+If the source item is presented as a teacher demonstration, label it as `Example`.
+If it is presented as student work, exercise, lab problem, homework problem, tutorial problem, quiz/test problem, or similar, label it as `Task` unless the original source clearly labels it as `Example`.
+
+### What to include
+
+Include all source problems that matter for study:
+
+- all explicit Examples
+- all explicit Tasks / Problems / Exercises / Homework items
+- all worked demonstrations that should become `Example`
+- all student-facing problems that should become `Task`
+
+### Ordering
+
+Never reorder content across source files.
+
+Rules:
+
+- preserve the original source-file order from the input
+- inside each source file, preserve the original item order
+- do not mix Lecture items into Tutorial blocks, or Lab items into Lecture blocks
+- if the input contains `Lecture`, then `Tutorial`, then `Lab`, keep that exact order from the source corpus
+
+### Solution policy
+
+- `Example`: include a full worked solution inside `<details>`
+- `Task`: by default, include the problem statement only
+- include a full solution for a `Task` only if the source explicitly solved it or if the local folder style clearly expects solved Tasks
+
+This is important: articles should feel like a mix of teacher-worked examples and student practice, not a giant answer sheet by default.
+
+### Example/Task heading format
+
+Use:
+
+```md
+##### **4.N. Short Descriptive Title** (Source Block, Item Number)
+```
+
+Examples:
+
+- `(Lecture 6, Example 3)`
+- `(Tutorial 4, Task 2)`
+- `(Lab 5, Task 7)`
+- `(Homework 2, Task 1)`
+- `(Chapter 3, Example 12)`
+- `(Midterm, Task 4)`
+
+## 9. Naming, Numbering, and Metadata Rules
+
+These rules are strict.
+
+### Heading numbering
+
+- numbering must be strictly increasing inside the file
+- never duplicate the same heading number
+- never restart numbering midway through the file
+- use the course-family numbering convention already used in the repository for that subject
+
+### Source metadata
+
+- metadata in parentheses must be complete
+- never leave incomplete labels like `(Lab 3, Task)` or `(Chapter 6)`
+- never leave bare `(Homework 2)` if the source implies a task number
+- never generate `Task 0` unless the source unambiguously requires it
+- never generate garbage like `Task Task`, `Example Example`, or duplicate numbering labels
+
+### Title style
+
+Use short, descriptive, action-oriented titles.
+
+Prefer:
+
+- `Find ...`
+- `Prove ...`
+- `Compute ...`
+- `Determine ...`
+- `Show ...`
+- `Classify ...`
+- `Construct ...`
+- `Analyze ...`
+- `Evaluate ...`
+- `Convert ...`
+
+Avoid:
+
+- vague placeholders
+- generic labels like `Problem`, `Exercise`, `Practice`
+- duplicate internal numbering in the title
+- gerund-heavy titles when the file style is imperative
+- awkward English such as `"More Than By 2"`
+
+Bad:
+
+- `Practice Differentiation`
+- `Prove a Standard Limit`
+- `Example: Line Through Two Points`
+- `Orthogonal Basis — Task 3`
+
+Good:
+
+- `Differentiate Composite and Rational Functions`
+- `Prove a Classical Sequence Limit`
+- `Line Through Two Points in Polar Coordinates`
+- `Construct an Orthogonal Basis`
+
+### No structural noise
+
+Never output:
+
+- `continued`
+- `AI artifacts`
+- `⚠️`
+- `placeholder`
+- `draft`
+- `alternative` as metadata noise unless it is genuinely part of the teaching content
+
+## 10. Source Label Priorities
+
+Preserve the real source type.
+
+Use the labels that actually correspond to the source:
+
+- `Lecture`
+- `Tutorial`
+- `Lab`
+- `Homework`
+- `Assignment`
+- `Quiz`
+- `Test`
+- `Midterm`
+- `Final`
+- `Exercises`
+- `Chapter`
+
+Do not normalize everything into one label if the source corpus distinguishes them.
+
+But write them consistently:
+
+- `Example` means teacher-demonstrated
+- `Task` means student-facing
+
+If the original source label is ambiguous, prefer:
+
+- `Example` for demonstrated material
+- `Task` for solve-yourself material
+
+## 11. Diagram and Illustration Rules
+
+Illustrations are required whenever they materially improve understanding or when comparable local articles use them.
+
+### Placement
+
+- place diagrams where they are pedagogically helpful
+- also place them where the original material clearly had one
+- if you are not rendering the final diagram immediately, insert `<!-- DIAGRAM HERE -->` exactly where it belongs
+
+### Height rule
+
+Every rendered image must have an explicit height to avoid empty vertical space.
+
+Use explicit height attributes, for example:
+
+```md
+![](file.png){height=260px}
+```
+
+If using embedded diagram blocks, ensure the resulting rendered block has controlled height or compact layout.
+
+### One visual style per article
+
+Choose one article-wide palette and keep it consistent across all figures.
+
+Recommended palette:
+
+- primary: `#1D3557`
+- secondary: `#457B9D`
+- accent: `#2A9D8F`
+- highlight: `#E9C46A`
+- warning/emphasis: `#E76F51`
+- neutral light: `#F1FAEE`
+- neutral dark: `#263238`
+
+Do not mix random palettes across figures.
+
+### Diagram library policy
+
+Use the fewest libraries necessary. Prefer at most 1-2 libraries per article unless the subject genuinely requires more.
+
+Default library choices:
+
+- `matplotlib`: function graphs, geometry plots, calculus plots, coordinate diagrams
+- `Graphviz`: automata, trees, strict node-edge graphs, dependency graphs
+- `Mermaid`: flowcharts, process diagrams, simple concept graphs
+- `PlantUML`: UML, software design, class/sequence/state diagrams
+- `ggplot2`: statistical or data-oriented plots only when that is the most natural choice
+
+Preferred mapping by content:
+
+- mathematical graphs and analytic geometry: `matplotlib`
+- finite-state automata and formal graph structures: `Graphviz`
+- software architecture / UML: `PlantUML`
+- process explanations and simple structured flows: `Mermaid`
+
+Avoid unnecessary library switching just because many tools are available.
+
+### Rendering safety
+
+- choose the simplest tool that will render reliably in Quarto
+- avoid fragile layout-heavy diagrams if a simpler diagram communicates the same idea
+- keep labels readable and compact
+
+## 12. Formatting Rules
+
+- use LaTeX for mathematics: `$...$` and `$$...$$`
+- use backticks only for code, file paths, commands, identifiers, and inline literals
+- keep heading structure stable
+- add blank lines before lists, code blocks, and diagram placeholders
+- do not add random decorative separators unless they are already used in local articles
+- match the dominant paragraph/list density of the folder you analyzed
+
+## 13. Writing Process
+
+Work incrementally, but the final article must be complete.
+
+- write the file in chunks to reduce tool/write failures
+- after finishing the article, run:
+  - `python3 fix_formatting.py`
+- if headings/examples were inserted, removed, or reordered and numbering must be updated, run:
+  - `python3 renumber_examples.py`
+
+Do not use `renumber_examples.py` as a substitute for thinking. First choose the correct local structure, then renumber only if needed.
+
+## 14. Final Validation Checklist
+
+Before finishing, verify all of the following:
+
+1. Every topic from the top-level table of contents appears in the Summary.
+2. The article matches the local style of at least 3 neighboring articles.
+3. Source blocks remain in original order.
+4. `Example` and `Task` are assigned according to pedagogical role, not randomly.
+5. Heading numbering is strictly increasing and contains no duplicates.
+6. Metadata labels are complete and consistent.
+7. Titles are descriptive, grammatical, and not vague.
+8. There is no `continued`, AI noise, placeholder text, or numbering garbage.
+9. Diagrams use one consistent palette and explicit height.
+10. The theory is sufficient for a new student to solve the Tasks.
+
+## 15. Author Map
+
+Use this only when the folder context does not already make the author obvious.
 
 | Course | Author(s) |
 |:-------|:----------|
@@ -352,3 +409,6 @@ b) $\begin{pmatrix} -4 \\ -2 \end{pmatrix}$
 | Introduction to Programming | Eugene Zouev, Munir Makhmutov |
 | Logic and Discrete Math | Andrey Frolov |
 
+## 16. Non-Negotiable Principle
+
+Do not generate a generic article template. Generate one article that looks like it belongs in this exact folder, written by the same invisible editor, with the same structure, naming discipline, and source ordering as the neighboring files.
