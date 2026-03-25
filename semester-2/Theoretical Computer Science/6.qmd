@@ -14,7 +14,28 @@ We already know that **Finite State Automata (FSAs)** can recognize **regular la
 
 To go beyond regular languages, we need a model with more memory. The natural extension is to attach a **stack** to an FSA, producing a **Pushdown Automaton (PDA)**. The name "pushdown" refers to the push-down nature of the stack, where new items are placed on top and the top item is always the one removed first.
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "From FSA to PDA: the same finite control gains an unbounded stack"
+//| fig-width: 6
+//| fig-height: 2.2
+digraph fsa_to_pda {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  fsa [shape=box, style="filled,rounded", fillcolor="#e8f4f8", label="FSA\nfinite control only"];
+  arrow [shape=plaintext, label="+"];
+  stack [shape=box, style="filled,rounded", fillcolor="#fff3cd", label="Stack\nA\n...\nZ₀"];
+  eq [shape=plaintext, label="="];
+  pda [shape=box, style="filled,rounded", fillcolor="#d6eef5", label="PDA\nfinite control + stack"];
+
+  fsa -> arrow [arrowhead=none];
+  arrow -> stack [arrowhead=none];
+  stack -> eq [arrowhead=none];
+  eq -> pda [arrowhead=none];
+}
+```
 
 Informally:
 
@@ -34,7 +55,28 @@ PDAs sit exactly at the level above FSAs and can recognize **context-free langua
 
 A **stack** is a **last-in, first-out (LIFO)** data structure. Think of a stack of trays in a cafeteria: you can only add or remove from the top.
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "LIFO stack discipline used by PDAs"
+//| fig-width: 3.4
+//| fig-height: 3
+digraph lifo_stack {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [shape=box, style="filled,rounded", fontname="Helvetica", fontsize=11, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  c [label="c", fillcolor="#f9d9e2"];
+  b [label="b", fillcolor="#fff3cd"];
+  a [label="a", fillcolor="#d6eef5"];
+  z0 [label="Z₀", fillcolor="#e8f4f8"];
+  top [shape=plaintext, label="top"];
+
+  top -> c [style=dashed];
+  c -> b;
+  b -> a;
+  a -> z0;
+}
+```
 
 Operations:
 
@@ -63,7 +105,28 @@ A PDA has three components:
 2.  **A finite control unit** — like an FSA, it keeps track of the current state
 3.  **A stack of infinite size** — the extra memory; the control unit reads the top and replaces it
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "PDA step: read input, inspect the stack top, then move to a new configuration"
+//| fig-width: 6
+//| fig-height: 2.4
+digraph pda_step {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  input [shape=box, style="filled,rounded", fillcolor="#e8f4f8", label="Unread Input\nax"];
+  state [shape=circle, style=filled, fillcolor="#d6eef5", label="q"];
+  stack [shape=box, style="filled,rounded", fillcolor="#fff3cd", label="Stack\nAβ"];
+  next [shape=circle, style=filled, fillcolor="#d7f0c2", label="q'"];
+  stack2 [shape=box, style="filled,rounded", fillcolor="#f9d9e2", label="Stack\nαβ"];
+
+  input -> state [label="read a or ε"];
+  stack -> state [label="inspect A"];
+  state -> next [label="δ(q,a,A)"];
+  next -> stack2 [label="replace A by α"];
+}
+```
 
 In each step, a PDA looks at three things simultaneously:
 
@@ -292,7 +355,30 @@ The language of balanced (well-formed) parentheses is the prototypical context-f
 *   PDAs can recognize languages that no FSA can (e.g., $a^n b^n$).
 *   Therefore, the class of **context-free languages** strictly contains the class of regular languages.
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "Classic PDA for aⁿbⁿ"
+//| fig-width: 5
+//| fig-height: 2.1
+digraph pda_anbn_classic {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  start [shape=point, width=0.1, fillcolor=black];
+  p0 [label="p0", fillcolor="#e8f4f8"];
+  p1 [label="p1", fillcolor="#d6eef5"];
+  p2 [label="p2", fillcolor="#fff3cd"];
+  p3 [label="p3", shape=doublecircle, fillcolor="#d7f0c2"];
+
+  start -> p0;
+  p0 -> p1 [label="a, Z₀/AZ₀"];
+  p1 -> p1 [label="a, A/AA"];
+  p1 -> p2 [label="b, A/ε"];
+  p2 -> p2 [label="b, A/ε"];
+  p2 -> p3 [label="ε, Z₀/Z₀"];
+}
+```
 
 *   Regular languages $\subsetneq$ Languages recognized by PDAs (context-free languages)
 *   Examples of context-free but not regular: $a^n b^n$, $vcv^R$, balanced parentheses
@@ -308,7 +394,22 @@ The language of balanced (well-formed) parentheses is the prototypical context-f
 
 PDAs are directly connected to how modern compilers work. A compiler is a program that translates source code (e.g., C, Python) into another language (e.g., machine code). It operates in several phases:
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "Regular languages are a proper subset of context-free languages"
+//| fig-width: 5.5
+//| fig-height: 3
+digraph reg_vs_cfl {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=ellipse, style=filled, color="#355c7d", penwidth=1.1];
+  edge [style=invis];
+
+  cfl [label="Context-Free Languages\nrecognized by PDAs\nexamples: aⁿbⁿ, vcvᴿ, balanced parentheses", fillcolor="#fff3cd", width=4.5, height=1.3];
+  reg [label="Regular Languages\nrecognized by FSAs", fillcolor="#d6eef5", width=2.6, height=0.8];
+
+  cfl -> reg;
+}
+```
 
 1.  **Lexical Analysis (Lexing):** Breaks source code into **tokens** — the smallest meaningful units (keywords, identifiers, operators, etc.). The syntax of tokens is *regular*, so an FSA (or regular expression engine) performs this phase.
 2.  **Syntax Analysis (Parsing):** Verifies that the sequence of tokens conforms to the grammar of the programming language. Programming languages have *nested structures* (balanced brackets, function calls, arithmetic expressions), which are context-free. A PDA performs this phase.
@@ -357,7 +458,34 @@ The contrapositive is the tool for proving non-regularity: if no such decomposit
 
 The intuition comes from parse trees (Chomsky normal form). In a sufficiently tall parse tree, some non-terminal $N$ must repeat. The two "arms" hanging from the two occurrences of $N$ yield the two pumpable segments $x_2$ and $x_4$.
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "Bar-Hillel intuition: a repeated nonterminal creates two pumpable branches"
+//| fig-width: 6
+//| fig-height: 2.5
+digraph bar_hillel {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=box, style="filled,rounded", color="#355c7d", penwidth=1.0];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+
+  root [label="S", fillcolor="#e8f4f8"];
+  n1 [label="N", fillcolor="#d6eef5"];
+  x3 [label="x3", fillcolor="#fff3cd"];
+  n2 [label="N", fillcolor="#d6eef5"];
+  x2 [label="x2", fillcolor="#f9d9e2"];
+  x4 [label="x4", fillcolor="#f9d9e2"];
+  x1 [label="x1", fillcolor="#d7f0c2"];
+  x5 [label="x5", fillcolor="#d7f0c2"];
+
+  root -> x1;
+  root -> n1;
+  root -> x5;
+  n1 -> x2;
+  n1 -> x3;
+  n1 -> n2;
+  n2 -> x4;
+}
+```
 
 ###### **1.12.3 Contrapositive: Proving Non-Context-Freeness**
 
@@ -465,6 +593,31 @@ Build a DPDA that recognizes the language $L = \{a^n b^{2n} \mid n \geq 1\}$ —
 
 **Key Concept:** For each $a$ read, push *two* stack symbols (so you accumulate $2n$ stack symbols for $n$ $a$'s). Then pop one stack symbol per $b$. When all $b$'s are consumed and the stack holds only $Z_0$, the ratio $1:2$ is satisfied.
 
+```{dot}
+//| fig-cap: "DPDA for aⁿb²ⁿ"
+//| fig-width: 5.8
+//| fig-height: 2.3
+digraph dpda_ab2n {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.1, fillcolor=black];
+  q0 [label="q0", fillcolor="#e8f4f8"];
+  q1 [label="q1\npush 2nd A", fillcolor="#d6eef5"];
+  q2 [label="q2", fillcolor="#fff3cd"];
+  q3 [label="q3", fillcolor="#f9d9e2"];
+  q4 [label="q4", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0;
+  q0 -> q1 [label="a, Z₀/AZ₀\na, A/AA"];
+  q1 -> q2 [label="ε, A/AA"];
+  q2 -> q1 [label="a, A/AA"];
+  q2 -> q3 [label="b, A/ε"];
+  q3 -> q3 [label="b, A/ε"];
+  q3 -> q4 [label="ε, Z₀/Z₀"];
+}
+```
+
 1.  **PDA specification:**
     *   States: $q_0$ (start), $q_1$ (reading $a$'s), $q_2$ (reading $b$'s), $q_3$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, A\}$
@@ -532,6 +685,24 @@ Construct a DPDA that recognizes the language of well-formed parentheses of arit
 <summary>Click to see the solution</summary>
 
 **Key Concept:** This problem is about recognizing a simple expression grammar. The core constraint is that parentheses must be balanced: each `(` must have a matching `)`, properly nested. The $a$ and $+$ symbols are essentially "filler" that don't affect balancing.
+
+```{dot}
+//| fig-cap: "DPDA skeleton for balanced parentheses in arithmetic expressions"
+//| fig-width: 4.8
+//| fig-height: 2.2
+digraph dpda_expr {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.1, fillcolor=black];
+  q0 [label="q0", fillcolor="#e8f4f8"];
+  q1 [label="q1", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0;
+  q0 -> q0 [label="(, */P*\n), P/ε\na, */*\n+, */*"];
+  q0 -> q1 [label="ε, Z₀/Z₀"];
+}
+```
 
 **Simplification:** For the purpose of DPDA construction, the key property is that the *parentheses* must be balanced. The $a$ and $+$ symbols just need to appear in valid positions within the grammar. We model this by tracking open parentheses on the stack.
 
@@ -618,6 +789,24 @@ Build a DPDA that recognizes the language of nested and balanced brackets and pa
 
 **Key Concept:** Use the stack to track open delimiters. When `(` is seen, push a marker $P$ for parenthesis. When `[` is seen, push a marker $Q$ for bracket. When `)` is seen, pop the top and check it is $P$ (matching parenthesis). When `]` is seen, pop and check it is $Q$ (matching bracket). Accept when the input is exhausted and the stack holds only $Z_0$.
 
+```{dot}
+//| fig-cap: "DPDA for balanced parentheses and brackets"
+//| fig-width: 5.2
+//| fig-height: 2.3
+digraph dpda_brackets {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.1, fillcolor=black];
+  q0 [label="q0", fillcolor="#e8f4f8"];
+  q1 [label="q1", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0;
+  q0 -> q0 [label="(, */P*\n[, */Q*\n), P/ε\n], Q/ε"];
+  q0 -> q1 [label="ε, Z₀/Z₀"];
+}
+```
+
 *Note:* A key challenge is that `([)]` must be rejected — the closing symbols must match the most recently opened one. The stack's LIFO property enforces this naturally.
 
 1.  **PDA specification:**
@@ -699,6 +888,33 @@ Build a DPDA that recognizes $L_2 = \{a^n b^m a^m b^n \mid n > 0, m > 0\}$.
 
 **Key Concept:** The string has the form $a^n b^m a^m b^n$ — an outer $a$-layer, an inner $b$-layer, a matching inner $a$-layer, and a matching outer $b$-layer. Use the stack in two phases:
 
+```{dot}
+//| fig-cap: "DPDA for aⁿbᵐaᵐbⁿ"
+//| fig-width: 6.1
+//| fig-height: 2.4
+digraph dpda_nested_counts {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.1, fillcolor=black];
+  q0 [label="q0", fillcolor="#e8f4f8"];
+  q1 [label="q1", fillcolor="#d6eef5"];
+  q2 [label="q2", fillcolor="#fff3cd"];
+  q3 [label="q3", fillcolor="#f9d9e2"];
+  q4 [label="q4", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0;
+  q0 -> q0 [label="a, Z₀/AZ₀\na, A/AA"];
+  q0 -> q1 [label="b, A/BA"];
+  q1 -> q1 [label="b, B/BB"];
+  q1 -> q2 [label="a, B/ε"];
+  q2 -> q2 [label="a, B/ε"];
+  q2 -> q3 [label="b, A/ε"];
+  q3 -> q3 [label="b, A/ε"];
+  q3 -> q4 [label="ε, Z₀/Z₀"];
+}
+```
+
 *   **Phase 1 (outer $a$'s):** Push $n$ copies of $A$ for the $n$ leading $a$'s.
 *   **Phase 2 (inner $b$'s):** Push $m$ copies of $B$ for the $m$ leading $b$'s (on top of the $A$'s).
 *   **Phase 3 (inner $a$'s):** Pop one $B$ per $a$ (matching the inner $b$'s with inner $a$'s).
@@ -770,6 +986,29 @@ Construct a Deterministic Pushdown Automaton (DPDA) that recognizes $L_1 = \{a^n
 <summary>Click to see the solution</summary>
 
 **Key Concept:** Use the stack to count $a$'s: push one $A$ per $a$ read, then pop one $A$ per $b$ read. If the stack holds only $Z_0$ exactly when all $b$'s are consumed, the counts matched.
+
+```{dot}
+//| fig-cap: "DPDA trace machine for aⁿbⁿ"
+//| fig-width: 5.2
+//| fig-height: 2.1
+digraph dpda_tut_abn {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.1, fillcolor=black];
+  p0 [label="p0", fillcolor="#e8f4f8"];
+  p1 [label="p1", fillcolor="#d6eef5"];
+  p2 [label="p2", fillcolor="#fff3cd"];
+  p3 [label="p3", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> p0;
+  p0 -> p1 [label="a, Z₀/AZ₀"];
+  p1 -> p1 [label="a, A/AA"];
+  p1 -> p2 [label="b, A/ε"];
+  p2 -> p2 [label="b, A/ε"];
+  p2 -> p3 [label="ε, Z₀/Z₀"];
+}
+```
 
 1.  **PDA specification:**
     *   States: $p_0$ (start), $p_1$ (reading $a$'s), $p_2$ (reading $b$'s), $p_3$ (accepting)

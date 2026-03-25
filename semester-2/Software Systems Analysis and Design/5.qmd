@@ -38,7 +38,16 @@ The solution is **genericity**: write the algorithm *once* and let the compiler 
 *   Java, C#, Rust, Swift, Scala: *Generics*
 *   C++: *Templates*
 
-<!-- DIAGRAM HERE -->
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "One generic template replaces many near-identical type-specific implementations"
+%%| fig-width: 6
+%%| fig-height: 3
+flowchart TB
+    Dup["Max(int,int)<br/>Max(float,float)<br/>Max(double,double)<br/>Max(Temperature,Temperature)"]
+    Tpl["template<typename T><br/>T Max(T a, T b)"]
+    Dup --> Tpl
+```
 
 ##### **1.2 Function Templates**
 
@@ -272,7 +281,20 @@ It is important to distinguish three conceptually different entities:
 | Class-by-template | `Stack<int>`, `Stack<double>` | Compiler (instantiation) | Compile time |
 | Object (instance) | `Stack<int> s;` | Runtime (`new` or stack allocation) | Runtime |
 
-<!-- DIAGRAM HERE -->
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "From template definition to class template specialization to runtime object"
+%%| fig-width: 6.3
+%%| fig-height: 3
+flowchart LR
+    Def["template<typename T><br/>class Stack"]
+    Spec1["Stack<int>"]
+    Spec2["Stack<double>"]
+    Obj["Stack<int> s"]
+    Def --> Spec1
+    Def --> Spec2
+    Spec1 --> Obj
+```
 
 ###### **1.3.4 Requirements on Actual Types for Class Templates**
 
@@ -619,7 +641,20 @@ int main() {
 
 When `f` returns, its entire stack frame (including `A`) is gone. `p` still holds an address into that now-invalid memory.
 
-<!-- DIAGRAM HERE -->
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Dangling pointer: pointer survives after the stack object it points to has been destroyed"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+flowchart TB
+    subgraph Frame["Function f stack frame"]
+      A["A : int = 42"]
+      P["p = &A"]
+    end
+    After["f returns<br/>stack frame removed"]
+    Dangling["p still stores old address<br/>dangling pointer"]
+    Frame --> After --> Dangling
+```
 
 ###### **1.5.6 Memory Leaks (Problem 7)**
 
@@ -634,7 +669,19 @@ void f() {
 
 In a long-running application, accumulated leaks can exhaust all available memory.
 
-<!-- DIAGRAM HERE -->
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Memory leak: the heap object remains allocated after the last owning pointer disappears"
+%%| fig-width: 6
+%%| fig-height: 3
+flowchart LR
+    P["p : int*"]
+    H["heap object<br/>new int(42)"]
+    Gone["p goes out of scope"]
+    Leak["unreachable heap object<br/>memory leak"]
+    P --> H
+    H --> Gone --> Leak
+```
 
 ##### **1.6 Smart Pointers**
 
@@ -731,7 +778,20 @@ auto x = std::make_shared<int>(42);  // ref count = 1
 
 **`shared_ptr` overhead:** Two pointers per instance, atomic reference count operations (for thread safety). Use `unique_ptr` when sharing is not needed.
 
-<!-- DIAGRAM HERE -->
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "shared_ptr ownership: several handles share one object through a common reference count"
+%%| fig-width: 6.2
+%%| fig-height: 3
+flowchart LR
+    A["shared_ptr a"]
+    B["shared_ptr b"]
+    RC["control block<br/>ref count = 2"]
+    Obj["managed object"]
+    A --> RC
+    B --> RC
+    RC --> Obj
+```
 
 ###### **1.6.4 Circular References: The `shared_ptr` Problem**
 
@@ -758,7 +818,20 @@ void fun() {
 // Both objects are leaked!
 ```
 
-<!-- DIAGRAM HERE -->
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Circular shared_ptr references prevent reference counts from reaching zero"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+flowchart LR
+    Foo["Foo object"]
+    Bar["Bar object"]
+    Foo -- "shared_ptr<Bar>" --> Bar
+    Bar -- "shared_ptr<Foo>" --> Foo
+    Leak["both stay alive<br/>reference cycle"]
+    Foo --> Leak
+    Bar --> Leak
+```
 
 ###### **1.6.5 `weak_ptr` — Breaking Circular References**
 
@@ -1698,4 +1771,3 @@ After scope exit
 **Answer:** The RAII destructor is the critical mechanism. See output above for the automatic cleanup sequence.
 
 </details>
-

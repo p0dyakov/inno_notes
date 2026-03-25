@@ -25,7 +25,30 @@ Before stating the Pumping Lemma, we need the classic **Pigeonhole Principle**:
 
 > *If $n$ pigeons are placed into $m$ pigeonholes and $n > m$, then at least one pigeonhole must contain at least two pigeons.*
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "Pigeonhole principle applied to automata: more visits than states force a repetition"
+//| fig-width: 6
+//| fig-height: 2.2
+digraph pigeonhole {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, color="#355c7d", penwidth=1.0];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+
+  p1 [shape=box, style="filled,rounded", fillcolor="#e8f4f8", label="State q0"];
+  p2 [shape=box, style="filled,rounded", fillcolor="#d6eef5", label="State q1"];
+  p3 [shape=box, style="filled,rounded", fillcolor="#fff3cd", label="State q2"];
+  t1 [shape=circle, style=filled, fillcolor="#f9d9e2", label="visit 1"];
+  t2 [shape=circle, style=filled, fillcolor="#f9d9e2", label="visit 2"];
+  t3 [shape=circle, style=filled, fillcolor="#f9d9e2", label="visit 3"];
+  t4 [shape=circle, style=filled, fillcolor="#f9d9e2", label="visit 4"];
+
+  t1 -> p1 [arrowhead=none];
+  t2 -> p2 [arrowhead=none];
+  t3 -> p3 [arrowhead=none];
+  t4 -> p2 [arrowhead=none, label="repeated state"];
+}
+```
 
 **Application to FSAs:** Think of the *states* of an FSA as pigeonholes and the *transitions* traversed while reading a string as pigeons. If a string has length greater than the number of states $|Q|$, then while processing the string, the automaton visits more than $|Q|$ states (counting repetitions). Since there are only $|Q|$ distinct states, *at least one state must be visited twice*. That repeated state corresponds to a **cycle** in the automaton.
 
@@ -33,7 +56,27 @@ Before stating the Pumping Lemma, we need the classic **Pigeonhole Principle**:
 
 Consider an infinite regular language $L$ recognized by an FSA with $m$ states. Since $L$ is infinite, there must be strings in $L$ of arbitrarily large length. When the FSA processes a sufficiently long string (one with more than $m$ symbols), it visits more than $m$ transitions. By the Pigeonhole Principle, some state $q$ must be revisited.
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "A long accepting path must contain a loop that can be pumped"
+//| fig-width: 6
+//| fig-height: 2
+digraph pumping_loop {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d", penwidth=1.0];
+
+  start [shape=point, width=0.1, fillcolor=black];
+  q0 [label="q0", fillcolor="#e8f4f8"];
+  q [label="q", fillcolor="#d6eef5"];
+  qf [label="qf", shape=doublecircle, fillcolor="#d7f0c2"];
+
+  start -> q0;
+  q0 -> q [label="x"];
+  q -> q [label="y"];
+  q -> qf [label="z"];
+}
+```
 
 This means the automaton's path looks like:
 $$\text{start} \xrightarrow{\text{read } x} q \xrightarrow{\text{read } y} q \xrightarrow{\text{read } z} \text{accept}$$
@@ -143,7 +186,30 @@ PDAs sit precisely in the layer above FSAs and are capable of recognizing **cont
 
 A **stack** is a last-in, first-out (LIFO) data structure. Think of a stack of plates: you can only add or remove from the top.
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "Stack behavior: push adds to the top, pop removes the most recent symbol"
+//| fig-width: 3.6
+//| fig-height: 3
+digraph stack_ops {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [shape=box, style="filled,rounded", fontname="Helvetica", fontsize=11, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  top [label="top: c", fillcolor="#f9d9e2"];
+  mid [label="b", fillcolor="#fff3cd"];
+  low [label="a", fillcolor="#d6eef5"];
+  z0 [label="Z₀", fillcolor="#e8f4f8"];
+  push [shape=plaintext, label="push"];
+  pop [shape=plaintext, label="pop"];
+
+  push -> top [style=dashed];
+  top -> mid;
+  mid -> low;
+  low -> z0;
+  top -> pop [style=dashed];
+}
+```
 
 Operations:
 
@@ -174,7 +240,27 @@ A **Pushdown Automaton** is identical, but adds a stack as external memory:
 *   The **finite control** reads the next input symbol and the **top of the stack**.
 *   Based on these (and the current state), it transitions to a new state and *replaces* the top of the stack with a string of symbols.
 
-<!-- DIAGRAM HERE -->
+```{dot}
+//| fig-cap: "PDA architecture: finite control reads input and the top of the stack, then updates both"
+//| fig-width: 6
+//| fig-height: 2.4
+digraph pda_arch {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  input [shape=box, style="filled,rounded", fillcolor="#e8f4f8", label="Input Tape"];
+  control [shape=circle, style=filled, fillcolor="#d6eef5", label="q"];
+  stack [shape=box, style="filled,rounded", fillcolor="#fff3cd", label="Stack\nA\nA\nZ₀"];
+  next [shape=circle, style=filled, fillcolor="#d7f0c2", label="q'"];
+
+  input -> control [label="read a or ε"];
+  stack -> control [label="top symbol"];
+  control -> next [label="transition"];
+  next -> stack [label="replace top"];
+}
+```
 
 The PDA can:
 
@@ -468,6 +554,29 @@ Show that $L_1 = \{a^n b^n \mid n \geq 1\}$ (which is not regular) is recognized
 
 **Key Concept:** Use the stack to count $a$'s: push one $A$ per $a$, then pop one $A$ per $b$. If the stack holds exactly $Z_0$ after all $b$'s are consumed, the counts matched.
 
+```{dot}
+//| fig-cap: "PDA for aⁿbⁿ"
+//| fig-width: 5.2
+//| fig-height: 2.1
+digraph pda_abn_w5 {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.1, fillcolor=black];
+  p0 [label="p0", fillcolor="#e8f4f8"];
+  p1 [label="p1", fillcolor="#d6eef5"];
+  p2 [label="p2", fillcolor="#fff3cd"];
+  p3 [label="p3", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> p0;
+  p0 -> p1 [label="a, Z₀/AZ₀"];
+  p1 -> p1 [label="a, A/AA"];
+  p1 -> p2 [label="b, A/ε"];
+  p2 -> p2 [label="b, A/ε"];
+  p2 -> p3 [label="ε, Z₀/Z₀"];
+}
+```
+
 1.  **Design the PDA:**
     *   States: $p_0$ (start), $p_1$ (reading $a$'s), $p_2$ (reading $b$'s), $p_3$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, A\}$
@@ -502,6 +611,27 @@ Show that $L_2 = \{a^n b\, a^n \mid n \geq 1\}$ is recognized by a pushdown auto
 <summary>Click to see the solution</summary>
 
 **Key Concept:** Push one $A$ per $a$ before the $b$, then use the single $b$ as a pivot, and pop one $A$ per $a$ after the $b$. The stack being empty at the end confirms equal $a$-counts.
+
+```{dot}
+//| fig-cap: "PDA for aⁿbaⁿ"
+//| fig-width: 4.8
+//| fig-height: 2.1
+digraph pda_aba {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.1, fillcolor=black];
+  q0 [label="q0", fillcolor="#e8f4f8"];
+  q1 [label="q1", fillcolor="#d6eef5"];
+  q2 [label="q2", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0;
+  q0 -> q0 [label="a, Z₀/AZ₀\na, A/AA"];
+  q0 -> q1 [label="b, A/A"];
+  q1 -> q1 [label="a, A/ε"];
+  q1 -> q2 [label="ε, Z₀/Z₀"];
+}
+```
 
 1.  **Design the PDA:**
     *   States: $q_0$ (start, reading left $a$'s), $q_1$ (pivot: saw $b$, now reading right $a$'s), $q_2$ (accepting)
