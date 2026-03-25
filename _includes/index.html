@@ -96,6 +96,55 @@
 })();
 </script>
 
+<script>
+// Patch WebSocket BEFORE quarto-preview.js so its messages don't interfere
+// with SPA navigation. quarto-preview sends three relevant message types:
+//   render:start  – shows render overlay
+//   render:stop   – hides render overlay
+//   reload        – reloads / replaces location
+// All three are suppressed while window._innNavigating is true.
+// onclose (socket disconnect) is also suppressed to prevent spurious reload.
+(function () {
+	if (!window.WebSocket) return;
+	var Orig = window.WebSocket;
+	function InnWS(url, proto) {
+		var ws = proto !== undefined ? new Orig(url, proto) : new Orig(url);
+		var _om = null, _oc = null;
+		Object.defineProperty(ws, 'onmessage', {
+			configurable: true,
+			get: function () { return _om; },
+			set: function (fn) {
+				_om = fn;
+				ws.addEventListener('message', function (e) {
+					if (window._innNavigating &&
+						typeof e.data === 'string' &&
+						(e.data.startsWith('reload') || e.data.startsWith('render:'))) return;
+					fn.call(ws, e);
+				});
+			}
+		});
+		Object.defineProperty(ws, 'onclose', {
+			configurable: true,
+			get: function () { return _oc; },
+			set: function (fn) {
+				_oc = fn;
+				ws.addEventListener('close', function (e) {
+					if (window._innNavigating) return;
+					fn.call(ws, e);
+				});
+			}
+		});
+		return ws;
+	}
+	InnWS.prototype = Orig.prototype;
+	InnWS.CONNECTING = Orig.CONNECTING;
+	InnWS.OPEN = Orig.OPEN;
+	InnWS.CLOSING = Orig.CLOSING;
+	InnWS.CLOSED = Orig.CLOSED;
+	window.WebSocket = InnWS;
+})();
+</script>
+
 <style>
 	:root {
 		--inn-bg: rgba(255, 255, 255, 0.88);
@@ -304,6 +353,11 @@
 
 	.sidebar-link.inn-read-title {
 		text-decoration: line-through;
+	}
+
+	details > summary {
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 	.problem-heading {
@@ -1596,7 +1650,7 @@
 </style>
 
 <script>
-	document.addEventListener('DOMContentLoaded', () => {
+	const initializeInnoNotesUI = () => {
 		const basePath = '/inno_notes/';
 		let loaderEl = document.getElementById('inn-page-loader');
 		if (!loaderEl) {
@@ -1693,29 +1747,30 @@
 			return /\\\(|\\\[|\$\$/.test(html);
 		};
 		const typesetMathContent = async (root) => {
-			if (!root || !containsMathContent(root) || !window.Quarto?.typesetMath) return;
+			if (!root || !containsMathContent(root)) return;
+			for (let attempt = 0; attempt < 80 && !window.MathJax && !window.katex; attempt += 1) {
+				await new Promise((resolve) => window.setTimeout(resolve, 120));
+			}
 			if (window.MathJax?.startup?.promise) {
 				try {
 					await window.MathJax.startup.promise;
 				} catch {}
-			} else if (!window.MathJax) {
-				for (let attempt = 0; attempt < 40 && !window.MathJax; attempt += 1) {
-					await new Promise((resolve) => window.setTimeout(resolve, 120));
-				}
-				if (window.MathJax?.startup?.promise) {
-					try {
-						await window.MathJax.startup.promise;
-					} catch {}
-				}
 			}
 			try {
-				window.Quarto.typesetMath(root);
+				if (typeof window.MathJax?.typesetPromise === 'function') {
+					await window.MathJax.typesetPromise([root]);
+					return;
+				}
+				if (typeof window.Quarto?.typesetMath === 'function') {
+					window.Quarto.typesetMath(root);
+				}
 			} catch {}
 		};
 		const fitDisplayMath = () => {};
 		const scheduleFitDisplayMath = () => {};
 		const pageCache = new Map();
 		const maxPageCacheEntries = 24;
+		const assetLoadCache = new Map();
 		const getPageCacheKey = (value) => {
 			const url = new URL(value, window.location.href);
 			url.hash = '';
@@ -1733,7 +1788,74 @@
 		const clonePagePayload = (payload) => ({
 			title: payload.title,
 			main: payload.main.cloneNode(true),
+			assets: { ...payload.assets },
 		});
+		const collectPageAssets = (doc, pageHref) => {
+			const collectUrls = (selector, attr) => Array.from(doc.querySelectorAll(selector))
+				.map((node) => node.getAttribute(attr))
+				.filter(Boolean)
+				.map((value) => new URL(value, pageHref).href);
+			const collectInlineStyles = () => Array.from(doc.head.querySelectorAll('style'))
+				.map((node) => node.textContent || '')
+				.map((value) => value.trim())
+				.filter(Boolean);
+			return {
+				stylesheets: collectUrls('link[rel="stylesheet"][href]', 'href'),
+				inlineStyles: collectInlineStyles(),
+				mathScripts: collectUrls('script[src*="mathjax"]', 'src'),
+				mermaidScripts: collectUrls('script[src*="quarto-diagram/mermaid.min.js"]', 'src'),
+				mermaidStyles: collectUrls('link[rel="stylesheet"][href*="quarto-diagram/mermaid.css"]', 'href'),
+			};
+		};
+		const hasAsset = (selector, targetHref, attr) => Array.from(document.querySelectorAll(selector)).some((node) => {
+			const value = node.getAttribute(attr);
+			if (!value) return false;
+			try {
+				return new URL(value, window.location.href).href === targetHref;
+			} catch {
+				return value === targetHref;
+			}
+		});
+		const ensureScriptAsset = (src) => {
+			if (!src) return Promise.resolve();
+			if (hasAsset(`script[src]`, src, 'src')) return Promise.resolve();
+			if (assetLoadCache.has(src)) return assetLoadCache.get(src);
+			const promise = new Promise((resolve, reject) => {
+				const script = document.createElement('script');
+				script.src = src;
+				script.async = false;
+				script.onload = () => resolve();
+				script.onerror = () => reject(new Error(`Failed to load ${src}`));
+				document.head.appendChild(script);
+			}).catch(() => {});
+			assetLoadCache.set(src, promise);
+			return promise;
+		};
+		const ensureStyleAsset = (href) => {
+			if (!href || hasAsset(`link[rel="stylesheet"][href]`, href, 'href')) return;
+			const link = document.createElement('link');
+			link.rel = 'stylesheet';
+			link.href = href;
+			document.head.appendChild(link);
+		};
+		const ensureInlineStyleAsset = (content) => {
+			if (!content) return;
+			const normalized = content.trim();
+			const existing = Array.from(document.head.querySelectorAll('style')).some((node) => (node.textContent || '').trim() === normalized);
+			if (existing) return;
+			const style = document.createElement('style');
+			style.setAttribute('data-inn-dynamic-style', 'true');
+			style.textContent = normalized;
+			document.head.appendChild(style);
+		};
+		const ensurePageAssets = async (assets = {}) => {
+			(assets.stylesheets || []).forEach(ensureStyleAsset);
+			(assets.inlineStyles || []).forEach(ensureInlineStyleAsset);
+			await Promise.all([
+				...(assets.mathScripts || []).map((src) => ensureScriptAsset(src)),
+				...(assets.mermaidScripts || []).map((src) => ensureScriptAsset(src)),
+			]);
+		};
 		const fetchPagePayload = async (value) => {
 			const url = new URL(value, window.location.href);
 			const key = getPageCacheKey(url.href);
@@ -1751,6 +1873,7 @@
 			const payload = {
 				title: doc.title,
 				main,
+				assets: collectPageAssets(doc, url.href),
 			};
 			rememberPage(key, payload);
 			return clonePagePayload(payload);
@@ -1779,6 +1902,19 @@
 			return `${url.pathname}${url.search}${hash ? `#${hash}` : ''}`;
 		};
 
+		const sanitizeMermaidSource = (value) => (value || '')
+			.split('\n')
+			.filter((line) => !line.trim().startsWith('%%|'))
+			.join('\n')
+			.trim();
+		const sanitizeMermaidBlocks = (root = document) => {
+			root.querySelectorAll('pre.mermaid, pre.mermaid-js').forEach((block) => {
+				const sanitized = sanitizeMermaidSource(block.textContent || '');
+				if (sanitized && sanitized !== (block.textContent || '').trim()) {
+					block.textContent = sanitized;
+				}
+			});
+		};
 		const getMermaidBlocks = (root = document) => Array.from(root.querySelectorAll('pre.mermaid, pre.mermaid-js, .mermaid-js'));
 		const rerenderMermaid = async (root = document) => {
 			const mermaidBlocks = getMermaidBlocks(root);
@@ -1787,19 +1923,39 @@
 				await new Promise((resolve) => window.setTimeout(resolve, 120));
 			}
 			if (!window.mermaid) return;
-			mermaidBlocks.forEach((block) => {
-				block.removeAttribute('data-processed');
-			});
 			try {
-				if (typeof window.mermaid.run === 'function') {
-					await window.mermaid.run({ nodes: mermaidBlocks });
-				} else if (typeof window.mermaid.init === 'function') {
-					window.mermaid.init(undefined, mermaidBlocks);
+				if (typeof window.mermaid.initialize === 'function') {
+					window.mermaid.initialize({ startOnLoad: false });
+				}
+				for (let index = 0; index < mermaidBlocks.length; index += 1) {
+					const block = mermaidBlocks[index];
+					const raw = sanitizeMermaidSource(block.textContent || '');
+					if (!raw) continue;
+					if (typeof window.mermaid.render === 'function') {
+						const id = `inn-mermaid-${Date.now()}-${index}`;
+						const renderResult = await window.mermaid.render(id, raw);
+						const host = document.createElement('div');
+						host.className = 'mermaid';
+						host.innerHTML = typeof renderResult === 'string' ? renderResult : renderResult.svg;
+						block.replaceWith(host);
+						if (typeof renderResult?.bindFunctions === 'function') {
+							renderResult.bindFunctions(host);
+						}
+					} else {
+						block.textContent = raw;
+						block.removeAttribute('data-processed');
+						if (typeof window.mermaid.run === 'function') {
+							await window.mermaid.run({ nodes: [block] });
+						} else if (typeof window.mermaid.init === 'function') {
+							window.mermaid.init(undefined, [block]);
+						}
+					}
 				}
 			} catch {}
 		};
 		const ensureMermaidRendered = async (root = document) => {
 			if (!getMermaidBlocks(root).length) return;
+			sanitizeMermaidBlocks(root);
 			for (let attempt = 0; attempt < 4; attempt += 1) {
 				await rerenderMermaid(root);
 				if (!getMermaidBlocks(root).some((block) => /^(PRE|DIV)$/.test(block.tagName) && /^(mermaid|mermaid-js)$/.test(block.className.trim()))) {
@@ -1825,6 +1981,8 @@
 			const pattern = new RegExp(`(${escapeRegExp(trimmed)})`, 'ig');
 			return safe.replace(pattern, '<mark>$1</mark>');
 		};
+
+		let innPageFullyLoaded = document.readyState === 'complete';
 
 		const applyArticleUI = () => {
 			const pathKey = normalizePath(getPathKey());
@@ -1921,7 +2079,9 @@
 			applyProgressiveContent(document.querySelector('main#quarto-document-content'));
 			syncSidebarReadState();
 			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
-			ensureMermaidRendered(document.querySelector('main#quarto-document-content'));
+			if (innPageFullyLoaded) {
+				ensureMermaidRendered(document.querySelector('main#quarto-document-content'));
+			}
 		};
 
 		rememberPage(getPageCacheKey(window.location.href), {
@@ -2133,6 +2293,7 @@
 					window.location.assign(url.href);
 					return;
 				}
+				await ensurePageAssets(payload.assets);
 				advanceLoader(54);
 				const nextMain = payload.main;
 
@@ -2156,6 +2317,7 @@
 					const swappedMain = document.querySelector('main#quarto-document-content');
 					window.requestAnimationFrame(async () => {
 						await typesetMathContent(swappedMain);
+						await ensureMermaidRendered(swappedMain);
 						scheduleFitDisplayMath(swappedMain);
 					});
 					if (url.hash) {
@@ -2518,12 +2680,23 @@
 			return true;
 		};
 		applyArticleUI();
-		window.requestAnimationFrame(async () => {
+		sanitizeMermaidBlocks(document);
+		const runInitialDynamicRender = async () => {
+			innPageFullyLoaded = true;
 			const mainContent = document.querySelector('main#quarto-document-content');
+			if (!mainContent) return;
 			await typesetMathContent(mainContent);
 			await ensureMermaidRendered(mainContent);
 			scheduleFitDisplayMath(mainContent);
+		};
+		window.requestAnimationFrame(() => {
+			runInitialDynamicRender();
 		});
+		window.addEventListener('load', () => {
+			window.requestAnimationFrame(() => {
+				runInitialDynamicRender();
+			});
+		}, { once: true });
 		window.addEventListener('resize', () => {
 			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
 		});
@@ -2677,5 +2850,10 @@
 		sidebar.addEventListener('scroll', () => {
 			localStorage.setItem(scrollKey, sidebar.scrollTop);
 		});
-	});
+	};
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', initializeInnoNotesUI, { once: true });
+	} else {
+		initializeInnoNotesUI();
+	}
 </script>
