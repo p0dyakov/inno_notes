@@ -314,21 +314,52 @@ Use explicit height attributes, for example:
 
 If using embedded diagram blocks, ensure the resulting rendered block has controlled height or compact layout.
 
+Every diagram should also have an explicit width when the default size makes labels, nodes, or relationships hard to read.
+
+If a diagram contains text inside shapes, enlarge it until the text is readable at normal page zoom. Do not keep a diagram artificially small just to save space.
+
+Prefer enlarging pedagogically important diagrams rather than leaving a small figure surrounded by empty whitespace.
+
 ### One visual style per article
 
 Choose one article-wide palette and keep it consistent across all figures.
 
 Recommended palette:
 
-- primary: `#1D3557`
-- secondary: `#457B9D`
-- accent: `#2A9D8F`
-- highlight: `#E9C46A`
-- warning/emphasis: `#E76F51`
-- neutral light: `#F1FAEE`
-- neutral dark: `#263238`
+- border / line color: `#355c7d`
+- primary text color inside diagrams: `#1f2d3d`
+- light blue fill: `#e8f4f8`
+- secondary blue fill: `#d6eef5`
+- positive / accepting fill: `#d7f0c2`
+- transitional / active fill: `#fff3cd`
+- warning / mismatch / critical fill: `#f9d9e2`
+- neutral helper fill: `#eef3f7`
+- cluster / container background: `#f9fbfd`
 
 Do not mix random palettes across figures.
+
+Prefer light backgrounds, dark text, and medium-contrast borders.
+
+Avoid dark blue filled nodes, dark gray panels, or any saturated accent fill behind text unless the text remains obviously readable.
+
+Do not use low-contrast combinations such as bright blue text on dark blue or dark gray fills.
+
+If an older or source-derived diagram color scheme conflicts with the course visual system, normalize it to the article palette instead of preserving the original colors.
+
+### Semantic color consistency
+
+Use colors consistently across diagrams:
+
+- neutral structure / ordinary node: `#e8f4f8`
+- secondary helper node: `#d6eef5`
+- positive / accepting / success state: `#d7f0c2`
+- transitional / active / in-progress state: `#fff3cd`
+- warning / mismatch / danger / invalid state: `#f9d9e2`
+- helper labels or operational markers: `#eef3f7`
+
+Do not assign colors randomly from one diagram to another.
+
+If the article contains automata, stacks, memory models, or process diagrams, keep the same semantic meaning for colors throughout the article.
 
 ### Diagram library policy
 
@@ -356,6 +387,9 @@ Avoid unnecessary library switching just because many tools are available.
 - choose the simplest tool that will render reliably in Quarto
 - avoid fragile layout-heavy diagrams if a simpler diagram communicates the same idea
 - keep labels readable and compact
+- prefer transparent or white backgrounds
+- keep diagram text dark and immediately legible
+- if a node label is hard to read, change colors or enlarge the figure; do not leave it as-is
 
 ## 12. Formatting Rules
 
