@@ -845,928 +845,7 @@ This shows:
 
 #### **3. Examples**
 
-##### **3.1. Separating Interface from Implementation** (Lecture 11, Example 1)
-
-Consider an airplane hierarchy where different airplane models need different flying algorithms. Implement this correctly by separating interface from implementation.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Use abstract methods to force explicit implementation while providing optional default implementations through protected helper methods.
-
-**Incorrect approach (problem):**
-
-```java
-class Airplane {
-    public void fly() {
-        // Standard flying algorithm for Airbus
-    }
-}
-
-class AirbusA extends Airplane { }  // Inherits Airbus algorithm
-class AirbusB extends Airplane { }  // Inherits Airbus algorithm
-class Boeing extends Airplane { }   // WRONG: Also inherits Airbus algorithm!
-```
-
-**Problem:** Boeing automatically inherits Airbus's flying algorithm. The compiler doesn't detect this semantic error.
-
-**Correct approach (solution):**
-
-```java
-abstract class Airplane {
-    // Interface: must be implemented by all subclasses
-    public abstract void fly();
-    
-    // Optional default implementation
-    protected void defaultFly() {
-        // Standard flying algorithm
-        System.out.println("Standard flying algorithm");
-    }
-}
-
-class AirbusA extends Airplane {
-    public void fly() {
-        defaultFly();  // Can choose to use default
-    }
-}
-
-class AirbusB extends Airplane {
-    public void fly() {
-        defaultFly();  // Can choose to use default
-    }
-}
-
-class Boeing extends Airplane {
-    public void fly() {
-        // MUST provide its own implementation
-        System.out.println("Boeing's own flying algorithm");
-    }
-}
-```
-
-**Usage:**
-
-```java
-Airplane a = new AirbusA();
-a.fly();  // Standard flying algorithm
-
-Airplane b = new AirbusB();
-b.fly();  // Standard flying algorithm
-
-Airplane c = new Boeing();
-c.fly();  // Boeing's own flying algorithm
-```
-
-**Answer:** By making `fly()` abstract, we force each subclass to explicitly implement it, preventing accidental inheritance of wrong behavior. The `defaultFly()` helper method provides an optional default implementation.
-
-</details>
-
-##### **3.2. Using Final Methods** (Lecture 11, Example 2)
-
-Create a base class with a final method and demonstrate that it cannot be overridden.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The `final` keyword on a method prevents subclasses from overriding it, ensuring consistent behavior.
-
-```java
-class Base {
-    public final void method() {
-        System.out.println("Base's method");
-    }
-}
-
-class Derived extends Base {
-    // This would cause a compilation error:
-    // public void method() {
-    //     System.out.println("Derived's method");
-    // }
-    // Error: Cannot override the final method from Base
-}
-```
-
-**Testing the code:**
-
-```java
-Base b1 = new Base();
-b1.method();  // Output: Base's method
-
-Base b2 = new Derived();
-b2.method();  // Output: Base's method (same implementation)
-```
-
-**Answer:** Final methods guarantee that the behavior defined in the base class cannot be changed by subclasses, enabling compiler optimizations and ensuring consistent behavior.
-
-</details>
-
-##### **3.3. Creating a Final Class** (Lecture 11, Example 3)
-
-Demonstrate creating a final class and show that it cannot be extended.
-
-<details>
-<summary>Click to see the solution</summary>
-
-```java
-final class Base {
-    public void method() {
-        System.out.println("Base's method");
-    }
-}
-
-// This would cause a compilation error:
-// class Derived extends Base {
-// }
-// Error: The type Derived cannot subclass the final class Base
-```
-
-**Why can't a class be both abstract and final?**
-
-```java
-// This is illegal and won't compile:
-// abstract final class InvalidClass {
-//     abstract void method();
-// }
-```
-
-**Explanation:** An `abstract` class is incomplete by design—it *requires* subclasses to provide implementations. A `final` class *forbids* subclasses. These two concepts are contradictory, so using both is illegal.
-
-**Answer:** Final classes prevent inheritance entirely. All methods in a final class are implicitly final. A class cannot be both abstract and final because abstract classes require inheritance to be complete.
-
-</details>
-
-##### **3.4. Implementing an Interface** (Lecture 11, Example 4)
-
-Create an interface `Features` and implement it in a `Lion` class.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** An interface defines a contract. Any class implementing it must provide implementations for all declared methods.
-
-```java
-interface Features {
-    int numOfLegs();
-    boolean canFly();
-    boolean canSwim();
-}
-
-class Lion implements Features {
-    public int numOfLegs() {
-        return 4;
-    }
-    
-    public boolean canFly() {
-        return false;
-    }
-    
-    public boolean canSwim() {
-        return true;
-    }
-}
-```
-
-**Usage:**
-
-```java
-// Can treat Lion as a Features interface
-Features f = new Lion();
-
-System.out.println("Number of legs: " + f.numOfLegs());
-
-if (f.canFly()) {
-    System.out.println("Can fly");
-} else {
-    System.out.println("Cannot fly");
-}
-
-if (f.canSwim()) {
-    System.out.println("Can swim");
-}
-```
-
-**Output:**
-```
-Number of legs: 4
-Cannot fly
-Can swim
-```
-
-**Answer:** The `Lion` class implements the `Features` interface by providing concrete implementations for all three methods. We can then treat a `Lion` object as a `Features` reference.
-
-</details>
-
-##### **3.5. Multiple Interface Implementation** (Lecture 11, Example 5)
-
-Create a `Person` class that implements multiple interfaces representing different aspects of a person.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** A class can implement multiple interfaces, providing a safe alternative to multiple inheritance.
-
-```java
-interface iBodyParams {
-    int getHeight();
-    int getWeight();
-}
-
-interface iSkills {
-    String getProgrammingLanguage();
-    int getExperienceYears();
-}
-
-interface iRelations {
-    String getFriendName();
-}
-
-class Person implements iBodyParams, iSkills, iRelations {
-    private int height;
-    private int weight;
-    private String programmingLanguage;
-    private int experienceYears;
-    private String friendName;
-    
-    public Person(int height, int weight, String language, 
-                  int experience, String friend) {
-        this.height = height;
-        this.weight = weight;
-        this.programmingLanguage = language;
-        this.experienceYears = experience;
-        this.friendName = friend;
-    }
-    
-    // iBodyParams implementation
-    public int getHeight() { return height; }
-    public int getWeight() { return weight; }
-    
-    // iSkills implementation
-    public String getProgrammingLanguage() { return programmingLanguage; }
-    public int getExperienceYears() { return experienceYears; }
-    
-    // iRelations implementation
-    public String getFriendName() { return friendName; }
-}
-```
-
-**Usage (viewing from different perspectives):**
-
-```java
-Person john = new Person(180, 75, "Java", 5, "Alice");
-
-// View John as a set of skills
-iSkills johnsSkills = john;
-System.out.println("Programming language: " + johnsSkills.getProgrammingLanguage());
-System.out.println("Experience: " + johnsSkills.getExperienceYears() + " years");
-
-// View John's body parameters
-iBodyParams johnsBody = john;
-System.out.println("Height: " + johnsBody.getHeight() + " cm");
-
-// View John's relationships
-iRelations johnsRelations = john;
-System.out.println("Friend: " + johnsRelations.getFriendName());
-```
-
-**Answer:** A `Person` can be viewed through different interfaces depending on the context. Each interface represents a "facet" or perspective on the person.
-
-</details>
-
-##### **3.6. Interface Inheritance** (Lecture 11, Example 6)
-
-Demonstrate how interfaces can extend other interfaces and how this affects implementing classes.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** An interface can extend another interface, inheriting all its method declarations.
-
-```java
-interface SpeedFeatures {
-    float maxSpeed();
-    float maxAcceleration();
-}
-
-interface EngineFeatures extends SpeedFeatures {
-    float numOfCyls();
-    float enginePower();
-}
-
-class Car implements EngineFeatures {
-    // Must implement ALL methods from both interfaces
-    
-    // From SpeedFeatures
-    public float maxSpeed() {
-        return 200.0f;
-    }
-    
-    public float maxAcceleration() {
-        return 5.5f;
-    }
-    
-    // From EngineFeatures
-    public float numOfCyls() {
-        return 6.0f;
-    }
-    
-    public float enginePower() {
-        return 300.0f;
-    }
-}
-```
-
-**Usage:**
-
-```java
-Car myCar = new Car();
-
-// Can be treated as EngineFeatures
-EngineFeatures engine = myCar;
-System.out.println("Engine power: " + engine.enginePower() + " HP");
-System.out.println("Cylinders: " + engine.numOfCyls());
-
-// Can also be treated as SpeedFeatures
-SpeedFeatures speed = myCar;
-System.out.println("Max speed: " + speed.maxSpeed() + " km/h");
-System.out.println("Max acceleration: " + speed.maxAcceleration() + " m/s²");
-```
-
-**Answer:** `Car` must implement methods from both `SpeedFeatures` and `EngineFeatures` because `EngineFeatures` extends `SpeedFeatures`. The object can be viewed as either interface type.
-
-</details>
-
-##### **3.7. Type Checking with Interfaces** (Lecture 11, Example 7)
-
-Use `instanceof` to check if an object implements specific interfaces and perform appropriate actions.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The `instanceof` operator works with interfaces to check if an object implements a given interface.
-
-```java
-interface Printable {
-    void print();
-}
-
-interface Movable {
-    void move();
-}
-
-interface Serializable {
-    void serialize();
-}
-
-abstract class Shape {
-    abstract void draw();
-}
-
-class Rectangle extends Shape implements Printable, Movable, Serializable {
-    public void draw() {
-        System.out.println("Drawing rectangle");
-    }
-    
-    public void print() {
-        System.out.println("Printing rectangle");
-    }
-    
-    public void move() {
-        System.out.println("Moving rectangle");
-    }
-    
-    public void serialize() {
-        System.out.println("Serializing rectangle");
-    }
-}
-```
-
-**Usage:**
-
-```java
-Shape a = new Rectangle();
-
-// Check and use different interfaces
-if (a instanceof Printable) {
-    ((Printable)a).print();  // Prints: Printing rectangle
-}
-
-if (a instanceof Movable) {
-    ((Movable)a).move();  // Prints: Moving rectangle
-}
-
-if (a instanceof Serializable) {
-    ((Serializable)a).serialize();  // Prints: Serializing rectangle
-}
-
-// This would be false
-if (a instanceof String) {
-    System.out.println("Never executes");
-}
-```
-
-**Answer:** `instanceof` checks if an object's class implements a particular interface. After checking, we can safely cast the object to that interface type.
-
-</details>
-
-##### **3.8. Nested Interface** (Lecture 11, Example 8)
-
-Create a nested interface inside a class and implement it.
-
-<details>
-<summary>Click to see the solution</summary>
-
-```java
-class SomeClass {
-    public interface Nested {
-        boolean isNotNegative(int x);
-    }
-}
-
-class MyClass implements SomeClass.Nested {
-    public boolean isNotNegative(int x) {
-        return x >= 0;
-    }
-}
-
-class Demo {
-    public static void main(String[] args) {
-        SomeClass.Nested obj = new MyClass();
-        
-        if (obj.isNotNegative(10)) {
-            System.out.println("10 is not negative");
-        }
-        
-        if (obj.isNotNegative(-5)) {
-            System.out.println("Never prints");
-        } else {
-            System.out.println("-5 is negative");
-        }
-    }
-}
-```
-
-**Output:**
-```
-10 is not negative
--5 is negative
-```
-
-**Answer:** Nested interfaces are accessed using the enclosing class name (e.g., `SomeClass.Nested`). They can be implemented by any class, not just nested classes.
-
-</details>
-
-##### **3.9. Basic Enumeration** (Lecture 11, Example 9)
-
-Create an enumeration for days of the week and use it in a switch statement.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Enumerations provide type-safe constants and work naturally with switch statements.
-
-```java
-public enum Day {
-    SUNDAY,
-    MONDAY,
-    TUESDAY,
-    WEDNESDAY,
-    THURSDAY,
-    FRIDAY,
-    SATURDAY
-}
-
-public class DayDemo {
-    public void tellItLikeItIs(Day day) {
-        switch (day) {
-            case MONDAY:
-                System.out.println("Mondays are bad.");
-                break;
-            case FRIDAY:
-                System.out.println("Fridays are better.");
-                break;
-            case SATURDAY:
-            case SUNDAY:
-                System.out.println("Weekends are best.");
-                break;
-            default:
-                System.out.println("Midweek days are so-so.");
-                break;
-        }
-    }
-    
-    public static void main(String[] args) {
-        DayDemo demo = new DayDemo();
-        
-        demo.tellItLikeItIs(Day.MONDAY);     // Mondays are bad.
-        demo.tellItLikeItIs(Day.FRIDAY);     // Fridays are better.
-        demo.tellItLikeItIs(Day.SATURDAY);   // Weekends are best.
-        demo.tellItLikeItIs(Day.WEDNESDAY);  // Midweek days are so-so.
-    }
-}
-```
-
-**Answer:** Enumerations provide readable, type-safe constants. The compiler ensures only valid `Day` values can be passed to `tellItLikeItIs()`.
-
-</details>
-
-##### **3.10. Enumeration with Fields and Constructor** (Lecture 11, Example 10)
-
-Create a `Coin` enumeration with associated values (in cents) and methods.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Java enums can have fields, constructors, and methods, making them more powerful than simple constants.
-
-```java
-enum Coin {
-    PENNY(1),
-    NICKEL(5),
-    DIME(10),
-    QUARTER(25);
-    
-    private final int value;
-    
-    // Constructor is private by default
-    Coin(int value) {
-        this.value = value;
-    }
-    
-    public int getValue() {
-        return value;
-    }
-}
-
-public class CoinDemo {
-    public static void main(String[] args) {
-        Coin c = Coin.DIME;
-        System.out.println("A dime is worth " + c.getValue() + " cents");
-        
-        // Print all coins and their values
-        System.out.println("\nAll coins:");
-        for (Coin coin : Coin.values()) {
-            System.out.println(coin + ": " + coin.getValue() + " cents");
-        }
-    }
-}
-```
-
-**Output:**
-```
-A dime is worth 10 cents
-
-All coins:
-PENNY: 1 cents
-NICKEL: 5 cents
-DIME: 10 cents
-QUARTER: 25 cents
-```
-
-**Answer:** Each enum constant is initialized with a value through the constructor. The `values()` method returns an array of all enum constants in declaration order.
-
-</details>
-
-##### **3.11. Enum with Method Bodies** (Lecture 11, Example 11)
-
-Create an `Operation` enum where each constant has its own implementation of an `eval()` method.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Each enum constant can have its own method implementation, enabling operation-specific behavior.
-
-```java
-enum Operation {
-    PLUS {
-        double eval(double x, double y) {
-            return x + y;
-        }
-    },
-    MINUS {
-        double eval(double x, double y) {
-            return x - y;
-        }
-    },
-    TIMES {
-        double eval(double x, double y) {
-            return x * y;
-        }
-    },
-    DIVIDE {
-        double eval(double x, double y) {
-            return x / y;
-        }
-    };
-    
-    // Abstract method that each constant must implement
-    abstract double eval(double x, double y);
-    
-    public static void main(String[] args) {
-        double x = 2.0;
-        double y = 4.0;
-        
-        for (Operation op : Operation.values()) {
-            System.out.println(x + " " + op + " " + y + " = " + op.eval(x, y));
-        }
-    }
-}
-```
-
-**Output:**
-```
-2.0 PLUS 4.0 = 6.0
-2.0 MINUS 4.0 = -2.0
-2.0 TIMES 4.0 = 8.0
-2.0 DIVIDE 4.0 = 0.5
-```
-
-**Answer:** Each enum constant provides its own implementation of the abstract `eval()` method, creating a clean alternative to switch statements.
-
-</details>
-
-##### **3.12. Enum with values() and ordinal() Methods** (Tutorial 11, Example 1)
-
-Demonstrate the predefined `values()` and `ordinal()` methods available in all enums.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** All Java enums automatically have `values()` (returns all constants) and `ordinal()` (returns position) methods.
-
-```java
-public class Test {
-    enum Season {
-        WINTER,
-        SPRING,
-        SUMMER,
-        FALL
-    }
-    
-    public static void main(String[] args) {
-        System.out.println("All seasons:");
-        for (Season s : Season.values()) {
-            System.out.println(s);
-        }
-        
-        System.out.println("\nSeasons with ordinals:");
-        for (Season s : Season.values()) {
-            System.out.println(s + " has ordinal " + s.ordinal());
-        }
-        
-        System.out.println("\nOrdinal of SUMMER: " + Season.SUMMER.ordinal());
-    }
-}
-```
-
-**Output:**
-```
-All seasons:
-WINTER
-SPRING
-SUMMER
-FALL
-
-Seasons with ordinals:
-WINTER has ordinal 0
-SPRING has ordinal 1
-SUMMER has ordinal 2
-FALL has ordinal 3
-
-Ordinal of SUMMER: 2
-```
-
-**Answer:** `values()` returns an array of all enum constants in declaration order. `ordinal()` returns the zero-based position of each constant.
-
-</details>
-
-##### **3.13. Creating and Using an ArrayList** (Tutorial 11, Example 2)
-
-Create an `ArrayList` of strings and perform basic operations.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** `ArrayList` is a resizable array implementation of the `List` interface.
-
-```java
-import java.util.List;
-import java.util.ArrayList;
-
-public class GFG {
-    public static void main(String args[]) {
-        // Creating an ArrayList
-        List<String> al = new ArrayList<>();
-        
-        // Adding elements
-        al.add("Geeks");
-        al.add("Geeks");
-        al.add(1, "For");  // Insert at index 1
-        
-        // Print all elements
-        System.out.println(al);
-        
-        // Access by index
-        System.out.println("Element at index 0: " + al.get(0));
-        System.out.println("Element at index 1: " + al.get(1));
-        
-        // Size
-        System.out.println("Size: " + al.size());
-        
-        // Remove
-        al.remove(2);  // Remove element at index 2
-        System.out.println("After removal: " + al);
-    }
-}
-```
-
-**Output:**
-```
-[Geeks, For, Geeks]
-Element at index 0: Geeks
-Element at index 1: For
-Size: 3
-After removal: [Geeks, For]
-```
-
-**Answer:** `ArrayList` maintains insertion order and allows duplicates. Elements are accessed by zero-based index.
-
-</details>
-
-##### **3.14. Creating and Using a HashSet** (Tutorial 11, Example 3)
-
-Create a `HashSet` and demonstrate that duplicates are automatically ignored.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** `HashSet` stores unique elements only. Attempting to add a duplicate has no effect.
-
-```java
-import java.util.Set;
-import java.util.HashSet;
-
-public class GFG {
-    public static void main(String[] args) {
-        // Create a HashSet
-        Set<String> hashSet = new HashSet<>();
-        
-        // Adding elements
-        hashSet.add("Geeks");
-        hashSet.add("For");
-        hashSet.add("Geeks");    // Duplicate - will be ignored
-        hashSet.add("Example");
-        hashSet.add("Set");
-        
-        // Print (order not guaranteed)
-        System.out.println(hashSet);
-        
-        // Check if contains
-        System.out.println("Contains 'Geeks': " + hashSet.contains("Geeks"));
-        System.out.println("Contains 'Java': " + hashSet.contains("Java"));
-        
-        // Size
-        System.out.println("Size: " + hashSet.size());
-    }
-}
-```
-
-**Possible Output:**
-```
-[Geeks, Example, Set, For]
-Contains 'Geeks': true
-Contains 'Java': false
-Size: 4
-```
-
-**Note:** The order of elements in the output may vary since `HashSet` doesn't maintain any order.
-
-**Answer:** `HashSet` automatically filters out duplicate elements. The second "Geeks" is ignored, so the set contains only 4 elements instead of 5.
-
-</details>
-
-##### **3.15. Creating and Using a HashMap** (Tutorial 11, Example 4)
-
-Create a `HashMap` to store key-value pairs and iterate through it.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** `HashMap` stores key-value pairs where each unique key maps to one value.
-
-```java
-import java.util.Map;
-import java.util.HashMap;
-
-public class HashMapDemo {
-    public static void main(String args[]) {
-        // Create a HashMap
-        Map<String, Integer> hm = new HashMap<>();
-        
-        // Adding key-value pairs
-        hm.put("a", 100);
-        hm.put("b", 200);
-        hm.put("c", 300);
-        hm.put("d", 400);
-        
-        // Replacing a value
-        hm.put("a", 150);  // Replaces previous value for key "a"
-        
-        System.out.println("HashMap contents:");
-        // Traversing through the map
-        for (Map.Entry<String, Integer> me : hm.entrySet()) {
-            System.out.println(me.getKey() + ": " + me.getValue());
-        }
-        
-        // Access by key
-        System.out.println("\nValue for key 'b': " + hm.get("b"));
-        
-        // Check if key exists
-        System.out.println("Contains key 'c': " + hm.containsKey("c"));
-        System.out.println("Contains key 'z': " + hm.containsKey("z"));
-        
-        // Size
-        System.out.println("Size: " + hm.size());
-    }
-}
-```
-
-**Possible Output:**
-```
-HashMap contents:
-a: 150
-b: 200
-c: 300
-d: 400
-
-Value for key 'b': 200
-Contains key 'c': true
-Contains key 'z': false
-Size: 4
-```
-
-**Note:** The order of entries may vary since `HashMap` doesn't maintain insertion order.
-
-**Answer:** `HashMap` maps unique keys to values. When we put a value for an existing key, the old value is replaced. We iterate using `entrySet()` which returns key-value pairs.
-
-</details>
-
-##### **3.16. Using an Iterator** (Tutorial 11, Example 5)
-
-Use an `Iterator` to traverse through an `ArrayList`.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** An `Iterator` provides a uniform way to traverse any collection.
-
-```java
-import java.util.ArrayList;
-import java.util.Iterator;
-
-public class Main {
-    public static void main(String[] args) {
-        // Create a collection
-        ArrayList<String> cars = new ArrayList<>();
-        cars.add("Volvo");
-        cars.add("BMW");
-        cars.add("Ford");
-        cars.add("Mazda");
-        
-        // Get the iterator
-        Iterator<String> it = cars.iterator();
-        
-        // Print all elements using iterator
-        System.out.println("All cars:");
-        while (it.hasNext()) {
-            String car = it.next();
-            System.out.println(car);
-        }
-        
-        // Create a new iterator for another traversal
-        Iterator<String> it2 = cars.iterator();
-        
-        // Print the first item
-        System.out.println("\nFirst car: " + it2.next());
-    }
-}
-```
-
-**Output:**
-```
-All cars:
-Volvo
-BMW
-Ford
-Mazda
-
-First car: Volvo
-```
-
-**Answer:** `iterator()` returns an `Iterator` object. We use `hasNext()` to check if more elements exist and `next()` to retrieve them. Note that an iterator is consumed after use—we need a new iterator for a second traversal.
-
-</details>
-
-##### **3.17. Enum Constructor Behavior** (Lab 10, Example 1)
+##### **3.1. Enum Constructor Behavior** (Lab 10, Task 1)
 
 Demonstrate when enum constructors are called.
 
@@ -1824,7 +903,7 @@ GREEN
 
 </details>
 
-##### **3.18. Animals List Program** (Lab 10, Task 3)
+##### **3.2. Animals List Program** (Lab 10, Task 3)
 
 Write a program to create a List of animals with methods for adding, removing, updating, and displaying.
 
@@ -1937,7 +1016,7 @@ Animal not found: Giraffe
 
 </details>
 
-##### **3.19. Remove Odd-Length Strings from Set** (Lab 10, Task 4)
+##### **3.3. Remove Odd-Length Strings from Set** (Lab 10, Task 4)
 
 Write a program that creates a Set with strings and removes all elements with odd length, leaving only even-length elements.
 
@@ -2022,7 +1101,7 @@ public class StringSetFilterLambda {
 
 </details>
 
-##### **3.20. Map with Repetitive Value Counter** (Lab 10, Task 5)
+##### **3.4. Map with Repetitive Value Counter** (Lab 10, Task 5)
 
 Write a program that creates a `Map<String, Integer>` from user input and reports if there are repetitive values and their count.
 
@@ -2181,7 +1260,7 @@ Value 200 is mapped by 2 keys: [banana, grape]
 
 </details>
 
-##### **3.21. Online Book Reader System** (Lab 10, Task 6 - Homework)
+##### **3.5. Online Book Reader System** (Lab 10, Task 6 - Homework)
 
 Design and implement a basic online book reader system with the following requirements:
 
@@ -2554,3 +1633,923 @@ Explore common software design patterns...
 
 </details>
 
+##### **3.6. Separating Interface from Implementation** (Lecture 11, Example 1)
+
+Consider an airplane hierarchy where different airplane models need different flying algorithms. Implement this correctly by separating interface from implementation.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use abstract methods to force explicit implementation while providing optional default implementations through protected helper methods.
+
+**Incorrect approach (problem):**
+
+```java
+class Airplane {
+    public void fly() {
+        // Standard flying algorithm for Airbus
+    }
+}
+
+class AirbusA extends Airplane { }  // Inherits Airbus algorithm
+class AirbusB extends Airplane { }  // Inherits Airbus algorithm
+class Boeing extends Airplane { }   // WRONG: Also inherits Airbus algorithm!
+```
+
+**Problem:** Boeing automatically inherits Airbus's flying algorithm. The compiler doesn't detect this semantic error.
+
+**Correct approach (solution):**
+
+```java
+abstract class Airplane {
+    // Interface: must be implemented by all subclasses
+    public abstract void fly();
+    
+    // Optional default implementation
+    protected void defaultFly() {
+        // Standard flying algorithm
+        System.out.println("Standard flying algorithm");
+    }
+}
+
+class AirbusA extends Airplane {
+    public void fly() {
+        defaultFly();  // Can choose to use default
+    }
+}
+
+class AirbusB extends Airplane {
+    public void fly() {
+        defaultFly();  // Can choose to use default
+    }
+}
+
+class Boeing extends Airplane {
+    public void fly() {
+        // MUST provide its own implementation
+        System.out.println("Boeing's own flying algorithm");
+    }
+}
+```
+
+**Usage:**
+
+```java
+Airplane a = new AirbusA();
+a.fly();  // Standard flying algorithm
+
+Airplane b = new AirbusB();
+b.fly();  // Standard flying algorithm
+
+Airplane c = new Boeing();
+c.fly();  // Boeing's own flying algorithm
+```
+
+**Answer:** By making `fly()` abstract, we force each subclass to explicitly implement it, preventing accidental inheritance of wrong behavior. The `defaultFly()` helper method provides an optional default implementation.
+
+</details>
+
+##### **3.7. Using Final Methods** (Lecture 11, Example 2)
+
+Create a base class with a final method and demonstrate that it cannot be overridden.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The `final` keyword on a method prevents subclasses from overriding it, ensuring consistent behavior.
+
+```java
+class Base {
+    public final void method() {
+        System.out.println("Base's method");
+    }
+}
+
+class Derived extends Base {
+    // This would cause a compilation error:
+    // public void method() {
+    //     System.out.println("Derived's method");
+    // }
+    // Error: Cannot override the final method from Base
+}
+```
+
+**Testing the code:**
+
+```java
+Base b1 = new Base();
+b1.method();  // Output: Base's method
+
+Base b2 = new Derived();
+b2.method();  // Output: Base's method (same implementation)
+```
+
+**Answer:** Final methods guarantee that the behavior defined in the base class cannot be changed by subclasses, enabling compiler optimizations and ensuring consistent behavior.
+
+</details>
+
+##### **3.8. Creating a Final Class** (Lecture 11, Example 3)
+
+Demonstrate creating a final class and show that it cannot be extended.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```java
+final class Base {
+    public void method() {
+        System.out.println("Base's method");
+    }
+}
+
+// This would cause a compilation error:
+// class Derived extends Base {
+// }
+// Error: The type Derived cannot subclass the final class Base
+```
+
+**Why can't a class be both abstract and final?**
+
+```java
+// This is illegal and won't compile:
+// abstract final class InvalidClass {
+//     abstract void method();
+// }
+```
+
+**Explanation:** An `abstract` class is incomplete by design—it *requires* subclasses to provide implementations. A `final` class *forbids* subclasses. These two concepts are contradictory, so using both is illegal.
+
+**Answer:** Final classes prevent inheritance entirely. All methods in a final class are implicitly final. A class cannot be both abstract and final because abstract classes require inheritance to be complete.
+
+</details>
+
+##### **3.9. Implementing an Interface** (Lecture 11, Example 4)
+
+Create an interface `Features` and implement it in a `Lion` class.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** An interface defines a contract. Any class implementing it must provide implementations for all declared methods.
+
+```java
+interface Features {
+    int numOfLegs();
+    boolean canFly();
+    boolean canSwim();
+}
+
+class Lion implements Features {
+    public int numOfLegs() {
+        return 4;
+    }
+    
+    public boolean canFly() {
+        return false;
+    }
+    
+    public boolean canSwim() {
+        return true;
+    }
+}
+```
+
+**Usage:**
+
+```java
+// Can treat Lion as a Features interface
+Features f = new Lion();
+
+System.out.println("Number of legs: " + f.numOfLegs());
+
+if (f.canFly()) {
+    System.out.println("Can fly");
+} else {
+    System.out.println("Cannot fly");
+}
+
+if (f.canSwim()) {
+    System.out.println("Can swim");
+}
+```
+
+**Output:**
+```
+Number of legs: 4
+Cannot fly
+Can swim
+```
+
+**Answer:** The `Lion` class implements the `Features` interface by providing concrete implementations for all three methods. We can then treat a `Lion` object as a `Features` reference.
+
+</details>
+
+##### **3.10. Multiple Interface Implementation** (Lecture 11, Example 5)
+
+Create a `Person` class that implements multiple interfaces representing different aspects of a person.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A class can implement multiple interfaces, providing a safe alternative to multiple inheritance.
+
+```java
+interface iBodyParams {
+    int getHeight();
+    int getWeight();
+}
+
+interface iSkills {
+    String getProgrammingLanguage();
+    int getExperienceYears();
+}
+
+interface iRelations {
+    String getFriendName();
+}
+
+class Person implements iBodyParams, iSkills, iRelations {
+    private int height;
+    private int weight;
+    private String programmingLanguage;
+    private int experienceYears;
+    private String friendName;
+    
+    public Person(int height, int weight, String language, 
+                  int experience, String friend) {
+        this.height = height;
+        this.weight = weight;
+        this.programmingLanguage = language;
+        this.experienceYears = experience;
+        this.friendName = friend;
+    }
+    
+    // iBodyParams implementation
+    public int getHeight() { return height; }
+    public int getWeight() { return weight; }
+    
+    // iSkills implementation
+    public String getProgrammingLanguage() { return programmingLanguage; }
+    public int getExperienceYears() { return experienceYears; }
+    
+    // iRelations implementation
+    public String getFriendName() { return friendName; }
+}
+```
+
+**Usage (viewing from different perspectives):**
+
+```java
+Person john = new Person(180, 75, "Java", 5, "Alice");
+
+// View John as a set of skills
+iSkills johnsSkills = john;
+System.out.println("Programming language: " + johnsSkills.getProgrammingLanguage());
+System.out.println("Experience: " + johnsSkills.getExperienceYears() + " years");
+
+// View John's body parameters
+iBodyParams johnsBody = john;
+System.out.println("Height: " + johnsBody.getHeight() + " cm");
+
+// View John's relationships
+iRelations johnsRelations = john;
+System.out.println("Friend: " + johnsRelations.getFriendName());
+```
+
+**Answer:** A `Person` can be viewed through different interfaces depending on the context. Each interface represents a "facet" or perspective on the person.
+
+</details>
+
+##### **3.11. Interface Inheritance** (Lecture 11, Example 6)
+
+Demonstrate how interfaces can extend other interfaces and how this affects implementing classes.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** An interface can extend another interface, inheriting all its method declarations.
+
+```java
+interface SpeedFeatures {
+    float maxSpeed();
+    float maxAcceleration();
+}
+
+interface EngineFeatures extends SpeedFeatures {
+    float numOfCyls();
+    float enginePower();
+}
+
+class Car implements EngineFeatures {
+    // Must implement ALL methods from both interfaces
+    
+    // From SpeedFeatures
+    public float maxSpeed() {
+        return 200.0f;
+    }
+    
+    public float maxAcceleration() {
+        return 5.5f;
+    }
+    
+    // From EngineFeatures
+    public float numOfCyls() {
+        return 6.0f;
+    }
+    
+    public float enginePower() {
+        return 300.0f;
+    }
+}
+```
+
+**Usage:**
+
+```java
+Car myCar = new Car();
+
+// Can be treated as EngineFeatures
+EngineFeatures engine = myCar;
+System.out.println("Engine power: " + engine.enginePower() + " HP");
+System.out.println("Cylinders: " + engine.numOfCyls());
+
+// Can also be treated as SpeedFeatures
+SpeedFeatures speed = myCar;
+System.out.println("Max speed: " + speed.maxSpeed() + " km/h");
+System.out.println("Max acceleration: " + speed.maxAcceleration() + " m/s²");
+```
+
+**Answer:** `Car` must implement methods from both `SpeedFeatures` and `EngineFeatures` because `EngineFeatures` extends `SpeedFeatures`. The object can be viewed as either interface type.
+
+</details>
+
+##### **3.12. Type Checking with Interfaces** (Lecture 11, Example 7)
+
+Use `instanceof` to check if an object implements specific interfaces and perform appropriate actions.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The `instanceof` operator works with interfaces to check if an object implements a given interface.
+
+```java
+interface Printable {
+    void print();
+}
+
+interface Movable {
+    void move();
+}
+
+interface Serializable {
+    void serialize();
+}
+
+abstract class Shape {
+    abstract void draw();
+}
+
+class Rectangle extends Shape implements Printable, Movable, Serializable {
+    public void draw() {
+        System.out.println("Drawing rectangle");
+    }
+    
+    public void print() {
+        System.out.println("Printing rectangle");
+    }
+    
+    public void move() {
+        System.out.println("Moving rectangle");
+    }
+    
+    public void serialize() {
+        System.out.println("Serializing rectangle");
+    }
+}
+```
+
+**Usage:**
+
+```java
+Shape a = new Rectangle();
+
+// Check and use different interfaces
+if (a instanceof Printable) {
+    ((Printable)a).print();  // Prints: Printing rectangle
+}
+
+if (a instanceof Movable) {
+    ((Movable)a).move();  // Prints: Moving rectangle
+}
+
+if (a instanceof Serializable) {
+    ((Serializable)a).serialize();  // Prints: Serializing rectangle
+}
+
+// This would be false
+if (a instanceof String) {
+    System.out.println("Never executes");
+}
+```
+
+**Answer:** `instanceof` checks if an object's class implements a particular interface. After checking, we can safely cast the object to that interface type.
+
+</details>
+
+##### **3.13. Nested Interface** (Lecture 11, Example 8)
+
+Create a nested interface inside a class and implement it.
+
+<details>
+<summary>Click to see the solution</summary>
+
+```java
+class SomeClass {
+    public interface Nested {
+        boolean isNotNegative(int x);
+    }
+}
+
+class MyClass implements SomeClass.Nested {
+    public boolean isNotNegative(int x) {
+        return x >= 0;
+    }
+}
+
+class Demo {
+    public static void main(String[] args) {
+        SomeClass.Nested obj = new MyClass();
+        
+        if (obj.isNotNegative(10)) {
+            System.out.println("10 is not negative");
+        }
+        
+        if (obj.isNotNegative(-5)) {
+            System.out.println("Never prints");
+        } else {
+            System.out.println("-5 is negative");
+        }
+    }
+}
+```
+
+**Output:**
+```
+10 is not negative
+-5 is negative
+```
+
+**Answer:** Nested interfaces are accessed using the enclosing class name (e.g., `SomeClass.Nested`). They can be implemented by any class, not just nested classes.
+
+</details>
+
+##### **3.14. Basic Enumeration** (Lecture 11, Example 9)
+
+Create an enumeration for days of the week and use it in a switch statement.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Enumerations provide type-safe constants and work naturally with switch statements.
+
+```java
+public enum Day {
+    SUNDAY,
+    MONDAY,
+    TUESDAY,
+    WEDNESDAY,
+    THURSDAY,
+    FRIDAY,
+    SATURDAY
+}
+
+public class DayDemo {
+    public void tellItLikeItIs(Day day) {
+        switch (day) {
+            case MONDAY:
+                System.out.println("Mondays are bad.");
+                break;
+            case FRIDAY:
+                System.out.println("Fridays are better.");
+                break;
+            case SATURDAY:
+            case SUNDAY:
+                System.out.println("Weekends are best.");
+                break;
+            default:
+                System.out.println("Midweek days are so-so.");
+                break;
+        }
+    }
+    
+    public static void main(String[] args) {
+        DayDemo demo = new DayDemo();
+        
+        demo.tellItLikeItIs(Day.MONDAY);     // Mondays are bad.
+        demo.tellItLikeItIs(Day.FRIDAY);     // Fridays are better.
+        demo.tellItLikeItIs(Day.SATURDAY);   // Weekends are best.
+        demo.tellItLikeItIs(Day.WEDNESDAY);  // Midweek days are so-so.
+    }
+}
+```
+
+**Answer:** Enumerations provide readable, type-safe constants. The compiler ensures only valid `Day` values can be passed to `tellItLikeItIs()`.
+
+</details>
+
+##### **3.15. Enumeration with Fields and Constructor** (Lecture 11, Example 10)
+
+Create a `Coin` enumeration with associated values (in cents) and methods.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Java enums can have fields, constructors, and methods, making them more powerful than simple constants.
+
+```java
+enum Coin {
+    PENNY(1),
+    NICKEL(5),
+    DIME(10),
+    QUARTER(25);
+    
+    private final int value;
+    
+    // Constructor is private by default
+    Coin(int value) {
+        this.value = value;
+    }
+    
+    public int getValue() {
+        return value;
+    }
+}
+
+public class CoinDemo {
+    public static void main(String[] args) {
+        Coin c = Coin.DIME;
+        System.out.println("A dime is worth " + c.getValue() + " cents");
+        
+        // Print all coins and their values
+        System.out.println("\nAll coins:");
+        for (Coin coin : Coin.values()) {
+            System.out.println(coin + ": " + coin.getValue() + " cents");
+        }
+    }
+}
+```
+
+**Output:**
+```
+A dime is worth 10 cents
+
+All coins:
+PENNY: 1 cents
+NICKEL: 5 cents
+DIME: 10 cents
+QUARTER: 25 cents
+```
+
+**Answer:** Each enum constant is initialized with a value through the constructor. The `values()` method returns an array of all enum constants in declaration order.
+
+</details>
+
+##### **3.16. Enum with Method Bodies** (Lecture 11, Example 11)
+
+Create an `Operation` enum where each constant has its own implementation of an `eval()` method.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each enum constant can have its own method implementation, enabling operation-specific behavior.
+
+```java
+enum Operation {
+    PLUS {
+        double eval(double x, double y) {
+            return x + y;
+        }
+    },
+    MINUS {
+        double eval(double x, double y) {
+            return x - y;
+        }
+    },
+    TIMES {
+        double eval(double x, double y) {
+            return x * y;
+        }
+    },
+    DIVIDE {
+        double eval(double x, double y) {
+            return x / y;
+        }
+    };
+    
+    // Abstract method that each constant must implement
+    abstract double eval(double x, double y);
+    
+    public static void main(String[] args) {
+        double x = 2.0;
+        double y = 4.0;
+        
+        for (Operation op : Operation.values()) {
+            System.out.println(x + " " + op + " " + y + " = " + op.eval(x, y));
+        }
+    }
+}
+```
+
+**Output:**
+```
+2.0 PLUS 4.0 = 6.0
+2.0 MINUS 4.0 = -2.0
+2.0 TIMES 4.0 = 8.0
+2.0 DIVIDE 4.0 = 0.5
+```
+
+**Answer:** Each enum constant provides its own implementation of the abstract `eval()` method, creating a clean alternative to switch statements.
+
+</details>
+
+##### **3.17. Enum with values() and ordinal() Methods** (Tutorial 11, Task 1)
+
+Demonstrate the predefined `values()` and `ordinal()` methods available in all enums.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** All Java enums automatically have `values()` (returns all constants) and `ordinal()` (returns position) methods.
+
+```java
+public class Test {
+    enum Season {
+        WINTER,
+        SPRING,
+        SUMMER,
+        FALL
+    }
+    
+    public static void main(String[] args) {
+        System.out.println("All seasons:");
+        for (Season s : Season.values()) {
+            System.out.println(s);
+        }
+        
+        System.out.println("\nSeasons with ordinals:");
+        for (Season s : Season.values()) {
+            System.out.println(s + " has ordinal " + s.ordinal());
+        }
+        
+        System.out.println("\nOrdinal of SUMMER: " + Season.SUMMER.ordinal());
+    }
+}
+```
+
+**Output:**
+```
+All seasons:
+WINTER
+SPRING
+SUMMER
+FALL
+
+Seasons with ordinals:
+WINTER has ordinal 0
+SPRING has ordinal 1
+SUMMER has ordinal 2
+FALL has ordinal 3
+
+Ordinal of SUMMER: 2
+```
+
+**Answer:** `values()` returns an array of all enum constants in declaration order. `ordinal()` returns the zero-based position of each constant.
+
+</details>
+
+##### **3.18. Creating and Using an ArrayList** (Tutorial 11, Task 2)
+
+Create an `ArrayList` of strings and perform basic operations.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `ArrayList` is a resizable array implementation of the `List` interface.
+
+```java
+import java.util.List;
+import java.util.ArrayList;
+
+public class GFG {
+    public static void main(String args[]) {
+        // Creating an ArrayList
+        List<String> al = new ArrayList<>();
+        
+        // Adding elements
+        al.add("Geeks");
+        al.add("Geeks");
+        al.add(1, "For");  // Insert at index 1
+        
+        // Print all elements
+        System.out.println(al);
+        
+        // Access by index
+        System.out.println("Element at index 0: " + al.get(0));
+        System.out.println("Element at index 1: " + al.get(1));
+        
+        // Size
+        System.out.println("Size: " + al.size());
+        
+        // Remove
+        al.remove(2);  // Remove element at index 2
+        System.out.println("After removal: " + al);
+    }
+}
+```
+
+**Output:**
+```
+[Geeks, For, Geeks]
+Element at index 0: Geeks
+Element at index 1: For
+Size: 3
+After removal: [Geeks, For]
+```
+
+**Answer:** `ArrayList` maintains insertion order and allows duplicates. Elements are accessed by zero-based index.
+
+</details>
+
+##### **3.19. Creating and Using a HashSet** (Tutorial 11, Task 3)
+
+Create a `HashSet` and demonstrate that duplicates are automatically ignored.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `HashSet` stores unique elements only. Attempting to add a duplicate has no effect.
+
+```java
+import java.util.Set;
+import java.util.HashSet;
+
+public class GFG {
+    public static void main(String[] args) {
+        // Create a HashSet
+        Set<String> hashSet = new HashSet<>();
+        
+        // Adding elements
+        hashSet.add("Geeks");
+        hashSet.add("For");
+        hashSet.add("Geeks");    // Duplicate - will be ignored
+        hashSet.add("Example");
+        hashSet.add("Set");
+        
+        // Print (order not guaranteed)
+        System.out.println(hashSet);
+        
+        // Check if contains
+        System.out.println("Contains 'Geeks': " + hashSet.contains("Geeks"));
+        System.out.println("Contains 'Java': " + hashSet.contains("Java"));
+        
+        // Size
+        System.out.println("Size: " + hashSet.size());
+    }
+}
+```
+
+**Possible Output:**
+```
+[Geeks, Example, Set, For]
+Contains 'Geeks': true
+Contains 'Java': false
+Size: 4
+```
+
+**Note:** The order of elements in the output may vary since `HashSet` doesn't maintain any order.
+
+**Answer:** `HashSet` automatically filters out duplicate elements. The second "Geeks" is ignored, so the set contains only 4 elements instead of 5.
+
+</details>
+
+##### **3.20. Creating and Using a HashMap** (Tutorial 11, Task 4)
+
+Create a `HashMap` to store key-value pairs and iterate through it.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `HashMap` stores key-value pairs where each unique key maps to one value.
+
+```java
+import java.util.Map;
+import java.util.HashMap;
+
+public class HashMapDemo {
+    public static void main(String args[]) {
+        // Create a HashMap
+        Map<String, Integer> hm = new HashMap<>();
+        
+        // Adding key-value pairs
+        hm.put("a", 100);
+        hm.put("b", 200);
+        hm.put("c", 300);
+        hm.put("d", 400);
+        
+        // Replacing a value
+        hm.put("a", 150);  // Replaces previous value for key "a"
+        
+        System.out.println("HashMap contents:");
+        // Traversing through the map
+        for (Map.Entry<String, Integer> me : hm.entrySet()) {
+            System.out.println(me.getKey() + ": " + me.getValue());
+        }
+        
+        // Access by key
+        System.out.println("\nValue for key 'b': " + hm.get("b"));
+        
+        // Check if key exists
+        System.out.println("Contains key 'c': " + hm.containsKey("c"));
+        System.out.println("Contains key 'z': " + hm.containsKey("z"));
+        
+        // Size
+        System.out.println("Size: " + hm.size());
+    }
+}
+```
+
+**Possible Output:**
+```
+HashMap contents:
+a: 150
+b: 200
+c: 300
+d: 400
+
+Value for key 'b': 200
+Contains key 'c': true
+Contains key 'z': false
+Size: 4
+```
+
+**Note:** The order of entries may vary since `HashMap` doesn't maintain insertion order.
+
+**Answer:** `HashMap` maps unique keys to values. When we put a value for an existing key, the old value is replaced. We iterate using `entrySet()` which returns key-value pairs.
+
+</details>
+
+##### **3.21. Using an Iterator** (Tutorial 11, Task 5)
+
+Use an `Iterator` to traverse through an `ArrayList`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** An `Iterator` provides a uniform way to traverse any collection.
+
+```java
+import java.util.ArrayList;
+import java.util.Iterator;
+
+public class Main {
+    public static void main(String[] args) {
+        // Create a collection
+        ArrayList<String> cars = new ArrayList<>();
+        cars.add("Volvo");
+        cars.add("BMW");
+        cars.add("Ford");
+        cars.add("Mazda");
+        
+        // Get the iterator
+        Iterator<String> it = cars.iterator();
+        
+        // Print all elements using iterator
+        System.out.println("All cars:");
+        while (it.hasNext()) {
+            String car = it.next();
+            System.out.println(car);
+        }
+        
+        // Create a new iterator for another traversal
+        Iterator<String> it2 = cars.iterator();
+        
+        // Print the first item
+        System.out.println("\nFirst car: " + it2.next());
+    }
+}
+```
+
+**Output:**
+```
+All cars:
+Volvo
+BMW
+Ford
+Mazda
+
+First car: Volvo
+```
+
+**Answer:** `iterator()` returns an `Iterator` object. We use `hasNext()` to check if more elements exist and `next()` to retrieve them. Note that an iterator is consumed after use—we need a new iterator for a second traversal.
+
+</details>

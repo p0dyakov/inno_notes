@@ -523,320 +523,7 @@ Describe the attributes of the following lambda expression:
 
 </details>
 
-##### **3.2. Meaning of String::valueOf Expression** (Lab 14, Warm-up 2)
-What is the meaning of `String::valueOf` expression?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Method references provide a shorthand for lambdas that simply call an existing method.
-
-`String::valueOf` is a **method reference** that refers to the static `valueOf` method of the `String` class.
-
-**Equivalence:**
-
-```java
-// Method reference
-Function<Integer, String> converter1 = String::valueOf;
-
-// Equivalent lambda expression
-Function<Integer, String> converter2 = x -> String.valueOf(x);
-```
-
-**Usage:**
-
-The `valueOf` method converts various types (int, double, Object, etc.) to their String representation. The method reference can be used wherever a functional interface is expected that matches the signature of one of the `valueOf` overloads.
-
-**Example:**
-
-```java
-List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
-List<String> strings = numbers.stream()
-    .map(String::valueOf)  // Convert each integer to String
-    .collect(Collectors.toList());
-```
-
-**Answer:** `String::valueOf` is a method reference to the static `valueOf` method of the `String` class, which converts values to their string representation. It's equivalent to the lambda `x -> String.valueOf(x)`.
-
-</details>
-
-##### **3.3. Stream Modifications Without Assignment** (Lab 14, Warm-up 3)
-Does the modification of a Set with Stream API and without assigning the value to this set do any updates in the original set?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Stream operations don't modify the source collection; they create a new stream with the results.
-
-**No**, stream operations do **not** modify the original collection unless you explicitly use methods designed to do so (like `forEach` with side effects, which is generally discouraged).
-
-**Example demonstrating this:**
-
-```java
-Set<Integer> numbers = new HashSet<>(Arrays.asList(5, 9, 8, 1));
-
-// This doesn't modify 'numbers'
-numbers.stream()
-    .filter(n -> n > 5)
-    .map(n -> n * 2);
-
-System.out.println(numbers);  // Still: [1, 5, 8, 9]
-
-// To save changes, you must collect the results
-Set<Integer> modified = numbers.stream()
-    .filter(n -> n > 5)
-    .map(n -> n * 2)
-    .collect(Collectors.toSet());
-
-System.out.println(modified);  // [16, 18]
-System.out.println(numbers);   // Still: [1, 5, 8, 9]
-```
-
-**Why?** Streams follow functional programming principles. They create new streams with transformed data rather than mutating existing collections. This makes code more predictable and thread-safe.
-
-**Answer:** No, stream operations without assignment do not modify the original set. Streams are immutable pipelines that produce new results without changing the source collection.
-
-</details>
-
-##### **3.4. Non-Abstract Methods in Functional Interfaces** (Lab 14, Warm-up 4)
-How many non-abstract (default) methods are allowed in functional interfaces?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Functional interfaces can have multiple default and static methods, but only one abstract method.
-
-**Answer:** **Unlimited** - there is no restriction on the number of default (non-abstract) methods or static methods in a functional interface.
-
-**Important rules:**
-
-*   A functional interface must have **exactly one** abstract method
-*   It can have **any number** of default methods
-*   It can have **any number** of static methods
-*   It inherits abstract methods from `Object` class (like `equals()`, `hashCode()`, `toString()`), but these don't count toward the "one abstract method" requirement
-
-**Example:**
-
-```java
-@FunctionalInterface
-interface MyInterface {
-    // One abstract method (required)
-    void doSomething(String s);
-    
-    // Multiple default methods (allowed)
-    default void method1() {
-        System.out.println("Default method 1");
-    }
-    
-    default void method2() {
-        System.out.println("Default method 2");
-    }
-    
-    default void method3() {
-        System.out.println("Default method 3");
-    }
-    
-    // Static methods (also allowed)
-    static void staticMethod() {
-        System.out.println("Static method");
-    }
-}
-```
-
-This is still a valid functional interface because it has exactly one abstract method, despite having multiple default and static methods.
-
-</details>
-
-##### **3.5. When to Use Runnable vs Thread** (Lab 14, Warm-up 5)
-When to use Runnable vs Thread in Java?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Prefer implementing `Runnable` over extending `Thread` in most cases for better design flexibility.
-
-**Use Runnable when:**
-
-*   You want to separate the task (what to run) from the execution mechanism (how to run)
-*   Your class already extends another class (Java doesn't support multiple inheritance)
-*   You want to implement multiple interfaces
-*   You follow better object-oriented design principles (composition over inheritance)
-*   You want to use thread pools or executor services
-*   The `Runnable` interface is functional, so you can use lambda expressions
-
-**Use Thread when:**
-
-*   You need to override other Thread methods besides `run()`
-*   You're creating a specialized thread class with additional thread-specific behavior
-*   (Rare cases - generally discouraged)
-
-**Comparison:**
-
-```java
-// Implementing Runnable (preferred)
-public class MyTask implements Runnable {
-    @Override
-    public void run() {
-        System.out.println("Task running");
-    }
-}
-// Usage
-Thread thread = new Thread(new MyTask());
-thread.start();
-
-// Or with lambda (since Runnable is functional)
-Thread thread = new Thread(() -> System.out.println("Task running"));
-thread.start();
-
-// Extending Thread (less flexible)
-public class MyThread extends Thread {
-    @Override
-    public void run() {
-        System.out.println("Thread running");
-    }
-}
-// Usage
-MyThread thread = new MyThread();
-thread.start();
-```
-
-**Answer:** Prefer `Runnable` in most cases because it provides better separation of concerns, allows your class to extend other classes, and works with lambda expressions and modern concurrency utilities. Use `Thread` only when you need to override additional thread-specific methods.
-
-</details>
-
-##### **3.6. Difference Between start() and run()** (Lab 14, Warm-up 6)
-What is the difference between `start()` and `run()` method of Thread class?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** `start()` creates a new thread; `run()` executes in the current thread.
-
-**Fundamental difference:**
-
-*   **`start()`**: Creates a **new thread** and executes the `run()` method in that new thread
-*   **`run()`**: Executes the `run()` method in the **current thread** (no new thread is created)
-
-**Detailed comparison:**
-
-| Aspect | start() | run() |
-|:-------|:--------|:------|
-| Creates new thread? | Yes | No |
-| Executes concurrently? | Yes (in separate thread) | No (in current thread) |
-| Can be called multiple times? | No (throws IllegalThreadStateException) | Yes (just a regular method call) |
-| Purpose | Begin thread execution | Define the thread's task |
-
-**Example:**
-
-```java
-class MyThread extends Thread {
-    @Override
-    public void run() {
-        System.out.println("Running in thread: " + 
-            Thread.currentThread().getName());
-    }
-}
-
-public class Main {
-    public static void main(String[] args) {
-        MyThread t1 = new MyThread();
-        MyThread t2 = new MyThread();
-        
-        // Using start() - creates new threads
-        t1.start();  // Output: Running in thread: Thread-0
-        t2.start();  // Output: Running in thread: Thread-1
-        
-        // Using run() - no new thread
-        MyThread t3 = new MyThread();
-        t3.run();    // Output: Running in thread: main
-    }
-}
-```
-
-**Visual explanation:**
-
-```
-start() -> JVM creates new thread -> new thread calls run()
-run()   -> Current thread executes run() directly
-```
-
-**Answer:** `start()` creates a new thread and calls `run()` in that new thread, enabling concurrent execution. `run()` simply executes the method in the current thread like any regular method call, providing no concurrency benefit. Always use `start()` to begin thread execution.
-
-</details>
-
-##### **3.7. Exception in Java Thread** (Lab 14, Warm-up 7)
-What happens when an exception occurs in Java thread?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Exceptions in threads are isolated to that thread and don't propagate to other threads.
-
-**What happens:**
-
-1.  **The thread terminates**: The thread where the exception occurred stops execution
-2.  **Other threads continue**: The exception does not affect other running threads
-3.  **Exception doesn't propagate**: The exception does not propagate back to the thread that started it (e.g., the main thread)
-4.  **Stack trace is printed**: By default, the uncaught exception and its stack trace are printed to the console
-5.  **UncaughtExceptionHandler is called**: If set, the thread's `UncaughtExceptionHandler` is invoked
-
-**Example:**
-
-```java
-public class ThreadExceptionDemo {
-    public static void main(String[] args) {
-        Thread t1 = new Thread(() -> {
-            System.out.println("Thread 1 starting");
-            throw new RuntimeException("Exception in Thread 1");
-        });
-        
-        Thread t2 = new Thread(() -> {
-            try {
-                Thread.sleep(100);
-                System.out.println("Thread 2 still running!");
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        });
-        
-        t1.start();
-        t2.start();
-        
-        System.out.println("Main thread continues");
-    }
-}
-```
-
-**Output:**
-```
-Thread 1 starting
-Main thread continues
-Exception in thread "Thread-0" java.lang.RuntimeException: Exception in Thread 1
-    at ThreadExceptionDemo.lambda$main$0(ThreadExceptionDemo.java:5)
-    at java.lang.Thread.run(Thread.java:748)
-Thread 2 still running!
-```
-
-**Handling exceptions in threads:**
-
-```java
-Thread thread = new Thread(() -> {
-    try {
-        // Thread code that might throw exception
-        int result = 10 / 0;
-    } catch (Exception e) {
-        System.out.println("Caught exception: " + e.getMessage());
-        // Handle appropriately
-    }
-});
-thread.start();
-```
-
-**Answer:** When an exception occurs in a thread, that thread terminates and prints the stack trace, but other threads (including the main thread) continue running unaffected. The exception doesn't propagate to the parent thread. To handle exceptions properly, wrap thread code in try-catch blocks within the `run()` method.
-
-</details>
-
-##### **3.8. Filter and Transform List Elements** (Lab 14, Task 1)
+##### **3.2. Filter and Transform List Elements** (Lab 14, Task 1)
 Create a list of integer numbers and fill it with random positive and negative values. By using lambda expressions display all of them which are divisible by 3 and remove "-" sign if present.
 
 <details>
@@ -902,7 +589,44 @@ Numbers divisible by 3 (absolute):
 
 </details>
 
-##### **3.9. Filter Strings with Regex** (Lab 14, Task 2)
+##### **3.3. Meaning of String::valueOf Expression** (Lab 14, Warm-up 2)
+What is the meaning of `String::valueOf` expression?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Method references provide a shorthand for lambdas that simply call an existing method.
+
+`String::valueOf` is a **method reference** that refers to the static `valueOf` method of the `String` class.
+
+**Equivalence:**
+
+```java
+// Method reference
+Function<Integer, String> converter1 = String::valueOf;
+
+// Equivalent lambda expression
+Function<Integer, String> converter2 = x -> String.valueOf(x);
+```
+
+**Usage:**
+
+The `valueOf` method converts various types (int, double, Object, etc.) to their String representation. The method reference can be used wherever a functional interface is expected that matches the signature of one of the `valueOf` overloads.
+
+**Example:**
+
+```java
+List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+List<String> strings = numbers.stream()
+    .map(String::valueOf)  // Convert each integer to String
+    .collect(Collectors.toList());
+```
+
+**Answer:** `String::valueOf` is a method reference to the static `valueOf` method of the `String` class, which converts values to their string representation. It's equivalent to the lambda `x -> String.valueOf(x)`.
+
+</details>
+
+##### **3.4. Filter Strings with Regex** (Lab 14, Task 2)
 Create a list of strings and fill it with random strings of different length containing English letters and numbers. Duplicate all values and add them to the same list. By using lambda expressions display sorted list containing non-empty unique strings without numbers.
 
 **Hint:** use regular expression
@@ -1013,7 +737,45 @@ System.out.println(filtered);
 
 </details>
 
-##### **3.10. Fix Race Condition with Synchronization** (Lab 14, Task 3)
+##### **3.5. Stream Modifications Without Assignment** (Lab 14, Warm-up 3)
+Does the modification of a Set with Stream API and without assigning the value to this set do any updates in the original set?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Stream operations don't modify the source collection; they create a new stream with the results.
+
+**No**, stream operations do **not** modify the original collection unless you explicitly use methods designed to do so (like `forEach` with side effects, which is generally discouraged).
+
+**Example demonstrating this:**
+
+```java
+Set<Integer> numbers = new HashSet<>(Arrays.asList(5, 9, 8, 1));
+
+// This doesn't modify 'numbers'
+numbers.stream()
+    .filter(n -> n > 5)
+    .map(n -> n * 2);
+
+System.out.println(numbers);  // Still: [1, 5, 8, 9]
+
+// To save changes, you must collect the results
+Set<Integer> modified = numbers.stream()
+    .filter(n -> n > 5)
+    .map(n -> n * 2)
+    .collect(Collectors.toSet());
+
+System.out.println(modified);  // [16, 18]
+System.out.println(numbers);   // Still: [1, 5, 8, 9]
+```
+
+**Why?** Streams follow functional programming principles. They create new streams with transformed data rather than mutating existing collections. This makes code more predictable and thread-safe.
+
+**Answer:** No, stream operations without assignment do not modify the original set. Streams are immutable pipelines that produce new results without changing the source collection.
+
+</details>
+
+##### **3.6. Fix Race Condition with Synchronization** (Lab 14, Task 3)
 A Counter object is referenced from multiple threads (i.e. two threads, `thread1` and `thread2`). The `counter++` statement can be decomposed into 3 steps:
 
 1. Retrieve the current value of counter
@@ -1154,754 +916,245 @@ public class TestCounter {
 
 </details>
 
-##### **3.11. Using Predicate Interface** (Tutorial 14, Example 1)
-Demonstrate the use of `Predicate<T>` functional interface to test if a number is positive.
+##### **3.7. Non-Abstract Methods in Functional Interfaces** (Lab 14, Warm-up 4)
+How many non-abstract (default) methods are allowed in functional interfaces?
 
 <details>
 <summary>Click to see the solution</summary>
 
-**Key Concept:** `Predicate<T>` represents a boolean-valued function that takes one argument and returns true or false.
+**Key Concept:** Functional interfaces can have multiple default and static methods, but only one abstract method.
 
-**Predicate Interface Definition:**
+**Answer:** **Unlimited** - there is no restriction on the number of default (non-abstract) methods or static methods in a functional interface.
+
+**Important rules:**
+
+*   A functional interface must have **exactly one** abstract method
+*   It can have **any number** of default methods
+*   It can have **any number** of static methods
+*   It inherits abstract methods from `Object` class (like `equals()`, `hashCode()`, `toString()`), but these don't count toward the "one abstract method" requirement
+
+**Example:**
 
 ```java
 @FunctionalInterface
-public interface Predicate<T> {
-    boolean test(T t);
-}
-```
-
-**Example Implementation:**
-
-```java
-import java.util.function.Predicate;
-
-public class LambdaApp {
-    public static void main(String[] args) {
-        // Create a predicate using lambda expression
-        Predicate<Integer> isPositive = x -> x > 0;
-        
-        // Test various numbers
-        System.out.println(isPositive.test(5));    // true
-        System.out.println(isPositive.test(-7));   // false
-        System.out.println(isPositive.test(0));    // false
-        
-        // Can also create other predicates
-        Predicate<Integer> isEven = x -> x % 2 == 0;
-        System.out.println(isEven.test(4));        // true
-        System.out.println(isEven.test(7));        // false
-        
-        // Combine predicates using and(), or(), negate()
-        Predicate<Integer> isPositiveAndEven = isPositive.and(isEven);
-        System.out.println(isPositiveAndEven.test(6));   // true
-        System.out.println(isPositiveAndEven.test(5));   // false
-        System.out.println(isPositiveAndEven.test(-4));  // false
+interface MyInterface {
+    // One abstract method (required)
+    void doSomething(String s);
+    
+    // Multiple default methods (allowed)
+    default void method1() {
+        System.out.println("Default method 1");
+    }
+    
+    default void method2() {
+        System.out.println("Default method 2");
+    }
+    
+    default void method3() {
+        System.out.println("Default method 3");
+    }
+    
+    // Static methods (also allowed)
+    static void staticMethod() {
+        System.out.println("Static method");
     }
 }
 ```
 
-**Common use with Stream API:**
-
-```java
-List<Integer> numbers = Arrays.asList(-5, 3, -2, 8, 0, 12, -7);
-
-// Filter using predicate
-List<Integer> positiveNumbers = numbers.stream()
-    .filter(x -> x > 0)  // Predicate lambda
-    .collect(Collectors.toList());
-
-System.out.println(positiveNumbers);  // [3, 8, 12]
-```
-
-**Answer:** `Predicate<Integer> isPositive = x -> x > 0;` creates a predicate that returns true for positive numbers. Call `isPositive.test(5)` to test a value, which returns true.
+This is still a valid functional interface because it has exactly one abstract method, despite having multiple default and static methods.
 
 </details>
 
-##### **3.12. Using UnaryOperator Interface** (Tutorial 14, Example 2)
-Demonstrate the use of `UnaryOperator<T>` functional interface to square a number.
+##### **3.8. When to Use Runnable vs Thread** (Lab 14, Warm-up 5)
+When to use Runnable vs Thread in Java?
 
 <details>
 <summary>Click to see the solution</summary>
 
-**Key Concept:** `UnaryOperator<T>` represents a function that takes one argument of type T and returns a result of the same type T.
+**Key Concept:** Prefer implementing `Runnable` over extending `Thread` in most cases for better design flexibility.
 
-**UnaryOperator Interface Definition:**
+**Use Runnable when:**
+
+*   You want to separate the task (what to run) from the execution mechanism (how to run)
+*   Your class already extends another class (Java doesn't support multiple inheritance)
+*   You want to implement multiple interfaces
+*   You follow better object-oriented design principles (composition over inheritance)
+*   You want to use thread pools or executor services
+*   The `Runnable` interface is functional, so you can use lambda expressions
+
+**Use Thread when:**
+
+*   You need to override other Thread methods besides `run()`
+*   You're creating a specialized thread class with additional thread-specific behavior
+*   (Rare cases - generally discouraged)
+
+**Comparison:**
 
 ```java
-@FunctionalInterface
-public interface UnaryOperator<T> {
-    T apply(T t);
-}
-```
-
-**Example Implementation:**
-
-```java
-import java.util.function.UnaryOperator;
-
-public class LambdaApp {
-    public static void main(String[] args) {
-        // Create a unary operator to square numbers
-        UnaryOperator<Integer> square = x -> x * x;
-        
-        System.out.println(square.apply(5));   // 25
-        System.out.println(square.apply(-3));  // 9
-        System.out.println(square.apply(0));   // 0
-        
-        // Other examples
-        UnaryOperator<String> toUpperCase = s -> s.toUpperCase();
-        System.out.println(toUpperCase.apply("hello"));  // HELLO
-        
-        UnaryOperator<Double> half = x -> x / 2.0;
-        System.out.println(half.apply(10.0));  // 5.0
+// Implementing Runnable (preferred)
+public class MyTask implements Runnable {
+    @Override
+    public void run() {
+        System.out.println("Task running");
     }
 }
+// Usage
+Thread thread = new Thread(new MyTask());
+thread.start();
+
+// Or with lambda (since Runnable is functional)
+Thread thread = new Thread(() -> System.out.println("Task running"));
+thread.start();
+
+// Extending Thread (less flexible)
+public class MyThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Thread running");
+    }
+}
+// Usage
+MyThread thread = new MyThread();
+thread.start();
 ```
 
-**Use with Stream API:**
-
-```java
-List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
-
-// Square all numbers using map
-List<Integer> squared = numbers.stream()
-    .map(x -> x * x)  // UnaryOperator-like lambda
-    .collect(Collectors.toList());
-
-System.out.println(squared);  // [1, 4, 9, 16, 25]
-```
-
-**Chaining UnaryOperators:**
-
-```java
-UnaryOperator<Integer> square = x -> x * x;
-UnaryOperator<Integer> addOne = x -> x + 1;
-
-// Compose: addOne(square(x))
-UnaryOperator<Integer> squareThenAddOne = square.andThen(addOne);
-System.out.println(squareThenAddOne.apply(5));  // 26 (5² + 1)
-```
-
-**Answer:** `UnaryOperator<Integer> square = x -> x * x;` creates a unary operator that squares numbers. Call `square.apply(5)` to get 25.
+**Answer:** Prefer `Runnable` in most cases because it provides better separation of concerns, allows your class to extend other classes, and works with lambda expressions and modern concurrency utilities. Use `Thread` only when you need to override additional thread-specific methods.
 
 </details>
 
-##### **3.13. Using BinaryOperator Interface** (Tutorial 14, Example 3)
-Demonstrate the use of `BinaryOperator<T>` functional interface to multiply two numbers.
+##### **3.9. Difference Between start() and run()** (Lab 14, Warm-up 6)
+What is the difference between `start()` and `run()` method of Thread class?
 
 <details>
 <summary>Click to see the solution</summary>
 
-**Key Concept:** `BinaryOperator<T>` represents a function that takes two arguments of the same type T and returns a result of type T.
+**Key Concept:** `start()` creates a new thread; `run()` executes in the current thread.
 
-**BinaryOperator Interface Definition:**
+**Fundamental difference:**
+
+*   **`start()`**: Creates a **new thread** and executes the `run()` method in that new thread
+*   **`run()`**: Executes the `run()` method in the **current thread** (no new thread is created)
+
+**Detailed comparison:**
+
+| Aspect | start() | run() |
+|:-------|:--------|:------|
+| Creates new thread? | Yes | No |
+| Executes concurrently? | Yes (in separate thread) | No (in current thread) |
+| Can be called multiple times? | No (throws IllegalThreadStateException) | Yes (just a regular method call) |
+| Purpose | Begin thread execution | Define the thread's task |
+
+**Example:**
 
 ```java
-@FunctionalInterface
-public interface BinaryOperator<T> {
-    T apply(T t1, T t2);
+class MyThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Running in thread: " + 
+            Thread.currentThread().getName());
+    }
 }
-```
 
-**Example Implementation:**
-
-```java
-import java.util.function.BinaryOperator;
-
-public class LambdaApp {
+public class Main {
     public static void main(String[] args) {
-        // Create a binary operator to multiply numbers
-        BinaryOperator<Integer> multiply = (x, y) -> x * y;
+        MyThread t1 = new MyThread();
+        MyThread t2 = new MyThread();
         
-        System.out.println(multiply.apply(3, 5));    // 15
-        System.out.println(multiply.apply(10, -2));  // -20
-        System.out.println(multiply.apply(7, 0));    // 0
+        // Using start() - creates new threads
+        t1.start();  // Output: Running in thread: Thread-0
+        t2.start();  // Output: Running in thread: Thread-1
         
-        // Other examples
-        BinaryOperator<Integer> add = (x, y) -> x + y;
-        System.out.println(add.apply(10, 20));  // 30
-        
-        BinaryOperator<String> concat = (s1, s2) -> s1 + s2;
-        System.out.println(concat.apply("Hello", "World"));  // HelloWorld
-        
-        BinaryOperator<Integer> max = (x, y) -> x > y ? x : y;
-        System.out.println(max.apply(5, 10));  // 10
+        // Using run() - no new thread
+        MyThread t3 = new MyThread();
+        t3.run();    // Output: Running in thread: main
     }
 }
 ```
 
-**Use with Stream API (reduce operation):**
+**Visual explanation:**
 
-```java
-List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
-
-// Multiply all numbers together using reduce
-int product = numbers.stream()
-    .reduce(1, (x, y) -> x * y);  // BinaryOperator lambda
-    
-System.out.println(product);  // 120 (1*2*3*4*5)
-
-// Sum all numbers
-int sum = numbers.stream()
-    .reduce(0, (x, y) -> x + y);
-    
-System.out.println(sum);  // 15
+```
+start() -> JVM creates new thread -> new thread calls run()
+run()   -> Current thread executes run() directly
 ```
 
-**Using built-in BinaryOperators:**
-
-```java
-import java.util.function.BinaryOperator;
-
-// Integer operations
-BinaryOperator<Integer> max = BinaryOperator.maxBy(Integer::compareTo);
-BinaryOperator<Integer> min = BinaryOperator.minBy(Integer::compareTo);
-
-System.out.println(max.apply(5, 10));  // 10
-System.out.println(min.apply(5, 10));  // 5
-```
-
-**Answer:** `BinaryOperator<Integer> multiply = (x, y) -> x * y;` creates a binary operator that multiplies two integers. Call `multiply.apply(3, 5)` to get 15.
+**Answer:** `start()` creates a new thread and calls `run()` in that new thread, enabling concurrent execution. `run()` simply executes the method in the current thread like any regular method call, providing no concurrency benefit. Always use `start()` to begin thread execution.
 
 </details>
 
-##### **3.14. Using Function Interface** (Tutorial 14, Example 4)
-Demonstrate the use of `Function<T,R>` functional interface to convert an integer to a string with "dollars" suffix.
+##### **3.10. Exception in Java Thread** (Lab 14, Warm-up 7)
+What happens when an exception occurs in Java thread?
 
 <details>
 <summary>Click to see the solution</summary>
 
-**Key Concept:** `Function<T,R>` represents a function that takes an argument of type T and returns a result of type R (which may be different from T).
+**Key Concept:** Exceptions in threads are isolated to that thread and don't propagate to other threads.
 
-**Function Interface Definition:**
+**What happens:**
+
+1.  **The thread terminates**: The thread where the exception occurred stops execution
+2.  **Other threads continue**: The exception does not affect other running threads
+3.  **Exception doesn't propagate**: The exception does not propagate back to the thread that started it (e.g., the main thread)
+4.  **Stack trace is printed**: By default, the uncaught exception and its stack trace are printed to the console
+5.  **UncaughtExceptionHandler is called**: If set, the thread's `UncaughtExceptionHandler` is invoked
+
+**Example:**
 
 ```java
-@FunctionalInterface
-public interface Function<T, R> {
-    R apply(T t);
-}
-```
-
-**Example Implementation:**
-
-```java
-import java.util.function.Function;
-
-public class LambdaApp {
+public class ThreadExceptionDemo {
     public static void main(String[] args) {
-        // Create a function that converts Integer to String
-        Function<Integer, String> convert = 
-            x -> String.valueOf(x) + " dollars";
-        
-        System.out.println(convert.apply(5));    // 5 dollars
-        System.out.println(convert.apply(100));  // 100 dollars
-        System.out.println(convert.apply(0));    // 0 dollars
-        
-        // Other examples
-        Function<String, Integer> length = s -> s.length();
-        System.out.println(length.apply("Hello"));  // 5
-        
-        Function<Double, Integer> round = d -> (int) Math.round(d);
-        System.out.println(round.apply(3.7));  // 4
-    }
-}
-```
-
-**Use with Stream API (map operation):**
-
-```java
-List<Integer> prices = Arrays.asList(10, 25, 50, 100);
-
-// Convert integers to formatted strings
-List<String> formatted = prices.stream()
-    .map(x -> String.valueOf(x) + " dollars")  // Function lambda
-    .collect(Collectors.toList());
-
-System.out.println(formatted);  
-// [10 dollars, 25 dollars, 50 dollars, 100 dollars]
-```
-
-**Chaining Functions:**
-
-```java
-Function<Integer, Integer> multiplyBy2 = x -> x * 2;
-Function<Integer, String> toString = x -> "Result: " + x;
-
-// Compose: toString(multiplyBy2(x))
-Function<Integer, String> combined = multiplyBy2.andThen(toString);
-
-System.out.println(combined.apply(5));  // Result: 10
-```
-
-**Using method references:**
-
-```java
-// Instead of: x -> String.valueOf(x)
-Function<Integer, String> convert = String::valueOf;
-System.out.println(convert.apply(42));  // 42
-```
-
-**Answer:** `Function<Integer, String> convert = x -> String.valueOf(x) + " dollars";` creates a function that converts integers to dollar strings. Call `convert.apply(5)` to get "5 dollars".
-
-</details>
-
-##### **3.15. Using Consumer Interface** (Tutorial 14, Example 5)
-Demonstrate the use of `Consumer<T>` functional interface to print formatted output.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** `Consumer<T>` represents an operation that takes a single argument and returns no result (void), typically used for side effects like printing.
-
-**Consumer Interface Definition:**
-
-```java
-@FunctionalInterface
-public interface Consumer<T> {
-    void accept(T t);
-}
-```
-
-**Example Implementation:**
-
-```java
-import java.util.function.Consumer;
-
-public class LambdaApp {
-    public static void main(String[] args) {
-        // Create a consumer that prints formatted output
-        Consumer<Integer> printer = 
-            x -> System.out.printf("%d dollars \n", x);
-        
-        printer.accept(600);   // 600 dollars
-        printer.accept(1500);  // 1500 dollars
-        
-        // Other examples
-        Consumer<String> upperPrinter = s -> System.out.println(s.toUpperCase());
-        upperPrinter.accept("hello");  // HELLO
-        
-        Consumer<List<String>> listPrinter = 
-            list -> list.forEach(System.out::println);
-        listPrinter.accept(Arrays.asList("A", "B", "C"));
-    }
-}
-```
-
-**Use with Stream API (forEach operation):**
-
-```java
-List<Integer> numbers = Arrays.asList(5, 10, 15, 20);
-
-// Print each number with formatting
-numbers.forEach(x -> System.out.printf("%d dollars\n", x));
-
-// Or using method reference
-numbers.forEach(System.out::println);
-```
-
-**Chaining Consumers:**
-
-```java
-Consumer<String> print = s -> System.out.print(s);
-Consumer<String> newLine = s -> System.out.println();
-
-// Chain consumers
-Consumer<String> printWithNewLine = print.andThen(newLine);
-printWithNewLine.accept("Hello");
-```
-
-**Practical example with collection modification:**
-
-```java
-List<String> names = new ArrayList<>(Arrays.asList("alice", "bob", "charlie"));
-
-// Consumer that modifies the list
-Consumer<List<String>> capitalizeAll = list -> {
-    for (int i = 0; i < list.size(); i++) {
-        list.set(i, list.get(i).toUpperCase());
-    }
-};
-
-capitalizeAll.accept(names);
-System.out.println(names);  // [ALICE, BOB, CHARLIE]
-```
-
-**Answer:** `Consumer<Integer> printer = x -> System.out.printf("%d dollars \n", x);` creates a consumer that prints formatted dollar amounts. Call `printer.accept(600)` to print "600 dollars".
-
-</details>
-
-##### **3.16. Using Supplier Interface** (Tutorial 14, Example 6)
-Demonstrate the use of `Supplier<T>` functional interface to create a user factory.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** `Supplier<T>` represents a function that takes no arguments and returns a result of type T, useful for factory patterns and lazy initialization.
-
-**Supplier Interface Definition:**
-
-```java
-@FunctionalInterface
-public interface Supplier<T> {
-    T get();
-}
-```
-
-**Example Implementation:**
-
-```java
-import java.util.Scanner;
-import java.util.function.Supplier;
-
-class User {
-    private String name;
-    
-    public User(String name) {
-        this.name = name;
-    }
-    
-    public String getName() {
-        return name;
-    }
-}
-
-public class LambdaApp {
-    public static void main(String[] args) {
-        // Create a supplier that creates User objects
-        Supplier<User> userFactory = () -> {
-            Scanner in = new Scanner(System.in);
-            System.out.println("Enter the name: ");
-            String name = in.nextLine();
-            return new User(name);
-        };
-        
-        // Create users using the factory
-        User user1 = userFactory.get();
-        User user2 = userFactory.get();
-        
-        System.out.println("user1 name: " + user1.getName());
-        System.out.println("user2 name: " + user2.getName());
-    }
-}
-```
-
-**Other Supplier Examples:**
-
-```java
-import java.util.function.Supplier;
-import java.time.LocalDateTime;
-
-public class SupplierExamples {
-    public static void main(String[] args) {
-        // Random number supplier
-        Supplier<Integer> randomInt = () -> (int)(Math.random() * 100);
-        System.out.println(randomInt.get());  // Random number
-        System.out.println(randomInt.get());  // Different random number
-        
-        // Current timestamp supplier
-        Supplier<LocalDateTime> timestamp = () -> LocalDateTime.now();
-        System.out.println(timestamp.get());
-        
-        // Default value supplier
-        Supplier<String> defaultName = () -> "Anonymous";
-        System.out.println(defaultName.get());  // Anonymous
-        
-        // Lazy computation
-        Supplier<Double> expensiveCalculation = () -> {
-            System.out.println("Performing expensive calculation...");
-            return Math.pow(2, 20);
-        };
-        // Calculation only happens when get() is called
-        System.out.println(expensiveCalculation.get());
-    }
-}
-```
-
-**Practical use case - Lazy evaluation:**
-
-```java
-public class LazyExample {
-    // Supplier allows lazy evaluation - value is computed only when needed
-    public static String getValue(boolean condition, Supplier<String> supplier) {
-        if (condition) {
-            return supplier.get();  // Only computed if condition is true
-        }
-        return "default";
-    }
-    
-    public static void main(String[] args) {
-        // This expensive operation won't execute if condition is false
-        String result = getValue(false, () -> {
-            System.out.println("Computing expensive value...");
-            return "expensive result";
+        Thread t1 = new Thread(() -> {
+            System.out.println("Thread 1 starting");
+            throw new RuntimeException("Exception in Thread 1");
         });
-        System.out.println(result);  // "default", computation never happened
-    }
-}
-```
-
-**Answer:** `Supplier<User> userFactory = () -> { /* create and return User */ };` creates a factory that generates User objects on demand. Call `userFactory.get()` to create a new user instance.
-
-</details>
-
-##### **3.17. Stream API Operations** (Tutorial 14, Example 7)
-Demonstrate using Stream API to filter, remove duplicates, sort, and limit a list of integers.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Stream API allows chaining multiple operations to process collections in a functional style.
-
-**Complete Example:**
-
-```java
-import java.util.*;
-
-public class StreamApp {
-    public static void main(String[] args) {
-        List<Integer> numbers = new ArrayList<>();
-        numbers.add(5);
-        numbers.add(9);
-        numbers.add(8);
-        numbers.add(8);
-        numbers.add(1);
         
-        // Print original list
-        numbers.forEach((n) -> System.out.print(n));
-        System.out.println();  // Output: 59881
+        Thread t2 = new Thread(() -> {
+            try {
+                Thread.sleep(100);
+                System.out.println("Thread 2 still running!");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
         
-        // Apply stream operations
-        numbers.stream()
-            .filter(n -> n > 5)        // Keep only numbers > 5: [9, 8, 8]
-            .distinct()                // Remove duplicates: [9, 8]
-            .sorted()                  // Sort: [8, 9]
-            .limit(1)                  // Take first element: [8]
-            .forEach(System.out::print);
+        t1.start();
+        t2.start();
         
-        System.out.println("\n" + numbers);
+        System.out.println("Main thread continues");
     }
 }
 ```
 
 **Output:**
 ```
-59881
-8
-[5, 9, 8, 8, 1]
+Thread 1 starting
+Main thread continues
+Exception in thread "Thread-0" java.lang.RuntimeException: Exception in Thread 1
+    at ThreadExceptionDemo.lambda$main$0(ThreadExceptionDemo.java:5)
+    at java.lang.Thread.run(Thread.java:748)
+Thread 2 still running!
 ```
 
-**Step-by-step breakdown:**
-
-1.  **Original list:** `[5, 9, 8, 8, 1]`
-2.  **After `filter(n -> n > 5)`:** `[9, 8, 8]` (only elements greater than 5)
-3.  **After `distinct()`:** `[9, 8]` (duplicates removed)
-4.  **After `sorted()`:** `[8, 9]` (sorted in ascending order)
-5.  **After `limit(1)`:** `[8]` (only first element)
-6.  **`forEach(System.out::print)`:** Prints `8`
-
-**Important Note:** The original list `numbers` remains unchanged `[5, 9, 8, 8, 1]` because stream operations don't modify the source.
-
-**Extended Example with collect():**
+**Handling exceptions in threads:**
 
 ```java
-List<Integer> numbers = Arrays.asList(5, 9, 8, 8, 1);
-
-// Collect results into a new list
-List<Integer> processed = numbers.stream()
-    .filter(n -> n > 5)
-    .distinct()
-    .sorted()
-    .collect(Collectors.toList());
-
-System.out.println("Original: " + numbers);      // [5, 9, 8, 8, 1]
-System.out.println("Processed: " + processed);   // [8, 9]
+Thread thread = new Thread(() -> {
+    try {
+        // Thread code that might throw exception
+        int result = 10 / 0;
+    } catch (Exception e) {
+        System.out.println("Caught exception: " + e.getMessage());
+        // Handle appropriately
+    }
+});
+thread.start();
 ```
 
-**More Stream Examples:**
-
-```java
-// Count elements
-long count = numbers.stream()
-    .filter(n -> n > 5)
-    .count();
-System.out.println("Count: " + count);  // 3
-
-// Find first
-Optional<Integer> first = numbers.stream()
-    .filter(n -> n > 5)
-    .findFirst();
-System.out.println("First: " + first.get());  // 9
-
-// Map transformation
-List<Integer> doubled = numbers.stream()
-    .map(n -> n * 2)
-    .collect(Collectors.toList());
-System.out.println("Doubled: " + doubled);  // [10, 18, 16, 16, 2]
-
-// Reduce (sum)
-int sum = numbers.stream()
-    .reduce(0, (a, b) -> a + b);
-System.out.println("Sum: " + sum);  // 31
-```
-
-**Answer:** The stream pipeline filters numbers greater than 5, removes duplicates, sorts them, takes the first element, and prints it. The original list remains unchanged. Output: `8`.
+**Answer:** When an exception occurs in a thread, that thread terminates and prints the stack trace, but other threads (including the main thread) continue running unaffected. The exception doesn't propagate to the parent thread. To handle exceptions properly, wrap thread code in try-catch blocks within the `run()` method.
 
 </details>
 
-##### **3.18. Creating and Starting Threads with Runnable** (Tutorial 14, Example 8)
-Demonstrate creating and starting a thread using the Runnable interface.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The Runnable interface defines the task to execute in a thread, separated from the thread mechanism itself.
-
-**Method 1: Implementing Runnable Interface**
-
-```java
-public class HelloRunnable implements Runnable {
-    public void run() {
-        System.out.println("Hello from a thread!");
-    }
-    
-    public static void main(String[] args) {
-        (new Thread(new HelloRunnable())).start();
-    }
-}
-```
-
-**Method 2: Extending Thread Class**
-
-```java
-public class HelloThread extends Thread {
-    @Override
-    public void run() {
-        System.out.println("Hello from a thread!");
-    }
-    
-    public static void main(String[] args) {
-        (new HelloThread()).start();
-    }
-}
-```
-
-**Method 3: Anonymous Class**
-
-```java
-public class ThreadDemo {
-    public static void main(String[] args) {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                System.out.println("Hello from anonymous thread!");
-            }
-        });
-        thread.start();
-    }
-}
-```
-
-**Method 4: Lambda Expression** (Best for simple tasks)
-
-```java
-public class LambdaThread {
-    public static void main(String[] args) {
-        // Runnable is a functional interface
-        Thread thread = new Thread(() -> {
-            System.out.println("Hello from lambda thread!");
-        });
-        thread.start();
-        
-        // Even more concise for single statements
-        new Thread(() -> System.out.println("Quick thread!")).start();
-    }
-}
-```
-
-**Complete Example with Multiple Threads:**
-
-```java
-public class MultiThreadExample {
-    public static void main(String[] args) {
-        System.out.println("Main thread: " + Thread.currentThread().getName());
-        
-        // Create first thread
-        Thread thread1 = new Thread(() -> {
-            for (int i = 1; i <= 5; i++) {
-                System.out.println("Thread 1: " + i);
-                try {
-                    Thread.sleep(500);  // Sleep 500ms
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        
-        // Create second thread
-        Thread thread2 = new Thread(() -> {
-            for (int i = 1; i <= 5; i++) {
-                System.out.println("Thread 2: " + i);
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        
-        // Start both threads
-        thread1.start();
-        thread2.start();
-        
-        System.out.println("Main thread continues...");
-    }
-}
-```
-
-**Output** (order may vary due to concurrent execution):
-```
-Main thread: main
-Main thread continues...
-Thread 1: 1
-Thread 2: 1
-Thread 1: 2
-Thread 2: 2
-Thread 1: 3
-Thread 2: 3
-Thread 1: 4
-Thread 2: 4
-Thread 1: 5
-Thread 2: 5
-```
-
-**Waiting for Thread Completion:**
-
-```java
-public class ThreadJoinExample {
-    public static void main(String[] args) throws InterruptedException {
-        Thread thread = new Thread(() -> {
-            System.out.println("Thread working...");
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            System.out.println("Thread finished!");
-        });
-        
-        thread.start();
-        System.out.println("Main thread waiting...");
-        thread.join();  // Wait for thread to complete
-        System.out.println("Main thread continues after thread finished");
-    }
-}
-```
-
-**Answer:** Implement Runnable interface or extend Thread class, then call `start()` to begin execution in a new thread. Using lambda expressions with Runnable is the most concise approach: `new Thread(() -> System.out.println("Hello")).start();`
-
-</details>
-
-##### **3.19. Lambda with Custom Functional Interface** (Lecture 14, Example 1)
+##### **3.11. Lambda with Custom Functional Interface** (Lecture 14, Example 1)
 Create a custom functional interface and implement it using a lambda expression.
 
 <details>
@@ -2013,7 +1266,7 @@ public class Main {
 
 </details>
 
-##### **3.20. Static Method Reference** (Lecture 14, Example 2)
+##### **3.12. Static Method Reference** (Lecture 14, Example 2)
 Demonstrate using method references to refer to static methods.
 
 <details>
@@ -2129,7 +1382,7 @@ public class ComparisonExample {
 
 </details>
 
-##### **3.21. Instance Method Reference** (Lecture 14, Example 3)
+##### **3.13. Instance Method Reference** (Lecture 14, Example 3)
 Demonstrate using method references to refer to instance methods.
 
 <details>
@@ -2237,7 +1490,7 @@ public class PrinterDemo {
 
 </details>
 
-##### **3.22. Constructor Reference** (Lecture 14, Example 4)
+##### **3.14. Constructor Reference** (Lecture 14, Example 4)
 Demonstrate using method references to refer to constructors.
 
 <details>
@@ -2380,7 +1633,7 @@ public class ArrayConstructorReference {
 
 </details>
 
-##### **3.23. Lambda Capturing Variables (Closures)** (Lecture 14, Example 5)
+##### **3.15. Lambda Capturing Variables (Closures)** (Lecture 14, Example 5)
 Demonstrate how lambdas can capture variables from their surrounding scope.
 
 <details>
@@ -2537,7 +1790,7 @@ public class StaticCapture {
 
 </details>
 
-##### **3.24. Imperative vs Functional: GCD Algorithm** (Lecture 14, Example 6)
+##### **3.16. Imperative vs Functional: GCD Algorithm** (Lecture 14, Example 6)
 Compare imperative and functional approaches by implementing Euclid's algorithm for finding the greatest common divisor (GCD).
 
 <details>
@@ -2661,7 +1914,7 @@ public class GCDComparison {
 
 </details>
 
-##### **3.25. Pure vs Impure Functions** (Lecture 14, Example 7)
+##### **3.17. Pure vs Impure Functions** (Lecture 14, Example 7)
 Compare pure functions (functional style) with impure functions (imperative style) that have side effects.
 
 <details>
@@ -2852,7 +2105,754 @@ System.out.println(result);   // [6, 8, 10]
 
 </details>
 
-##### **3.26. Complete Lambda and Stream Example** (Combined Tutorial/Lab Example)
+##### **3.18. Using Predicate Interface** (Tutorial 14, Task 1)
+Demonstrate the use of `Predicate<T>` functional interface to test if a number is positive.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `Predicate<T>` represents a boolean-valued function that takes one argument and returns true or false.
+
+**Predicate Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface Predicate<T> {
+    boolean test(T t);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.Predicate;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a predicate using lambda expression
+        Predicate<Integer> isPositive = x -> x > 0;
+        
+        // Test various numbers
+        System.out.println(isPositive.test(5));    // true
+        System.out.println(isPositive.test(-7));   // false
+        System.out.println(isPositive.test(0));    // false
+        
+        // Can also create other predicates
+        Predicate<Integer> isEven = x -> x % 2 == 0;
+        System.out.println(isEven.test(4));        // true
+        System.out.println(isEven.test(7));        // false
+        
+        // Combine predicates using and(), or(), negate()
+        Predicate<Integer> isPositiveAndEven = isPositive.and(isEven);
+        System.out.println(isPositiveAndEven.test(6));   // true
+        System.out.println(isPositiveAndEven.test(5));   // false
+        System.out.println(isPositiveAndEven.test(-4));  // false
+    }
+}
+```
+
+**Common use with Stream API:**
+
+```java
+List<Integer> numbers = Arrays.asList(-5, 3, -2, 8, 0, 12, -7);
+
+// Filter using predicate
+List<Integer> positiveNumbers = numbers.stream()
+    .filter(x -> x > 0)  // Predicate lambda
+    .collect(Collectors.toList());
+
+System.out.println(positiveNumbers);  // [3, 8, 12]
+```
+
+**Answer:** `Predicate<Integer> isPositive = x -> x > 0;` creates a predicate that returns true for positive numbers. Call `isPositive.test(5)` to test a value, which returns true.
+
+</details>
+
+##### **3.19. Using UnaryOperator Interface** (Tutorial 14, Task 2)
+Demonstrate the use of `UnaryOperator<T>` functional interface to square a number.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `UnaryOperator<T>` represents a function that takes one argument of type T and returns a result of the same type T.
+
+**UnaryOperator Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface UnaryOperator<T> {
+    T apply(T t);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.UnaryOperator;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a unary operator to square numbers
+        UnaryOperator<Integer> square = x -> x * x;
+        
+        System.out.println(square.apply(5));   // 25
+        System.out.println(square.apply(-3));  // 9
+        System.out.println(square.apply(0));   // 0
+        
+        // Other examples
+        UnaryOperator<String> toUpperCase = s -> s.toUpperCase();
+        System.out.println(toUpperCase.apply("hello"));  // HELLO
+        
+        UnaryOperator<Double> half = x -> x / 2.0;
+        System.out.println(half.apply(10.0));  // 5.0
+    }
+}
+```
+
+**Use with Stream API:**
+
+```java
+List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+
+// Square all numbers using map
+List<Integer> squared = numbers.stream()
+    .map(x -> x * x)  // UnaryOperator-like lambda
+    .collect(Collectors.toList());
+
+System.out.println(squared);  // [1, 4, 9, 16, 25]
+```
+
+**Chaining UnaryOperators:**
+
+```java
+UnaryOperator<Integer> square = x -> x * x;
+UnaryOperator<Integer> addOne = x -> x + 1;
+
+// Compose: addOne(square(x))
+UnaryOperator<Integer> squareThenAddOne = square.andThen(addOne);
+System.out.println(squareThenAddOne.apply(5));  // 26 (5² + 1)
+```
+
+**Answer:** `UnaryOperator<Integer> square = x -> x * x;` creates a unary operator that squares numbers. Call `square.apply(5)` to get 25.
+
+</details>
+
+##### **3.20. Using BinaryOperator Interface** (Tutorial 14, Task 3)
+Demonstrate the use of `BinaryOperator<T>` functional interface to multiply two numbers.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `BinaryOperator<T>` represents a function that takes two arguments of the same type T and returns a result of type T.
+
+**BinaryOperator Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface BinaryOperator<T> {
+    T apply(T t1, T t2);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.BinaryOperator;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a binary operator to multiply numbers
+        BinaryOperator<Integer> multiply = (x, y) -> x * y;
+        
+        System.out.println(multiply.apply(3, 5));    // 15
+        System.out.println(multiply.apply(10, -2));  // -20
+        System.out.println(multiply.apply(7, 0));    // 0
+        
+        // Other examples
+        BinaryOperator<Integer> add = (x, y) -> x + y;
+        System.out.println(add.apply(10, 20));  // 30
+        
+        BinaryOperator<String> concat = (s1, s2) -> s1 + s2;
+        System.out.println(concat.apply("Hello", "World"));  // HelloWorld
+        
+        BinaryOperator<Integer> max = (x, y) -> x > y ? x : y;
+        System.out.println(max.apply(5, 10));  // 10
+    }
+}
+```
+
+**Use with Stream API (reduce operation):**
+
+```java
+List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+
+// Multiply all numbers together using reduce
+int product = numbers.stream()
+    .reduce(1, (x, y) -> x * y);  // BinaryOperator lambda
+    
+System.out.println(product);  // 120 (1*2*3*4*5)
+
+// Sum all numbers
+int sum = numbers.stream()
+    .reduce(0, (x, y) -> x + y);
+    
+System.out.println(sum);  // 15
+```
+
+**Using built-in BinaryOperators:**
+
+```java
+import java.util.function.BinaryOperator;
+
+// Integer operations
+BinaryOperator<Integer> max = BinaryOperator.maxBy(Integer::compareTo);
+BinaryOperator<Integer> min = BinaryOperator.minBy(Integer::compareTo);
+
+System.out.println(max.apply(5, 10));  // 10
+System.out.println(min.apply(5, 10));  // 5
+```
+
+**Answer:** `BinaryOperator<Integer> multiply = (x, y) -> x * y;` creates a binary operator that multiplies two integers. Call `multiply.apply(3, 5)` to get 15.
+
+</details>
+
+##### **3.21. Using Function Interface** (Tutorial 14, Task 4)
+Demonstrate the use of `Function<T,R>` functional interface to convert an integer to a string with "dollars" suffix.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `Function<T,R>` represents a function that takes an argument of type T and returns a result of type R (which may be different from T).
+
+**Function Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface Function<T, R> {
+    R apply(T t);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.Function;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a function that converts Integer to String
+        Function<Integer, String> convert = 
+            x -> String.valueOf(x) + " dollars";
+        
+        System.out.println(convert.apply(5));    // 5 dollars
+        System.out.println(convert.apply(100));  // 100 dollars
+        System.out.println(convert.apply(0));    // 0 dollars
+        
+        // Other examples
+        Function<String, Integer> length = s -> s.length();
+        System.out.println(length.apply("Hello"));  // 5
+        
+        Function<Double, Integer> round = d -> (int) Math.round(d);
+        System.out.println(round.apply(3.7));  // 4
+    }
+}
+```
+
+**Use with Stream API (map operation):**
+
+```java
+List<Integer> prices = Arrays.asList(10, 25, 50, 100);
+
+// Convert integers to formatted strings
+List<String> formatted = prices.stream()
+    .map(x -> String.valueOf(x) + " dollars")  // Function lambda
+    .collect(Collectors.toList());
+
+System.out.println(formatted);  
+// [10 dollars, 25 dollars, 50 dollars, 100 dollars]
+```
+
+**Chaining Functions:**
+
+```java
+Function<Integer, Integer> multiplyBy2 = x -> x * 2;
+Function<Integer, String> toString = x -> "Result: " + x;
+
+// Compose: toString(multiplyBy2(x))
+Function<Integer, String> combined = multiplyBy2.andThen(toString);
+
+System.out.println(combined.apply(5));  // Result: 10
+```
+
+**Using method references:**
+
+```java
+// Instead of: x -> String.valueOf(x)
+Function<Integer, String> convert = String::valueOf;
+System.out.println(convert.apply(42));  // 42
+```
+
+**Answer:** `Function<Integer, String> convert = x -> String.valueOf(x) + " dollars";` creates a function that converts integers to dollar strings. Call `convert.apply(5)` to get "5 dollars".
+
+</details>
+
+##### **3.22. Using Consumer Interface** (Tutorial 14, Task 5)
+Demonstrate the use of `Consumer<T>` functional interface to print formatted output.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `Consumer<T>` represents an operation that takes a single argument and returns no result (void), typically used for side effects like printing.
+
+**Consumer Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface Consumer<T> {
+    void accept(T t);
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.function.Consumer;
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a consumer that prints formatted output
+        Consumer<Integer> printer = 
+            x -> System.out.printf("%d dollars \n", x);
+        
+        printer.accept(600);   // 600 dollars
+        printer.accept(1500);  // 1500 dollars
+        
+        // Other examples
+        Consumer<String> upperPrinter = s -> System.out.println(s.toUpperCase());
+        upperPrinter.accept("hello");  // HELLO
+        
+        Consumer<List<String>> listPrinter = 
+            list -> list.forEach(System.out::println);
+        listPrinter.accept(Arrays.asList("A", "B", "C"));
+    }
+}
+```
+
+**Use with Stream API (forEach operation):**
+
+```java
+List<Integer> numbers = Arrays.asList(5, 10, 15, 20);
+
+// Print each number with formatting
+numbers.forEach(x -> System.out.printf("%d dollars\n", x));
+
+// Or using method reference
+numbers.forEach(System.out::println);
+```
+
+**Chaining Consumers:**
+
+```java
+Consumer<String> print = s -> System.out.print(s);
+Consumer<String> newLine = s -> System.out.println();
+
+// Chain consumers
+Consumer<String> printWithNewLine = print.andThen(newLine);
+printWithNewLine.accept("Hello");
+```
+
+**Practical example with collection modification:**
+
+```java
+List<String> names = new ArrayList<>(Arrays.asList("alice", "bob", "charlie"));
+
+// Consumer that modifies the list
+Consumer<List<String>> capitalizeAll = list -> {
+    for (int i = 0; i < list.size(); i++) {
+        list.set(i, list.get(i).toUpperCase());
+    }
+};
+
+capitalizeAll.accept(names);
+System.out.println(names);  // [ALICE, BOB, CHARLIE]
+```
+
+**Answer:** `Consumer<Integer> printer = x -> System.out.printf("%d dollars \n", x);` creates a consumer that prints formatted dollar amounts. Call `printer.accept(600)` to print "600 dollars".
+
+</details>
+
+##### **3.23. Using Supplier Interface** (Tutorial 14, Task 6)
+Demonstrate the use of `Supplier<T>` functional interface to create a user factory.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `Supplier<T>` represents a function that takes no arguments and returns a result of type T, useful for factory patterns and lazy initialization.
+
+**Supplier Interface Definition:**
+
+```java
+@FunctionalInterface
+public interface Supplier<T> {
+    T get();
+}
+```
+
+**Example Implementation:**
+
+```java
+import java.util.Scanner;
+import java.util.function.Supplier;
+
+class User {
+    private String name;
+    
+    public User(String name) {
+        this.name = name;
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+
+public class LambdaApp {
+    public static void main(String[] args) {
+        // Create a supplier that creates User objects
+        Supplier<User> userFactory = () -> {
+            Scanner in = new Scanner(System.in);
+            System.out.println("Enter the name: ");
+            String name = in.nextLine();
+            return new User(name);
+        };
+        
+        // Create users using the factory
+        User user1 = userFactory.get();
+        User user2 = userFactory.get();
+        
+        System.out.println("user1 name: " + user1.getName());
+        System.out.println("user2 name: " + user2.getName());
+    }
+}
+```
+
+**Other Supplier Examples:**
+
+```java
+import java.util.function.Supplier;
+import java.time.LocalDateTime;
+
+public class SupplierExamples {
+    public static void main(String[] args) {
+        // Random number supplier
+        Supplier<Integer> randomInt = () -> (int)(Math.random() * 100);
+        System.out.println(randomInt.get());  // Random number
+        System.out.println(randomInt.get());  // Different random number
+        
+        // Current timestamp supplier
+        Supplier<LocalDateTime> timestamp = () -> LocalDateTime.now();
+        System.out.println(timestamp.get());
+        
+        // Default value supplier
+        Supplier<String> defaultName = () -> "Anonymous";
+        System.out.println(defaultName.get());  // Anonymous
+        
+        // Lazy computation
+        Supplier<Double> expensiveCalculation = () -> {
+            System.out.println("Performing expensive calculation...");
+            return Math.pow(2, 20);
+        };
+        // Calculation only happens when get() is called
+        System.out.println(expensiveCalculation.get());
+    }
+}
+```
+
+**Practical use case - Lazy evaluation:**
+
+```java
+public class LazyExample {
+    // Supplier allows lazy evaluation - value is computed only when needed
+    public static String getValue(boolean condition, Supplier<String> supplier) {
+        if (condition) {
+            return supplier.get();  // Only computed if condition is true
+        }
+        return "default";
+    }
+    
+    public static void main(String[] args) {
+        // This expensive operation won't execute if condition is false
+        String result = getValue(false, () -> {
+            System.out.println("Computing expensive value...");
+            return "expensive result";
+        });
+        System.out.println(result);  // "default", computation never happened
+    }
+}
+```
+
+**Answer:** `Supplier<User> userFactory = () -> { /* create and return User */ };` creates a factory that generates User objects on demand. Call `userFactory.get()` to create a new user instance.
+
+</details>
+
+##### **3.24. Stream API Operations** (Tutorial 14, Task 7)
+Demonstrate using Stream API to filter, remove duplicates, sort, and limit a list of integers.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Stream API allows chaining multiple operations to process collections in a functional style.
+
+**Complete Example:**
+
+```java
+import java.util.*;
+
+public class StreamApp {
+    public static void main(String[] args) {
+        List<Integer> numbers = new ArrayList<>();
+        numbers.add(5);
+        numbers.add(9);
+        numbers.add(8);
+        numbers.add(8);
+        numbers.add(1);
+        
+        // Print original list
+        numbers.forEach((n) -> System.out.print(n));
+        System.out.println();  // Output: 59881
+        
+        // Apply stream operations
+        numbers.stream()
+            .filter(n -> n > 5)        // Keep only numbers > 5: [9, 8, 8]
+            .distinct()                // Remove duplicates: [9, 8]
+            .sorted()                  // Sort: [8, 9]
+            .limit(1)                  // Take first element: [8]
+            .forEach(System.out::print);
+        
+        System.out.println("\n" + numbers);
+    }
+}
+```
+
+**Output:**
+```
+59881
+8
+[5, 9, 8, 8, 1]
+```
+
+**Step-by-step breakdown:**
+
+1.  **Original list:** `[5, 9, 8, 8, 1]`
+2.  **After `filter(n -> n > 5)`:** `[9, 8, 8]` (only elements greater than 5)
+3.  **After `distinct()`:** `[9, 8]` (duplicates removed)
+4.  **After `sorted()`:** `[8, 9]` (sorted in ascending order)
+5.  **After `limit(1)`:** `[8]` (only first element)
+6.  **`forEach(System.out::print)`:** Prints `8`
+
+**Important Note:** The original list `numbers` remains unchanged `[5, 9, 8, 8, 1]` because stream operations don't modify the source.
+
+**Extended Example with collect():**
+
+```java
+List<Integer> numbers = Arrays.asList(5, 9, 8, 8, 1);
+
+// Collect results into a new list
+List<Integer> processed = numbers.stream()
+    .filter(n -> n > 5)
+    .distinct()
+    .sorted()
+    .collect(Collectors.toList());
+
+System.out.println("Original: " + numbers);      // [5, 9, 8, 8, 1]
+System.out.println("Processed: " + processed);   // [8, 9]
+```
+
+**More Stream Examples:**
+
+```java
+// Count elements
+long count = numbers.stream()
+    .filter(n -> n > 5)
+    .count();
+System.out.println("Count: " + count);  // 3
+
+// Find first
+Optional<Integer> first = numbers.stream()
+    .filter(n -> n > 5)
+    .findFirst();
+System.out.println("First: " + first.get());  // 9
+
+// Map transformation
+List<Integer> doubled = numbers.stream()
+    .map(n -> n * 2)
+    .collect(Collectors.toList());
+System.out.println("Doubled: " + doubled);  // [10, 18, 16, 16, 2]
+
+// Reduce (sum)
+int sum = numbers.stream()
+    .reduce(0, (a, b) -> a + b);
+System.out.println("Sum: " + sum);  // 31
+```
+
+**Answer:** The stream pipeline filters numbers greater than 5, removes duplicates, sorts them, takes the first element, and prints it. The original list remains unchanged. Output: `8`.
+
+</details>
+
+##### **3.25. Creating and Starting Threads with Runnable** (Tutorial 14, Task 8)
+Demonstrate creating and starting a thread using the Runnable interface.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The Runnable interface defines the task to execute in a thread, separated from the thread mechanism itself.
+
+**Method 1: Implementing Runnable Interface**
+
+```java
+public class HelloRunnable implements Runnable {
+    public void run() {
+        System.out.println("Hello from a thread!");
+    }
+    
+    public static void main(String[] args) {
+        (new Thread(new HelloRunnable())).start();
+    }
+}
+```
+
+**Method 2: Extending Thread Class**
+
+```java
+public class HelloThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Hello from a thread!");
+    }
+    
+    public static void main(String[] args) {
+        (new HelloThread()).start();
+    }
+}
+```
+
+**Method 3: Anonymous Class**
+
+```java
+public class ThreadDemo {
+    public static void main(String[] args) {
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("Hello from anonymous thread!");
+            }
+        });
+        thread.start();
+    }
+}
+```
+
+**Method 4: Lambda Expression** (Best for simple tasks)
+
+```java
+public class LambdaThread {
+    public static void main(String[] args) {
+        // Runnable is a functional interface
+        Thread thread = new Thread(() -> {
+            System.out.println("Hello from lambda thread!");
+        });
+        thread.start();
+        
+        // Even more concise for single statements
+        new Thread(() -> System.out.println("Quick thread!")).start();
+    }
+}
+```
+
+**Complete Example with Multiple Threads:**
+
+```java
+public class MultiThreadExample {
+    public static void main(String[] args) {
+        System.out.println("Main thread: " + Thread.currentThread().getName());
+        
+        // Create first thread
+        Thread thread1 = new Thread(() -> {
+            for (int i = 1; i <= 5; i++) {
+                System.out.println("Thread 1: " + i);
+                try {
+                    Thread.sleep(500);  // Sleep 500ms
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        
+        // Create second thread
+        Thread thread2 = new Thread(() -> {
+            for (int i = 1; i <= 5; i++) {
+                System.out.println("Thread 2: " + i);
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        
+        // Start both threads
+        thread1.start();
+        thread2.start();
+        
+        System.out.println("Main thread continues...");
+    }
+}
+```
+
+**Output** (order may vary due to concurrent execution):
+```
+Main thread: main
+Main thread continues...
+Thread 1: 1
+Thread 2: 1
+Thread 1: 2
+Thread 2: 2
+Thread 1: 3
+Thread 2: 3
+Thread 1: 4
+Thread 2: 4
+Thread 1: 5
+Thread 2: 5
+```
+
+**Waiting for Thread Completion:**
+
+```java
+public class ThreadJoinExample {
+    public static void main(String[] args) throws InterruptedException {
+        Thread thread = new Thread(() -> {
+            System.out.println("Thread working...");
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.println("Thread finished!");
+        });
+        
+        thread.start();
+        System.out.println("Main thread waiting...");
+        thread.join();  // Wait for thread to complete
+        System.out.println("Main thread continues after thread finished");
+    }
+}
+```
+
+**Answer:** Implement Runnable interface or extend Thread class, then call `start()` to begin execution in a new thread. Using lambda expressions with Runnable is the most concise approach: `new Thread(() -> System.out.println("Hello")).start();`
+
+</details>
+
+##### **3.26. Complete Lambda and Stream Example** (Tutorial 14, Task 9)
 Create a comprehensive program demonstrating lambda expressions, functional interfaces, and Stream API operations.
 
 <details>
@@ -3039,4 +3039,3 @@ John (age 42, salary $68000.00)
 **Answer:** This comprehensive example demonstrates all major functional programming concepts in Java: lambda expressions for all built-in functional interfaces, stream operations (filter, map, reduce, collect), method references, and complex data processing pipelines.
 
 </details>
-
