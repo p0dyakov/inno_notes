@@ -1031,6 +1031,7 @@ Use Prototype when:
 
 </details>
 
+
 ##### **3.2. Smart Document Editor** (Lab 8, Task 2)
 
 Implement a "Smart Document Editor" system in C++ demonstrating **Singleton**, **State**, and **Prototype** patterns working together.
@@ -1234,6 +1235,7 @@ InvoiceType | footer: Invoice #2026-001
 
 </details>
 
+
 ##### **3.3. Document Builder** (Lab 8, Task 3)
 
 Implement the Builder pattern in C++ for a `Document` with `header`, `body`, and `footer` sections. Include:
@@ -1353,6 +1355,7 @@ Footer: Prepared by Finance Dept. | Confidential
 
 </details>
 
+
 ##### **3.4. Implement the Singleton Pattern in C#** (Lecture 8, Example 1)
 
 Implement the Singleton design pattern in C#.
@@ -1408,7 +1411,60 @@ class Program
 
 </details>
 
-##### **3.5. Implement the Singleton Pattern in C++** (Lecture 8, Example 2)
+
+##### **3.5. Lazy vs. Non-Lazy Singleton: Compare the Implementations** (Lecture 8, Example 1)
+
+Given the two Singleton implementations below, explain the difference between them and state which is preferred and why.
+
+**Implementation A (Lazy):**
+```java
+public class LazySingleton {
+    private static LazySingleton unique;
+    private LazySingleton() { }
+    public static LazySingleton getInstance() {
+        if (unique == null) {
+            unique = new LazySingleton();
+        }
+        return unique;
+    }
+}
+```
+
+**Implementation B (Non-Lazy):**
+```java
+public class NonLazySingleton {
+    private static final NonLazySingleton unique = new NonLazySingleton();
+    private NonLazySingleton() { }
+    public static NonLazySingleton getInstance() {
+        return unique;
+    }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The difference is *when* the single instance is created — at first use (lazy) vs. at class loading time (non-lazy/eager).
+
+| | **Lazy (A)** | **Non-Lazy (B)** |
+|---|---|---|
+| **When created** | On first call to `getInstance()` | When the class is loaded by the JVM |
+| **Field declaration** | `private static LazySingleton unique;` (null initially) | `private static final NonLazySingleton unique = new ...` |
+| **Memory usage** | Only if/when needed | Always, even if never used |
+| **`getInstance()` body** | Null-check + possible construction | Simply `return unique` |
+| **Thread safety** | Requires synchronization | JVM class loading is thread-safe by default |
+| **Preferred?** | ✅ Generally preferred | ❌ Better to avoid |
+
+**Why Lazy is preferred:** If the Singleton is never actually used in a run of the program, the Non-Lazy version wastes memory and initialization time. The Lazy version avoids this by creating the instance only on demand.
+
+**Why Non-Lazy is problematic:** The instance is created eagerly regardless of need. Also, if the constructor has side effects (file I/O, network, etc.), they happen unconditionally at startup.
+
+**Answer:** Implementation A (Lazy) is preferred because it creates the instance only when first requested, saving resources if the Singleton is never needed. Implementation B (Non-Lazy) should be avoided.
+
+</details>
+
+
+##### **3.6. Implement the Singleton Pattern in C++** (Lecture 8, Example 2)
 
 Implement the Singleton design pattern in C++.
 
@@ -1462,7 +1518,95 @@ int main() {
 
 </details>
 
-##### **3.6. Thread Safety in Singleton** (Lecture 8, Example 3–4)
+
+##### **3.7. Prototype Pattern: Shapes Demo Trace** (Lecture 8, Example 2)
+
+Given the `Shape`, `Circle`, and `Rectangle` classes from the tutorial, trace through the `Demo.main()` method and predict what gets printed and why.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `clone()` creates a new object via the copy constructor — same field values, but different object identity (`!=`). The `equals()` method checks field values.
+
+**Setup (shapes list):**
+
+1.  A `Circle` with `x=10, y=20, radius=15, color="red"` — added to `shapes`.
+2.  `anotherCircle = (Circle) circle.clone()` — a second `Circle` with identical fields — added to `shapes`.
+3.  A `Rectangle` with `width=10, height=20, color="blue"` — added to `shapes`.
+
+Then `cloneAndCompare()` clones all three shapes into `shapesCopy`.
+
+**For each pair `(shapes.get(i), shapesCopy.get(i))`:**
+
+*   `shapes.get(i) != shapesCopy.get(i)` is **always true** — `clone()` always creates a new object at a different memory address; the reference `!=` test always passes.
+*   `shapes.get(i).equals(shapesCopy.get(i))` is **true** — the copy constructors faithfully copied all fields (x, y, color, and the subclass-specific fields), so content matches.
+
+**Expected output:**
+
+```
+0: Shapes are different objects (yay!)
+0: And their content are identical (yay!)
+1: Shapes are different objects (yay!)
+1: And their content are identical (yay!)
+2: Shapes are different objects (yay!)
+2: And their content are identical (yay!)
+```
+
+**Answer:** All three pairs print "different objects" (because `clone()` always allocates a new object) and "identical content" (because the copy constructors copied all fields correctly). This confirms the Prototype pattern is working.
+
+</details>
+
+
+##### **3.8. Builder Pattern: Car Factory Trace** (Lecture 8, Example 3)
+
+Trace through `Main.main()` in the Java car builder example using `SportsCarBuilder` and predict the complete console output.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The Director (`AutomotiveEngineer`) calls the builder's steps in a fixed sequence. Each step prints a message and sets a field. Method chaining means each call returns `this` (the same builder object).
+
+**Execution trace:**
+
+```java
+CarBuilder builder    = new SportsCarBuilder();
+AutomotiveEngineer eng = new AutomotiveEngineer(builder);
+// AutomotiveEngineer constructor checks builder != null — OK
+
+Car car = eng.manufactureCar();
+// Calls: builder.fixChassis().fixBody().paint().fixInterior().build()
+```
+
+Step by step:
+
+1.  `builder.fixChassis()` → prints `"Assembling chassis of the sports model"`, sets `chassis = "Sporty Chassis"`, returns `this`.
+2.  `.fixBody()` → prints `"Assembling body of the sports model"`, sets `body = "Sporty Body"`, returns `this`.
+3.  `.paint()` → prints `"Painting body of the sports model"`, sets `paint = "Sporty Torch Red Paint"`, returns `this`.
+4.  `.fixInterior()` → prints `"Setting up interior of the sports model"`, sets `interior = "Sporty interior"`, returns `this`.
+5.  `.build()` → creates `Car("Sporty Chassis", "Sporty Body", "Sporty Torch Red Paint", "Sporty interior")`, calls `doQualityCheck()` — all 4 fields are non-null and non-empty → returns `true`. Returns the car.
+
+`car != null`, so the main function prints:
+
+**Expected output:**
+
+```
+Assembling chassis of the sports model
+Assembling body of the sports model
+Painting body of the sports model
+Setting up interior of the sports model
+Below car delivered:
+============================================================================
+Car [chassis=Sporty Chassis, body=Sporty Body, paint=Sporty Torch Red Paint]
+============================================================================
+```
+
+**If `ClassicCarBuilder` were used instead:** The same sequence of prints would occur, but each line would say "classical model" instead of "sports model", and the final car would show "Classic Chassis", "Classic Body", "Classic White Paint". *Same Director, different ConcreteBuilder, different product* — this is the core value of the Builder pattern.
+
+**Answer:** Each step prints its assembly message in sequence; `build()` verifies quality and returns the complete car. Swapping `SportsCarBuilder` for `ClassicCarBuilder` produces a different car with no changes to the Director.
+
+</details>
+
+##### **3.9. Thread Safety in Singleton** (Lecture 8, Example 3–4)
 
 **(a)** Explain why the basic Singleton implementation is incomplete. **(b)** Illustrate the race condition. **(c)** Propose an industrial-strength solution.
 
@@ -1545,139 +1689,3 @@ The outer check avoids locking on every call. Only the first time (when `unique`
 
 </details>
 
-##### **3.7. Lazy vs. Non-Lazy Singleton: Compare the Implementations** (Lecture 8, Example 1)
-
-Given the two Singleton implementations below, explain the difference between them and state which is preferred and why.
-
-**Implementation A (Lazy):**
-```java
-public class LazySingleton {
-    private static LazySingleton unique;
-    private LazySingleton() { }
-    public static LazySingleton getInstance() {
-        if (unique == null) {
-            unique = new LazySingleton();
-        }
-        return unique;
-    }
-}
-```
-
-**Implementation B (Non-Lazy):**
-```java
-public class NonLazySingleton {
-    private static final NonLazySingleton unique = new NonLazySingleton();
-    private NonLazySingleton() { }
-    public static NonLazySingleton getInstance() {
-        return unique;
-    }
-}
-```
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The difference is *when* the single instance is created — at first use (lazy) vs. at class loading time (non-lazy/eager).
-
-| | **Lazy (A)** | **Non-Lazy (B)** |
-|---|---|---|
-| **When created** | On first call to `getInstance()` | When the class is loaded by the JVM |
-| **Field declaration** | `private static LazySingleton unique;` (null initially) | `private static final NonLazySingleton unique = new ...` |
-| **Memory usage** | Only if/when needed | Always, even if never used |
-| **`getInstance()` body** | Null-check + possible construction | Simply `return unique` |
-| **Thread safety** | Requires synchronization | JVM class loading is thread-safe by default |
-| **Preferred?** | ✅ Generally preferred | ❌ Better to avoid |
-
-**Why Lazy is preferred:** If the Singleton is never actually used in a run of the program, the Non-Lazy version wastes memory and initialization time. The Lazy version avoids this by creating the instance only on demand.
-
-**Why Non-Lazy is problematic:** The instance is created eagerly regardless of need. Also, if the constructor has side effects (file I/O, network, etc.), they happen unconditionally at startup.
-
-**Answer:** Implementation A (Lazy) is preferred because it creates the instance only when first requested, saving resources if the Singleton is never needed. Implementation B (Non-Lazy) should be avoided.
-
-</details>
-
-##### **3.8. Prototype Pattern: Shapes Demo Trace** (Lecture 8, Example 2)
-
-Given the `Shape`, `Circle`, and `Rectangle` classes from the tutorial, trace through the `Demo.main()` method and predict what gets printed and why.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** `clone()` creates a new object via the copy constructor — same field values, but different object identity (`!=`). The `equals()` method checks field values.
-
-**Setup (shapes list):**
-
-1.  A `Circle` with `x=10, y=20, radius=15, color="red"` — added to `shapes`.
-2.  `anotherCircle = (Circle) circle.clone()` — a second `Circle` with identical fields — added to `shapes`.
-3.  A `Rectangle` with `width=10, height=20, color="blue"` — added to `shapes`.
-
-Then `cloneAndCompare()` clones all three shapes into `shapesCopy`.
-
-**For each pair `(shapes.get(i), shapesCopy.get(i))`:**
-
-*   `shapes.get(i) != shapesCopy.get(i)` is **always true** — `clone()` always creates a new object at a different memory address; the reference `!=` test always passes.
-*   `shapes.get(i).equals(shapesCopy.get(i))` is **true** — the copy constructors faithfully copied all fields (x, y, color, and the subclass-specific fields), so content matches.
-
-**Expected output:**
-
-```
-0: Shapes are different objects (yay!)
-0: And their content are identical (yay!)
-1: Shapes are different objects (yay!)
-1: And their content are identical (yay!)
-2: Shapes are different objects (yay!)
-2: And their content are identical (yay!)
-```
-
-**Answer:** All three pairs print "different objects" (because `clone()` always allocates a new object) and "identical content" (because the copy constructors copied all fields correctly). This confirms the Prototype pattern is working.
-
-</details>
-
-##### **3.9. Builder Pattern: Car Factory Trace** (Lecture 8, Example 3)
-
-Trace through `Main.main()` in the Java car builder example using `SportsCarBuilder` and predict the complete console output.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The Director (`AutomotiveEngineer`) calls the builder's steps in a fixed sequence. Each step prints a message and sets a field. Method chaining means each call returns `this` (the same builder object).
-
-**Execution trace:**
-
-```java
-CarBuilder builder    = new SportsCarBuilder();
-AutomotiveEngineer eng = new AutomotiveEngineer(builder);
-// AutomotiveEngineer constructor checks builder != null — OK
-
-Car car = eng.manufactureCar();
-// Calls: builder.fixChassis().fixBody().paint().fixInterior().build()
-```
-
-Step by step:
-
-1.  `builder.fixChassis()` → prints `"Assembling chassis of the sports model"`, sets `chassis = "Sporty Chassis"`, returns `this`.
-2.  `.fixBody()` → prints `"Assembling body of the sports model"`, sets `body = "Sporty Body"`, returns `this`.
-3.  `.paint()` → prints `"Painting body of the sports model"`, sets `paint = "Sporty Torch Red Paint"`, returns `this`.
-4.  `.fixInterior()` → prints `"Setting up interior of the sports model"`, sets `interior = "Sporty interior"`, returns `this`.
-5.  `.build()` → creates `Car("Sporty Chassis", "Sporty Body", "Sporty Torch Red Paint", "Sporty interior")`, calls `doQualityCheck()` — all 4 fields are non-null and non-empty → returns `true`. Returns the car.
-
-`car != null`, so the main function prints:
-
-**Expected output:**
-
-```
-Assembling chassis of the sports model
-Assembling body of the sports model
-Painting body of the sports model
-Setting up interior of the sports model
-Below car delivered:
-============================================================================
-Car [chassis=Sporty Chassis, body=Sporty Body, paint=Sporty Torch Red Paint]
-============================================================================
-```
-
-**If `ClassicCarBuilder` were used instead:** The same sequence of prints would occur, but each line would say "classical model" instead of "sports model", and the final car would show "Classic Chassis", "Classic Body", "Classic White Paint". *Same Director, different ConcreteBuilder, different product* — this is the core value of the Builder pattern.
-
-**Answer:** Each step prints its assembly message in sequence; `build()` verifies quality and returns the complete car. Swapping `SportsCarBuilder` for `ClassicCarBuilder` produces a different car with no changes to the Director.
-
-</details>

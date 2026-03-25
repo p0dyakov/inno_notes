@@ -520,167 +520,8 @@ Build a DPDA that recognizes the language $L = \{a^n b^{2n} \mid n \geq 1\}$ —
 
 </details>
 
-##### **4.2. Construct a DPDA for $P = \{xycy^Rx^R \mid x \in \{a,b\}^*, y \in \{d,e\}^*, |x|>0\}$** (Lab 5, Task 2)
 
-Build a DPDA that recognizes $P = \{xycy^Rx^R \mid x \in \{a,b\}^*, y \in \{d,e\}^*, |x|>0\}$ over the alphabet $I = \{a,b,c,d,e\}$.
-
-*(The string consists of a non-empty string $x$ over $\{a,b\}$, followed by a string $y$ over $\{d,e\}$, followed by the center marker $c$, followed by $y^R$, followed by $x^R$.)*
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Push all symbols of $x$ (using stack symbols $A$ for $a$, $B$ for $b$) and then all symbols of $y$ (using $D$ for $d$, $E$ for $e$). When $c$ appears, switch to pop mode: first pop $y^R$ (matching $y$ reversed), then pop $x^R$ (matching $x$ reversed).
-
-1.  **PDA specification:**
-    *   States: $q_0$ (pushing $x$), $q_1$ (pushing $y$), $q_2$ (popping $y^R$), $q_3$ (popping $x^R$), $q_4$ (accepting)
-    *   Stack alphabet: $\Gamma = \{Z_0, A, B, D, E\}$
-2.  **Phase 1 — Push $x$ (state $q_0$, loops):**
-    *   $a,\, Z_0 / AZ_0$; $b,\, Z_0 / BZ_0$
-    *   $a,\, A / AA$; $a,\, B / AB$
-    *   $b,\, A / BA$; $b,\, B / BB$
-3.  **Transition to $y$-push phase (state $q_0 \to q_1$):** On reading the first $d$ or $e$ symbol, switch to $q_1$:
-    *   $d,\, A / DA$; $d,\, B / DB$; $e,\, A / EA$; $e,\, B / EB$
-4.  **Phase 2 — Push $y$ (state $q_1$, loops):**
-    *   $d,\, D / DD$; $d,\, E / DE$
-    *   $e,\, D / ED$; $e,\, E / EE$
-5.  **Pivot on $c$ ($q_1 \to q_2$ or $q_0 \to q_2$ if $y$ empty):**
-    *   $c,\, D / D$; $c,\, E / E$ (top is a $y$-symbol: switch to pop-$y$ phase)
-    *   $c,\, A / A$; $c,\, B / B$ (no $y$ was pushed, skip to pop-$x$ phase: $q_1 \to q_3$)
-6.  **Phase 3 — Pop $y^R$ (state $q_2$, loops):**
-    *   $d,\, D / \varepsilon$; $e,\, E / \varepsilon$ (match $d \leftrightarrow D$, $e \leftrightarrow E$)
-    *   Transition to pop-$x$ phase when hitting an $x$-symbol: $q_2 \to q_3$ on $\varepsilon$ when top is $A$ or $B$: $\varepsilon,\, A / A$; $\varepsilon,\, B / B$
-7.  **Phase 4 — Pop $x^R$ (state $q_3$, loops):**
-    *   $a,\, A / \varepsilon$; $b,\, B / \varepsilon$ (match $a \leftrightarrow A$, $b \leftrightarrow B$)
-8.  **Accept:** $q_3 \to q_4$: $\varepsilon,\, Z_0 / Z_0$
-
-**Answer:** The DPDA with phases for pushing $x$, pushing $y$, popping $y^R$, and popping $x^R$ (with $c$ as the pivot) recognizes $P = \{xycy^Rx^R \mid x \in \{a,b\}^*, y \in \{d,e\}^*, |x|>0\}$.
-
-</details>
-
-##### **4.3. Construct a DPDA for Balanced Brackets and Parentheses** (Lab 5, Task 3)
-
-Build a DPDA that recognizes the language of nested and balanced brackets and parentheses over the alphabet $I = \{(, ), [, ]\}$.
-
-*Examples of strings in the language:* `(([])())()`, `(())[]`
-*Examples NOT in the language:* `([(]))()()`, `([)]`
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Use the stack to track open delimiters. When `(` is seen, push a marker $P$ for parenthesis. When `[` is seen, push a marker $Q$ for bracket. When `)` is seen, pop the top and check it is $P$ (matching parenthesis). When `]` is seen, pop and check it is $Q$ (matching bracket). Accept when the input is exhausted and the stack holds only $Z_0$.
-
-*Note:* A key challenge is that `([)]` must be rejected — the closing symbols must match the most recently opened one. The stack's LIFO property enforces this naturally.
-
-1.  **PDA specification:**
-    *   States: $q_0$ (start, processing), $q_1$ (accepting)
-    *   Stack alphabet: $\Gamma = \{Z_0, P, Q\}$ where $P$ marks `(` and $Q$ marks `[`
-2.  **Transitions (all loops on $q_0$ except the final accept):**
-
-    | Notation | Meaning |
-    |:---------|:--------|
-    | $(,\, Z_0 / PZ_0$ | Open `(` on empty stack: push $P$ |
-    | $(,\, P / PP$ | Open `(` with $P$ on top: push $P$ |
-    | $(,\, Q / PQ$ | Open `(` with $Q$ on top: push $P$ |
-    | $[,\, Z_0 / QZ_0$ | Open `[` on empty stack: push $Q$ |
-    | $[,\, P / QP$ | Open `[` with $P$ on top: push $Q$ |
-    | $[,\, Q / QQ$ | Open `[` with $Q$ on top: push $Q$ |
-    | $),\, P / \varepsilon$ | Close `)` with $P$ on top: pop (matched!) |
-    | $],\, Q / \varepsilon$ | Close `]` with $Q$ on top: pop (matched!) |
-3.  **Accept:** $q_0 \to q_1$: $\varepsilon,\, Z_0 / Z_0$ — all matched, stack has only $Z_0$.
-4.  **Rejection (implicitly):** If `)` is read but $Q$ (not $P$) is on top, there is no defined transition, so the PDA gets stuck and rejects. This correctly rejects strings like `([)]`.
-5.  **Trace for input $"([])"$:**
-    *   $q_0 \xrightarrow{(,\,Z_0/PZ_0} q_0$: stack = $P, Z_0$
-    *   $q_0 \xrightarrow{[,\,P/QP} q_0$: stack = $Q, P, Z_0$
-    *   $q_0 \xrightarrow{],\,Q/\varepsilon} q_0$: stack = $P, Z_0$
-    *   $q_0 \xrightarrow{),\,P/\varepsilon} q_0$: stack = $Z_0$
-    *   $q_0 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_1$: **ACCEPT** $\checkmark$
-
-**Answer:** The DPDA above recognizes the language of nested and balanced brackets and parentheses over $\{(, ), [, ]\}$.
-
-</details>
-
-##### **4.4. Construct a DPDA for $L_1 = \{w \in \{a,b\}^* \mid \phi(w,a) = \phi(w,b)\}$** (Lab 5, Task 4)
-
-Build a DPDA that recognizes $L_1 = \{w \in \{a,b\}^* \mid \phi(w,a) = \phi(w,b)\}$, where $\phi(s,c)$ is the number of occurrences of character $c$ in string $s$. In other words, $L_1$ is the set of all strings over $\{a,b\}$ with equal numbers of $a$'s and $b$'s (in any order).
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Unlike $a^n b^n$ where all $a$'s come first, here $a$'s and $b$'s can be interleaved in any order. We use the stack as a *counter*: push $A$ for each $a$ seen (when stack contains only $Z_0$ or $A$'s), and push $B$ for each $b$ seen (when stack contains only $Z_0$ or $B$'s). When the top symbol and the input symbol cancel (an $a$ arrives while the top is $B$, or a $b$ arrives while the top is $A$), pop the top instead. This is a net balance counter.
-
-1.  **PDA specification:**
-    *   States: $q_0$ (processing), $q_1$ (accepting)
-    *   Stack alphabet: $\Gamma = \{Z_0, A, B\}$
-    *   $A$ on the stack means "more $a$'s seen so far"; $B$ means "more $b$'s seen so far"
-2.  **Transitions (all loops on $q_0$):**
-
-    | Notation | Meaning |
-    |:---------|:--------|
-    | $a,\, Z_0 / AZ_0$ | Read $a$, stack balanced so far: push $A$ (now +1 $a$) |
-    | $a,\, A / AA$ | Read $a$, currently have excess $a$'s: push more $A$ |
-    | $a,\, B / \varepsilon$ | Read $a$, currently have excess $b$'s: cancel one $B$ |
-    | $b,\, Z_0 / BZ_0$ | Read $b$, stack balanced so far: push $B$ (now +1 $b$) |
-    | $b,\, B / BB$ | Read $b$, currently have excess $b$'s: push more $B$ |
-    | $b,\, A / \varepsilon$ | Read $b$, currently have excess $a$'s: cancel one $A$ |
-3.  **Accept:** $q_0 \to q_1$: $\varepsilon,\, Z_0 / Z_0$ — all cancelled out, stack holds $Z_0$: counts equal; accept.
-4.  **Trace for input $"abba"$:**
-    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$ (1 excess $a$)
-    *   $q_0 \xrightarrow{b,\,A/\varepsilon} q_0$: stack = $Z_0$ (cancelled)
-    *   $q_0 \xrightarrow{b,\,Z_0/BZ_0} q_0$: stack = $B, Z_0$ (1 excess $b$)
-    *   $q_0 \xrightarrow{a,\,B/\varepsilon} q_0$: stack = $Z_0$ (cancelled)
-    *   $q_0 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_1$: **ACCEPT** $\checkmark$
-5.  **Trace for input $"aab"$** (should reject since $\phi(w,a)=2 \neq 1=\phi(w,b)$):
-    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
-    *   $q_0 \xrightarrow{a,\,A/AA} q_0$: stack = $A, A, Z_0$
-    *   $q_0 \xrightarrow{b,\,A/\varepsilon} q_0$: stack = $A, Z_0$
-    *   Input exhausted; stack is $A, Z_0$ (not just $Z_0$); no $\varepsilon$-accept transition applies. **REJECT** $\checkmark$
-
-**Answer:** The DPDA above uses the stack as a signed counter to recognize $L_1 = \{w \mid \phi(w,a) = \phi(w,b)\}$.
-
-</details>
-
-##### **4.5. Construct a DPDA for $L_2 = \{a^n b^m a^m b^n \mid n > 0, m > 0\}$** (Lab 5, Task 5)
-
-Build a DPDA that recognizes $L_2 = \{a^n b^m a^m b^n \mid n > 0, m > 0\}$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The string has the form $a^n b^m a^m b^n$ — an outer $a$-layer, an inner $b$-layer, a matching inner $a$-layer, and a matching outer $b$-layer. Use the stack in two phases:
-
-*   **Phase 1 (outer $a$'s):** Push $n$ copies of $A$ for the $n$ leading $a$'s.
-*   **Phase 2 (inner $b$'s):** Push $m$ copies of $B$ for the $m$ leading $b$'s (on top of the $A$'s).
-*   **Phase 3 (inner $a$'s):** Pop one $B$ per $a$ (matching the inner $b$'s with inner $a$'s).
-*   **Phase 4 (outer $b$'s):** Pop one $A$ per $b$ (matching the outer $a$'s with outer $b$'s).
-1.  **States:** $q_0$ (reading outer $a$'s), $q_1$ (reading inner $b$'s), $q_2$ (reading inner $a$'s), $q_3$ (reading outer $b$'s), $q_4$ (accepting)
-2.  **Transitions:**
-
-    | Transition | Notation | Meaning |
-    |:-----------|:---------|:--------|
-    | $q_0 \circlearrowleft$ | $a,\, Z_0 / AZ_0$ | First outer $a$: push $A$ |
-    | $q_0 \circlearrowleft$ | $a,\, A / AA$ | More outer $a$'s: push $A$ |
-    | $q_0 \to q_1$ | $b,\, A / BA$ | First inner $b$: push $B$ on top of $A$'s |
-    | $q_1 \circlearrowleft$ | $b,\, B / BB$ | More inner $b$'s: push $B$ |
-    | $q_1 \to q_2$ | $a,\, B / \varepsilon$ | First inner $a$: pop one $B$ |
-    | $q_2 \circlearrowleft$ | $a,\, B / \varepsilon$ | More inner $a$'s: pop $B$ |
-    | $q_2 \to q_3$ | $b,\, A / \varepsilon$ | First outer $b$: pop one $A$ (all $B$'s gone) |
-    | $q_3 \circlearrowleft$ | $b,\, A / \varepsilon$ | More outer $b$'s: pop $A$ |
-    | $q_3 \to q_4$ | $\varepsilon,\, Z_0 / Z_0$ | All matched: accept |
-3.  **Trace for input $"abba"$ is too short (minimum: $a^1b^1a^1b^1 = "abab"$):**
-
-    Trace for $"abab"$ ($n=m=1$):
-
-    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
-    *   $q_0 \xrightarrow{b,\,A/BA} q_1$: stack = $B, A, Z_0$
-    *   $q_1 \xrightarrow{a,\,B/\varepsilon} q_2$: stack = $A, Z_0$
-    *   $q_2 \xrightarrow{b,\,A/\varepsilon} q_3$: stack = $Z_0$
-    *   $q_3 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_4$: **ACCEPT** $\checkmark$
-
-**Answer:** The DPDA with phases for outer $a$'s, inner $b$'s, inner $a$'s, and outer $b$'s recognizes $L_2 = \{a^n b^m a^m b^n \mid n > 0, m > 0\}$.
-
-</details>
-
-##### **4.6. Construct a DPDA for Arithmetic Expression Parentheses** (Lab 5, Homework 1)
+##### **4.2. Construct a DPDA for Arithmetic Expression Parentheses** (Lab 5, Homework 1)
 
 Construct a DPDA that recognizes the language of well-formed parentheses of arithmetic expressions (binary operations). The alphabet is $I = \{a, (, ), +\}$, where $a$ represents terms and $+$ is the binary operator.
 
@@ -726,6 +567,171 @@ For a simple DPDA approach tracking only parenthesis balance:
 
 </details>
 
+
+##### **4.3. Construct a DPDA for $P = \{xycy^Rx^R \mid x \in \{a,b\}^*, y \in \{d,e\}^*, |x|>0\}$** (Lab 5, Task 2)
+
+Build a DPDA that recognizes $P = \{xycy^Rx^R \mid x \in \{a,b\}^*, y \in \{d,e\}^*, |x|>0\}$ over the alphabet $I = \{a,b,c,d,e\}$.
+
+*(The string consists of a non-empty string $x$ over $\{a,b\}$, followed by a string $y$ over $\{d,e\}$, followed by the center marker $c$, followed by $y^R$, followed by $x^R$.)*
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Push all symbols of $x$ (using stack symbols $A$ for $a$, $B$ for $b$) and then all symbols of $y$ (using $D$ for $d$, $E$ for $e$). When $c$ appears, switch to pop mode: first pop $y^R$ (matching $y$ reversed), then pop $x^R$ (matching $x$ reversed).
+
+1.  **PDA specification:**
+    *   States: $q_0$ (pushing $x$), $q_1$ (pushing $y$), $q_2$ (popping $y^R$), $q_3$ (popping $x^R$), $q_4$ (accepting)
+    *   Stack alphabet: $\Gamma = \{Z_0, A, B, D, E\}$
+2.  **Phase 1 — Push $x$ (state $q_0$, loops):**
+    *   $a,\, Z_0 / AZ_0$; $b,\, Z_0 / BZ_0$
+    *   $a,\, A / AA$; $a,\, B / AB$
+    *   $b,\, A / BA$; $b,\, B / BB$
+3.  **Transition to $y$-push phase (state $q_0 \to q_1$):** On reading the first $d$ or $e$ symbol, switch to $q_1$:
+    *   $d,\, A / DA$; $d,\, B / DB$; $e,\, A / EA$; $e,\, B / EB$
+4.  **Phase 2 — Push $y$ (state $q_1$, loops):**
+    *   $d,\, D / DD$; $d,\, E / DE$
+    *   $e,\, D / ED$; $e,\, E / EE$
+5.  **Pivot on $c$ ($q_1 \to q_2$ or $q_0 \to q_2$ if $y$ empty):**
+    *   $c,\, D / D$; $c,\, E / E$ (top is a $y$-symbol: switch to pop-$y$ phase)
+    *   $c,\, A / A$; $c,\, B / B$ (no $y$ was pushed, skip to pop-$x$ phase: $q_1 \to q_3$)
+6.  **Phase 3 — Pop $y^R$ (state $q_2$, loops):**
+    *   $d,\, D / \varepsilon$; $e,\, E / \varepsilon$ (match $d \leftrightarrow D$, $e \leftrightarrow E$)
+    *   Transition to pop-$x$ phase when hitting an $x$-symbol: $q_2 \to q_3$ on $\varepsilon$ when top is $A$ or $B$: $\varepsilon,\, A / A$; $\varepsilon,\, B / B$
+7.  **Phase 4 — Pop $x^R$ (state $q_3$, loops):**
+    *   $a,\, A / \varepsilon$; $b,\, B / \varepsilon$ (match $a \leftrightarrow A$, $b \leftrightarrow B$)
+8.  **Accept:** $q_3 \to q_4$: $\varepsilon,\, Z_0 / Z_0$
+
+**Answer:** The DPDA with phases for pushing $x$, pushing $y$, popping $y^R$, and popping $x^R$ (with $c$ as the pivot) recognizes $P = \{xycy^Rx^R \mid x \in \{a,b\}^*, y \in \{d,e\}^*, |x|>0\}$.
+
+</details>
+
+
+##### **4.4. Construct a DPDA for Balanced Brackets and Parentheses** (Lab 5, Task 3)
+
+Build a DPDA that recognizes the language of nested and balanced brackets and parentheses over the alphabet $I = \{(, ), [, ]\}$.
+
+*Examples of strings in the language:* `(([])())()`, `(())[]`
+*Examples NOT in the language:* `([(]))()()`, `([)]`
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the stack to track open delimiters. When `(` is seen, push a marker $P$ for parenthesis. When `[` is seen, push a marker $Q$ for bracket. When `)` is seen, pop the top and check it is $P$ (matching parenthesis). When `]` is seen, pop and check it is $Q$ (matching bracket). Accept when the input is exhausted and the stack holds only $Z_0$.
+
+*Note:* A key challenge is that `([)]` must be rejected — the closing symbols must match the most recently opened one. The stack's LIFO property enforces this naturally.
+
+1.  **PDA specification:**
+    *   States: $q_0$ (start, processing), $q_1$ (accepting)
+    *   Stack alphabet: $\Gamma = \{Z_0, P, Q\}$ where $P$ marks `(` and $Q$ marks `[`
+2.  **Transitions (all loops on $q_0$ except the final accept):**
+
+    | Notation | Meaning |
+    |:---------|:--------|
+    | $(,\, Z_0 / PZ_0$ | Open `(` on empty stack: push $P$ |
+    | $(,\, P / PP$ | Open `(` with $P$ on top: push $P$ |
+    | $(,\, Q / PQ$ | Open `(` with $Q$ on top: push $P$ |
+    | $[,\, Z_0 / QZ_0$ | Open `[` on empty stack: push $Q$ |
+    | $[,\, P / QP$ | Open `[` with $P$ on top: push $Q$ |
+    | $[,\, Q / QQ$ | Open `[` with $Q$ on top: push $Q$ |
+    | $),\, P / \varepsilon$ | Close `)` with $P$ on top: pop (matched!) |
+    | $],\, Q / \varepsilon$ | Close `]` with $Q$ on top: pop (matched!) |
+3.  **Accept:** $q_0 \to q_1$: $\varepsilon,\, Z_0 / Z_0$ — all matched, stack has only $Z_0$.
+4.  **Rejection (implicitly):** If `)` is read but $Q$ (not $P$) is on top, there is no defined transition, so the PDA gets stuck and rejects. This correctly rejects strings like `([)]`.
+5.  **Trace for input $"([])"$:**
+    *   $q_0 \xrightarrow{(,\,Z_0/PZ_0} q_0$: stack = $P, Z_0$
+    *   $q_0 \xrightarrow{[,\,P/QP} q_0$: stack = $Q, P, Z_0$
+    *   $q_0 \xrightarrow{],\,Q/\varepsilon} q_0$: stack = $P, Z_0$
+    *   $q_0 \xrightarrow{),\,P/\varepsilon} q_0$: stack = $Z_0$
+    *   $q_0 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_1$: **ACCEPT** $\checkmark$
+
+**Answer:** The DPDA above recognizes the language of nested and balanced brackets and parentheses over $\{(, ), [, ]\}$.
+
+</details>
+
+
+##### **4.5. Construct a DPDA for $L_1 = \{w \in \{a,b\}^* \mid \phi(w,a) = \phi(w,b)\}$** (Lab 5, Task 4)
+
+Build a DPDA that recognizes $L_1 = \{w \in \{a,b\}^* \mid \phi(w,a) = \phi(w,b)\}$, where $\phi(s,c)$ is the number of occurrences of character $c$ in string $s$. In other words, $L_1$ is the set of all strings over $\{a,b\}$ with equal numbers of $a$'s and $b$'s (in any order).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Unlike $a^n b^n$ where all $a$'s come first, here $a$'s and $b$'s can be interleaved in any order. We use the stack as a *counter*: push $A$ for each $a$ seen (when stack contains only $Z_0$ or $A$'s), and push $B$ for each $b$ seen (when stack contains only $Z_0$ or $B$'s). When the top symbol and the input symbol cancel (an $a$ arrives while the top is $B$, or a $b$ arrives while the top is $A$), pop the top instead. This is a net balance counter.
+
+1.  **PDA specification:**
+    *   States: $q_0$ (processing), $q_1$ (accepting)
+    *   Stack alphabet: $\Gamma = \{Z_0, A, B\}$
+    *   $A$ on the stack means "more $a$'s seen so far"; $B$ means "more $b$'s seen so far"
+2.  **Transitions (all loops on $q_0$):**
+
+    | Notation | Meaning |
+    |:---------|:--------|
+    | $a,\, Z_0 / AZ_0$ | Read $a$, stack balanced so far: push $A$ (now +1 $a$) |
+    | $a,\, A / AA$ | Read $a$, currently have excess $a$'s: push more $A$ |
+    | $a,\, B / \varepsilon$ | Read $a$, currently have excess $b$'s: cancel one $B$ |
+    | $b,\, Z_0 / BZ_0$ | Read $b$, stack balanced so far: push $B$ (now +1 $b$) |
+    | $b,\, B / BB$ | Read $b$, currently have excess $b$'s: push more $B$ |
+    | $b,\, A / \varepsilon$ | Read $b$, currently have excess $a$'s: cancel one $A$ |
+3.  **Accept:** $q_0 \to q_1$: $\varepsilon,\, Z_0 / Z_0$ — all cancelled out, stack holds $Z_0$: counts equal; accept.
+4.  **Trace for input $"abba"$:**
+    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$ (1 excess $a$)
+    *   $q_0 \xrightarrow{b,\,A/\varepsilon} q_0$: stack = $Z_0$ (cancelled)
+    *   $q_0 \xrightarrow{b,\,Z_0/BZ_0} q_0$: stack = $B, Z_0$ (1 excess $b$)
+    *   $q_0 \xrightarrow{a,\,B/\varepsilon} q_0$: stack = $Z_0$ (cancelled)
+    *   $q_0 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_1$: **ACCEPT** $\checkmark$
+5.  **Trace for input $"aab"$** (should reject since $\phi(w,a)=2 \neq 1=\phi(w,b)$):
+    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
+    *   $q_0 \xrightarrow{a,\,A/AA} q_0$: stack = $A, A, Z_0$
+    *   $q_0 \xrightarrow{b,\,A/\varepsilon} q_0$: stack = $A, Z_0$
+    *   Input exhausted; stack is $A, Z_0$ (not just $Z_0$); no $\varepsilon$-accept transition applies. **REJECT** $\checkmark$
+
+**Answer:** The DPDA above uses the stack as a signed counter to recognize $L_1 = \{w \mid \phi(w,a) = \phi(w,b)\}$.
+
+</details>
+
+
+##### **4.6. Construct a DPDA for $L_2 = \{a^n b^m a^m b^n \mid n > 0, m > 0\}$** (Lab 5, Task 5)
+
+Build a DPDA that recognizes $L_2 = \{a^n b^m a^m b^n \mid n > 0, m > 0\}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The string has the form $a^n b^m a^m b^n$ — an outer $a$-layer, an inner $b$-layer, a matching inner $a$-layer, and a matching outer $b$-layer. Use the stack in two phases:
+
+*   **Phase 1 (outer $a$'s):** Push $n$ copies of $A$ for the $n$ leading $a$'s.
+*   **Phase 2 (inner $b$'s):** Push $m$ copies of $B$ for the $m$ leading $b$'s (on top of the $A$'s).
+*   **Phase 3 (inner $a$'s):** Pop one $B$ per $a$ (matching the inner $b$'s with inner $a$'s).
+*   **Phase 4 (outer $b$'s):** Pop one $A$ per $b$ (matching the outer $a$'s with outer $b$'s).
+1.  **States:** $q_0$ (reading outer $a$'s), $q_1$ (reading inner $b$'s), $q_2$ (reading inner $a$'s), $q_3$ (reading outer $b$'s), $q_4$ (accepting)
+2.  **Transitions:**
+
+    | Transition | Notation | Meaning |
+    |:-----------|:---------|:--------|
+    | $q_0 \circlearrowleft$ | $a,\, Z_0 / AZ_0$ | First outer $a$: push $A$ |
+    | $q_0 \circlearrowleft$ | $a,\, A / AA$ | More outer $a$'s: push $A$ |
+    | $q_0 \to q_1$ | $b,\, A / BA$ | First inner $b$: push $B$ on top of $A$'s |
+    | $q_1 \circlearrowleft$ | $b,\, B / BB$ | More inner $b$'s: push $B$ |
+    | $q_1 \to q_2$ | $a,\, B / \varepsilon$ | First inner $a$: pop one $B$ |
+    | $q_2 \circlearrowleft$ | $a,\, B / \varepsilon$ | More inner $a$'s: pop $B$ |
+    | $q_2 \to q_3$ | $b,\, A / \varepsilon$ | First outer $b$: pop one $A$ (all $B$'s gone) |
+    | $q_3 \circlearrowleft$ | $b,\, A / \varepsilon$ | More outer $b$'s: pop $A$ |
+    | $q_3 \to q_4$ | $\varepsilon,\, Z_0 / Z_0$ | All matched: accept |
+3.  **Trace for input $"abba"$ is too short (minimum: $a^1b^1a^1b^1 = "abab"$):**
+
+    Trace for $"abab"$ ($n=m=1$):
+
+    *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
+    *   $q_0 \xrightarrow{b,\,A/BA} q_1$: stack = $B, A, Z_0$
+    *   $q_1 \xrightarrow{a,\,B/\varepsilon} q_2$: stack = $A, Z_0$
+    *   $q_2 \xrightarrow{b,\,A/\varepsilon} q_3$: stack = $Z_0$
+    *   $q_3 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_4$: **ACCEPT** $\checkmark$
+
+**Answer:** The DPDA with phases for outer $a$'s, inner $b$'s, inner $a$'s, and outer $b$'s recognizes $L_2 = \{a^n b^m a^m b^n \mid n > 0, m > 0\}$.
+
+</details>
+
+
 ##### **4.7. Prove That $L = \{a^n b^n c^n \mid n \in \mathbb{N}\}$ Is Not Context-Free** (Tutorial 6, Example 1)
 
 Use the Bar-Hillel Lemma (Pumping Lemma for context-free languages) to prove that $L = \{a^n b^n c^n \mid n \geq 0\}$ is not a context-free language.
@@ -754,6 +760,7 @@ Use the Bar-Hillel Lemma (Pumping Lemma for context-free languages) to prove tha
 **Answer:** $L = \{a^n b^n c^n \mid n \geq 0\}$ is not a context-free language.
 
 </details>
+
 
 ##### **4.8. Construct a DPDA for $L_1 = \{a^n b^n \mid n \geq 1\}$** (Tutorial 6, Example 2)
 
@@ -798,6 +805,7 @@ Construct a Deterministic Pushdown Automaton (DPDA) that recognizes $L_1 = \{a^n
 
 </details>
 
+
 ##### **4.9. Construct a DPDA for $L_2 = \{a^n b a^n \mid n \in \mathbb{N}^+\}$** (Tutorial 6, Example 3)
 
 Construct a DPDA that recognizes $L_2 = \{a^n b a^n \mid n \geq 1\}$.
@@ -835,6 +843,7 @@ Construct a DPDA that recognizes $L_2 = \{a^n b a^n \mid n \geq 1\}$.
 **Answer:** The DPDA with states $q_0, q_1, q_2$ (accepting) and the transitions above recognizes $L_2 = \{a^n b a^n \mid n \geq 1\}$.
 
 </details>
+
 
 ##### **4.10. Construct a DPDA for $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$** (Tutorial 6, Example 4)
 

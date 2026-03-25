@@ -406,7 +406,7 @@ Therefore:
 
 $$E[\text{probes}] \le \frac{1}{\alpha}\ln\frac{1}{1-\alpha} \qquad \square$$
 
----
+***
 
 #### **2. Definitions**
 
@@ -428,7 +428,7 @@ $$E[\text{probes}] \le \frac{1}{\alpha}\ln\frac{1}{1-\alpha} \qquad \square$$
 - **Uniform hashing:** A stronger assumption used for open addressing analysis: each key's probe sequence is equally likely to be any of the $m!$ permutations of slots, independently.
 - **Direct-address table:** A special case of a hash table where keys are integers in $\{0, 1, \dots, m-1\}$ and $h(k) = k$ (identity function). Provides $\mathcal{O}(1)$ worst-case for all operations when feasible.
 
----
+***
 
 #### **3. Formulas**
 
@@ -445,200 +445,11 @@ $$E[\text{probes}] \le \frac{1}{\alpha}\ln\frac{1}{1-\alpha} \qquad \square$$
 - **Polynomial hash code:** $\text{hashCode}(k) = k_0 + k_1 a + k_2 a^2 + \dots + k_{n-1} a^{n-1}$
 - **Geometric series identity (used in proofs):** $\sum_{i=0}^\infty \alpha^i = \dfrac{1}{1-\alpha}$ for $|\alpha| < 1$
 
----
+***
 
 #### **4. Examples**
 
-##### **4.1. Hash Table with Chaining** (Lecture 8, Task 1)
-
-Insert keys $5, 28, 19, 15, 20, 33, 12, 17, 10$ into a hash table of size 9 using chaining with $h(k) = k \bmod 9$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** For each key, compute $h(k) = k \bmod 9$ and prepend the key to the linked list at that slot. Multiple keys at the same slot form a chain.
-
-1. **Compute hash values:**
-
-    | Key $k$ | $k \bmod 9$ | Slot |
-    |:---:|:---:|:---:|
-    | 5 | 5 | 5 |
-    | 28 | 1 | 1 |
-    | 19 | 1 | 1 |
-    | 15 | 6 | 6 |
-    | 20 | 2 | 2 |
-    | 33 | 6 | 6 |
-    | 12 | 3 | 3 |
-    | 17 | 8 | 8 |
-    | 10 | 1 | 1 |
-2. **Build the chains** (new elements are prepended, so the last inserted appears at the head):
-    - Slot 0: empty
-    - Slot 1: $10 \to 19 \to 28$
-    - Slot 2: $20$
-    - Slot 3: $12$
-    - Slot 4: empty
-    - Slot 5: $5$
-    - Slot 6: $33 \to 15$
-    - Slot 7: empty
-    - Slot 8: $17$
-
-**Answer:** The hash table has chains at slots 1, 2, 3, 5, 6, 8. Slot 1 has the longest chain: $[10 \to 19 \to 28]$.
-
-</details>
-
-##### **4.2. Hash Table with Double Hashing** (Lecture 8, Task 2)
-
-Insert keys $50, 6, 3, 17, 8, 5, 12, 34$ into a hash table of size 11 using double hashing with $h_1(k) = (k+1) \bmod 11$ and $h_2(k) = 1 + (k \bmod 5)$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Compute the initial slot $h(k,0) = h_1(k)$. On collision, the next probe is at $(h_1(k) + h_2(k)) \bmod 11$, then $(h_1(k) + 2 \cdot h_2(k)) \bmod 11$, etc.
-
-1. **Compute $h_1(k)$, $h_2(k)$, and initial slot $h(k,0) = h_1(k) \bmod 11$:**
-
-    | $k$ | $h_1(k) = (k+1)\bmod 11$ | $h_2(k) = 1 + (k \bmod 5)$ | $h(k,0)$ |
-    |:---:|:---:|:---:|:---:|
-    | 50 | $(51)\bmod 11 = 7$ | $1 + (0) = 1$ | 7 |
-    | 6 | $(7)\bmod 11 = 7$ | $1 + (1) = 2$ | 7 |
-    | 3 | $(4)\bmod 11 = 4$ | $1 + (3) = 4$ | 4 |
-    | 17 | $(18)\bmod 11 = 7$ | $1 + (2) = 3$ | 7 |
-    | 8 | $(9)\bmod 11 = 9$ | $1 + (3) = 4$ | 9 |
-    | 5 | $(6)\bmod 11 = 6$ | $1 + (0) = 1$ | 6 |
-    | 12 | $(13)\bmod 11 = 2$ | $1 + (2) = 3$ | 2 |
-    | 34 | $(35)\bmod 11 = 2$ | $1 + (4) = 5$ | 2 |
-2. **Insert each key:**
-    - $k=50$: slot 7 is empty → place at 7.
-    - $k=6$: slot 7 occupied ($h_2=2$) → probe $7+2=9$; slot 9 empty → place at 9.
-    - $k=3$: slot 4 is empty → place at 4.
-    - $k=17$: slot 7 occupied ($h_2=3$) → probe $7+3=10$; slot 10 empty → place at 10.
-    - $k=8$: slot 9 occupied ($h_2=4$) → probe $9+4=13\bmod 11=2$; slot 2 empty → place at 2.
-    - $k=5$: slot 6 is empty → place at 6.
-    - $k=12$: slot 2 occupied ($h_2=3$) → probe $2+3=5$; slot 5 empty → place at 5.
-    - $k=34$: slot 2 occupied ($h_2=5$) → probe $2+5=7$; slot 7 occupied → probe $7+5=12\bmod 11=1$; slot 1 empty → place at 1.
-3. **Final table state:**
-
-    | Index | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
-    |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-    | Key | — | 34 | 8 | — | 3 | 12 | 5 | 50 | — | 6 | 17 |
-
-**Answer:** Final table as shown above. No slot required more than 3 probes.
-
-</details>
-
-##### **4.3. Hash Table with Linear Probing** (Lecture 8, Task 3)
-
-Insert keys $50, 6, 3, 17, 8, 5, 12, 34$ into a hash table of size 11 using linear probing with $h_1(k) = (k+1) \bmod 11$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Compute $h(k,0) = h_1(k)$. On collision, probe $h(k,0)+1$, $h(k,0)+2$, etc. (modulo 11), until an empty slot is found.
-
-1. **Compute initial slots:**
-
-    | $k$ | $h_1(k) = (k+1)\bmod 11$ |
-    |:---:|:---:|
-    | 50 | 7 |
-    | 6 | 7 |
-    | 3 | 4 |
-    | 17 | 7 |
-    | 8 | 9 |
-    | 5 | 6 |
-    | 12 | 2 |
-    | 34 | 2 |
-2. **Insert each key (linear probing +1 on collision):**
-    - $k=50$: slot 7 empty → place at 7.
-    - $k=6$: slot 7 occupied → try 8; empty → place at 8.
-    - $k=3$: slot 4 empty → place at 4.
-    - $k=17$: slot 7 occupied → try 8 (occupied) → try 9; empty → place at 9.
-    - $k=8$: slot 9 occupied → try 10; empty → place at 10.
-    - $k=5$: slot 6 empty → place at 6.
-    - $k=12$: slot 2 empty → place at 2.
-    - $k=34$: slot 2 occupied → try 3; empty → place at 3.
-3. **Final table state:**
-
-    | Index | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
-    |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-    | Key | — | — | 12 | 34 | 3 | — | 5 | 50 | 6 | 17 | 8 |
-
-**Answer:** Final table as shown. Notice that $k=6,17,8$ all required extra probes due to a cluster forming around index 7.
-
-</details>
-
-##### **4.4. Effect of Sorted Chains on Complexity** (Lecture 8, Task 4)
-
-How do worst-case and average-case key-search complexity change for a chained hash table if each chain is a **sorted array** and we perform a **binary search** within the array?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The standard chaining implementation uses linked lists, giving $\mathcal{O}(1)$ insertion (prepend) and $\mathcal{O}(\ell)$ search in a chain of length $\ell$. Switching to sorted arrays changes both operations.
-
-**(a) Worst case:**
-
-In the worst case all $n$ keys hash to the same slot, giving a single chain (array) of length $n$.
-
-- **Standard chaining (linked list):** worst-case search is $\mathcal{O}(n)$ (linear scan).
-- **Sorted array + binary search:** worst-case search is $\mathcal{O}(\log n)$ — we can binary search the sorted array.
-
-So the worst-case search improves from $\mathcal{O}(n)$ to $\mathcal{O}(\log n)$.
-
-**(b) Average case (under simple uniform hashing):**
-
-Under simple uniform hashing, the expected chain length is $\alpha = n/m$. A linear scan costs $\mathcal{O}(\alpha)$; binary search costs $\mathcal{O}(\log \alpha)$. Including the $\mathcal{O}(1)$ hash computation:
-
-- **Standard chaining:** $\mathcal{O}(1 + \alpha)$ on average.
-- **Sorted array + binary search:** $\mathcal{O}(1 + \log \alpha)$ on average.
-
-If $\alpha$ is bounded by a constant (the usual practical goal), both are $\mathcal{O}(1)$ and the asymptotic difference disappears.
-
-**(c) Cost of insertion:**
-
-There is a trade-off: maintaining a sorted array requires finding the correct insertion position ($\mathcal{O}(\log \alpha)$ via binary search) plus shifting elements ($\mathcal{O}(\alpha)$ in the worst case). So `put(k, v)` becomes $\mathcal{O}(\alpha)$ on average — worse than the $\mathcal{O}(1)$ prepend with a linked list.
-
-**Answer:** Worst-case search improves from $\mathcal{O}(n)$ to $\mathcal{O}(\log n)$. Average-case search improves from $\mathcal{O}(1+\alpha)$ to $\mathcal{O}(1+\log\alpha)$. However, insertion worsens from $\mathcal{O}(1)$ to $\mathcal{O}(\alpha)$ due to the cost of maintaining sorted order.
-
-</details>
-
-##### **4.5. Open Addressing: Bounds on Number of Probes** (Lecture 8, Task 5)
-
-Compute upper bounds on the expected number of probes for unsuccessful and successful search in an open-address hash table when:
-
-**(a)** $\alpha = \dfrac{3}{4}$
-
-**(b)** $\alpha = \dfrac{7}{8}$
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Use the two theorems:
-
-- Unsuccessful search: $\le \dfrac{1}{1-\alpha}$
-- Successful search: $\le \dfrac{1}{\alpha} \ln \dfrac{1}{1-\alpha}$
-
-**(a) $\alpha = 3/4$:**
-
-- **Unsuccessful:** $\dfrac{1}{1 - 3/4} = \dfrac{1}{1/4} = 4$ probes.
-- **Successful:** $\dfrac{1}{3/4} \cdot \ln\!\dfrac{1}{1/4} = \dfrac{4}{3} \cdot \ln 4 = \dfrac{4}{3} \cdot 2\ln 2 \approx \dfrac{4}{3} \cdot 1.386 \approx 1.85$ probes.
-
-**(b) $\alpha = 7/8$:**
-
-- **Unsuccessful:** $\dfrac{1}{1 - 7/8} = \dfrac{1}{1/8} = 8$ probes.
-- **Successful:** $\dfrac{1}{7/8} \cdot \ln\!\dfrac{1}{1/8} = \dfrac{8}{7} \cdot \ln 8 = \dfrac{8}{7} \cdot 3\ln 2 \approx \dfrac{8}{7} \cdot 2.079 \approx 2.38$ probes.
-
-**Answer:**
-
-| $\alpha$ | Unsuccessful (upper bound) | Successful (upper bound) |
-|:---:|:---:|:---:|
-| $3/4$ | 4 | $\approx 1.85$ |
-| $7/8$ | 8 | $\approx 2.38$ |
-
-Note that doubling the "fullness" (going from $1-3/4 = 1/4$ free space to $1-7/8 = 1/8$ free space) doubles the unsuccessful search bound, while successful search grows much more slowly due to the logarithm.
-
-</details>
-
-##### **4.6. Linear Probing with Quadratic Hash Function** (Problem Set 8, Task 1)
+##### **4.1. Linear Probing with Quadratic Hash Function** (Problem Set 8, Task 1)
 
 Consider a hash table with 11 slots (indices $0, \dots, 10$) and primary hash function:
 
@@ -712,7 +523,8 @@ The table is completely full (all 11 slots occupied). An unsuccessful search for
 
 </details>
 
-##### **4.7. Dictionary of Dictionaries: Complexity Analysis** (Problem Set 8, Task 2)
+
+##### **4.2. Dictionary of Dictionaries: Complexity Analysis** (Problem Set 8, Task 2)
 
 Consider a dictionary $D$ where keys are pairs (integer, short string) and values are floating-point numbers. It is implemented as a **dictionary of dictionaries**: $D$ is a dictionary (method $A$) with integer keys; each value $D.\mathsf{get}(k)$ is a dictionary (method $B$) with string keys.
 
@@ -773,7 +585,8 @@ Open addressing also gives $\Theta(1)$ at $\alpha = \beta = 1/2$ but with a slig
 
 </details>
 
-##### **4.8. Hash Function Analysis** (Problem Set 8, Task 3)
+
+##### **4.3. Hash Function Analysis** (Problem Set 8, Task 3)
 
 Let $h(k) = 2k \bmod 7$. Consider the key set:
 
@@ -845,3 +658,197 @@ Since we need $m' \ge 10$ for injectivity but $m' = 10$ fails, **no such $m' \le
 **(d)** No such $m' \le 10$ exists. The key set $S$ has 10 elements, requiring $m' \ge 10$ for injectivity, but $m' = 10$ already produces collisions (e.g., $2 \bmod 10 = 12 \bmod 10 = 2$).
 
 </details>
+
+##### **4.4. Hash Table with Chaining** (Lecture 8, Task 1)
+
+Insert keys $5, 28, 19, 15, 20, 33, 12, 17, 10$ into a hash table of size 9 using chaining with $h(k) = k \bmod 9$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For each key, compute $h(k) = k \bmod 9$ and prepend the key to the linked list at that slot. Multiple keys at the same slot form a chain.
+
+1. **Compute hash values:**
+
+    | Key $k$ | $k \bmod 9$ | Slot |
+    |:---:|:---:|:---:|
+    | 5 | 5 | 5 |
+    | 28 | 1 | 1 |
+    | 19 | 1 | 1 |
+    | 15 | 6 | 6 |
+    | 20 | 2 | 2 |
+    | 33 | 6 | 6 |
+    | 12 | 3 | 3 |
+    | 17 | 8 | 8 |
+    | 10 | 1 | 1 |
+2. **Build the chains** (new elements are prepended, so the last inserted appears at the head):
+    - Slot 0: empty
+    - Slot 1: $10 \to 19 \to 28$
+    - Slot 2: $20$
+    - Slot 3: $12$
+    - Slot 4: empty
+    - Slot 5: $5$
+    - Slot 6: $33 \to 15$
+    - Slot 7: empty
+    - Slot 8: $17$
+
+**Answer:** The hash table has chains at slots 1, 2, 3, 5, 6, 8. Slot 1 has the longest chain: $[10 \to 19 \to 28]$.
+
+</details>
+
+
+##### **4.5. Hash Table with Double Hashing** (Lecture 8, Task 2)
+
+Insert keys $50, 6, 3, 17, 8, 5, 12, 34$ into a hash table of size 11 using double hashing with $h_1(k) = (k+1) \bmod 11$ and $h_2(k) = 1 + (k \bmod 5)$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Compute the initial slot $h(k,0) = h_1(k)$. On collision, the next probe is at $(h_1(k) + h_2(k)) \bmod 11$, then $(h_1(k) + 2 \cdot h_2(k)) \bmod 11$, etc.
+
+1. **Compute $h_1(k)$, $h_2(k)$, and initial slot $h(k,0) = h_1(k) \bmod 11$:**
+
+    | $k$ | $h_1(k) = (k+1)\bmod 11$ | $h_2(k) = 1 + (k \bmod 5)$ | $h(k,0)$ |
+    |:---:|:---:|:---:|:---:|
+    | 50 | $(51)\bmod 11 = 7$ | $1 + (0) = 1$ | 7 |
+    | 6 | $(7)\bmod 11 = 7$ | $1 + (1) = 2$ | 7 |
+    | 3 | $(4)\bmod 11 = 4$ | $1 + (3) = 4$ | 4 |
+    | 17 | $(18)\bmod 11 = 7$ | $1 + (2) = 3$ | 7 |
+    | 8 | $(9)\bmod 11 = 9$ | $1 + (3) = 4$ | 9 |
+    | 5 | $(6)\bmod 11 = 6$ | $1 + (0) = 1$ | 6 |
+    | 12 | $(13)\bmod 11 = 2$ | $1 + (2) = 3$ | 2 |
+    | 34 | $(35)\bmod 11 = 2$ | $1 + (4) = 5$ | 2 |
+2. **Insert each key:**
+    - $k=50$: slot 7 is empty → place at 7.
+    - $k=6$: slot 7 occupied ($h_2=2$) → probe $7+2=9$; slot 9 empty → place at 9.
+    - $k=3$: slot 4 is empty → place at 4.
+    - $k=17$: slot 7 occupied ($h_2=3$) → probe $7+3=10$; slot 10 empty → place at 10.
+    - $k=8$: slot 9 occupied ($h_2=4$) → probe $9+4=13\bmod 11=2$; slot 2 empty → place at 2.
+    - $k=5$: slot 6 is empty → place at 6.
+    - $k=12$: slot 2 occupied ($h_2=3$) → probe $2+3=5$; slot 5 empty → place at 5.
+    - $k=34$: slot 2 occupied ($h_2=5$) → probe $2+5=7$; slot 7 occupied → probe $7+5=12\bmod 11=1$; slot 1 empty → place at 1.
+3. **Final table state:**
+
+    | Index | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+    |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+    | Key | — | 34 | 8 | — | 3 | 12 | 5 | 50 | — | 6 | 17 |
+
+**Answer:** Final table as shown above. No slot required more than 3 probes.
+
+</details>
+
+
+##### **4.6. Hash Table with Linear Probing** (Lecture 8, Task 3)
+
+Insert keys $50, 6, 3, 17, 8, 5, 12, 34$ into a hash table of size 11 using linear probing with $h_1(k) = (k+1) \bmod 11$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Compute $h(k,0) = h_1(k)$. On collision, probe $h(k,0)+1$, $h(k,0)+2$, etc. (modulo 11), until an empty slot is found.
+
+1. **Compute initial slots:**
+
+    | $k$ | $h_1(k) = (k+1)\bmod 11$ |
+    |:---:|:---:|
+    | 50 | 7 |
+    | 6 | 7 |
+    | 3 | 4 |
+    | 17 | 7 |
+    | 8 | 9 |
+    | 5 | 6 |
+    | 12 | 2 |
+    | 34 | 2 |
+2. **Insert each key (linear probing +1 on collision):**
+    - $k=50$: slot 7 empty → place at 7.
+    - $k=6$: slot 7 occupied → try 8; empty → place at 8.
+    - $k=3$: slot 4 empty → place at 4.
+    - $k=17$: slot 7 occupied → try 8 (occupied) → try 9; empty → place at 9.
+    - $k=8$: slot 9 occupied → try 10; empty → place at 10.
+    - $k=5$: slot 6 empty → place at 6.
+    - $k=12$: slot 2 empty → place at 2.
+    - $k=34$: slot 2 occupied → try 3; empty → place at 3.
+3. **Final table state:**
+
+    | Index | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+    |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+    | Key | — | — | 12 | 34 | 3 | — | 5 | 50 | 6 | 17 | 8 |
+
+**Answer:** Final table as shown. Notice that $k=6,17,8$ all required extra probes due to a cluster forming around index 7.
+
+</details>
+
+
+##### **4.7. Effect of Sorted Chains on Complexity** (Lecture 8, Task 4)
+
+How do worst-case and average-case key-search complexity change for a chained hash table if each chain is a **sorted array** and we perform a **binary search** within the array?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The standard chaining implementation uses linked lists, giving $\mathcal{O}(1)$ insertion (prepend) and $\mathcal{O}(\ell)$ search in a chain of length $\ell$. Switching to sorted arrays changes both operations.
+
+**(a) Worst case:**
+
+In the worst case all $n$ keys hash to the same slot, giving a single chain (array) of length $n$.
+
+- **Standard chaining (linked list):** worst-case search is $\mathcal{O}(n)$ (linear scan).
+- **Sorted array + binary search:** worst-case search is $\mathcal{O}(\log n)$ — we can binary search the sorted array.
+
+So the worst-case search improves from $\mathcal{O}(n)$ to $\mathcal{O}(\log n)$.
+
+**(b) Average case (under simple uniform hashing):**
+
+Under simple uniform hashing, the expected chain length is $\alpha = n/m$. A linear scan costs $\mathcal{O}(\alpha)$; binary search costs $\mathcal{O}(\log \alpha)$. Including the $\mathcal{O}(1)$ hash computation:
+
+- **Standard chaining:** $\mathcal{O}(1 + \alpha)$ on average.
+- **Sorted array + binary search:** $\mathcal{O}(1 + \log \alpha)$ on average.
+
+If $\alpha$ is bounded by a constant (the usual practical goal), both are $\mathcal{O}(1)$ and the asymptotic difference disappears.
+
+**(c) Cost of insertion:**
+
+There is a trade-off: maintaining a sorted array requires finding the correct insertion position ($\mathcal{O}(\log \alpha)$ via binary search) plus shifting elements ($\mathcal{O}(\alpha)$ in the worst case). So `put(k, v)` becomes $\mathcal{O}(\alpha)$ on average — worse than the $\mathcal{O}(1)$ prepend with a linked list.
+
+**Answer:** Worst-case search improves from $\mathcal{O}(n)$ to $\mathcal{O}(\log n)$. Average-case search improves from $\mathcal{O}(1+\alpha)$ to $\mathcal{O}(1+\log\alpha)$. However, insertion worsens from $\mathcal{O}(1)$ to $\mathcal{O}(\alpha)$ due to the cost of maintaining sorted order.
+
+</details>
+
+
+##### **4.8. Open Addressing: Bounds on Number of Probes** (Lecture 8, Task 5)
+
+Compute upper bounds on the expected number of probes for unsuccessful and successful search in an open-address hash table when:
+
+**(a)** $\alpha = \dfrac{3}{4}$
+
+**(b)** $\alpha = \dfrac{7}{8}$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the two theorems:
+
+- Unsuccessful search: $\le \dfrac{1}{1-\alpha}$
+- Successful search: $\le \dfrac{1}{\alpha} \ln \dfrac{1}{1-\alpha}$
+
+**(a) $\alpha = 3/4$:**
+
+- **Unsuccessful:** $\dfrac{1}{1 - 3/4} = \dfrac{1}{1/4} = 4$ probes.
+- **Successful:** $\dfrac{1}{3/4} \cdot \ln\!\dfrac{1}{1/4} = \dfrac{4}{3} \cdot \ln 4 = \dfrac{4}{3} \cdot 2\ln 2 \approx \dfrac{4}{3} \cdot 1.386 \approx 1.85$ probes.
+
+**(b) $\alpha = 7/8$:**
+
+- **Unsuccessful:** $\dfrac{1}{1 - 7/8} = \dfrac{1}{1/8} = 8$ probes.
+- **Successful:** $\dfrac{1}{7/8} \cdot \ln\!\dfrac{1}{1/8} = \dfrac{8}{7} \cdot \ln 8 = \dfrac{8}{7} \cdot 3\ln 2 \approx \dfrac{8}{7} \cdot 2.079 \approx 2.38$ probes.
+
+**Answer:**
+
+| $\alpha$ | Unsuccessful (upper bound) | Successful (upper bound) |
+|:---:|:---:|:---:|
+| $3/4$ | 4 | $\approx 1.85$ |
+| $7/8$ | 8 | $\approx 2.38$ |
+
+Note that doubling the "fullness" (going from $1-3/4 = 1/4$ free space to $1-7/8 = 1/8$ free space) doubles the unsuccessful search bound, while successful search grows much more slowly due to the logarithm.
+
+</details>
+

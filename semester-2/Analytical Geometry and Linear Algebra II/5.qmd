@@ -86,6 +86,16 @@ The matrix $A^T A$ is always:
 *   **Positive semi-definite:** $\mathbf{x}^T (A^T A) \mathbf{x} = \|A\mathbf{x}\|^2 \geq 0$
 *   **Invertible** if and only if $A$ has full column rank (columns linearly independent)
 
+###### **1.3.3 The Pseudoinverse**
+
+When $A$ has full column rank, the formula $\hat{\mathbf{x}} = (A^T A)^{-1} A^T \mathbf{b}$ can be written compactly using the **Moore–Penrose pseudoinverse**:
+
+$$A^+ = (A^T A)^{-1} A^T$$
+
+so that $\hat{\mathbf{x}} = A^+ \mathbf{b}$. The pseudoinverse generalizes the ordinary inverse: when $A$ is square and invertible, $A^+ = A^{-1}$; for rectangular $A$ with full column rank it gives the least-squares solution directly. It satisfies the four Moore–Penrose conditions, and in particular $AA^+ A = A$ and $A^+ A A^+ = A^+$.
+
+The pseudoinverse is central to numerical linear algebra and appears throughout machine learning and signal processing as the canonical way to "invert" a non-square or rank-deficient mapping.
+
 ##### **1.4 Projection Matrices**
 
 ###### **1.4.1 Projection onto a Subspace**
@@ -123,6 +133,7 @@ Additional properties:
 *   $\text{rank}(P) = \text{rank}(A)$
 *   For any $\mathbf{b}$, $P\mathbf{b} \in \mathcal{C}(A)$
 *   $(I - P)$ is also a projection matrix, projecting onto $\mathcal{N}(A^T)$ (the left null space, orthogonal complement of $\mathcal{C}(A)$)
+*   **$P$ is not invertible.** The projection matrix $P = A(A^T A)^{-1}A^T$ projects every vector in $\mathbb{R}^m$ onto the column space $\mathcal{C}(A)$, which has dimension $r = \text{rank}(A) < m$ (assuming $A$ is not square of full rank). Any vector $\mathbf{v}$ in the orthogonal complement $\mathcal{C}(A)^\perp = \mathcal{N}(A^T)$ satisfies $P\mathbf{v} = \mathbf{0}$, so $P$ has a nontrivial null space and is therefore **singular** (not invertible). Geometrically, $P$ collapses the entire orthogonal complement to zero, making it impossible to recover the original vector from $P\mathbf{b}$ alone.
 
 ###### **1.4.3 Proof that $P^2 = P$ for Projection onto a Line**
 
@@ -142,7 +153,17 @@ $$A = \begin{pmatrix} 1 & t_1 \\ 1 & t_2 \\ \vdots & \vdots \\ 1 & t_n \end{pmat
 
 The least-squares solution via normal equations $A^T A\hat{\mathbf{x}} = A^T \mathbf{b}$ gives the best-fit line.
 
-**Key fact:** The best-fit line always passes through the **point of averages** $(\bar{t}, \bar{b})$ where $\bar{t} = \frac{1}{n}\sum t_i$ and $\bar{b} = \frac{1}{n}\sum b_i$. This follows directly from the first normal equation.
+**Key fact:** The best-fit line always passes through the **point of averages** $(\bar{t}, \bar{b})$ where $\bar{t} = \frac{1}{n}\sum t_i$ and $\bar{b} = \frac{1}{n}\sum b_i$.
+
+**Proof.** The first row of the normal equations $A^T A\hat{\mathbf{x}} = A^T \mathbf{b}$ corresponds to the first column of $A$ (the all-ones vector $\mathbf{1}$):
+
+$$\mathbf{1}^T(A\hat{\mathbf{x}} - \mathbf{b}) = 0 \quad \Longleftrightarrow \quad \sum_{i=1}^n (C + D t_i) = \sum_{i=1}^n b_i$$
+
+Dividing both sides by $n$:
+
+$$C + D\bar{t} = \bar{b}$$
+
+This is precisely the condition that the line $b = C + Dt$ passes through $(\bar{t}, \bar{b})$. $\blacksquare$
 
 ###### **1.5.2 Fitting a Plane and Higher Dimensions**
 
@@ -186,6 +207,27 @@ Since $R$ is **upper triangular**, the system $R\hat{\mathbf{x}} = Q^T \mathbf{b
 *   No need to form $A^T A$ (avoids squaring the condition number)
 *   Back substitution is efficient ($O(n^2)$ instead of $O(n^3)$ for inversion)
 *   Numerically stable and preferred in practice
+
+###### **1.6.4 SVD as an Alternative for Large or Rank-Deficient Problems**
+
+For large-scale or rank-deficient problems, the **Singular Value Decomposition (SVD)** provides the most general and numerically robust approach to least squares. Any $m \times n$ matrix $A$ can be factored as:
+
+$$A = U \Sigma V^T$$
+
+where $U \in \mathbb{R}^{m \times m}$ and $V \in \mathbb{R}^{n \times n}$ are orthogonal matrices and $\Sigma \in \mathbb{R}^{m \times n}$ is diagonal with non-negative entries $\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_r > 0$ (the **singular values** of $A$). The pseudoinverse of $A$ is then:
+
+$$A^+ = V \Sigma^+ U^T$$
+
+where $\Sigma^+$ replaces each nonzero singular value $\sigma_i$ by $1/\sigma_i$ and leaves zeros in place. The least-squares solution of minimum norm is $\hat{\mathbf{x}} = A^+ \mathbf{b}$.
+
+**Why SVD over QR or normal equations?**
+
+*   It handles **rank-deficient** $A$ gracefully (zero singular values are simply ignored).
+*   It avoids the numerical hazards of forming $A^T A$.
+*   It reveals the intrinsic geometry (rank, condition number, null space) of the problem.
+*   It is the method of choice in machine learning (e.g., principal component analysis) and large-scale scientific computing.
+
+The condition number of $A$ is $\kappa(A) = \sigma_1 / \sigma_r$; the condition number of $A^T A$ is $\kappa(A)^2$, which is why working with $A$ directly via QR or SVD is preferred over the normal equations for ill-conditioned problems.
 
 ***
 

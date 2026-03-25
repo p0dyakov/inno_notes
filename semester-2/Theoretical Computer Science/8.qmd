@@ -728,7 +728,37 @@ Design a Turing Machine that recognizes $L_1 = \{wcw \mid w \in \{a, b\}^+\}$. T
 
 </details>
 
-##### **4.2. Design a TM for $L_2 = \{wcw^R \mid w \in \{a,b\}^+\}$** (Lab 7, Task 2)
+
+##### **4.2. Design a TM for $L_5 = \{(ab)^n \mid n \geq 0\}$** (Lab 7, Homework 1)
+
+Design a Turing Machine that recognizes $L_5 = \{(ab)^n \mid n \geq 0\}$ — strings formed by repeating `ab` zero or more times: $\varepsilon$, `ab`, `abab`, `ababab`, ...
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** $L_5$ is actually a *regular language* — it can be recognized by a 3-state FSA. A TM can use the same finite-control logic. No memory tape is needed.
+
+**FSA intuition:**
+
+*   State $q_0$ (start, accepting): expects `a` or end of string.
+*   State $q_1$: just read `a`, now expects `b`.
+*   Any other symbol goes to a dead (rejecting) state.
+
+**TM Transitions (no memory tape needed, or memory tape ignored):**
+
+*   $(q_0, \_, Z_0/Z_0, \langle S, S \rangle) \rightarrow q_F$ — empty input: accept ($n = 0$).
+*   $(q_0, a, Z_0/Z_0, \langle R, S \rangle) \rightarrow q_1$ — read `a`, go to $q_1$.
+*   $(q_1, b, Z_0/Z_0, \langle R, S \rangle) \rightarrow q_0$ — read `b` after `a`, return to $q_0$.
+*   All other transitions: undefined (reject).
+
+When back in $q_0$ after reading `b`, if input is blank: accept. Otherwise continue.
+
+**Answer:** The TM alternates between expecting `a` (state $q_0$) and expecting `b` (state $q_1$). It accepts iff the input ends in state $q_0$ (all pairs complete). No memory tape is needed for this regular language.
+
+</details>
+
+
+##### **4.3. Design a TM for $L_2 = \{wcw^R \mid w \in \{a,b\}^+\}$** (Lab 7, Task 2)
 
 Design a Turing Machine that recognizes $L_2 = \{wcw^R \mid w \in \{a,b\}^+\}$, where $w^R$ is the reversal of $w$. Examples: `abcba` ($w = ab$), `bcb` ($w = b$). Describe the strategy and key transitions.
 
@@ -757,97 +787,8 @@ Design a Turing Machine that recognizes $L_2 = \{wcw^R \mid w \in \{a,b\}^+\}$, 
 
 </details>
 
-##### **4.3. Design a TM for Palindromes** (Lab 7, Task 3)
 
-Design a Turing Machine that recognizes $L_3 = \{w \mid w \in \{a,b\}^*,\; w \text{ is a palindrome}\}$. A **palindrome** reads the same forwards and backwards. Examples: $\varepsilon$, `a`, `b`, `aba`, `abba`. Describe the strategy.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** A palindrome satisfies $w = w^R$. We can reduce the palindrome check to the $wcw^R$ check by storing the string in memory and comparing it against its reverse.
-
-**Strategy (1 memory tape):**
-
-1.  **Copy phase ($q_0$):** Copy the entire input to the memory tape (both heads advance together).
-2.  **Rewind memory ($q_1$):** After the input is fully read, rewind the memory head to $Z_0$.
-3.  **Compare phase ($q_2$):** Walk the memory head forward and the *input head backward* simultaneously, comparing each position.
-4.  **Accept ($q_F$):** Both the input head and memory head meet in the middle (or reach $Z_0$ and blank simultaneously).
-
-*Note:* A TM can move its input head backward (left), unlike a standard FSA or PDA. This bidirectional access is part of what makes TMs more powerful.
-
-**Alternative approach** — two-pass comparison:
-
-1.  Find the center of the string (by walking forward and backward alternately).
-2.  Compare the first symbol with the last, the second with the second-to-last, etc.
-
-**Key insight:** The palindrome check on a string $w$ is equivalent to checking that $w$ equals $w^R$. Since TMs can re-read their tapes, this is straightforward. The memory tape holds $w$; after rewinding, it is read forward to produce a reversed comparison with the input.
-
-**Answer:** The TM accepts iff the input is a palindrome. The memory tape stores a copy of $w$, which is read forward while the input is compared in reverse order.
-
-</details>
-
-##### **4.4. Design a TM for $L_4 = \{a^n b^n \mid n \geq 0\} \cup \{a^n b^{2n} \mid n \geq 0\}$** (Lab 7, Task 4)
-
-Design a Turing Machine that recognizes $L_4 = \{a^n b^n \mid n \geq 0\} \cup \{a^n b^{2n} \mid n \geq 0\}$. Explain why this requires a TM (and cannot be easily handled by a single deterministic PDA), and describe the TM strategy.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The union $\{a^n b^n\} \cup \{a^n b^{2n}\}$ requires checking two different counting conditions. A deterministic PDA cannot handle this in one pass because the stack must be prepared differently for each alternative. A TM can re-read the tape, effectively trying both strategies sequentially.
-
-**Why a single deterministic PDA struggles:** After reading the `a`s and pushing $n$ markers, the PDA must decide whether to expect $n$ or $2n$ `b`s. In the deterministic case, this decision must be made without seeing the `b`s yet — impossible. A nondeterministic PDA could guess; a deterministic TM can try one and then the other.
-
-**TM Strategy:**
-
-**Phase 1: Check $a^n b^n$**
-
-1.  For each `a`, write one `M` on memory. Advance both.
-2.  For each `b`, consume one `M` (memory left). Advance input.
-3.  If input ends and memory is at $Z_0$: accept ($n = 0$ case: both blank immediately).
-4.  If input ends but memory still has `M`s (more `a`s than `b`s): reject.
-5.  If `b`s run out but memory still has `M`s: proceed to Phase 2 (but reset first).
-
-**Phase 2: Check $a^n b^{2n}$**
-
-1.  Reset: rewind memory to $Z_0$; rewind input head to beginning.
-2.  For each `a`, write one `M` on memory.
-3.  For each pair of `b`s, consume one `M`.
-4.  If input ends and memory is at $Z_0$ and `b`s consumed were even: accept.
-5.  Otherwise: reject.
-
-**Answer:** The TM's ability to re-read and rewind its tapes allows it to test multiple hypotheses. This is the power of non-destructive, bidirectional tape access — unavailable to PDAs with their destructive one-directional stacks.
-
-</details>
-
-##### **4.5. Design a TM for $L_5 = \{(ab)^n \mid n \geq 0\}$** (Lab 7, Homework 1)
-
-Design a Turing Machine that recognizes $L_5 = \{(ab)^n \mid n \geq 0\}$ — strings formed by repeating `ab` zero or more times: $\varepsilon$, `ab`, `abab`, `ababab`, ...
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** $L_5$ is actually a *regular language* — it can be recognized by a 3-state FSA. A TM can use the same finite-control logic. No memory tape is needed.
-
-**FSA intuition:**
-
-*   State $q_0$ (start, accepting): expects `a` or end of string.
-*   State $q_1$: just read `a`, now expects `b`.
-*   Any other symbol goes to a dead (rejecting) state.
-
-**TM Transitions (no memory tape needed, or memory tape ignored):**
-
-*   $(q_0, \_, Z_0/Z_0, \langle S, S \rangle) \rightarrow q_F$ — empty input: accept ($n = 0$).
-*   $(q_0, a, Z_0/Z_0, \langle R, S \rangle) \rightarrow q_1$ — read `a`, go to $q_1$.
-*   $(q_1, b, Z_0/Z_0, \langle R, S \rangle) \rightarrow q_0$ — read `b` after `a`, return to $q_0$.
-*   All other transitions: undefined (reject).
-
-When back in $q_0$ after reading `b`, if input is blank: accept. Otherwise continue.
-
-**Answer:** The TM alternates between expecting `a` (state $q_0$) and expecting `b` (state $q_1$). It accepts iff the input ends in state $q_0$ (all pairs complete). No memory tape is needed for this regular language.
-
-</details>
-
-##### **4.6. Design a TM for $L_6 = \{a^n b^{2n} c^{3n} \mid n \geq 0\}$** (Lab 7, Homework 2)
+##### **4.4. Design a TM for $L_6 = \{a^n b^{2n} c^{3n} \mid n \geq 0\}$** (Lab 7, Homework 2)
 
 Design a Turing Machine that recognizes $L_6 = \{a^n b^{2n} c^{3n} \mid n \geq 0\}$. Examples: $\varepsilon$ ($n=0$), `abbccc` ($n=1$), `aabbbbcccccc` ($n=2$). Describe the strategy in detail.
 
@@ -886,6 +827,71 @@ For each `a` on the input, write **2 B-markers** and **3 C-markers** to the memo
 **Answer:** The TM encodes the ratio $1:2:3$ directly in the memory layout. This technique generalizes to any fixed-ratio language $a^n b^{kn} c^{mn}$ by writing $k$ B-markers and $m$ C-markers per `a`.
 
 </details>
+
+
+##### **4.5. Design a TM for Palindromes** (Lab 7, Task 3)
+
+Design a Turing Machine that recognizes $L_3 = \{w \mid w \in \{a,b\}^*,\; w \text{ is a palindrome}\}$. A **palindrome** reads the same forwards and backwards. Examples: $\varepsilon$, `a`, `b`, `aba`, `abba`. Describe the strategy.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A palindrome satisfies $w = w^R$. We can reduce the palindrome check to the $wcw^R$ check by storing the string in memory and comparing it against its reverse.
+
+**Strategy (1 memory tape):**
+
+1.  **Copy phase ($q_0$):** Copy the entire input to the memory tape (both heads advance together).
+2.  **Rewind memory ($q_1$):** After the input is fully read, rewind the memory head to $Z_0$.
+3.  **Compare phase ($q_2$):** Walk the memory head forward and the *input head backward* simultaneously, comparing each position.
+4.  **Accept ($q_F$):** Both the input head and memory head meet in the middle (or reach $Z_0$ and blank simultaneously).
+
+*Note:* A TM can move its input head backward (left), unlike a standard FSA or PDA. This bidirectional access is part of what makes TMs more powerful.
+
+**Alternative approach** — two-pass comparison:
+
+1.  Find the center of the string (by walking forward and backward alternately).
+2.  Compare the first symbol with the last, the second with the second-to-last, etc.
+
+**Key insight:** The palindrome check on a string $w$ is equivalent to checking that $w$ equals $w^R$. Since TMs can re-read their tapes, this is straightforward. The memory tape holds $w$; after rewinding, it is read forward to produce a reversed comparison with the input.
+
+**Answer:** The TM accepts iff the input is a palindrome. The memory tape stores a copy of $w$, which is read forward while the input is compared in reverse order.
+
+</details>
+
+
+##### **4.6. Design a TM for $L_4 = \{a^n b^n \mid n \geq 0\} \cup \{a^n b^{2n} \mid n \geq 0\}$** (Lab 7, Task 4)
+
+Design a Turing Machine that recognizes $L_4 = \{a^n b^n \mid n \geq 0\} \cup \{a^n b^{2n} \mid n \geq 0\}$. Explain why this requires a TM (and cannot be easily handled by a single deterministic PDA), and describe the TM strategy.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The union $\{a^n b^n\} \cup \{a^n b^{2n}\}$ requires checking two different counting conditions. A deterministic PDA cannot handle this in one pass because the stack must be prepared differently for each alternative. A TM can re-read the tape, effectively trying both strategies sequentially.
+
+**Why a single deterministic PDA struggles:** After reading the `a`s and pushing $n$ markers, the PDA must decide whether to expect $n$ or $2n$ `b`s. In the deterministic case, this decision must be made without seeing the `b`s yet — impossible. A nondeterministic PDA could guess; a deterministic TM can try one and then the other.
+
+**TM Strategy:**
+
+**Phase 1: Check $a^n b^n$**
+
+1.  For each `a`, write one `M` on memory. Advance both.
+2.  For each `b`, consume one `M` (memory left). Advance input.
+3.  If input ends and memory is at $Z_0$: accept ($n = 0$ case: both blank immediately).
+4.  If input ends but memory still has `M`s (more `a`s than `b`s): reject.
+5.  If `b`s run out but memory still has `M`s: proceed to Phase 2 (but reset first).
+
+**Phase 2: Check $a^n b^{2n}$**
+
+1.  Reset: rewind memory to $Z_0$; rewind input head to beginning.
+2.  For each `a`, write one `M` on memory.
+3.  For each pair of `b`s, consume one `M`.
+4.  If input ends and memory is at $Z_0$ and `b`s consumed were even: accept.
+5.  Otherwise: reject.
+
+**Answer:** The TM's ability to re-read and rewind its tapes allows it to test multiple hypotheses. This is the power of non-destructive, bidirectional tape access — unavailable to PDAs with their destructive one-directional stacks.
+
+</details>
+
 
 ##### **4.7. Trace a TM on $a^n b^n$** (Lecture 8, Example 1)
 
@@ -927,6 +933,7 @@ We have $c_0 \vdash^* c_F$.
 
 </details>
 
+
 ##### **4.8. Trace a TM on $a^n b^n c^n$** (Lecture 8, Example 2)
 
 Consider the TM $T$ recognizing $A^n B^n C^n = \{a^n b^n c^n \mid n > 0\}$ with transitions:
@@ -962,5 +969,94 @@ Starting from $\langle q_2, aa \uparrow bbcc, Z_0 M \uparrow M \rangle$:
     $$\langle q_F,\; aabbcc \uparrow,\; Z_0 MM \uparrow \rangle$$
 
 **Answer:** The string `aabbcc` is accepted. The memory tape $Z_0 MM$ records $n = 2$. The `M` markers are traversed once during the `b`-phase (right-to-left) and once during the `c`-phase (left-to-right). Both the input and the memory tape are exhausted simultaneously.
+
+</details>
+
+##### **4.9. Design a TM for $L = \{a^n b^n \mid n > 0\}$** (Tutorial 9, Task 1)
+
+Design a deterministic Turing Machine that recognizes the language $L = \{a^n b^n \mid n > 0\}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** This is the classic non-regular, context-free language. A TM can handle it by using the tape as a counter — marking off matched pairs of $a$'s and $b$'s.
+
+**Idea:** Repeatedly scan the tape, marking one unmatched $a$ (replace with $M$), then scanning right to find and mark one unmatched $b$ (replace with $M$), then return left. Accept when all symbols are marked.
+
+**States:** $q_0$ (find an $a$), $q_1$ (scan right to find $b$), $q_2$ (scan left to return), $q_F$ (accept), $q_{reject}$ (reject).
+
+**Transition function:**
+
+| State | Read | Write | Move | Next |
+|-------|------|-------|------|------|
+| $q_0$ | $a$ | $M$ | R | $q_1$ |
+| $q_0$ | $M$ | $M$ | R | $q_0$ |
+| $q_0$ | $\sqcup$ | $\sqcup$ | S | $q_F$ |
+| $q_1$ | $a$ | $a$ | R | $q_1$ |
+| $q_1$ | $M$ | $M$ | R | $q_1$ (skip marked $b$'s) |
+| $q_1$ | $b$ | $M$ | L | $q_2$ |
+| $q_1$ | $\sqcup$ | $\sqcup$ | S | $q_{reject}$ |
+| $q_2$ | $a$ | $a$ | L | $q_2$ |
+| $q_2$ | $M$ | $M$ | L | $q_2$ |
+| $q_2$ | $\sqcup$ | $\sqcup$ | R | $q_0$ |
+
+**Acceptance condition:** In $q_0$, if only $M$'s remain (next unread is $\sqcup$), accept. Reject if an unmatched $b$ or extra $a$ is found.
+
+**Trace on $aabb$:**
+
+$$\sqcup \underline{a}abb\sqcup \xrightarrow{q_0} \sqcup M\underline{a}bb\sqcup \xrightarrow{q_1} \sqcup Ma\underline{b}b\sqcup \xrightarrow{q_1,\text{mark}} \sqcup Ma\underline{M}b\sqcup \xrightarrow{q_2} \sqcup \underline{M}aMb\sqcup \xrightarrow{q_2,\text{return}} \sqcup \underline{M}aMb$$
+
+Continue: mark second $a$ → find second $b$ → all marked → accept.
+
+</details>
+
+##### **4.10. Design a TM for $L = \{a^n b^n c^n \mid n > 0\}$** (Tutorial 9, Task 2)
+
+Design a Turing Machine that recognizes the context-sensitive language $L = \{a^n b^n c^n \mid n > 0\}$.
+
+*(Note: this language cannot be recognized by any finite automaton or pushdown automaton — only a Turing Machine can handle it.)*
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Extend the $a^n b^n$ idea with a third phase: each pass marks one $a$, one $b$, and one $c$.
+
+**Idea:** Each iteration of the main loop:
+1. Scan right, mark the leftmost unmarked $a$ with $X$.
+2. Continue right, mark the leftmost unmarked $b$ with $Y$.
+3. Continue right, mark the leftmost unmarked $c$ with $Z$.
+4. Scan all the way left back to start.
+5. Repeat. Accept when no unmarked $a$'s remain and all $b$'s and $c$'s are also fully marked.
+
+**States:** $q_0$ (seek $a$), $q_1$ (seek $b$), $q_2$ (seek $c$), $q_3$ (return left), $q_4$ (verify all $b,c$ marked), $q_F$ (accept).
+
+**Transition function (high level):**
+
+| State | Read | Write | Move | Next |
+|-------|------|-------|------|------|
+| $q_0$ | $a$ | $X$ | R | $q_1$ |
+| $q_0$ | $X$ | $X$ | R | $q_0$ (skip marked $a$'s) |
+| $q_0$ | $Y$ | $Y$ | R | $q_4$ (no more $a$'s — verify rest) |
+| $q_1$ | $a$ | $a$ | R | $q_1$ |
+| $q_1$ | $Y$ | $Y$ | R | $q_1$ (skip marked $b$'s) |
+| $q_1$ | $b$ | $Y$ | R | $q_2$ |
+| $q_2$ | $b$ | $b$ | R | $q_2$ |
+| $q_2$ | $Z$ | $Z$ | R | $q_2$ (skip marked $c$'s) |
+| $q_2$ | $c$ | $Z$ | L | $q_3$ |
+| $q_3$ | any | same | L | $q_3$ (scan all the way left) |
+| $q_3$ | $\sqcup$ | $\sqcup$ | R | $q_0$ |
+| $q_4$ | $Y$ | $Y$ | R | $q_4$ |
+| $q_4$ | $Z$ | $Z$ | R | $q_4$ |
+| $q_4$ | $\sqcup$ | $\sqcup$ | S | $q_F$ |
+
+**Reject** if at any point the expected symbol is not found (e.g., $b$ or $c$ is missing when expected).
+
+**Trace on $aabbcc$ (abbreviated):**
+
+Pass 1: mark $a_1 \to X$, $b_1 \to Y$, $c_1 \to Z$, return.
+
+Pass 2: mark $a_2 \to X$, $b_2 \to Y$, $c_2 \to Z$, return.
+
+Pass 3: $q_0$ sees $Y$ (no more $a$'s) → enter $q_4$ → all $Y$'s and $Z$'s → accept.
 
 </details>

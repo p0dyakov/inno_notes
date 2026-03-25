@@ -449,539 +449,7 @@ $$N(d, h) = \frac{d^{h+1} - 1}{d - 1} = 1 + d + d^2 + \cdots + d^h$$
 
 #### **4. Examples**
 
-##### **4.1. Build a BST by Insertion** (Lecture 6, Task 1)
-
-Insert the following keys into an initially empty binary search tree in the given order and draw the resulting tree:
-
-$$50, 30, 70, 20, 40, 60, 80$$
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** To insert into a BST, compare the new key to the current node and go left if smaller, right if larger. Insert as a new leaf at the first empty spot.
-
-**Step-by-step insertions:**
-
-1.  **Insert 50:** Tree is empty; 50 becomes the root.
-2.  **Insert 30:** $30 < 50$ → go left. Left of 50 is empty → place 30 there.
-3.  **Insert 70:** $70 > 50$ → go right. Right of 50 is empty → place 70.
-4.  **Insert 20:** $20 < 50$ → left to 30; $20 < 30$ → go left. Empty → place 20.
-5.  **Insert 40:** $40 < 50$ → left to 30; $40 > 30$ → go right. Empty → place 40.
-6.  **Insert 60:** $60 > 50$ → right to 70; $60 < 70$ → go left. Empty → place 60.
-7.  **Insert 80:** $80 > 50$ → right to 70; $80 > 70$ → go right. Empty → place 80.
-
-**Resulting BST:**
-
-```{r, echo=FALSE, fig.align='center', fig.width=6, fig.height=4}
-library(igraph)
-edges <- c("50","30", "50","70", "30","20", "30","40", "70","60", "70","80")
-g <- graph(edges, directed=TRUE)
-layout_mat <- matrix(c(
-  0, 0,    # 50
- -2,-1,    # 30
-  2,-1,    # 70
- -3,-2,    # 20
- -1,-2,    # 40
-  1,-2,    # 60
-  3,-2     # 80
-), ncol=2, byrow=TRUE)
-plot(g, layout=layout_mat,
-     vertex.color="#a8d8a8", vertex.size=28,
-     vertex.label.color="black", vertex.label.cex=1.0,
-     edge.arrow.size=0.5, edge.color="#555555",
-     main="BST after inserting 50,30,70,20,40,60,80")
-```
-
-**Answer:** The root is 50. Its left subtree has root 30 (children 20, 40) and right subtree has root 70 (children 60, 80). The tree is perfectly balanced with height 2.
-
-</details>
-
-
-##### **4.2. Build an AVL Tree by Insertion** (Lecture 6, Task 2)
-
-Build an AVL tree by inserting the following keys into an initially empty tree in the given order:
-
-$$1, 2, 3, 8, 41, 12, 19, 31, 38$$
-
-Show the tree after each rotation.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** After each insertion, check the balance factors on the path from the inserted node to the root. Apply single or double rotations to restore $|\text{bf}| \le 1$.
-
-**Convention:** $h(\text{empty}) = -1$, $h(\text{single node}) = 0$.
-
-**Step 1 — Insert 1:** Tree: just node 1. Balanced.
-
-**Step 2 — Insert 2:** $2 > 1$, goes right of 1. $\text{bf}(1) = -1$. Still balanced.
-
-**Step 3 — Insert 3:** $3 > 1$ → right; $3 > 2$ → right of 2. $\text{bf}(1) = -2$ → **RR case**. Apply left rotation at 1:
-
-```
-Before:  1          After:   2
-          \                 / \
-           2               1   3
-            \
-             3
-```
-
-Rotations so far: 1.
-
-**Step 4 — Insert 8:** $8 > 2$ → right to 3; $8 > 3$ → right of 3. $\text{bf}(3) = -1$, $\text{bf}(2) = -1$. Balanced.
-
-**Step 5 — Insert 41:** $41 > 2$ → right; $41 > 3$ → right; $41 > 8$ → right of 8. $\text{bf}(3) = -2$ → **RR case**. Left rotation at 3:
-
-```
-Before: 2            After:  2
-       / \                  / \
-      1   3                1   8
-           \              / \
-            8            3  41
-             \
-             41
-```
-
-Rotations so far: 2.
-
-**Step 6 — Insert 12:** $12 > 8$, $12 < 41$ → left of 41. $\text{bf}(41) = 1$, $\text{bf}(8) = -1$. Balanced.
-
-**Step 7 — Insert 19:** $19 > 8$, $19 < 41$, $19 > 12$ → right of 12. $\text{bf}(41) = 2$, $12$ is its left child and $19$ is right child of $12$ → **LR case** (at node 41). First left rotation at 12, then right rotation at 41:
-
-```
-After LR at 41:  2
-                / \
-               1   8
-              / \
-             3  19
-            / \
-           12  41
-```
-
-Rotations so far: 4.
-
-**Step 8 — Insert 31:** $31 > 19$ → right of 19. Balanced (bf at 19 = -1, others still fine with minor adjustments).
-
-**Step 9 — Insert 38:** Insert 38, which causes another LR rotation, ultimately producing the final balanced AVL tree.
-
-**Final tree shape** (balanced AVL tree, height 3):
-
-```{r, echo=FALSE, fig.align='center', fig.width=6, fig.height=4}
-library(igraph)
-edges2 <- c("12","2","12","31","2","1","2","8","8","3","8","19","31","19b","31","41","19b","_","19b","38b")
-# Simplified final AVL for visualization
-edges_avl <- c("12","2", "12","31", "2","1", "2","8", "8","3","8","19", "31","19b","31","41")
-nodes_avl <- c("12","2","31","1","8","19","41","3","19b")
-g2 <- make_empty_graph(n=0, directed=TRUE)
-g2 <- add_vertices(g2, length(nodes_avl), name=nodes_avl)
-edge_list <- c(1,2, 1,3, 2,4, 2,5, 5,8, 5,6, 3,9, 3,7)
-g2 <- add_edges(g2, edge_list)
-layout2 <- matrix(c(
-  0,0,  -2,-1,  2,-1,  -3,-2,  -1,-2,  0,-2,  3,-2,  -2,-3, 1,-2
-), ncol=2, byrow=TRUE)
-V(g2)$label <- c("12","2","31","1","8","19","41","3","19")
-plot(g2, layout=layout2,
-     vertex.color="#a8d8a8", vertex.size=28,
-     vertex.label.color="black", vertex.label.cex=0.9,
-     edge.arrow.size=0.5, edge.color="#555555",
-     main="AVL tree (approximate final shape)")
-```
-
-**Total rotations performed:** 4 (two single rotations and one double rotation counted as two).
-
-**Answer:** The insertions require 4 rotations total. The final AVL tree is balanced with height 3.
-
-</details>
-
-##### **4.3. Build a Red-Black Tree by Insertion** (Lecture 6, Task 3)
-
-Build a red-black tree by inserting the following keys into an initially empty tree in the given order:
-
-$$1, 2, 3, 8, 41, 12, 19, 31, 38$$
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Each new node is inserted as red. After insertion, fix any red–red violation by applying Case 1 (recolor), Case 2 (rotation to convert to Case 3), or Case 3 (rotation + recolor). Always re-blacken the root.
-
-**Color notation:** B = black, R = red.
-
-**Insert 1:** Node 1 becomes root → color black. Tree: **1(B)**.
-
-**Insert 2:** $2 > 1$, right child of 1. Color red. No red–red violation. Tree: 1(B) → right: 2(R).
-
-**Insert 3:** $3 > 1 > 2$, right child of 2(R). Now 2(R)–3(R) is a violation. Uncle of 3 is NIL (black). This is Case 3 (right-right): left rotation at 1, then recolor.
-
-```
-After rotation + recolor:  2(B)
-                          / \
-                        1(R) 3(R)
-```
-
-**Insert 8:** Right child of 3(R). Uncle of 8 is 1(R) → **Case 1** (both uncle and parent are red): recolor 3 → B, 1 → B (uncle), and 2 → R; then re-blacken root 2 → B.
-
-```
-Tree:  2(B)
-      / \
-   1(B) 3(B)
-          \
-          8(R)
-```
-
-**Insert 41:** Right child of 8(R). Uncle (3's left child) is NIL (black). **Case 3**: left rotation at 3.
-
-```
-After:  2(B)
-       / \
-     1(B) 8(B)
-          / \
-        3(R) 41(R)
-```
-
-**Insert 12:** $12 < 41$, left child of 41(R). Uncle of 12 is 3(R) → **Case 1**: recolor 41 → B, 3 → B, 8 → R, then re-blacken 2(B) (2 is root, stays black). Now 2(B)–8(R) is fine since 2 is black.
-
-```
-Tree:  2(B)
-      / \
-    1(B) 8(R)
-         / \
-       3(B) 41(B)
-            /
-          12(R)
-```
-
-**Insert 19:** Right of 12(R). Uncle of 19 is NIL → **Case 2** (node is right child): left rotate at 12 → converts to Case 3. Then right rotate at 41, recolor.
-
-**Insert 31:** Continue inserting and fixing violations following the same three-case procedure.
-
-**Insert 38:** Final insertion may require rotations and recolorings to maintain all five invariants.
-
-**Final red-black tree** (one valid result after inserting all 9 keys):
-
-```{r, echo=FALSE, fig.align='center', fig.width=8, fig.height=5}
-library(igraph)
-nodes_rb <- c("19","8","38","2","12","31","41","1","3","_a","_b","19b","_c","_d","_e")
-g_rb <- make_empty_graph(n=0, directed=TRUE)
-g_rb <- add_vertices(g_rb, 8, name=c("19","8","38","2","12","31","41","1"))
-edge_rb <- c(1,2, 1,3, 2,4, 2,5, 3,6, 3,7, 4,8)
-g_rb <- add_edges(g_rb, edge_rb)
-layout_rb <- matrix(c(
-  0,0,  -3,-1,  3,-1,  -4,-2,  -2,-2,  2,-2,  4,-2, -5,-3
-), ncol=2, byrow=TRUE)
-node_colors <- c("#333333","#ff6666","#ff6666","#333333","#333333","#333333","#333333","#ff6666")
-node_label_colors <- c("white","black","black","white","white","white","white","black")
-V(g_rb)$label <- c("19","8","38","2","12","31","41","1")
-plot(g_rb, layout=layout_rb,
-     vertex.color=node_colors, vertex.size=28,
-     vertex.label.color=node_label_colors, vertex.label.cex=0.9,
-     edge.arrow.size=0.5, edge.color="#555555",
-     main="Red-Black tree (dark=black nodes, red=red nodes, approximate)")
-```
-
-**Answer:** The tree is built by applying recolorings and rotations after each insertion to maintain the five red-black invariants. The resulting tree has height $\le 4$ for 9 nodes, satisfying the $2\log_2(10) \approx 6.6$ bound.
-
-</details>
-
-##### **4.4. Delete from a Red-Black Tree** (Lecture 6, Task 4)
-
-Given the red-black tree below, delete the keys in order: $8, 12, 19, 31, 38, 41$.
-
-The initial tree has: root 38 (Black), left child 19 (Red), right child 41 (Black). Node 19 has left child 12 (Black) and right child 31 (Black). Node 12 has left child 8 (Red).
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Deletion from a red-black tree follows BST deletion, then fixes any "double-black" violations using one of four cases. For brevity, we trace the key cases.
-
-**Initial tree:**
-```
-        38(B)
-       /     \
-     19(R)   41(B)
-    /    \
-  12(B)  31(B)
-  /
-8(R)
-```
-
-**Delete 8 (red leaf):** Simply remove it. No violation occurs — removing a red node does not change any black-heights.
-```
-        38(B)
-       /     \
-     19(R)   41(B)
-    /    \
-  12(B)  31(B)
-```
-
-**Delete 12 (black leaf):** Removing a black node creates a "double-black" situation. Node 12's sibling is 31(B) with no red children → **Case 2**: recolor 31 → Red, push double-black up to 19(R).
-Since 19 is red, re-color 19 → Black to absorb the double-black.
-```
-        38(B)
-       /     \
-     19(B)   41(B)
-        \
-        31(R)
-```
-
-**Delete 19 (black, one child 31(R)):** Replace 19 with its right child 31, color it black.
-```
-    38(B)
-   /    \
- 31(B)  41(B)
-```
-
-**Delete 31 (black leaf):** Double-black at 31's position. Sibling is 41(B) with no red children, parent 38(B) → **Case 2**: recolor 41 → Red, push double-black up to 38. Since 38 is the root, simply color root black (double-black absorbed).
-```
-   38(B)
-      \
-      41(R)
-```
-
-**Delete 38 (black root, right child 41(R)):** Replace 38 with 41, color 41 black.
-```
-   41(B)
-```
-
-**Delete 41:** Last remaining node. Remove it. Tree is empty.
-
-**Answer:** After deleting all six keys in order, the tree becomes empty. Key operations used: leaf removal of red nodes (trivial), double-black fix by recoloring siblings, and replacement of black nodes by their red children.
-
-</details>
-
-##### **4.5. BST Traversals** (Lecture 6, Task 5)
-
-Give the in-order, pre-order, and post-order traversals of the following BST:
-
-Root: 20. Left child: 10 (with children 5 and 15). Right child: 30 (with children 25 and 35).
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Apply the traversal definition recursively. For BSTs, in-order always gives sorted order.
-
-**Tree structure:**
-
-```
-        20
-       /  \
-     10    30
-    /  \  /  \
-   5   15 25  35
-```
-
-1.  **In-order (Left → Root → Right):**
-    *   Visit left subtree of 20: [5, 10, 15]
-    *   Visit root: 20
-    *   Visit right subtree of 20: [25, 30, 35]
-    *   **Result:** 5, 10, 15, 20, 25, 30, 35 *(sorted order — always true for BST in-order)*
-2.  **Pre-order (Root → Left → Right):**
-    *   Visit 20, then left subtree [10, 5, 15], then right subtree [30, 25, 35]
-    *   **Result:** 20, 10, 5, 15, 30, 25, 35
-3.  **Post-order (Left → Right → Root):**
-    *   Left subtree [5, 15, 10], right subtree [25, 35, 30], then root
-    *   **Result:** 5, 15, 10, 25, 35, 30, 20
-
-**Answer:**
-
-- In-order: 5, 10, 15, 20, 25, 30, 35
-- Pre-order: 20, 10, 5, 15, 30, 25, 35
-- Post-order: 5, 15, 10, 25, 35, 30, 20
-
-</details>
-
-##### **4.6. Maximum and Minimum Node Count for a Binary Tree of Height $h$** (Lecture 6, Task 6)
-
-What is the maximum number of nodes in a binary tree of height $h$? What is the minimum? Justify briefly.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Think about what configurations of nodes are most/least efficient.
-
-**Maximum nodes:**
-
-A binary tree of height $h$ is maximized when it is a *perfect binary tree* — every level is completely full. Level $k$ (counting from 0) has $2^k$ nodes. Summing all levels:
-
-$$N_{\max}(h) = \sum_{k=0}^{h} 2^k = 2^{h+1} - 1$$
-
-For example, a perfect binary tree of height 2 has $2^3 - 1 = 7$ nodes.
-
-**Minimum nodes:**
-
-The minimum occurs when the tree has exactly *one leaf at the deepest level* — a chain or path of length $h$. At each depth from 0 to $h-1$, there is exactly one internal node with one child. At depth $h$, there is one leaf:
-
-$$N_{\min}(h) = h + 1$$
-
-For example, the chain $1 \to 2 \to 3$ has height 2 and $3 = 2+1$ nodes.
-
-**Answer:**
-
-- Maximum: $2^{h+1} - 1$ nodes (perfect binary tree)
-- Minimum: $h + 1$ nodes (a chain / path)
-
-</details>
-
-##### **4.7. Tree Predecessor Pseudocode** (Lecture 6, Task 7)
-
-Write pseudocode for `TREE-PREDECESSOR(x)` (the predecessor of $x$ in in-order traversal). What is its time complexity?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** The predecessor is the mirror image of the successor. Instead of going right, we go left; instead of looking for the minimum, we look for the maximum.
-
-The **in-order predecessor** of $x$ is the node with the largest key *smaller* than $x.\text{key}$.
-
-```
-TREE-PREDECESSOR(x):
-    if x.left ≠ NIL
-        return TREE-MAXIMUM(x.left)   // rightmost node in left subtree
-    else
-        // Find the lowest ancestor of x whose right child is an ancestor of x
-        y = x.parent
-        while y ≠ NIL and x == y.left
-            x = y
-            y = y.parent
-        return y
-```
-
-**Explanation of the two cases:**
-
-1. **If $x$ has a left subtree:** The predecessor is the *maximum* of that subtree (rightmost node). This is symmetric to finding the successor's minimum in the right subtree.
-2. **If $x$ has no left subtree:** We climb the tree looking for the first ancestor that we entered from the *right* side. That ancestor has a key smaller than $x.\text{key}$, and it's the closest such ancestor.
-
-**Time complexity:** $O(h)$, where $h$ is the height of the tree. In the worst case, we walk from a leaf all the way up to the root.
-
-**Answer:** The pseudocode above correctly computes the predecessor. Time complexity is $O(h)$.
-
-</details>
-
-##### **4.8. Prove AVL Tree Height is $O(\log n)$** (Lecture 6, Task 8)
-
-Prove that the height of an AVL tree with $n$ nodes is $O(\log n)$.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Instead of bounding height from above directly, we bound the *minimum number of nodes* needed for a given height from below, then invert.
-
-**Define:** Let $n_{\min}(h)$ = minimum number of nodes in an AVL tree of height $h$.
-
-**Base cases:**
-
-- $n_{\min}(-1) = 0$ (empty tree has height $-1$ by convention)
-- $n_{\min}(0) = 1$ (a single node)
-
-**Recurrence:** An AVL tree of height $h$ must have a root, plus:
-
-- One subtree of height $h-1$ (to achieve height $h$)
-- One subtree of height $\ge h-2$ (by the AVL balance property, heights can differ by at most 1)
-
-The *minimum* is achieved when one subtree has height $h-1$ and the other has height $h-2$:
-
-$$n_{\min}(h) = 1 + n_{\min}(h-1) + n_{\min}(h-2)$$
-
-**First few values:**
-
-| $h$ | $n_{\min}(h)$ |
-|:---:|:---:|
-| -1 | 0 |
-| 0 | 1 |
-| 1 | 2 |
-| 2 | 4 |
-| 3 | 7 |
-| 4 | 12 |
-
-**Lower bound:** We claim $n_{\min}(h) \ge 2^{h/2}$. Proof by strong induction:
-
-- Base: $n_{\min}(0) = 1 \ge 2^0 = 1$ ✓, $n_{\min}(1) = 2 \ge 2^{1/2} \approx 1.41$ ✓
-- Step: $n_{\min}(h) = 1 + n_{\min}(h-1) + n_{\min}(h-2) \ge n_{\min}(h-2) + n_{\min}(h-2) = 2 \cdot n_{\min}(h-2) \ge 2 \cdot 2^{(h-2)/2} = 2^{h/2}$.
-
-**Conclusion:** Any AVL tree with $n$ nodes and height $h$ satisfies:
-
-$$n \ge n_{\min}(h) \ge 2^{h/2}$$
-
-Taking logarithms: $h \le 2\log_2 n$, so $h = O(\log n)$.
-
-**Answer:** The height of an AVL tree with $n$ nodes is at most $2\log_2 n = O(\log n)$.
-
-</details>
-
-##### **4.9. Prove Red-Black Tree Height is at most $2\log_2(n+1)$** (Lecture 6, Task 9)
-
-Prove that the height of a red-black tree with $n$ internal nodes is at most $2\log_2(n+1)$ (Cormen et al. 2022, Lemma 13.1).
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Use the black-height and the constraint on red nodes to derive the bound.
-
-**Lemma:** A subtree rooted at any node $x$ contains at least $2^{\text{bh}(x)} - 1$ internal nodes.
-
-*Proof by induction on height of $x$:*
-
-- **Base case:** If $x$ is a leaf (NIL), it has 0 internal nodes. $\text{bh}(\text{NIL}) = 0$, and $2^0 - 1 = 0$. ✓
-- **Inductive step:** If $x$ is an internal node with children $l$ and $r$:
-  - Each child has black-height $\ge \text{bh}(x) - 1$ (they may be red, contributing 0, but the black nodes below them satisfy the black-height of $x$ minus the contribution of $x$ itself if black).
-  - By induction, each child's subtree has $\ge 2^{\text{bh}(x)-1} - 1$ internal nodes.
-  - Total for $x$'s subtree: $1 + (2^{\text{bh}(x)-1} - 1) + (2^{\text{bh}(x)-1} - 1) = 2^{\text{bh}(x)} - 1$.
-
-**Applying to the root:**
-
-Let $h$ = height of the tree and $\text{bh}$ = black-height of the root.
-
-By invariant 4 (no two consecutive red nodes), at least half of the nodes on any root-to-leaf path are black. Therefore:
-
-$$\text{bh}(\text{root}) \ge h/2$$
-
-From the lemma:
-
-$$n \ge 2^{\text{bh}(\text{root})} - 1 \ge 2^{h/2} - 1$$
-
-Solving for $h$:
-
-$$n + 1 \ge 2^{h/2} \implies h/2 \le \log_2(n+1) \implies h \le 2\log_2(n+1)$$
-
-**Answer:** The height of a red-black tree with $n$ internal nodes is at most $2\log_2(n+1) = O(\log n)$.
-
-</details>
-
-
-##### **4.10. Compare AVL and Red-Black Trees** (Lecture 6, Task 10)
-
-Compare AVL trees and red-black trees: when would you prefer one over the other?
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Key Concept:** Both structures guarantee $O(\log n)$ operations, but they differ in their height constants and the cost of rebalancing.
-
-**Height comparison:**
-
-- AVL trees: height $\le 1.44\log_2(n+1)$ — strictly tighter bound
-- Red-black trees: height $\le 2\log_2(n+1)$ — up to ~39% taller
-
-**Rotation cost comparison:**
-
-- **Insert:** Both require $O(1)$ rotations ($\le 2$ for AVL, $\le 2$ for red-black)
-- **Delete:** AVL requires up to $O(\log n)$ rotations; red-black requires at most **3 rotations**
-
-**Practical guidance:**
-
-| Scenario | Preferred structure |
-|:---|:---|
-| **Read-heavy workload** (many lookups, few modifications) | **AVL tree** — lower height means fewer comparisons per lookup |
-| **Write-heavy workload** (frequent insertions and deletions) | **Red-black tree** — fewer rotations on delete, lower overhead |
-| **Mixed workload** | Red-black tree (used in most standard library implementations, e.g., Java `TreeMap`, C++ `std::map`) |
-| **Memory-constrained** | AVL tree (only needs height per node; red-black needs 1-bit color per node) |
-
-**Real-world use:** Most language standard libraries (Java, C++, Linux kernel's interval trees) use red-black trees because writes are common in practice and the simpler deletion fix (at most 3 rotations) outweighs the slightly taller tree.
-
-**Answer:** Prefer **AVL trees** when lookups dominate; prefer **red-black trees** when insertions and deletions are frequent.
-
-</details>
-
-##### **4.11. Red-Black Tree Height — Recurrence for $B(h)$** (Problem Set 6, Task 1)
+##### **4.1. Red-Black Tree Height — Recurrence for $B(h)$** (Problem Set 6, Task 1)
 
 Let $B(h)$ denote the minimum possible number of internal nodes in a red-black tree of black-height $h$ (black-height is the number of black nodes from root to leaf; empty tree has $\text{bh} = 0$, singleton has $\text{bh} = 1$).
 
@@ -1053,7 +521,8 @@ $$h \le 2\log_2(10^6 + 1) \approx 2 \times \log_2(10^6) = 2 \times 19.93 \approx
 
 </details>
 
-##### **4.12. Build and Delete from a BST** (Problem Set 6, Task 2)
+
+##### **4.2. Build and Delete from a BST** (Problem Set 6, Task 2)
 
 Consider the BST built by inserting the following keys in that order:
 
@@ -1172,7 +641,8 @@ Also note: when deleting 10 (the first deletion), the successor of 10 is 11 and 
 
 </details>
 
-##### **4.13. $d$-ary Tree in an Array** (Problem Set 6, Task 3)
+
+##### **4.3. $d$-ary Tree in an Array** (Problem Set 6, Task 3)
 
 Consider storing an ordered rooted $d$-ary tree in an array using level-order numbering (root at index 0).
 
@@ -1226,6 +696,549 @@ The array has indices $0$ to $n-1 = 69$. So:
 3. Only child at index **69** exists in the array.
 
 </details>
+
+
+##### **4.4. Build a BST by Insertion** (Lecture 6, Task 1)
+
+Insert the following keys into an initially empty binary search tree in the given order and draw the resulting tree:
+
+$$50, 30, 70, 20, 40, 60, 80$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** To insert into a BST, compare the new key to the current node and go left if smaller, right if larger. Insert as a new leaf at the first empty spot.
+
+**Step-by-step insertions:**
+
+1.  **Insert 50:** Tree is empty; 50 becomes the root.
+2.  **Insert 30:** $30 < 50$ → go left. Left of 50 is empty → place 30 there.
+3.  **Insert 70:** $70 > 50$ → go right. Right of 50 is empty → place 70.
+4.  **Insert 20:** $20 < 50$ → left to 30; $20 < 30$ → go left. Empty → place 20.
+5.  **Insert 40:** $40 < 50$ → left to 30; $40 > 30$ → go right. Empty → place 40.
+6.  **Insert 60:** $60 > 50$ → right to 70; $60 < 70$ → go left. Empty → place 60.
+7.  **Insert 80:** $80 > 50$ → right to 70; $80 > 70$ → go right. Empty → place 80.
+
+**Resulting BST:**
+
+```{r, echo=FALSE, fig.align='center', fig.width=6, fig.height=4}
+library(igraph)
+edges <- c("50","30", "50","70", "30","20", "30","40", "70","60", "70","80")
+g <- graph(edges, directed=TRUE)
+layout_mat <- matrix(c(
+  0, 0,    # 50
+ -2,-1,    # 30
+  2,-1,    # 70
+ -3,-2,    # 20
+ -1,-2,    # 40
+  1,-2,    # 60
+  3,-2     # 80
+), ncol=2, byrow=TRUE)
+plot(g, layout=layout_mat,
+     vertex.color="#a8d8a8", vertex.size=28,
+     vertex.label.color="black", vertex.label.cex=1.0,
+     edge.arrow.size=0.5, edge.color="#555555",
+     main="BST after inserting 50,30,70,20,40,60,80")
+```
+
+**Answer:** The root is 50. Its left subtree has root 30 (children 20, 40) and right subtree has root 70 (children 60, 80). The tree is perfectly balanced with height 2.
+
+</details>
+
+
+
+##### **4.5. Build an AVL Tree by Insertion** (Lecture 6, Task 2)
+
+Build an AVL tree by inserting the following keys into an initially empty tree in the given order:
+
+$$1, 2, 3, 8, 41, 12, 19, 31, 38$$
+
+Show the tree after each rotation.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** After each insertion, check the balance factors on the path from the inserted node to the root. Apply single or double rotations to restore $|\text{bf}| \le 1$.
+
+**Convention:** $h(\text{empty}) = -1$, $h(\text{single node}) = 0$.
+
+**Step 1 — Insert 1:** Tree: just node 1. Balanced.
+
+**Step 2 — Insert 2:** $2 > 1$, goes right of 1. $\text{bf}(1) = -1$. Still balanced.
+
+**Step 3 — Insert 3:** $3 > 1$ → right; $3 > 2$ → right of 2. $\text{bf}(1) = -2$ → **RR case**. Apply left rotation at 1:
+
+```
+Before:  1          After:   2
+          \                 / \
+           2               1   3
+            \
+             3
+```
+
+Rotations so far: 1.
+
+**Step 4 — Insert 8:** $8 > 2$ → right to 3; $8 > 3$ → right of 3. $\text{bf}(3) = -1$, $\text{bf}(2) = -1$. Balanced.
+
+**Step 5 — Insert 41:** $41 > 2$ → right; $41 > 3$ → right; $41 > 8$ → right of 8. $\text{bf}(3) = -2$ → **RR case**. Left rotation at 3:
+
+```
+Before: 2            After:  2
+       / \                  / \
+      1   3                1   8
+           \              / \
+            8            3  41
+             \
+             41
+```
+
+Rotations so far: 2.
+
+**Step 6 — Insert 12:** $12 > 8$, $12 < 41$ → left of 41. $\text{bf}(41) = 1$, $\text{bf}(8) = -1$. Balanced.
+
+**Step 7 — Insert 19:** $19 > 8$, $19 < 41$, $19 > 12$ → right of 12. $\text{bf}(41) = 2$, $12$ is its left child and $19$ is right child of $12$ → **LR case** (at node 41). First left rotation at 12, then right rotation at 41:
+
+```
+After LR at 41:  2
+                / \
+               1   8
+              / \
+             3  19
+            / \
+           12  41
+```
+
+Rotations so far: 4.
+
+**Step 8 — Insert 31:** $31 > 19$ → right of 19. Balanced (bf at 19 = -1, others still fine with minor adjustments).
+
+**Step 9 — Insert 38:** Insert 38, which causes another LR rotation, ultimately producing the final balanced AVL tree.
+
+**Final tree shape** (balanced AVL tree, height 3):
+
+```{r, echo=FALSE, fig.align='center', fig.width=6, fig.height=4}
+library(igraph)
+edges2 <- c("12","2","12","31","2","1","2","8","8","3","8","19","31","19b","31","41","19b","_","19b","38b")
+# Simplified final AVL for visualization
+edges_avl <- c("12","2", "12","31", "2","1", "2","8", "8","3","8","19", "31","19b","31","41")
+nodes_avl <- c("12","2","31","1","8","19","41","3","19b")
+g2 <- make_empty_graph(n=0, directed=TRUE)
+g2 <- add_vertices(g2, length(nodes_avl), name=nodes_avl)
+edge_list <- c(1,2, 1,3, 2,4, 2,5, 5,8, 5,6, 3,9, 3,7)
+g2 <- add_edges(g2, edge_list)
+layout2 <- matrix(c(
+  0,0,  -2,-1,  2,-1,  -3,-2,  -1,-2,  0,-2,  3,-2,  -2,-3, 1,-2
+), ncol=2, byrow=TRUE)
+V(g2)$label <- c("12","2","31","1","8","19","41","3","19")
+plot(g2, layout=layout2,
+     vertex.color="#a8d8a8", vertex.size=28,
+     vertex.label.color="black", vertex.label.cex=0.9,
+     edge.arrow.size=0.5, edge.color="#555555",
+     main="AVL tree (approximate final shape)")
+```
+
+**Total rotations performed:** 4 (two single rotations and one double rotation counted as two).
+
+**Answer:** The insertions require 4 rotations total. The final AVL tree is balanced with height 3.
+
+</details>
+
+
+##### **4.6. Build a Red-Black Tree by Insertion** (Lecture 6, Task 3)
+
+Build a red-black tree by inserting the following keys into an initially empty tree in the given order:
+
+$$1, 2, 3, 8, 41, 12, 19, 31, 38$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each new node is inserted as red. After insertion, fix any red–red violation by applying Case 1 (recolor), Case 2 (rotation to convert to Case 3), or Case 3 (rotation + recolor). Always re-blacken the root.
+
+**Color notation:** B = black, R = red.
+
+**Insert 1:** Node 1 becomes root → color black. Tree: **1(B)**.
+
+**Insert 2:** $2 > 1$, right child of 1. Color red. No red–red violation. Tree: 1(B) → right: 2(R).
+
+**Insert 3:** $3 > 1 > 2$, right child of 2(R). Now 2(R)–3(R) is a violation. Uncle of 3 is NIL (black). This is Case 3 (right-right): left rotation at 1, then recolor.
+
+```
+After rotation + recolor:  2(B)
+                          / \
+                        1(R) 3(R)
+```
+
+**Insert 8:** Right child of 3(R). Uncle of 8 is 1(R) → **Case 1** (both uncle and parent are red): recolor 3 → B, 1 → B (uncle), and 2 → R; then re-blacken root 2 → B.
+
+```
+Tree:  2(B)
+      / \
+   1(B) 3(B)
+          \
+          8(R)
+```
+
+**Insert 41:** Right child of 8(R). Uncle (3's left child) is NIL (black). **Case 3**: left rotation at 3.
+
+```
+After:  2(B)
+       / \
+     1(B) 8(B)
+          / \
+        3(R) 41(R)
+```
+
+**Insert 12:** $12 < 41$, left child of 41(R). Uncle of 12 is 3(R) → **Case 1**: recolor 41 → B, 3 → B, 8 → R, then re-blacken 2(B) (2 is root, stays black). Now 2(B)–8(R) is fine since 2 is black.
+
+```
+Tree:  2(B)
+      / \
+    1(B) 8(R)
+         / \
+       3(B) 41(B)
+            /
+          12(R)
+```
+
+**Insert 19:** Right of 12(R). Uncle of 19 is NIL → **Case 2** (node is right child): left rotate at 12 → converts to Case 3. Then right rotate at 41, recolor.
+
+**Insert 31:** Continue inserting and fixing violations following the same three-case procedure.
+
+**Insert 38:** Final insertion may require rotations and recolorings to maintain all five invariants.
+
+**Final red-black tree** (one valid result after inserting all 9 keys):
+
+```{r, echo=FALSE, fig.align='center', fig.width=8, fig.height=5}
+library(igraph)
+nodes_rb <- c("19","8","38","2","12","31","41","1","3","_a","_b","19b","_c","_d","_e")
+g_rb <- make_empty_graph(n=0, directed=TRUE)
+g_rb <- add_vertices(g_rb, 8, name=c("19","8","38","2","12","31","41","1"))
+edge_rb <- c(1,2, 1,3, 2,4, 2,5, 3,6, 3,7, 4,8)
+g_rb <- add_edges(g_rb, edge_rb)
+layout_rb <- matrix(c(
+  0,0,  -3,-1,  3,-1,  -4,-2,  -2,-2,  2,-2,  4,-2, -5,-3
+), ncol=2, byrow=TRUE)
+node_colors <- c("#333333","#ff6666","#ff6666","#333333","#333333","#333333","#333333","#ff6666")
+node_label_colors <- c("white","black","black","white","white","white","white","black")
+V(g_rb)$label <- c("19","8","38","2","12","31","41","1")
+plot(g_rb, layout=layout_rb,
+     vertex.color=node_colors, vertex.size=28,
+     vertex.label.color=node_label_colors, vertex.label.cex=0.9,
+     edge.arrow.size=0.5, edge.color="#555555",
+     main="Red-Black tree (dark=black nodes, red=red nodes, approximate)")
+```
+
+**Answer:** The tree is built by applying recolorings and rotations after each insertion to maintain the five red-black invariants. The resulting tree has height $\le 4$ for 9 nodes, satisfying the $2\log_2(10) \approx 6.6$ bound.
+
+</details>
+
+
+##### **4.7. Delete from a Red-Black Tree** (Lecture 6, Task 4)
+
+Given the red-black tree below, delete the keys in order: $8, 12, 19, 31, 38, 41$.
+
+The initial tree has: root 38 (Black), left child 19 (Red), right child 41 (Black). Node 19 has left child 12 (Black) and right child 31 (Black). Node 12 has left child 8 (Red).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Deletion from a red-black tree follows BST deletion, then fixes any "double-black" violations using one of four cases. For brevity, we trace the key cases.
+
+**Initial tree:**
+```
+        38(B)
+       /     \
+     19(R)   41(B)
+    /    \
+  12(B)  31(B)
+  /
+8(R)
+```
+
+**Delete 8 (red leaf):** Simply remove it. No violation occurs — removing a red node does not change any black-heights.
+```
+        38(B)
+       /     \
+     19(R)   41(B)
+    /    \
+  12(B)  31(B)
+```
+
+**Delete 12 (black leaf):** Removing a black node creates a "double-black" situation. Node 12's sibling is 31(B) with no red children → **Case 2**: recolor 31 → Red, push double-black up to 19(R).
+Since 19 is red, re-color 19 → Black to absorb the double-black.
+```
+        38(B)
+       /     \
+     19(B)   41(B)
+        \
+        31(R)
+```
+
+**Delete 19 (black, one child 31(R)):** Replace 19 with its right child 31, color it black.
+```
+    38(B)
+   /    \
+ 31(B)  41(B)
+```
+
+**Delete 31 (black leaf):** Double-black at 31's position. Sibling is 41(B) with no red children, parent 38(B) → **Case 2**: recolor 41 → Red, push double-black up to 38. Since 38 is the root, simply color root black (double-black absorbed).
+```
+   38(B)
+      \
+      41(R)
+```
+
+**Delete 38 (black root, right child 41(R)):** Replace 38 with 41, color 41 black.
+```
+   41(B)
+```
+
+**Delete 41:** Last remaining node. Remove it. Tree is empty.
+
+**Answer:** After deleting all six keys in order, the tree becomes empty. Key operations used: leaf removal of red nodes (trivial), double-black fix by recoloring siblings, and replacement of black nodes by their red children.
+
+</details>
+
+
+##### **4.8. BST Traversals** (Lecture 6, Task 5)
+
+Give the in-order, pre-order, and post-order traversals of the following BST:
+
+Root: 20. Left child: 10 (with children 5 and 15). Right child: 30 (with children 25 and 35).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Apply the traversal definition recursively. For BSTs, in-order always gives sorted order.
+
+**Tree structure:**
+
+```
+        20
+       /  \
+     10    30
+    /  \  /  \
+   5   15 25  35
+```
+
+1.  **In-order (Left → Root → Right):**
+    *   Visit left subtree of 20: [5, 10, 15]
+    *   Visit root: 20
+    *   Visit right subtree of 20: [25, 30, 35]
+    *   **Result:** 5, 10, 15, 20, 25, 30, 35 *(sorted order — always true for BST in-order)*
+2.  **Pre-order (Root → Left → Right):**
+    *   Visit 20, then left subtree [10, 5, 15], then right subtree [30, 25, 35]
+    *   **Result:** 20, 10, 5, 15, 30, 25, 35
+3.  **Post-order (Left → Right → Root):**
+    *   Left subtree [5, 15, 10], right subtree [25, 35, 30], then root
+    *   **Result:** 5, 15, 10, 25, 35, 30, 20
+
+**Answer:**
+
+- In-order: 5, 10, 15, 20, 25, 30, 35
+- Pre-order: 20, 10, 5, 15, 30, 25, 35
+- Post-order: 5, 15, 10, 25, 35, 30, 20
+
+</details>
+
+
+##### **4.9. Maximum and Minimum Node Count for a Binary Tree of Height $h$** (Lecture 6, Task 6)
+
+What is the maximum number of nodes in a binary tree of height $h$? What is the minimum? Justify briefly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Think about what configurations of nodes are most/least efficient.
+
+**Maximum nodes:**
+
+A binary tree of height $h$ is maximized when it is a *perfect binary tree* — every level is completely full. Level $k$ (counting from 0) has $2^k$ nodes. Summing all levels:
+
+$$N_{\max}(h) = \sum_{k=0}^{h} 2^k = 2^{h+1} - 1$$
+
+For example, a perfect binary tree of height 2 has $2^3 - 1 = 7$ nodes.
+
+**Minimum nodes:**
+
+The minimum occurs when the tree has exactly *one leaf at the deepest level* — a chain or path of length $h$. At each depth from 0 to $h-1$, there is exactly one internal node with one child. At depth $h$, there is one leaf:
+
+$$N_{\min}(h) = h + 1$$
+
+For example, the chain $1 \to 2 \to 3$ has height 2 and $3 = 2+1$ nodes.
+
+**Answer:**
+
+- Maximum: $2^{h+1} - 1$ nodes (perfect binary tree)
+- Minimum: $h + 1$ nodes (a chain / path)
+
+</details>
+
+
+##### **4.10. Tree Predecessor Pseudocode** (Lecture 6, Task 7)
+
+Write pseudocode for `TREE-PREDECESSOR(x)` (the predecessor of $x$ in in-order traversal). What is its time complexity?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The predecessor is the mirror image of the successor. Instead of going right, we go left; instead of looking for the minimum, we look for the maximum.
+
+The **in-order predecessor** of $x$ is the node with the largest key *smaller* than $x.\text{key}$.
+
+```
+TREE-PREDECESSOR(x):
+    if x.left ≠ NIL
+        return TREE-MAXIMUM(x.left)   // rightmost node in left subtree
+    else
+        // Find the lowest ancestor of x whose right child is an ancestor of x
+        y = x.parent
+        while y ≠ NIL and x == y.left
+            x = y
+            y = y.parent
+        return y
+```
+
+**Explanation of the two cases:**
+
+1. **If $x$ has a left subtree:** The predecessor is the *maximum* of that subtree (rightmost node). This is symmetric to finding the successor's minimum in the right subtree.
+2. **If $x$ has no left subtree:** We climb the tree looking for the first ancestor that we entered from the *right* side. That ancestor has a key smaller than $x.\text{key}$, and it's the closest such ancestor.
+
+**Time complexity:** $O(h)$, where $h$ is the height of the tree. In the worst case, we walk from a leaf all the way up to the root.
+
+**Answer:** The pseudocode above correctly computes the predecessor. Time complexity is $O(h)$.
+
+</details>
+
+
+##### **4.11. Prove AVL Tree Height is $O(\log n)$** (Lecture 6, Task 8)
+
+Prove that the height of an AVL tree with $n$ nodes is $O(\log n)$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Instead of bounding height from above directly, we bound the *minimum number of nodes* needed for a given height from below, then invert.
+
+**Define:** Let $n_{\min}(h)$ = minimum number of nodes in an AVL tree of height $h$.
+
+**Base cases:**
+
+- $n_{\min}(-1) = 0$ (empty tree has height $-1$ by convention)
+- $n_{\min}(0) = 1$ (a single node)
+
+**Recurrence:** An AVL tree of height $h$ must have a root, plus:
+
+- One subtree of height $h-1$ (to achieve height $h$)
+- One subtree of height $\ge h-2$ (by the AVL balance property, heights can differ by at most 1)
+
+The *minimum* is achieved when one subtree has height $h-1$ and the other has height $h-2$:
+
+$$n_{\min}(h) = 1 + n_{\min}(h-1) + n_{\min}(h-2)$$
+
+**First few values:**
+
+| $h$ | $n_{\min}(h)$ |
+|:---:|:---:|
+| -1 | 0 |
+| 0 | 1 |
+| 1 | 2 |
+| 2 | 4 |
+| 3 | 7 |
+| 4 | 12 |
+
+**Lower bound:** We claim $n_{\min}(h) \ge 2^{h/2}$. Proof by strong induction:
+
+- Base: $n_{\min}(0) = 1 \ge 2^0 = 1$ ✓, $n_{\min}(1) = 2 \ge 2^{1/2} \approx 1.41$ ✓
+- Step: $n_{\min}(h) = 1 + n_{\min}(h-1) + n_{\min}(h-2) \ge n_{\min}(h-2) + n_{\min}(h-2) = 2 \cdot n_{\min}(h-2) \ge 2 \cdot 2^{(h-2)/2} = 2^{h/2}$.
+
+**Conclusion:** Any AVL tree with $n$ nodes and height $h$ satisfies:
+
+$$n \ge n_{\min}(h) \ge 2^{h/2}$$
+
+Taking logarithms: $h \le 2\log_2 n$, so $h = O(\log n)$.
+
+**Answer:** The height of an AVL tree with $n$ nodes is at most $2\log_2 n = O(\log n)$.
+
+</details>
+
+
+##### **4.12. Prove Red-Black Tree Height is at most $2\log_2(n+1)$** (Lecture 6, Task 9)
+
+Prove that the height of a red-black tree with $n$ internal nodes is at most $2\log_2(n+1)$ (Cormen et al. 2022, Lemma 13.1).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use the black-height and the constraint on red nodes to derive the bound.
+
+**Lemma:** A subtree rooted at any node $x$ contains at least $2^{\text{bh}(x)} - 1$ internal nodes.
+
+*Proof by induction on height of $x$:*
+
+- **Base case:** If $x$ is a leaf (NIL), it has 0 internal nodes. $\text{bh}(\text{NIL}) = 0$, and $2^0 - 1 = 0$. ✓
+- **Inductive step:** If $x$ is an internal node with children $l$ and $r$:
+  - Each child has black-height $\ge \text{bh}(x) - 1$ (they may be red, contributing 0, but the black nodes below them satisfy the black-height of $x$ minus the contribution of $x$ itself if black).
+  - By induction, each child's subtree has $\ge 2^{\text{bh}(x)-1} - 1$ internal nodes.
+  - Total for $x$'s subtree: $1 + (2^{\text{bh}(x)-1} - 1) + (2^{\text{bh}(x)-1} - 1) = 2^{\text{bh}(x)} - 1$.
+
+**Applying to the root:**
+
+Let $h$ = height of the tree and $\text{bh}$ = black-height of the root.
+
+By invariant 4 (no two consecutive red nodes), at least half of the nodes on any root-to-leaf path are black. Therefore:
+
+$$\text{bh}(\text{root}) \ge h/2$$
+
+From the lemma:
+
+$$n \ge 2^{\text{bh}(\text{root})} - 1 \ge 2^{h/2} - 1$$
+
+Solving for $h$:
+
+$$n + 1 \ge 2^{h/2} \implies h/2 \le \log_2(n+1) \implies h \le 2\log_2(n+1)$$
+
+**Answer:** The height of a red-black tree with $n$ internal nodes is at most $2\log_2(n+1) = O(\log n)$.
+
+</details>
+
+
+
+##### **4.13. Compare AVL and Red-Black Trees** (Lecture 6, Task 10)
+
+Compare AVL trees and red-black trees: when would you prefer one over the other?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Both structures guarantee $O(\log n)$ operations, but they differ in their height constants and the cost of rebalancing.
+
+**Height comparison:**
+
+- AVL trees: height $\le 1.44\log_2(n+1)$ — strictly tighter bound
+- Red-black trees: height $\le 2\log_2(n+1)$ — up to ~39% taller
+
+**Rotation cost comparison:**
+
+- **Insert:** Both require $O(1)$ rotations ($\le 2$ for AVL, $\le 2$ for red-black)
+- **Delete:** AVL requires up to $O(\log n)$ rotations; red-black requires at most **3 rotations**
+
+**Practical guidance:**
+
+| Scenario | Preferred structure |
+|:---|:---|
+| **Read-heavy workload** (many lookups, few modifications) | **AVL tree** — lower height means fewer comparisons per lookup |
+| **Write-heavy workload** (frequent insertions and deletions) | **Red-black tree** — fewer rotations on delete, lower overhead |
+| **Mixed workload** | Red-black tree (used in most standard library implementations, e.g., Java `TreeMap`, C++ `std::map`) |
+| **Memory-constrained** | AVL tree (only needs height per node; red-black needs 1-bit color per node) |
+
+**Real-world use:** Most language standard libraries (Java, C++, Linux kernel's interval trees) use red-black trees because writes are common in practice and the simpler deletion fix (at most 3 rotations) outweighs the slightly taller tree.
+
+**Answer:** Prefer **AVL trees** when lookups dominate; prefer **red-black trees** when insertions and deletions are frequent.
+
+</details>
+
 
 ##### **4.14. Recurrence Relation and Master Theorem** (Midterm 2025, Question A)
 
@@ -1290,6 +1303,7 @@ Regularity: $a \cdot f(n/b) = 4 \cdot (n/3)^2 = 4n^2/9 \le (4/9) \cdot f(n)$ wit
 
 </details>
 
+
 ##### **4.15. Radix Sort with Different Inner Sorts** (Midterm 2025, Question B)
 
 Consider sorting $p$ phrases using RADIX-SORT, treating each word as a "digit":
@@ -1334,6 +1348,7 @@ Total for $w$ outer passes: $\mathbf{O(w \cdot s \cdot (p + a))}$.
 
 </details>
 
+
 ##### **4.16. List Intersection Complexity** (Midterm 2025, Question C)
 
 Consider the intersection of $k$ non-empty sorted lists of integers with $m$ total elements. For each representation, determine whether an $O(mk)$ algorithm is possible:
@@ -1360,6 +1375,7 @@ Consider the intersection of $k$ non-empty sorted lists of integers with $m$ tot
 3. Doubly-Linked List: **YES**
 
 </details>
+
 
 ##### **4.17. Asymptotic Comparisons Table** (Midterm 2025, Question D)
 
@@ -1420,6 +1436,7 @@ $O$: YES, $o$: NO, $\Omega$: YES, $\omega$: NO, $\Theta$: YES.
 
 </details>
 
+
 ##### **4.18. Master Theorem Application** (Midterm 2025, Question E)
 
 Consider the recurrence $T(n) = 64T(n/4) + 7n^3 + 49$. Which applies?
@@ -1447,6 +1464,7 @@ $$T(n) = \Theta(n^3 \log^{0+1} n) = \Theta(n^3 \log n)$$
 **Answer:** Option **1**: $T(n) = \Theta(n^3 \log n)$. Master Theorem Case 2 applies since $f(n) = \Theta(n^{\log_4 64}) = \Theta(n^3)$.
 
 </details>
+
 
 ##### **4.19. Hash Table with Linear Probing** (Midterm 2025, Question F)
 
@@ -1486,6 +1504,7 @@ Answer YES/NO:
 **Answer:** 1. YES, 2. YES, 3. NO, 4. YES.
 
 </details>
+
 
 ##### **4.20. True/False Statements** (Midterm 2025, Questions G–H)
 
@@ -1541,6 +1560,7 @@ For each statement, determine TRUE or FALSE:
 | 10 | FALSE |
 
 </details>
+
 
 ##### **4.21. Rod Cutting with DP** (Midterm 2025, Question H)
 
@@ -1619,6 +1639,7 @@ function ROD-CUTTING-K(p, n, k):
 
 </details>
 
+
 ##### **4.22. Asymptotic Complexity of SOLVE** (Midterm 2026, Question A)
 
 Compute the asymptotic worst-case time complexity of the SOLVE procedure:
@@ -1690,8 +1711,6 @@ $$\boxed{T(n) = \Theta(n^{\log_3 5})}$$
 
 </details>
 
----
-
 ##### **4.23. Asymptotic Comparison Table** (Midterm 2026, Question B)
 
 Use the most precise asymptotic notation ($O$, $\Theta$, $\Omega$) or $\times$ if none applies, to express the relationship $f(n) = [?](g(n))$:
@@ -1715,15 +1734,11 @@ $(n+2026)!$ grows much faster than any exponential $c^n$. For large $n$, $(n+202
 
 **Answer:** $f(n) = O(g(n))$
 
----
-
 **2. $(2026/2025)^n$ vs $n^{2026/2025}$**
 
 $(2026/2025)^n$ is exponential (base $> 1$), while $n^{2026/2025}$ is polynomial. Exponential grows faster.
 
 **Answer:** $f(n) = \Omega(g(n))$
-
----
 
 **3. $(\log_2 n)^{2026}$ vs $\sqrt[2026]{n} = n^{1/2026}$**
 
@@ -1733,8 +1748,6 @@ Here $\varepsilon = 1/2026 > 0$, so $(\log_2 n)^{2026} = o(n^{1/2026})$.
 
 **Answer:** $f(n) = O(g(n))$
 
----
-
 **4. $n \log_2 n$ vs $n^2 / \log_2 n$**
 
 $\frac{g(n)}{f(n)} = \frac{n^2/\log n}{n \log n} = \frac{n}{\log^2 n} \to \infty$.
@@ -1742,8 +1755,6 @@ $\frac{g(n)}{f(n)} = \frac{n^2/\log n}{n \log n} = \frac{n}{\log^2 n} \to \infty
 So $f(n) = o(g(n))$.
 
 **Answer:** $f(n) = O(g(n))$
-
----
 
 **5. $\log_2(n^n)$ vs $\log_2(n!)$**
 
@@ -1754,8 +1765,6 @@ By Stirling's approximation: $\log_2(n!) = \Theta(n \log n)$.
 More precisely, $n \log n - n/\ln 2 \le \log_2(n!) \le n \log n$, so both are $\Theta(n \log n)$.
 
 **Answer:** $f(n) = \Theta(g(n))$
-
----
 
 **6. $\sqrt{n \log_2 n}$ vs $\sqrt{n} \cdot \log_2 \sqrt{n}$**
 
@@ -1769,15 +1778,11 @@ So $f(n) = o(g(n))$.
 
 **Answer:** $f(n) = O(g(n))$
 
----
-
 **7. $(1 + 1/n)^n$ vs $n$**
 
 $(1 + 1/n)^n \to e \approx 2.718$ as $n \to \infty$ (converges to a constant). Meanwhile $g(n) = n \to \infty$.
 
 **Answer:** $f(n) = O(g(n))$
-
----
 
 **8. $2^n + 2^n$ vs $4^n$**
 
@@ -1790,8 +1795,6 @@ $\frac{2^{2n}}{2^{n+1}} = 2^{n-1} \to \infty$, so $f(n) = o(g(n))$.
 **Answer:** $f(n) = O(g(n))$
 
 </details>
-
----
 
 ##### **4.24. Master Theorem Application** (Midterm 2026, Question C)
 
@@ -1831,8 +1834,6 @@ $$T(n) = \Theta(f(n)) = \Theta(n^2)$$
 None of the listed options (1), (2), (3) is correct — the correct answer is $T(n) = \Theta(n^2)$, which is option **(4) None of the above**.
 
 </details>
-
----
 
 ##### **4.25. Data Structure Complexity Table** (Midterm 2026, Question D)
 
@@ -1895,8 +1896,6 @@ Within each $C_i$, accessing element at position $i$:
 
 </details>
 
----
-
 ##### **4.26. RADIX-SORT for Phrases** (Midterm 2026, Question E)
 
 $p$ phrases are sorted using RADIX-SORT, treating each word as a "digit":
@@ -1953,8 +1952,6 @@ Note: Since QUICK-SORT is not stable, RADIX-SORT with QUICK-SORT does not correc
 $$\boxed{O(w \cdot s \cdot p^2)}$$
 
 </details>
-
----
 
 ##### **4.27. COUNTING-SORT Application** (Midterm 2026, Question F)
 
@@ -2040,8 +2037,6 @@ Note: Reading the data in sorted order spells out **RISE AND SHINE** — a cute 
 
 </details>
 
----
-
 ##### **4.28. True or False** (Midterm 2026, Question G)
 
 Determine TRUE or FALSE for each statement:
@@ -2063,15 +2058,11 @@ Determine TRUE or FALSE for each statement:
 
 Counterexample: $f(n) = n^2$, $g(n) = n^3$. Then $\log f(n) = 2\log n$, $\log g(n) = 3\log n$, so $\log f(n) = \Theta(\log g(n))$. But $f(n) = O(g(n))$, not $\Theta(g(n))$.
 
----
-
 **2. TRUE.**
 
 In the worst case, incrementing a $k$-bit binary counter flips all $k$ bits (e.g., $0111\ldots1 \to 1000\ldots0$), which takes $\Theta(k)$ time. So worst case is $\Theta(k)$... but the question says $\Theta(\log k)$, which is wrong — it should be $\Theta(k)$.
 
 **FALSE.** Worst case is $\Theta(k)$, not $\Theta(\log k)$.
-
----
 
 **3. FALSE.**
 
@@ -2079,37 +2070,25 @@ ARRAYSTACK PUSH(x) appends to the end of an array. This is $O(1)$ amortized (wit
 
 **TRUE** (a single PUSH can take $\Theta(n)$ in the worst case due to array resizing).
 
----
-
 **4. TRUE.**
 
 MERGE-SORT always divides the array in half and merges, giving $T(n) = 2T(n/2) + \Theta(n)$, which solves to $\Theta(n \log n)$ in all cases (best, average, worst).
-
----
 
 **5. FALSE.**
 
 COUNTING-SORT on $n$ integers in $[0, n^2]$ requires an auxiliary array of size $n^2 + 1$, so it takes $\Theta(n + n^2) = \Theta(n^2)$ time, not $\Theta(n)$.
 
----
-
 **6. FALSE.**
 
 If the master theorem doesn't apply, it simply means the theorem cannot be used — the algorithm still terminates normally. We just need another method (e.g., substitution, recursion tree) to find the complexity.
-
----
 
 **7. FALSE.**
 
 Dynamic Programming (DP) is an algorithmic technique for solving problems with overlapping subproblems and optimal substructure. It has nothing to do with dynamically-typed programming languages.
 
----
-
 **8. FALSE.**
 
 QUICK-SORT has worst-case $\Theta(n^2)$ time (when pivots are always the smallest or largest element). Its average-case is $\Theta(n \log n)$.
-
----
 
 **9. FALSE.**
 
@@ -2117,15 +2096,11 @@ The minimum node in a BST has no **left** child (no smaller key exists). It can 
 
 More precisely: the minimum node has no left child, but may have a right child.
 
----
-
 **10. TRUE.**
 
 A red-black tree with $n$ internal nodes has height $h \le 2\log_2(n+1)$, so $h = O(\log n)$. Also $h = \Omega(\log n)$ since it's a binary tree. Therefore height is $\Theta(\log n)$.
 
 </details>
-
----
 
 ##### **4.29. BST Array Representation** (Midterm 2026, Question H)
 
@@ -2195,8 +2170,6 @@ Replace root key with 9. Remove 9 from index 11.
 
 </details>
 
----
-
 ##### **4.30. Rod Cutting Problem** (Midterm 2026, Question I)
 
 The Rod Cutting problem: given a rod of length $n$ and a table of prices $p_i$ for lengths $i = 1, \ldots, n$, find the maximum revenue $r_n$ obtainable by cutting the rod.
@@ -2264,6 +2237,7 @@ $$r[j] = \max_{1 \le i \le j}(p_i + r[j - i])$$
 One optimal cut: cut into length 7 + length 3 gives $p_7 + p_3 = 20 + 5 = 25$. Better: length 1 + length 9 gives $1 + 22 = 23$. Let's check $r[10]=26$: achieved by, e.g., $p_1 + r[9] = 1 + 25 = 26$, and $r[9]=25$ from $p_2 + r[7] = 5 + 20 = 25$. So: cut 10 = 1 + 2 + 7, giving $1 + 5 + 20 = 26$. ✓
 
 </details>
+
 
 ##### **4.31. Asymptotic Complexity of Solve** (Mock Midterm 2026, Question A)
 
@@ -2336,8 +2310,6 @@ $$\boxed{T(n) = \Theta(n \log^2 n)}$$
 
 </details>
 
----
-
 ##### **4.32. Asymptotic Comparison Table** (Mock Midterm 2026, Question B)
 
 Use the most precise asymptotic notation ($O$, $\Theta$, $\Omega$) or $\times$ if none applies:
@@ -2365,8 +2337,6 @@ So $f(n) = o(g(n))$.
 
 **Answer:** $f(n) = O(g(n))$
 
----
-
 **2. $n^{1.001}$ vs $n \log^2 n$**
 
 $\frac{f(n)}{g(n)} = \frac{n^{1.001}}{n \log^2 n} = \frac{n^{0.001}}{\log^2 n} \to \infty$.
@@ -2375,15 +2345,11 @@ Polynomial beats polylog.
 
 **Answer:** $f(n) = \Omega(g(n))$
 
----
-
 **3. $\log_2(n!)$ vs $n \log_2 n$**
 
 By Stirling: $\log(n!) = \Theta(n \log n)$. Both are $\Theta(n \log n)$.
 
 **Answer:** $f(n) = \Theta(g(n))$
-
----
 
 **4. $\sqrt[4]{n} = n^{1/4}$ vs $\log_2 n$**
 
@@ -2393,15 +2359,11 @@ $\frac{n^{1/4}}{\log n} \to \infty$.
 
 **Answer:** $f(n) = \Omega(g(n))$
 
----
-
 **5. $(1 + 2/n)^n$ vs $n^2$**
 
 $(1 + 2/n)^n \to e^2 \approx 7.389$ (constant). Meanwhile $g(n) = n^2 \to \infty$.
 
 **Answer:** $f(n) = O(g(n))$
-
----
 
 **6. $3^n + 2^n$ vs $3^n$**
 
@@ -2411,15 +2373,11 @@ $\frac{3^n + 2^n}{3^n} = 1 + (2/3)^n \to 1$.
 
 **Answer:** $f(n) = \Theta(g(n))$
 
----
-
 **7. $n^2/\log n$ vs $n\sqrt{n} = n^{3/2}$**
 
 $\frac{f(n)}{g(n)} = \frac{n^2/\log n}{n^{3/2}} = \frac{n^{1/2}}{\log n} \to \infty$.
 
 **Answer:** $f(n) = \Omega(g(n))$
-
----
 
 **8. $(n+1)!$ vs $n!$**
 
@@ -2428,8 +2386,6 @@ $(n+1)! = (n+1) \cdot n!$, so $\frac{(n+1)!}{n!} = n+1 \to \infty$.
 **Answer:** $f(n) = \Omega(g(n))$
 
 </details>
-
----
 
 ##### **4.33. Brute-Force Subset Sum** (Mock Midterm 2026, Question C)
 
@@ -2479,8 +2435,6 @@ Using iterative enumeration with a bitmask, we only need:
 
 </details>
 
----
-
 ##### **4.34. Merging $n$ Sorted Lists** (Mock Midterm 2026, Question D)
 
 $n$ sorted lists contain $m$ elements in total. Merge them into one sorted list of $m$ elements.
@@ -2526,8 +2480,6 @@ With a **min-heap** of size $n$:
 
 </details>
 
----
-
 ##### **4.35. Hybrid QUICK-SORT + COUNTING-SORT** (Mock Midterm 2026, Question E)
 
 A hybrid sorting algorithm: run QUICK-SORT but stop when the subarray size is $\le k$, then apply COUNTING-SORT to each small block (keys in $[0, R]$), and concatenate the results.
@@ -2560,8 +2512,6 @@ $$\boxed{O(n^2)}$$
 Note: The hybrid approach doesn't improve the worst case because QUICK-SORT still degenerates. In the **average case**, QUICK-SORT phase takes $O(n \log n)$, giving total $O(n \log n + nR/k) = O(n \log n + n \cdot n/\log n) = O(n^2/\log n)$.
 
 </details>
-
----
 
 ##### **4.36. BUCKET-SORT Application** (Mock Midterm 2026, Question F)
 
@@ -2606,8 +2556,6 @@ Use 10 buckets for ranges $[0.0, 0.1), [0.1, 0.2), \ldots, [0.9, 1.0]$.
 
 </details>
 
----
-
 ##### **4.37. True or False** (Mock Midterm 2026, Question G)
 
 Determine TRUE or FALSE for each statement:
@@ -2629,25 +2577,17 @@ Determine TRUE or FALSE for each statement:
 
 $O(n^{3/2})$ means the function is bounded above by $c \cdot n^{3/2}$. But $n^2 / n^{3/2} = n^{1/2} \to \infty$, so $n^2$ is not $O(n^{3/2})$.
 
----
-
 **2. In a BST, the node with maximum key has no left child — FALSE.**
 
 The node with maximum key has no **right** child (since no key is larger). It can have a left child. For example: insert 5, then 3 into a BST. Root is 5, left child is 3. Node 5 has maximum key and has a left child.
-
----
 
 **3. HEAP-SORT has $O(n)$ worst-case time complexity — FALSE.**
 
 HEAP-SORT has $\Theta(n \log n)$ worst-case time complexity.
 
----
-
 **4. RADIX-SORT sorts $n$ integers in $\Theta(n)$ time regardless of number of digits — FALSE.**
 
 RADIX-SORT with $d$ digits and base $b$ runs in $\Theta(d(n + b))$. If $d$ grows (e.g., $d = \Theta(\log n)$), the complexity is $\Theta(n \log n)$, not $\Theta(n)$.
-
----
 
 **5. In ARRAYQUEUE, ENQUEUE(x) has $\Theta(n)$ worst-case time complexity — FALSE.**
 
@@ -2657,39 +2597,27 @@ Depending on interpretation: if the array must resize, then TRUE; if using circu
 
 **FALSE** (standard circular array implementation: $O(1)$ worst case).
 
----
-
 **6. Height of an AVL tree with $n$ nodes is $\Theta(\log n)$ — TRUE.**
 
 By AVL property, height is $O(\log n)$ and $\Omega(\log n)$, so $\Theta(\log n)$.
-
----
 
 **7. For $T(n) = 2T(n/2) + n$, master theorem gives $T(n) = \Theta(n)$ — FALSE.**
 
 $a=2, b=2, f(n)=n, n^{\log_2 2} = n$. This is Case 2: $T(n) = \Theta(n \log n)$, not $\Theta(n)$.
 
----
-
 **8. In dynamic programming, overlapping subproblems are solved at least twice — FALSE.**
 
 The key benefit of DP is that overlapping subproblems are solved **only once** and their results are cached/reused. Without DP (plain recursion), they'd be solved multiple times.
 
----
-
 **9. MERGE-SORT is a comparison-based sorting algorithm — TRUE.**
 
 MERGE-SORT compares elements to determine order, so yes, it is comparison-based.
-
----
 
 **10. A red-black tree with $n$ internal nodes has height at least $2\log_2(n+1)$ — FALSE.**
 
 The known bound is height $\le 2\log_2(n+1)$ (upper bound). A red-black tree can have height as small as $\log_2(n+1)$ (a perfect binary tree). So the height is at most $2\log_2(n+1)$, not at least.
 
 </details>
-
----
 
 ##### **4.38. BST Construction and Deletions** (Mock Midterm 2026, Question H)
 
@@ -2779,8 +2707,6 @@ Replace key at idx 1 with 11. Remove 11 from idx 4.
 
 </details>
 
----
-
 ##### **4.39. LCS Problem** (Mock Midterm 2026, Question I)
 
 Longest Common Subsequence (LCS) problem. Given sequences $X$ and $Y$:
@@ -2841,8 +2767,6 @@ Full table $C[i,j]$ for $i=0..5$, $j=0..5$:
 **Answer:** LCS length is **3**, one LCS is $\langle A, B, A \rangle$.
 
 </details>
-
----
 
 ##### **4.40. AVL Tree Rotation** (Mock Midterm 2026, Question J)
 
@@ -2954,8 +2878,6 @@ After rotation, the AVL invariant is restored (all balance factors become 0 or �
 
 </details>
 
----
-
 ##### **4.41. Maximum Subarray Problem** (Mock Midterm 2026, Question K)
 
 For the Maximum Subarray problem (find contiguous subarray with maximum sum), state the worst-case time complexity and brief justification for each approach:
@@ -2972,15 +2894,11 @@ For the Maximum Subarray problem (find contiguous subarray with maximum sum), st
 
 **Justification:** Enumerate all $O(n^2)$ pairs $(i, j)$ with $i \le j$. For each pair, sum the subarray $A[i..j]$. Using prefix sums, each sum is $O(1)$, giving total $O(n^2)$. (Without prefix sums: $O(n^3)$.)
 
----
-
 **2. Divide-and-Conquer**
 
 **Complexity:** $\Theta(n \log n)$
 
 **Justification:** Divide the array in half. The maximum subarray either lies entirely in the left half, entirely in the right half, or crosses the midpoint. The crossing case is solved in $O(n)$ (scan left from mid and right from mid). Recurrence: $T(n) = 2T(n/2) + O(n)$, which gives $T(n) = \Theta(n \log n)$ by the Master Theorem (Case 2).
-
----
 
 **3. Dynamic Programming (Kadane's Algorithm)**
 
@@ -2989,8 +2907,6 @@ For the Maximum Subarray problem (find contiguous subarray with maximum sum), st
 **Justification:** Maintain a running variable $\text{maxEndingHere}$: for each position $i$, compute the maximum subarray sum ending at $i$. This is either $A[i]$ alone or $A[i] + \text{maxEndingHere}(i-1)$. One pass through the array suffices. Each element is processed in $O(1)$, so total is $\Theta(n)$.
 
 </details>
-
----
 
 ##### **4.42. Decision Tree Lower Bound** (Mock Midterm 2026, Question L)
 
@@ -3022,8 +2938,6 @@ By Stirling's approximation: $\log_2(n!) = n\log_2 n - n\log_2 e + O(\log n) = \
 Any comparison-based sorting algorithm requires at least $\Omega(n \log n)$ comparisons in the worst case.
 
 </details>
-
----
 
 ##### **4.43. Minimum Nodes in AVL Tree** (Mock Midterm 2026, Question M)
 
@@ -3089,8 +3003,6 @@ Min AVL of height 4 has 12 nodes: root + left subtree (min AVL h=3, 7 nodes) + r
 This has 12 nodes. Heights: node 1 → 0, node 2 → 1, node 6 → 0, node 8 → 0, node 7 → 1, node 3 → 2, node 5 → 3, node 12 → 0, node 14 → 0, node 13 → 1, node 15 → 2, node 10 → 4. ✓
 
 </details>
-
----
 
 ##### **4.44. Red-Black Tree Construction** (Mock Midterm 2026, Question N)
 
