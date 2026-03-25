@@ -1,7 +1,50 @@
+<script>
+// Patch WebSocket BEFORE quarto-preview.js runs so its reload messages
+// don't interfere with our navigation (window._innNavigating flag suppresses them).
+(function () {
+	if (!window.WebSocket) return;
+	var Orig = window.WebSocket;
+	function InnWS(url, proto) {
+		var ws = proto !== undefined ? new Orig(url, proto) : new Orig(url);
+		var _om = null, _oc = null;
+		Object.defineProperty(ws, 'onmessage', {
+			configurable: true,
+			get: function () { return _om; },
+			set: function (fn) {
+				_om = fn;
+				ws.addEventListener('message', function (e) {
+					if (window._innNavigating && typeof e.data === 'string' && e.data.startsWith('reload')) return;
+					fn.call(ws, e);
+				});
+			}
+		});
+		Object.defineProperty(ws, 'onclose', {
+			configurable: true,
+			get: function () { return _oc; },
+			set: function (fn) {
+				_oc = fn;
+				ws.addEventListener('close', function (e) {
+					if (window._innNavigating) return;
+					fn.call(ws, e);
+				});
+			}
+		});
+		return ws;
+	}
+	InnWS.prototype = Orig.prototype;
+	InnWS.CONNECTING = Orig.CONNECTING;
+	InnWS.OPEN = Orig.OPEN;
+	InnWS.CLOSING = Orig.CLOSING;
+	InnWS.CLOSED = Orig.CLOSED;
+	window.WebSocket = InnWS;
+})();
+</script>
+
 <style>
 	:root {
 		--inn-bg: rgba(255, 255, 255, 0.88);
 		--inn-bg-strong: rgba(255, 255, 255, 0.96);
+		--inn-bg-solid: #ffffff;
 		--inn-border: rgba(53, 92, 125, 0.14);
 		--inn-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
 		--inn-shadow-press: 0 4px 12px rgba(15, 23, 42, 0.05);
@@ -18,20 +61,21 @@
 
 	@media (prefers-color-scheme: dark) {
 		:root {
-			--inn-bg: rgba(255, 255, 255, 0.965);
-			--inn-bg-strong: rgba(255, 255, 255, 0.985);
-			--inn-border: rgba(148, 163, 184, 0.34);
-			--inn-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-			--inn-shadow-press: 0 4px 10px rgba(0, 0, 0, 0.14);
-			--inn-text: #12314f;
-			--inn-text-muted: rgba(18, 49, 79, 0.62);
-			--inn-accent: #0d6efd;
-			--inn-accent-soft: rgba(13, 110, 253, 0.12);
-			--inn-icon-idle: #24384d;
-			--inn-success: #0d6efd;
-			--inn-success-soft: rgba(13, 110, 253, 0.26);
-			--inn-read: #0d6efd;
-			--inn-read-soft: rgba(13, 110, 253, 0.26);
+			--inn-bg: #0f141b;
+			--inn-bg-strong: #121922;
+			--inn-bg-solid: #0b1016;
+			--inn-border: rgba(226, 232, 240, 0.12);
+			--inn-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+			--inn-shadow-press: 0 4px 10px rgba(0, 0, 0, 0.22);
+			--inn-text: #ffffff;
+			--inn-text-muted: rgba(255, 255, 255, 0.72);
+			--inn-accent: #6ea8ff;
+			--inn-accent-soft: rgba(110, 168, 255, 0.14);
+			--inn-icon-idle: #ffffff;
+			--inn-success: #6ea8ff;
+			--inn-success-soft: rgba(110, 168, 255, 0.18);
+			--inn-read: #6ea8ff;
+			--inn-read-soft: rgba(110, 168, 255, 0.18);
 		}
 	}
 
@@ -40,7 +84,7 @@
 		flex-wrap: wrap;
 		gap: 0.75rem;
 		align-items: center;
-		margin: 1.1rem 0 1.6rem;
+		margin: 1.1rem 0 1.15rem;
 	}
 
 	.inn-pill {
@@ -138,7 +182,7 @@
 		}
 
 		.inn-pill:hover {
-			background: rgba(255, 255, 255, 0.96);
+			background: #161f2a;
 			border-color: rgba(13, 110, 253, 0.24);
 		}
 
@@ -153,7 +197,7 @@
 		}
 
 		.inn-pill--read.is-active {
-			background: rgba(230, 240, 255, 0.98);
+			background: rgba(110, 168, 255, 0.16);
 			border-color: rgba(13, 110, 253, 0.34);
 			color: var(--inn-read);
 		}
@@ -172,7 +216,7 @@
 
 	@media (prefers-color-scheme: dark) {
 		.inn-pill--solved.is-active {
-			background: rgba(230, 240, 255, 0.98);
+			background: rgba(110, 168, 255, 0.16);
 			border-color: rgba(13, 110, 253, 0.34);
 			color: var(--inn-success);
 		}
@@ -186,16 +230,17 @@
 
 	.inn-read-title {
 		text-decoration: line-through;
-		text-decoration-thickness: 2.2px;
-		text-decoration-color: color-mix(in srgb, var(--inn-accent) 82%, transparent);
-		opacity: 0.62;
-		transition: opacity 220ms ease, text-decoration-color 220ms ease;
+		text-decoration-thickness: 1.8px;
+		text-decoration-color: rgba(107, 114, 128, 0.78);
+		color: color-mix(in srgb, currentColor 64%, transparent);
+		opacity: 1;
+		transition: color 220ms ease, text-decoration-color 220ms ease;
 	}
 
 	@media (prefers-color-scheme: dark) {
 		.inn-read-title {
-			opacity: 0.66;
-			text-decoration-color: rgba(139, 184, 255, 0.92);
+			text-decoration-color: rgba(156, 163, 175, 0.82);
+			color: color-mix(in srgb, currentColor 72%, transparent);
 		}
 	}
 
@@ -487,25 +532,54 @@
 	}
 
 	mark.search-match {
-		background: rgba(13, 110, 253, 0.12);
+		background: rgba(13, 110, 253, 0.18);
 		color: inherit;
-		padding: 0.02em 0.12em;
-		border-radius: 4px;
+		padding: 0.015em 0.16em 0.025em;
+		border-radius: 0.3em;
+		line-height: inherit;
+		vertical-align: baseline;
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
 	}
 
 	@media (prefers-color-scheme: dark) {
+		#inn-site-nav .sidebar-link,
+		#inn-site-nav .sidebar-item-text,
+		#inn-site-nav .menu-text,
+		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text,
+		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text {
+			color: #ffffff !important;
+		}
+
+		#inn-site-nav .sidebar-link.active,
+		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text.active,
+		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text.active {
+			color: #ffffff !important;
+		}
+
+		#inn-site-nav .sidebar-link:hover,
+		#inn-site-nav .sidebar-link:focus,
+		#inn-site-nav .sidebar-item-text:hover,
+		#inn-site-nav .sidebar-item-text:focus,
+		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text:hover,
+		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text:focus,
+		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text:hover,
+		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text:focus {
+			color: #6ea8ff !important;
+		}
+
 		#quarto-sidebar .aa-Form {
 			background: var(--inn-bg);
 			border-color: var(--inn-border);
 		}
 
 		#quarto-sidebar .aa-Form:focus-within {
-			background: rgba(255, 255, 255, 0.985);
+			background: #161f2a;
 			border-color: rgba(13, 110, 253, 0.24);
 		}
 
 		.aa-Panel {
-			background: rgba(255, 255, 255, 0.985);
+			background: #121922;
 			border-color: rgba(148, 163, 184, 0.28);
 		}
 
@@ -590,15 +664,365 @@
 			max-width: calc(100% - var(--inn-nav-width));
 			padding: 1.4rem 2.15rem 3rem;
 			box-sizing: border-box;
+			view-transition-name: inn-main-content;
 		}
 
 		body.inn-custom-nav #title-block-header {
 			margin-top: 0;
 		}
+
+		#title-block-header .quarto-page-breadcrumbs .breadcrumb-item:last-child,
+		#title-block-header .quarto-title-breadcrumbs .breadcrumb-item:last-child {
+			display: none;
+		}
+
+		#title-block-header .quarto-page-breadcrumbs a,
+		#title-block-header .quarto-title-breadcrumbs a {
+			pointer-events: none;
+			cursor: default;
+			color: inherit !important;
+			text-decoration: none !important;
+		}
+	}
+
+	@media (max-width: 991.98px) {
+		body.inn-custom-nav-mobile.inn-mobile-nav-open {
+			overflow: hidden;
+		}
+
+		body.inn-custom-nav-mobile #quarto-sidebar,
+		body.inn-custom-nav-mobile #quarto-sidebar-glass,
+		body.inn-custom-nav-mobile #quarto-header {
+			display: none !important;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-topbar {
+			position: fixed !important;
+			top: 0;
+			left: 0;
+			width: 100dvw;
+			height: 3.4rem;
+			display: flex;
+			align-items: center;
+			justify-content: flex-start;
+			gap: 0.42rem;
+			padding: 0.55rem 0.8rem;
+			background: var(--inn-bg-solid);
+			border-bottom: 1px solid rgba(127, 127, 127, 0.12);
+			z-index: 2140;
+			box-sizing: border-box;
+			transform: translateZ(0);
+			-webkit-transform: translateZ(0);
+			backface-visibility: hidden;
+			-webkit-backface-visibility: hidden;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-topbar .inn-mobile-topbar__button {
+			width: 2.25rem;
+			height: 2.25rem;
+			border: 0;
+			border-radius: 12px;
+			background: transparent;
+			color: var(--inn-text);
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-topbar .inn-mobile-topbar__button.is-active {
+			color: var(--inn-accent);
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-topbar .inn-mobile-topbar__button svg {
+			width: 1.2rem;
+			height: 1.2rem;
+			display: block;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-topbar .inn-mobile-topbar__search {
+			margin-left: auto;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-topbar .inn-mobile-topbar__title {
+			display: block;
+			flex: 1 1 auto;
+			min-width: 0;
+			height: 0;
+			overflow: hidden;
+			visibility: hidden;
+			pointer-events: none;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-overlay {
+			position: fixed;
+			inset: 0;
+			width: auto;
+			height: auto;
+			min-height: 100svh;
+			background: rgba(15, 23, 42, 0.22);
+			opacity: 0;
+			pointer-events: none;
+			transition: opacity 180ms ease;
+			z-index: 2138;
+		}
+
+		body.inn-custom-nav-mobile #inn-site-nav {
+			position: fixed;
+			inset: 0;
+			width: auto;
+			height: auto;
+			min-height: 100svh;
+			max-width: none;
+			background: var(--inn-bg-solid);
+			border-right: 0;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+			z-index: 2139;
+			transform: translateX(-100%);
+			transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+			box-shadow: none;
+			backdrop-filter: none;
+			-webkit-backdrop-filter: none;
+			box-sizing: border-box;
+			overscroll-behavior: contain;
+		}
+
+		body.inn-custom-nav-mobile .inn-site-nav__header {
+			padding: 0.42rem 0.8rem 0.08rem;
+		}
+
+		body.inn-custom-nav-mobile .inn-site-nav__tools {
+			gap: 0.12rem;
+		}
+
+		body.inn-custom-nav-mobile .inn-site-nav__search,
+		body.inn-custom-nav-mobile .inn-site-nav__results {
+			display: none !important;
+		}
+
+		body.inn-custom-nav-mobile #inn-site-nav .inn-site-nav__menu {
+			padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+		}
+
+		body.inn-custom-nav-mobile.inn-mobile-nav-open #inn-site-nav {
+			transform: translateX(0);
+		}
+
+		body.inn-custom-nav-mobile.inn-mobile-nav-open #inn-mobile-overlay {
+			opacity: 1;
+			pointer-events: auto;
+		}
+
+		body.inn-custom-nav-mobile .inn-site-nav__resizer {
+			display: none !important;
+		}
+
+		body.inn-custom-nav-mobile #quarto-content {
+			width: 100%;
+			max-width: none;
+			margin: 0;
+			padding: 0;
+			display: block;
+			box-sizing: border-box;
+		}
+
+		body.inn-custom-nav-mobile #quarto-content.page-columns,
+		body.inn-custom-nav-mobile #quarto-content.page-rows-contents,
+		body.inn-custom-nav-mobile #quarto-content.page-layout-article {
+			grid-template-columns: minmax(0, 1fr) !important;
+			column-gap: 0 !important;
+			row-gap: 0 !important;
+		}
+
+		body.inn-custom-nav-mobile main#quarto-document-content {
+			grid-column: 1 / -1;
+			margin-left: 0;
+			max-width: 100%;
+			padding: 4.1rem 0.42rem 1.85rem;
+			box-sizing: border-box;
+			font-size: 0.86rem;
+			min-width: 0;
+			overflow-x: clip;
+		}
+
+		body.inn-custom-nav-mobile #title-block-header {
+			margin-top: 0;
+		}
+
+		body.inn-custom-nav-mobile #title-block-header h1.title {
+			font-size: clamp(1.22rem, 4.35vw, 1.68rem);
+			line-height: 1.04;
+			margin-bottom: 0.64rem;
+		}
+
+		body.inn-custom-nav-mobile main#quarto-document-content h2 {
+			font-size: 1.7rem;
+		}
+
+		body.inn-custom-nav-mobile main#quarto-document-content h3 {
+			font-size: 1.42rem;
+		}
+
+		body.inn-custom-nav-mobile main#quarto-document-content h4 {
+			font-size: 1.2rem;
+		}
+
+		body.inn-custom-nav-mobile main#quarto-document-content h5,
+		body.inn-custom-nav-mobile main#quarto-document-content h6 {
+			font-size: 1.02rem;
+		}
+
+		body.inn-custom-nav-mobile mjx-container[display="true"],
+		body.inn-custom-nav-mobile .MathJax[display="true"],
+		body.inn-custom-nav-mobile .math.display,
+		body.inn-custom-nav-mobile mjx-container:not([display="true"]),
+		body.inn-custom-nav-mobile .math.inline {
+			max-width: 100%;
+			overflow-x: auto !important;
+			overflow-y: hidden !important;
+			-webkit-overflow-scrolling: touch;
+		}
+
+		body.inn-custom-nav-mobile mjx-container[display="true"] > mjx-math,
+		body.inn-custom-nav-mobile mjx-container:not([display="true"]) > mjx-math {
+			transform: none !important;
+			display: inline-block;
+			min-width: max-content;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-search-panel {
+			position: fixed;
+			top: 3.4rem;
+			left: 0;
+			width: 100dvw;
+			height: calc(100dvh - 3.4rem);
+			background: var(--inn-bg-solid);
+			z-index: 1039;
+			padding: 0.8rem 0.8rem 1rem;
+			opacity: 0;
+			visibility: hidden;
+			pointer-events: none;
+			transform: translateY(-8px);
+			transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear 180ms;
+			overflow: hidden;
+			display: grid;
+			grid-template-rows: auto minmax(0, 1fr);
+			gap: 0.38rem;
+			box-sizing: border-box;
+		}
+
+		body.inn-custom-nav-mobile.inn-mobile-search-open {
+			overflow: hidden;
+		}
+
+		body.inn-custom-nav-mobile.inn-mobile-search-open #inn-mobile-search-panel {
+			opacity: 1;
+			visibility: visible;
+			pointer-events: auto;
+			transform: translateY(0);
+			transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear 0s;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-search-panel .inn-site-nav__search,
+		body.inn-custom-nav-mobile #inn-mobile-search-panel .inn-site-nav__results {
+			display: block !important;
+			margin-left: 0;
+			margin-right: 0;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-search-panel .inn-site-nav__search {
+			padding: 0;
+			width: 100%;
+			box-sizing: border-box;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-search-panel .inn-site-nav__search-shell {
+			width: 100%;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-search-panel .inn-site-nav__results.is-open:not(.is-empty) {
+			margin-bottom: 0;
+			min-height: 0 !important;
+			max-height: none !important;
+			height: 100%;
+			display: flex !important;
+			flex-direction: column;
+			overflow: hidden;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-search-panel .inn-site-nav__results.is-open:not(.is-empty) .inn-site-nav__results-list {
+			flex: 1 1 auto;
+			min-height: 0;
+			max-height: none;
+			overflow-y: auto;
+			overflow-x: hidden;
+			padding-bottom: calc(2.2rem + env(safe-area-inset-bottom));
+			scroll-padding-bottom: calc(2.2rem + env(safe-area-inset-bottom));
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-search-panel .inn-site-nav__results.is-empty {
+			margin-bottom: 0;
+			display: block !important;
+			min-height: 4rem;
+			max-height: 4rem;
+		}
+
+		body.inn-custom-nav-mobile #inn-mobile-search-panel .inn-site-nav__results-header {
+			flex: 0 0 auto;
+		}
+	}
+
+	::view-transition-old(inn-main-content),
+	::view-transition-new(inn-main-content) {
+		animation-duration: 220ms;
+		animation-timing-function: ease;
+	}
+
+	.inn-content-chunk:not(.is-eager) {
+		content-visibility: visible;
+		contain-intrinsic-size: auto;
 	}
 
 	#inn-site-nav {
 		display: none;
+		user-select: none;
+		-webkit-user-select: none;
+	}
+
+	#inn-page-loader {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 3px;
+		z-index: 9999;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 180ms ease;
+	}
+
+	#inn-page-loader.is-active {
+		opacity: 1;
+	}
+
+	#inn-page-loader::before {
+		content: "";
+		position: absolute;
+		inset: 0;
+		background: rgba(13, 110, 253, 0.08);
+	}
+
+	#inn-page-loader::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(90deg, rgba(13, 110, 253, 0.74), rgba(88, 154, 255, 0.96));
+		border-radius: 999px;
+		transform-origin: left center;
+		transform: scaleX(calc(var(--inn-loader-progress, 0) / 100));
+		transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
 	.inn-site-nav__header {
@@ -633,11 +1057,17 @@
 		border: 1px solid var(--inn-border);
 		border-radius: 12px;
 		background: var(--inn-bg);
-		padding: 0 0.72rem 0 0.68rem;
+		min-height: 2.72rem;
+		padding: 0 0.48rem;
 		transition: border-color 180ms ease, background-color 180ms ease;
 	}
 
 	.inn-site-nav__search-shell:focus-within {
+		border-color: rgba(13, 110, 253, 0.22);
+		background: var(--inn-bg-strong);
+	}
+
+	.inn-site-nav__search-shell.is-active {
 		border-color: rgba(13, 110, 253, 0.22);
 		background: var(--inn-bg-strong);
 	}
@@ -648,8 +1078,9 @@
 		border-radius: 0;
 		background: transparent;
 		color: var(--inn-text);
-		font: 500 0.78rem/1.2 "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-		padding: 0.58rem 0.42rem 0.58rem 0.52rem;
+		font: 400 0.8rem/1.1 "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+		padding: 0.34rem 0.28rem;
+		margin: 0;
 		outline: none;
 		transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
 		appearance: none;
@@ -662,6 +1093,10 @@
 	}
 
 	.inn-site-nav__search-shell:focus-within .inn-site-nav__search-icon {
+		color: var(--inn-accent);
+	}
+
+	.inn-site-nav__search-shell.is-active .inn-site-nav__search-icon {
 		color: var(--inn-accent);
 	}
 
@@ -681,9 +1116,13 @@
 
 	.inn-site-nav__search-icon {
 		pointer-events: none;
-		font-size: 0.92rem;
-		line-height: 1;
+		width: 1.06rem;
+		height: 1.06rem;
+		line-height: 0;
 		flex: 0 0 auto;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.inn-site-nav__search-clear {
@@ -691,56 +1130,104 @@
 		background: transparent;
 		padding: 0;
 		display: none;
-		font-size: 0.98rem;
 		cursor: pointer;
-		line-height: 1;
 		transition: color 160ms ease, opacity 160ms ease;
 		flex: 0 0 auto;
 		align-self: center;
-		width: 1rem;
-		height: 1rem;
+		width: 1.08rem;
+		height: 1.08rem;
 		display: none;
 		align-items: center;
 		justify-content: center;
+		line-height: 0;
 	}
 
 	.inn-site-nav__search-clear:hover {
 		color: var(--inn-text);
 	}
 
+	.inn-site-nav__search-icon svg,
+	.inn-site-nav__search-clear svg {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
 	.inn-site-nav__results {
-		display: none;
-		margin: 0 1rem 0.38rem;
-		border: 1px solid var(--inn-border);
+		margin: 0 1rem 0;
+		border: 1px solid transparent;
 		border-radius: 14px;
 		background: var(--inn-bg-strong);
 		overflow: hidden;
 		transform-origin: top center;
-		animation: inn-search-panel-in 170ms ease;
+		opacity: 0;
+		transform: translateY(-4px) scale(0.988);
+		visibility: hidden;
+		pointer-events: none;
+		min-height: 0;
+		max-height: 0;
+		transition: opacity 170ms ease, transform 170ms ease, visibility 0s linear 170ms, max-height 170ms ease, margin 170ms ease, border-color 170ms ease;
 	}
 
 	.inn-site-nav__results.is-open {
-		display: block;
+		opacity: 1;
+		transform: translateY(0) scale(1);
+		visibility: visible;
+		pointer-events: auto;
+		margin-bottom: 0.38rem;
+		min-height: 16rem;
+		max-height: min(78vh, 46rem);
+		border-color: var(--inn-border);
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		transition: opacity 170ms ease, transform 170ms ease, visibility 0s linear 0s, max-height 170ms ease, margin 170ms ease, border-color 170ms ease;
 	}
 
 	.inn-site-nav__results-header {
 		padding: 0.5rem 0.72rem 0.34rem;
 		border-bottom: 1px solid rgba(127, 127, 127, 0.1);
 		font-size: 0.77rem;
-		font-weight: 600;
+		font-weight: 500;
 		color: var(--inn-text-muted);
+		flex: 0 0 auto;
+	}
+
+	.inn-site-nav__results.is-empty .inn-site-nav__results-header {
+		padding: 0 0.84rem;
+		border-bottom: 0;
+		font-size: 0.82rem;
+		line-height: 1.2;
+		min-height: 4rem;
+		display: flex;
+		align-items: center;
+	}
+
+	.inn-site-nav__results.is-empty {
+		min-height: 4rem;
+		max-height: 4rem;
+	}
+
+	.inn-site-nav__results.is-empty .inn-site-nav__results-list {
+		display: none;
 	}
 
 	.inn-site-nav__results-list {
-		max-height: min(52vh, 34rem);
-		overflow: auto;
-		padding: 0.22rem;
-		contain: content;
+		flex: 1 1 auto;
+		min-height: 0;
+		max-height: none;
+		overflow-y: auto;
+		overflow-x: hidden;
+		padding: 0.28rem 0.28rem calc(0.96rem + env(safe-area-inset-bottom));
+		overscroll-behavior: contain;
+		display: flex;
+		flex-direction: column;
+		gap: 0.08rem;
 	}
 
 	.inn-site-nav__result {
 		display: block;
-		padding: 0.46rem 0.56rem;
+		padding: 0.52rem 0.58rem;
 		border-radius: 10px;
 		text-decoration: none;
 		color: inherit;
@@ -773,18 +1260,28 @@
 	}
 
 	.inn-site-nav__results-empty {
-		padding: 0.72rem 0.66rem 0.78rem;
-		min-height: 2.6rem;
-		display: flex;
-		align-items: center;
+		display: none;
 	}
 
 	.inn-site-nav__result mark,
 	.inn-site-nav__results mark {
-		background: rgba(13, 110, 253, 0.12);
+		background: rgba(13, 110, 253, 0.18);
 		color: inherit;
-		padding: 0.02em 0.14em;
-		border-radius: 4px;
+		padding: 0.015em 0.16em 0.025em;
+		border-radius: 0.3em;
+		line-height: inherit;
+		vertical-align: baseline;
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		mark.search-match,
+		.inn-site-nav__result mark,
+		.inn-site-nav__results mark {
+			background: rgba(255, 255, 255, 0.96);
+			color: #000000;
+		}
 	}
 
 	.inn-site-nav__menu {
@@ -812,14 +1309,23 @@
 		line-height: 1;
 	}
 
-	#inn-site-nav .sidebar-item-toggle i {
+	#inn-site-nav .inn-nav-chevron {
 		display: inline-block;
 		transform: rotate(0deg);
 		transform-origin: center center;
 		transition: transform 180ms ease;
+		width: 0.9rem;
+		height: 0.9rem;
+		line-height: 0;
 	}
 
-	#inn-site-nav li.sidebar-item-section.is-open > .sidebar-item-container .sidebar-item-toggle i {
+	#inn-site-nav .inn-nav-chevron svg {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
+	#inn-site-nav li.sidebar-item-section.is-open > .sidebar-item-container .inn-nav-chevron {
 		transform: rotate(90deg);
 	}
 
@@ -827,6 +1333,7 @@
 	#inn-site-nav .menu-text {
 		font-size: 0.84rem;
 		line-height: 1.18;
+		font-weight: 400;
 	}
 
 	#inn-site-nav a,
@@ -848,18 +1355,145 @@
 		color: var(--inn-accent);
 	}
 
+	#inn-site-nav .sidebar-item-container:hover > .sidebar-item-toggle,
+	#inn-site-nav .sidebar-item-container:focus-within > .sidebar-item-toggle {
+		color: var(--inn-accent);
+	}
+
 	#inn-site-nav .sidebar-link.active {
 		color: var(--inn-accent);
-		font-weight: 600;
+		font-weight: 500;
+	}
+
+	#inn-site-nav .sidebar-link.inn-read-title {
+		color: color-mix(in srgb, var(--inn-text) 54%, transparent);
+		text-decoration: line-through !important;
+		text-decoration-line: line-through !important;
+		text-decoration-thickness: 1.8px;
+		text-decoration-color: rgba(107, 114, 128, 0.78);
+	}
+
+	#inn-site-nav .sidebar-link.inn-read-title .menu-text {
+		color: color-mix(in srgb, var(--inn-text) 54%, transparent);
+		text-decoration: line-through;
+		text-decoration-thickness: 1.8px;
+		text-decoration-color: rgba(107, 114, 128, 0.78);
+	}
+
+	#inn-site-nav .sidebar-link.active.inn-read-title {
+		color: color-mix(in srgb, var(--inn-accent) 62%, transparent);
+	}
+
+	#inn-site-nav .sidebar-link.active.inn-read-title,
+	#inn-site-nav .sidebar-link.active.inn-read-title .menu-text {
+		text-decoration-color: color-mix(in srgb, var(--inn-accent) 76%, transparent);
 	}
 
 	#inn-site-nav .sidebar-section {
 		margin-left: 0.48rem;
 		padding-left: 0.18rem;
+		overflow: hidden;
+		height: auto;
+		opacity: 1;
+		transition: height 230ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
 	}
 
 	#inn-site-nav .sidebar-section[hidden] {
 		display: none !important;
+	}
+
+	#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text,
+	#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text:visited,
+	#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text.active {
+		color: var(--inn-text) !important;
+		font-weight: 400 !important;
+	}
+
+	#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text:hover,
+	#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text:focus {
+		color: var(--inn-accent) !important;
+	}
+
+	#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text,
+	#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text:visited,
+	#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text.active {
+		color: var(--inn-text);
+	}
+
+	#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text:hover,
+	#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text:focus {
+		color: var(--inn-accent) !important;
+	}
+
+	#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text.active {
+		color: var(--inn-accent);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		#inn-site-nav .sidebar-link,
+		#inn-site-nav .sidebar-item-text,
+		#inn-site-nav .menu-text,
+		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text,
+		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text,
+		#inn-site-nav .sidebar-link.active,
+		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text.active,
+		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text.active {
+			color: #ffffff !important;
+		}
+
+		#inn-site-nav .sidebar-link:hover,
+		#inn-site-nav .sidebar-link:focus,
+		#inn-site-nav .sidebar-item-text:hover,
+		#inn-site-nav .sidebar-item-text:focus,
+		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text:hover,
+		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text:focus,
+		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text:hover,
+		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text:focus {
+			color: #6ea8ff !important;
+		}
+
+		#inn-site-nav .sidebar-link:hover .menu-text,
+		#inn-site-nav .sidebar-link:focus .menu-text,
+		#inn-site-nav .sidebar-item-text:hover .menu-text,
+		#inn-site-nav .sidebar-item-text:focus .menu-text,
+		#inn-site-nav .sidebar-item-container:hover > .sidebar-item-text .menu-text,
+		#inn-site-nav .sidebar-item-container:focus-within > .sidebar-item-text .menu-text,
+		#inn-site-nav .sidebar-item-container:hover > .sidebar-item-toggle,
+		#inn-site-nav .sidebar-item-container:focus-within > .sidebar-item-toggle,
+		#inn-site-nav .sidebar-item-container:hover > .sidebar-item-toggle .inn-nav-chevron,
+		#inn-site-nav .sidebar-item-container:focus-within > .sidebar-item-toggle .inn-nav-chevron {
+			color: #6ea8ff !important;
+		}
+
+		#inn-site-nav .inn-site-nav__tools .quarto-navigation-tool,
+		#inn-site-nav .sidebar-item-toggle,
+		#inn-site-nav .inn-nav-chevron,
+		#inn-site-nav .inn-site-nav__search-icon,
+		#inn-site-nav .inn-site-nav__search-clear,
+		#inn-mobile-topbar .inn-mobile-topbar__button,
+		#inn-mobile-search-panel .inn-site-nav__search-icon,
+		#inn-mobile-search-panel .inn-site-nav__search-clear {
+			color: #ffffff !important;
+		}
+
+		#inn-mobile-topbar .inn-mobile-topbar__button.is-active {
+			color: #0d6efd !important;
+		}
+
+		#inn-site-nav .inn-site-nav__search-input,
+		#inn-mobile-search-panel .inn-site-nav__search-input,
+		#inn-site-nav .inn-site-nav__search-input::placeholder,
+		#inn-mobile-search-panel .inn-site-nav__search-input::placeholder,
+		#inn-site-nav .inn-site-nav__results-header,
+		#inn-site-nav .inn-site-nav__result-crumbs,
+		#inn-site-nav .inn-site-nav__result-text,
+		#inn-mobile-search-panel .inn-site-nav__results-header,
+		#inn-mobile-search-panel .inn-site-nav__result-crumbs,
+		#inn-mobile-search-panel .inn-site-nav__result-text,
+		#inn-site-nav .inn-site-nav__result-title,
+		#inn-mobile-search-panel .inn-site-nav__result-title {
+			color: #ffffff !important;
+		}
 	}
 
 	.inn-site-nav__resizer {
@@ -902,9 +1536,42 @@
 <script>
 	document.addEventListener('DOMContentLoaded', () => {
 		const basePath = '/inno_notes/';
-		const pathKey = window.location.pathname.replace(/index\.html$/, '');
-		const relativePath = pathKey.replace(basePath, '');
-		const isHome = !relativePath || relativePath === '/' || /(^|\/)index\/?$/.test(relativePath);
+		let loaderEl = document.getElementById('inn-page-loader');
+		if (!loaderEl) {
+			loaderEl = document.createElement('div');
+			loaderEl.id = 'inn-page-loader';
+			document.body.appendChild(loaderEl);
+		}
+
+		const setLoaderProgress = (value) => {
+			const clamped = Math.max(0, Math.min(100, value));
+			document.documentElement.style.setProperty('--inn-loader-progress', String(clamped));
+		};
+
+		const showLoader = () => {
+			setLoaderProgress(14);
+			loaderEl.classList.add('is-active');
+		};
+
+		const advanceLoader = (value) => {
+			if (!loaderEl.classList.contains('is-active')) return;
+			setLoaderProgress(value);
+		};
+
+		const hideLoader = () => {
+			setLoaderProgress(100);
+			window.setTimeout(() => {
+				loaderEl.classList.remove('is-active');
+				setLoaderProgress(0);
+			}, 180);
+		};
+
+		const getPathKey = () => window.location.pathname.replace(/index\.html$/, '');
+		const getRelativePath = () => getPathKey().replace(basePath, '');
+		const getIsHome = () => {
+			const relativePath = getRelativePath();
+			return !relativePath || relativePath === '/' || /(^|\/)index\/?$/.test(relativePath);
+		};
 
 		const createPill = ({ title, meta, variant }) => {
 			const button = document.createElement('button');
@@ -955,11 +1622,64 @@
 			}
 		};
 
+		const getReadStorageKey = (value) => `read_${normalizePath(value)}`;
+		const applyProgressiveContent = () => {};
+		const containsMathContent = (root) => {
+			if (!root) return false;
+			if (root.querySelector('span.math, div.math, .math.display, .math.inline, script[type^="math/tex"]')) return true;
+			const html = root.innerHTML || '';
+			return /\\\(|\\\[|\$\$/.test(html);
+		};
+		const fitDisplayMath = () => {};
+		const scheduleFitDisplayMath = () => {};
+		const pageCache = new Map();
+		const maxPageCacheEntries = 24;
+		const getPageCacheKey = (value) => {
+			const url = new URL(value, window.location.href);
+			url.hash = '';
+			return `${url.pathname}${url.search}`;
+		};
+		const rememberPage = (key, payload) => {
+			if (!payload?.main) return;
+			if (pageCache.has(key)) pageCache.delete(key);
+			pageCache.set(key, payload);
+			if (pageCache.size > maxPageCacheEntries) {
+				const oldestKey = pageCache.keys().next().value;
+				if (oldestKey) pageCache.delete(oldestKey);
+			}
+		};
+		const clonePagePayload = (payload) => ({
+			title: payload.title,
+			main: payload.main.cloneNode(true),
+		});
+		const fetchPagePayload = async (value) => {
+			const url = new URL(value, window.location.href);
+			const key = getPageCacheKey(url.href);
+			const cached = pageCache.get(key);
+			if (cached) {
+				return clonePagePayload(cached);
+			}
+
+			const response = await fetch(url.href, { credentials: 'same-origin' });
+			if (!response.ok) return null;
+			const html = await response.text();
+			const doc = new DOMParser().parseFromString(html, 'text/html');
+			const main = doc.querySelector('main#quarto-document-content');
+			if (!main) return null;
+			const payload = {
+				title: doc.title,
+				main,
+			};
+			rememberPage(key, payload);
+			return clonePagePayload(payload);
+		};
+		const prefetchPage = async () => {};
+
 		const syncSidebarReadState = () => {
-			document.querySelectorAll('.sidebar-item-text.sidebar-link[href]').forEach(link => {
+			document.querySelectorAll('.sidebar-item-text.sidebar-link[href]:not([data-nav-section-toggle="true"])').forEach(link => {
 				const href = normalizePath(link.getAttribute('data-original-href') || link.getAttribute('href') || '');
 				const isArticleLink = /\.html?$/.test(href) || /\/$/.test(href);
-				link.classList.toggle('inn-read-title', isArticleLink && !!localStorage.getItem(`read_${href}`));
+				link.classList.toggle('inn-read-title', isArticleLink && !!localStorage.getItem(getReadStorageKey(href)));
 			});
 		};
 
@@ -994,8 +1714,110 @@
 			return safe.replace(pattern, '<mark>$1</mark>');
 		};
 
-		const initializeCustomNav = (sidebar) => {
-			document.body.classList.add('inn-custom-nav');
+		const applyArticleUI = () => {
+			const pathKey = normalizePath(getPathKey());
+			const isHome = getIsHome();
+			document.querySelectorAll('.inn-article-actions').forEach((el) => el.remove());
+
+			if (!isHome) {
+				const pageTitle = document.querySelector('main.content h1, main h1');
+				const isFormulaPage = (pageTitle?.textContent || '').trim().toLowerCase() === 'formulas';
+				if (pageTitle && !isFormulaPage) {
+					const actions = document.createElement('div');
+					actions.className = 'inn-article-actions';
+
+					const readButton = createPill({
+						title: 'Mark as Read',
+						meta: '',
+						variant: 'read'
+					});
+
+					const readKey = getReadStorageKey(pathKey);
+					const applyRead = (isRead) => {
+						readButton.classList.toggle('is-active', isRead);
+						setPillText(readButton, isRead ? 'Read' : 'Mark as Read', '');
+						pageTitle.classList.toggle('inn-read-title', isRead);
+						syncSidebarReadState();
+					};
+
+					applyRead(!!localStorage.getItem(readKey));
+
+					readButton.addEventListener('click', () => {
+						const next = !localStorage.getItem(readKey);
+						if (next) {
+							localStorage.setItem(readKey, 'true');
+						} else {
+							localStorage.removeItem(readKey);
+						}
+						applyRead(next);
+					});
+
+					actions.appendChild(readButton);
+					pageTitle.insertAdjacentElement('afterend', actions);
+				}
+
+				document.querySelectorAll('main#quarto-document-content h5').forEach(h5 => {
+					const rawText = (h5.textContent || '').trim();
+					if (!/^\d+\.\d+\./.test(rawText)) return;
+					if (!/\((?:Lecture|Tutorial|Lab|Homework|Assignment|Quiz|Test|Midterm|Final|Exercises|Chapter)[^)]*(?:Task|Example)/.test(rawText)) return;
+					if (h5.querySelector('.inn-pill--solved')) return;
+
+					h5.classList.add('problem-heading');
+
+					let textSpan = h5.querySelector('.problem-title-text');
+					if (!textSpan) {
+						textSpan = document.createElement('span');
+						textSpan.className = 'problem-title-text';
+						while (h5.firstChild) {
+							textSpan.appendChild(h5.firstChild);
+						}
+						h5.appendChild(textSpan);
+					}
+
+					const anchorId = h5.dataset.anchorId || h5.id || rawText;
+					const solvedKey = `solved_${pathKey}#${anchorId}`;
+					const solvedButton = createPill({
+						title: 'Solved',
+						meta: '',
+						variant: 'solved'
+					});
+
+					const applySolved = (isSolved) => {
+						h5.classList.toggle('is-solved', isSolved);
+						solvedButton.classList.toggle('is-active', isSolved);
+						setPillText(solvedButton, 'Solved', '');
+					};
+
+					applySolved(!!localStorage.getItem(solvedKey));
+
+					solvedButton.addEventListener('click', (event) => {
+						event.preventDefault();
+						event.stopPropagation();
+						const next = !localStorage.getItem(solvedKey);
+						if (next) {
+							localStorage.setItem(solvedKey, 'true');
+						} else {
+							localStorage.removeItem(solvedKey);
+						}
+						applySolved(next);
+					});
+
+					h5.appendChild(solvedButton);
+				});
+			}
+
+			applyProgressiveContent(document.querySelector('main#quarto-document-content'));
+			syncSidebarReadState();
+			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
+		};
+
+		rememberPage(getPageCacheKey(window.location.href), {
+			title: document.title,
+			main: document.querySelector('main#quarto-document-content')?.cloneNode(true),
+		});
+
+		const initializeCustomNav = (sidebar, { mobile = false } = {}) => {
+			document.body.classList.add(mobile ? 'inn-custom-nav-mobile' : 'inn-custom-nav');
 
 			const nav = document.createElement('aside');
 			nav.id = 'inn-site-nav';
@@ -1009,9 +1831,19 @@
 				</div>
 				<div class="inn-site-nav__search">
 					<div class="inn-site-nav__search-shell">
-						<i class="bi bi-search inn-site-nav__search-icon" aria-hidden="true"></i>
+						<span class="inn-site-nav__search-icon" aria-hidden="true">
+							<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+								<circle cx="8.5" cy="8.5" r="5.7" stroke="currentColor" stroke-width="1.8"/>
+								<path d="M12.7 12.7L17 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+							</svg>
+						</span>
 						<input class="inn-site-nav__search-input" type="text" placeholder="Search" aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
-						<button class="inn-site-nav__search-clear" type="button" aria-label="Clear">×</button>
+						<button class="inn-site-nav__search-clear" type="button" aria-label="Clear">
+							<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+								<path d="M5.2 5.2L14.8 14.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+								<path d="M14.8 5.2L5.2 14.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+							</svg>
+						</button>
 					</div>
 				</div>
 				<div class="inn-site-nav__results" aria-live="polite">
@@ -1026,6 +1858,102 @@
 			if (menu) nav.querySelector('.inn-site-nav__menu')?.appendChild(menu);
 			document.body.appendChild(nav);
 
+			let mobileTopbar = null;
+			let mobileOverlay = null;
+			let mobileSearchPanel = null;
+			const getMobileTitle = () => {
+				return (document.querySelector('main#quarto-document-content h1')?.textContent || document.title || 'InnoNotes').trim();
+			};
+			const updateSearchButtonState = () => {
+				const hasQuery = !!input?.value.trim();
+				const isSearchOpen = results?.classList.contains('is-open') || document.body.classList.contains('inn-mobile-search-open');
+				nav.querySelector('.inn-site-nav__search-shell')?.classList.toggle('is-active', hasQuery || isSearchOpen);
+				mobileTopbar?.querySelector('.inn-mobile-topbar__menu')?.classList.toggle('is-active', document.body.classList.contains('inn-mobile-nav-open'));
+				mobileTopbar?.querySelector('.inn-mobile-topbar__search')?.classList.toggle('is-active', document.body.classList.contains('inn-mobile-search-open'));
+			};
+
+			const closeMobileNav = () => {
+				if (!mobile) return;
+				document.body.classList.remove('inn-mobile-nav-open');
+				updateSearchButtonState();
+			};
+
+			const closeMobileSearch = () => {
+				if (!mobile) return;
+				document.body.classList.remove('inn-mobile-search-open');
+				updateSearchButtonState();
+			};
+
+			const openMobileNav = ({ focusSearch = false } = {}) => {
+				if (!mobile) return;
+				closeMobileSearch();
+				document.body.classList.add('inn-mobile-nav-open');
+				updateSearchButtonState();
+				if (focusSearch) {
+					window.setTimeout(() => input?.focus(), 180);
+				}
+			};
+
+			const openMobileSearch = () => {
+				if (!mobile) return;
+				closeMobileNav();
+				document.body.classList.add('inn-mobile-search-open');
+				updateSearchButtonState();
+				window.setTimeout(() => input?.focus(), 180);
+			};
+
+			if (mobile) {
+				mobileOverlay = document.createElement('div');
+				mobileOverlay.id = 'inn-mobile-overlay';
+				document.body.appendChild(mobileOverlay);
+
+				mobileSearchPanel = document.createElement('div');
+				mobileSearchPanel.id = 'inn-mobile-search-panel';
+				document.body.appendChild(mobileSearchPanel);
+
+				mobileTopbar = document.createElement('div');
+				mobileTopbar.id = 'inn-mobile-topbar';
+				mobileTopbar.innerHTML = `
+					<button class="inn-mobile-topbar__button inn-mobile-topbar__menu" type="button" aria-label="Open navigation">
+						<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+							<path d="M3.5 5.5H16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+							<path d="M3.5 10H16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+							<path d="M3.5 14.5H12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+						</svg>
+					</button>
+					<div class="inn-mobile-topbar__title"></div>
+					<button class="inn-mobile-topbar__button inn-mobile-topbar__search" type="button" aria-label="Search">
+						<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+							<circle cx="8.5" cy="8.5" r="5.7" stroke="currentColor" stroke-width="1.8"/>
+							<path d="M12.7 12.7L17 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+						</svg>
+					</button>
+				`;
+				document.body.appendChild(mobileTopbar);
+
+				mobileTopbar.querySelector('.inn-mobile-topbar__menu')?.addEventListener('click', () => {
+					if (document.body.classList.contains('inn-mobile-nav-open')) {
+						closeMobileNav();
+						return;
+					}
+					openMobileNav();
+				});
+				mobileTopbar.querySelector('.inn-mobile-topbar__search')?.addEventListener('click', () => {
+					if (document.body.classList.contains('inn-mobile-search-open')) {
+						closeMobileSearch();
+						return;
+					}
+					openMobileSearch();
+				});
+				mobileOverlay.addEventListener('click', closeMobileNav);
+				document.addEventListener('keydown', (event) => {
+					if (event.key === 'Escape') {
+						closeMobileNav();
+						closeMobileSearch();
+					}
+				});
+			}
+
 			nav.querySelectorAll('.inn-site-nav__tools a[href]').forEach((link) => {
 				const href = link.getAttribute('href') || '';
 				if (!href || href === '#') return;
@@ -1038,23 +1966,166 @@
 			const results = nav.querySelector('.inn-site-nav__results');
 			const resultsHeader = nav.querySelector('.inn-site-nav__results-header');
 			const resultsList = nav.querySelector('.inn-site-nav__results-list');
-			let searchTimer = null;
+			let searchFrame = null;
+			let activeSearchToken = 0;
+			let idlePrefetchHandle = null;
 
-			const searchDataPromise = fetch(withOffset('search.json'))
-				.then((response) => response.json())
-				.then((items) => new window.Fuse(items, {
-					includeScore: true,
-					threshold: 0.32,
-					ignoreLocation: true,
-					minMatchCharLength: 2,
-					keys: [
-						{ name: 'title', weight: 0.45 },
-						{ name: 'section', weight: 0.15 },
-						{ name: 'crumbs', weight: 0.15 },
-						{ name: 'text', weight: 0.25 }
-					]
-				}))
-				.catch(() => null);
+			if (mobile && mobileSearchPanel) {
+				mobileSearchPanel.appendChild(nav.querySelector('.inn-site-nav__search'));
+				mobileSearchPanel.appendChild(results);
+			}
+
+			const updateActiveNavState = () => {
+				const currentPath = getPathKey();
+				nav.querySelectorAll('.sidebar-link.active').forEach((link) => link.classList.remove('active'));
+				nav.querySelectorAll('.inn-site-nav__menu .sidebar-link[href]').forEach((link) => {
+					const href = normalizePath(link.getAttribute('data-original-href') || link.getAttribute('href') || '');
+					if (href === currentPath) {
+						link.classList.add('active');
+						let section = link.closest('li.sidebar-item-section');
+						while (section) {
+							section.classList.add('is-open');
+							const childList = Array.from(section.children).find((child) => child.matches?.('ul.sidebar-section'));
+							if (childList) {
+								childList.hidden = false;
+								childList.style.height = 'auto';
+								childList.style.opacity = '1';
+								childList.style.pointerEvents = 'auto';
+							}
+							section = section.parentElement?.closest('li.sidebar-item-section') || null;
+						}
+					}
+				});
+				syncSidebarReadState();
+				if (mobileTopbar) {
+					const titleEl = mobileTopbar.querySelector('.inn-mobile-topbar__title');
+					if (titleEl) titleEl.textContent = getMobileTitle();
+				}
+			};
+
+			const navigateInternal = async (href, { replace = false } = {}) => {
+				const url = new URL(href, window.location.href);
+				closeMobileNav();
+				closeMobileSearch();
+				if (url.origin !== window.location.origin) {
+					window.location.assign(url.href);
+					return;
+				}
+				showLoader();
+				advanceLoader(28);
+				const payload = await fetchPagePayload(url.href);
+				if (!payload) {
+					hideLoader();
+					window.location.assign(url.href);
+					return;
+				}
+				advanceLoader(54);
+				const nextMain = payload.main;
+
+				const applySwap = () => {
+					const currentMain = document.querySelector('main#quarto-document-content');
+					if (!currentMain) {
+						window.location.assign(url.href);
+						return;
+					}
+					currentMain.replaceWith(nextMain);
+					document.title = payload.title;
+					if (replace) {
+						window.history.replaceState({}, '', url.href);
+					} else {
+						window.history.pushState({}, '', url.href);
+					}
+					advanceLoader(78);
+					applyArticleUI();
+					updateActiveNavState();
+					advanceLoader(92);
+					const swappedMain = document.querySelector('main#quarto-document-content');
+					if (window.Quarto?.typesetMath && containsMathContent(swappedMain)) {
+						window.requestAnimationFrame(() => {
+							window.Quarto.typesetMath(swappedMain);
+							scheduleFitDisplayMath(swappedMain);
+						});
+					} else {
+						scheduleFitDisplayMath(swappedMain);
+					}
+					if (url.hash) {
+						const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
+						target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+					} else {
+						window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+					}
+					hideLoader();
+				};
+
+				if (document.startViewTransition) {
+					document.startViewTransition(applySwap);
+				} else {
+					applySwap();
+				}
+			};
+
+			const queueIdlePrefetch = () => {};
+
+			const collectPrefetchCandidates = () => {
+				const candidates = [];
+				nav.querySelectorAll('.inn-site-nav__menu .sidebar-link[href]:not([data-nav-section-toggle="true"])').forEach((link) => {
+					const parentSection = link.closest('ul.sidebar-section');
+					if (!parentSection || parentSection.hidden) return;
+					const href = link.getAttribute('data-original-href') || link.getAttribute('href');
+					if (href) candidates.push(href);
+				});
+				queueIdlePrefetch(candidates);
+			};
+
+			let searchDataPromise = null;
+			const getSearchData = () => {
+				if (!searchDataPromise) {
+					searchDataPromise = fetch(withOffset('search.json'))
+						.then((response) => response.json())
+						.then((items) => items.map((item) => {
+							const crumbs = Array.isArray(item.crumbs) ? item.crumbs : [];
+							return {
+								...item,
+								_crumbsText: crumbs.join(' › '),
+								_titleLower: String(item.title || '').toLowerCase(),
+								_sectionLower: String(item.section || '').toLowerCase(),
+								_crumbsLower: crumbs.join(' ').toLowerCase(),
+								_textLower: String(item.text || '').replace(/\s+/g, ' ').toLowerCase(),
+							};
+						}))
+						.catch(() => []);
+				}
+				return searchDataPromise;
+			};
+
+			const scoreSearchItem = (item, terms) => {
+				const haystack = `${item._titleLower} ${item._sectionLower} ${item._crumbsLower} ${item._textLower}`;
+				let score = 0;
+				for (const term of terms) {
+					if (!haystack.includes(term)) return null;
+					if (item._titleLower.includes(term)) {
+						score += 0;
+					} else if (item._sectionLower.includes(term)) {
+						score += 2;
+					} else if (item._crumbsLower.includes(term)) {
+						score += 4;
+					} else {
+						score += 8;
+					}
+				}
+				score += Math.min(item._textLower.indexOf(terms[0]) + 1, 160) / 1000;
+				return score;
+			};
+
+			const runSearch = (items, query) => {
+				const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+				if (!terms.length) return [];
+				return items
+					.map((item) => ({ item, score: scoreSearchItem(item, terms) }))
+					.filter((entry) => entry.score !== null)
+					.sort((a, b) => a.score - b.score)
+					.map((entry) => entry.item);
+			};
 
 			const makeSnippet = (text, query) => {
 				if (!text) return '';
@@ -1069,52 +2140,107 @@
 			};
 
 			const renderResults = async (query) => {
+				const token = ++activeSearchToken;
 				const trimmed = query.trim();
-				clear.style.display = trimmed ? 'block' : 'none';
+				clear.style.display = trimmed ? 'inline-flex' : 'none';
 				if (!trimmed) {
 					results.classList.remove('is-open');
-					resultsList.innerHTML = '';
+					results.classList.remove('is-empty');
+					resultsHeader.textContent = '';
+					updateSearchButtonState();
+					window.setTimeout(() => {
+						if (!results.classList.contains('is-open')) {
+							resultsList.replaceChildren();
+						}
+					}, 170);
 					return;
 				}
-				const fuse = await searchDataPromise;
-				if (!fuse) return;
-				const found = fuse.search(trimmed, { limit: 12 }).map((result) => result.item);
 				results.classList.add('is-open');
-				resultsHeader.textContent = `${found.length} result${found.length === 1 ? '' : 's'}`;
+				results.classList.remove('is-empty');
+				resultsHeader.textContent = 'Searching…';
+				resultsList.replaceChildren();
+				updateSearchButtonState();
+				const items = await getSearchData();
+				if (token !== activeSearchToken) return;
+				const found = runSearch(items, trimmed);
+				results.classList.add('is-open');
+				results.classList.toggle('is-empty', !found.length);
+				resultsHeader.textContent = !found.length ? 'Nothing found' : `${found.length} result${found.length === 1 ? '' : 's'}`;
+				updateSearchButtonState();
 				if (!found.length) {
-					resultsList.innerHTML = `<div class="inn-site-nav__results-empty">No results</div>`;
+					resultsList.replaceChildren();
 					return;
 				}
-				resultsList.innerHTML = found.map((item) => `
-					<a class="inn-site-nav__result" href="${createSearchUrl(item.href, trimmed)}">
-						<div class="inn-site-nav__result-title">${highlightMatch(item.title || 'Untitled', trimmed)}</div>
-						<div class="inn-site-nav__result-crumbs">${highlightMatch((item.crumbs || []).join(' › '), trimmed)}</div>
-						<div class="inn-site-nav__result-text">${makeSnippet(item.text || '', trimmed)}</div>
-					</a>
-				`).join('');
+				const fragment = document.createDocumentFragment();
+				found.forEach((item) => {
+					const link = document.createElement('a');
+					link.className = 'inn-site-nav__result';
+					link.href = createSearchUrl(item.href, trimmed);
+
+					const title = document.createElement('div');
+					title.className = 'inn-site-nav__result-title';
+					title.innerHTML = highlightMatch(item.title || 'Untitled', trimmed);
+
+					const crumbs = document.createElement('div');
+					crumbs.className = 'inn-site-nav__result-crumbs';
+					crumbs.innerHTML = highlightMatch(item._crumbsText || '', trimmed);
+
+					const text = document.createElement('div');
+					text.className = 'inn-site-nav__result-text';
+					text.innerHTML = makeSnippet(item.text || '', trimmed);
+
+					link.append(title, crumbs, text);
+					fragment.appendChild(link);
+				});
+				resultsList.replaceChildren(fragment);
+				queueIdlePrefetch(found.slice(0, 4).map((item) => item.href));
 			};
 
 			input?.addEventListener('input', (event) => {
 				const nextValue = event.target.value;
-				if (searchTimer) window.clearTimeout(searchTimer);
-				searchTimer = window.setTimeout(() => {
+				if (searchFrame !== null) window.cancelAnimationFrame(searchFrame);
+				searchFrame = window.requestAnimationFrame(() => {
+					searchFrame = null;
 					renderResults(nextValue);
-				}, 90);
+				});
 			});
 			clear?.addEventListener('click', () => {
 				input.value = '';
-				if (searchTimer) {
-					window.clearTimeout(searchTimer);
-					searchTimer = null;
+				if (searchFrame !== null) {
+					window.cancelAnimationFrame(searchFrame);
+					searchFrame = null;
 				}
 				renderResults('');
 				input.focus();
 			});
 			document.addEventListener('click', (event) => {
-				if (!nav.contains(event.target)) {
+				const insideNav = nav.contains(event.target);
+				const insideSearch = mobileSearchPanel?.contains(event.target);
+				if (!insideNav && !insideSearch) {
 					results.classList.remove('is-open');
+					results.classList.remove('is-empty');
+					updateSearchButtonState();
 				}
 			});
+			// Navigate on link click — explicitly assign href to bypass any
+			// Bootstrap/Quarto handlers that might call preventDefault.
+			const onNavLinkClick = (event) => {
+				const link = event.target.closest('a[href]');
+				if (!link) return;
+				const href = link.href;
+				if (!href || href === window.location.href.split('#')[0] + '#' || link.dataset.navSectionToggle) return;
+				if (link.target === '_blank') return;
+				event.preventDefault();
+				closeMobileNav();
+				closeMobileSearch();
+				results.classList.remove('is-open');
+				results.classList.remove('is-empty');
+				updateSearchButtonState();
+				window._innNavigating = true;
+				window.location.href = href;
+			};
+			nav.addEventListener('click', onNavLinkClick);
+			mobileSearchPanel?.addEventListener('click', onNavLinkClick);
 
 			const sections = nav.querySelectorAll('li.sidebar-item-section');
 			sections.forEach((section) => {
@@ -1128,31 +2254,85 @@
 				const storageKey = `inn_custom_nav_${title}`;
 				const saved = localStorage.getItem(storageKey);
 				const activeDesc = !!section.querySelector('.sidebar-link.active');
-				const open = saved ? saved === 'open' : childList.classList.contains('show') || activeDesc;
+				const open = saved ? saved === 'open' : activeDesc;
 
-				const applyOpen = (isOpen) => {
+				childList.classList.remove('collapse', 'show');
+				textToggle.classList.remove('collapsed');
+				iconToggle.classList.remove('collapsed');
+				iconToggle.querySelectorAll('i').forEach((icon) => {
+					icon.className = 'inn-nav-chevron';
+					icon.innerHTML = `
+						<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+							<path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+					`;
+				});
+
+				const finalizeOpen = (isOpen) => {
 					section.classList.toggle('is-open', isOpen);
-					childList.classList.toggle('show', isOpen);
+					textToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+					iconToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 					childList.hidden = !isOpen;
+					childList.style.height = isOpen ? 'auto' : '0px';
+					childList.style.opacity = isOpen ? '1' : '0';
+					childList.style.pointerEvents = isOpen ? 'auto' : 'none';
 					localStorage.setItem(storageKey, isOpen ? 'open' : 'closed');
+				};
+
+				const applyOpen = (isOpen, animate = true) => {
+					if (!animate) {
+						finalizeOpen(isOpen);
+						return;
+					}
+
+					childList.hidden = false;
+					const startHeight = childList.getBoundingClientRect().height;
+					const targetHeight = isOpen
+						? (() => {
+							childList.style.height = 'auto';
+							return childList.scrollHeight;
+						})()
+						: 0;
+
+					childList.style.height = `${startHeight}px`;
+					childList.style.opacity = isOpen ? '0' : '1';
+					childList.style.pointerEvents = 'none';
+
+					const onEnd = (event) => {
+						if (event.target !== childList || event.propertyName !== 'height') return;
+						childList.removeEventListener('transitionend', onEnd);
+						finalizeOpen(isOpen);
+					};
+
+					childList.addEventListener('transitionend', onEnd);
+					section.classList.toggle('is-open', isOpen);
+					window.requestAnimationFrame(() => {
+						childList.style.height = `${targetHeight}px`;
+						childList.style.opacity = isOpen ? '1' : '0';
+					});
 				};
 
 				textToggle.removeAttribute('data-bs-toggle');
 				textToggle.removeAttribute('data-bs-target');
-				textToggle.href = '#';
+				textToggle.removeAttribute('href');
+				textToggle.setAttribute('role', 'button');
+				textToggle.dataset.navSectionToggle = 'true';
 				iconToggle.removeAttribute('data-bs-toggle');
 				iconToggle.removeAttribute('data-bs-target');
-				iconToggle.href = '#';
+				iconToggle.removeAttribute('href');
+				iconToggle.setAttribute('role', 'button');
+				iconToggle.dataset.navSectionToggle = 'true';
 
 				const toggle = (event) => {
 					event.preventDefault();
 					event.stopPropagation();
-					applyOpen(!section.classList.contains('is-open'));
+					applyOpen(!section.classList.contains('is-open'), true);
+					window.setTimeout(collectPrefetchCandidates, 220);
 				};
 
 				textToggle.addEventListener('click', toggle);
 				iconToggle.addEventListener('click', toggle);
-				applyOpen(open);
+				applyOpen(open, false);
 			});
 
 			const navWidthKey = 'inn_custom_nav_width';
@@ -1168,152 +2348,64 @@
 				if (persist) localStorage.setItem(navWidthKey, String(clamped));
 			};
 
-			const storedWidth = parseInt(localStorage.getItem(navWidthKey) || '', 10);
-			applyWidth(Number.isFinite(storedWidth) ? storedWidth : defaultWidth, false);
+			if (!mobile) {
+				const storedWidth = parseInt(localStorage.getItem(navWidthKey) || '', 10);
+				applyWidth(Number.isFinite(storedWidth) ? storedWidth : defaultWidth, false);
 
-			const resizer = nav.querySelector('.inn-site-nav__resizer');
-			let dragFrame = null;
-			let pendingWidth = Number.isFinite(storedWidth) ? storedWidth : defaultWidth;
-			const startResize = (clientX) => {
-				resizer.classList.add('is-dragging');
-				const onMove = (moveX) => {
-					pendingWidth = moveX;
-					if (dragFrame !== null) return;
-					dragFrame = window.requestAnimationFrame(() => {
-						dragFrame = null;
-						applyWidth(pendingWidth, false);
-					});
+				const resizer = nav.querySelector('.inn-site-nav__resizer');
+				let dragFrame = null;
+				let pendingWidth = Number.isFinite(storedWidth) ? storedWidth : defaultWidth;
+				const startResize = (clientX) => {
+					resizer.classList.add('is-dragging');
+					const onMove = (moveX) => {
+						pendingWidth = moveX;
+						if (dragFrame !== null) return;
+						dragFrame = window.requestAnimationFrame(() => {
+							dragFrame = null;
+							applyWidth(pendingWidth, false);
+						});
+					};
+					const onMouseMove = (event) => onMove(event.clientX);
+					const onTouchMove = (event) => {
+						if (event.touches[0]) onMove(event.touches[0].clientX);
+					};
+					const stop = () => {
+						resizer.classList.remove('is-dragging');
+						if (dragFrame !== null) {
+							window.cancelAnimationFrame(dragFrame);
+							dragFrame = null;
+						}
+						applyWidth(pendingWidth, true);
+						window.removeEventListener('mousemove', onMouseMove);
+						window.removeEventListener('mouseup', stop);
+						window.removeEventListener('touchmove', onTouchMove);
+						window.removeEventListener('touchend', stop);
+					};
+					window.addEventListener('mousemove', onMouseMove);
+					window.addEventListener('mouseup', stop);
+					window.addEventListener('touchmove', onTouchMove, { passive: true });
+					window.addEventListener('touchend', stop, { passive: true });
 				};
-				const onMouseMove = (event) => onMove(event.clientX);
-				const onTouchMove = (event) => {
-					if (event.touches[0]) onMove(event.touches[0].clientX);
-				};
-				const stop = () => {
-					resizer.classList.remove('is-dragging');
-					if (dragFrame !== null) {
-						window.cancelAnimationFrame(dragFrame);
-						dragFrame = null;
-					}
-					applyWidth(pendingWidth, true);
-					window.removeEventListener('mousemove', onMouseMove);
-					window.removeEventListener('mouseup', stop);
-					window.removeEventListener('touchmove', onTouchMove);
-					window.removeEventListener('touchend', stop);
-				};
-				window.addEventListener('mousemove', onMouseMove);
-				window.addEventListener('mouseup', stop);
-				window.addEventListener('touchmove', onTouchMove, { passive: true });
-				window.addEventListener('touchend', stop, { passive: true });
-			};
 
-			resizer?.addEventListener('mousedown', (event) => {
-				event.preventDefault();
-				startResize(event.clientX);
-			});
+				resizer?.addEventListener('mousedown', (event) => {
+					event.preventDefault();
+					startResize(event.clientX);
+				});
+			}
 
-			syncSidebarReadState();
+			updateActiveNavState();
+			collectPrefetchCandidates();
+			updateSearchButtonState();
 			return true;
 		};
-
-		if (!isHome) {
-			const pageTitle = document.querySelector('main.content h1, main h1');
-			if (pageTitle) {
-				const actions = document.createElement('div');
-				actions.className = 'inn-article-actions';
-
-				const readButton = createPill({
-					title: 'Mark as Read',
-					meta: '',
-					variant: 'read'
-				});
-
-				const readKey = `read_${pathKey}`;
-				const applyRead = (isRead) => {
-					readButton.classList.toggle('is-active', isRead);
-					setPillText(
-						readButton,
-						isRead ? 'Read' : 'Mark as Read',
-						''
-					);
-					pageTitle.classList.toggle('inn-read-title', isRead);
-					syncSidebarReadState();
-				};
-
-				applyRead(!!localStorage.getItem(readKey));
-
-				readButton.addEventListener('click', () => {
-					const next = !localStorage.getItem(readKey);
-					if (next) {
-						localStorage.setItem(readKey, 'true');
-					} else {
-						localStorage.removeItem(readKey);
-					}
-					applyRead(next);
-				});
-
-				actions.appendChild(readButton);
-				pageTitle.insertAdjacentElement('afterend', actions);
-				syncSidebarReadState();
-			}
-		}
-
-		if (!isHome) {
-			document.querySelectorAll('h5').forEach(h5 => {
-				const rawText = (h5.textContent || '').trim();
-				if (!/^\d+\.\d+\./.test(rawText)) return;
-				if (!/\((?:Lecture|Tutorial|Lab|Homework|Assignment|Quiz|Test|Midterm|Final|Exercises|Chapter)[^)]*(?:Task|Example)/.test(rawText)) return;
-
-				h5.classList.add('problem-heading');
-
-				let textSpan = h5.querySelector('.problem-title-text');
-				if (!textSpan) {
-					textSpan = document.createElement('span');
-					textSpan.className = 'problem-title-text';
-					while (h5.firstChild) {
-						textSpan.appendChild(h5.firstChild);
-					}
-					h5.appendChild(textSpan);
-				}
-
-				const anchorId = h5.dataset.anchorId || h5.id || rawText;
-				const solvedKey = `solved_${pathKey}#${anchorId}`;
-				const solvedButton = createPill({
-					title: 'Solved',
-					meta: '',
-					variant: 'solved'
-				});
-
-				const applySolved = (isSolved) => {
-					h5.classList.toggle('is-solved', isSolved);
-					solvedButton.classList.toggle('is-active', isSolved);
-					setPillText(
-						solvedButton,
-						isSolved ? 'Solved' : 'Solved',
-						''
-					);
-				};
-
-				applySolved(!!localStorage.getItem(solvedKey));
-
-				solvedButton.addEventListener('click', (event) => {
-					event.preventDefault();
-					event.stopPropagation();
-					const next = !localStorage.getItem(solvedKey);
-					if (next) {
-						localStorage.setItem(solvedKey, 'true');
-					} else {
-						localStorage.removeItem(solvedKey);
-					}
-					applySolved(next);
-				});
-
-				h5.appendChild(solvedButton);
-			});
-		}
+		applyArticleUI();
+		window.addEventListener('resize', () => {
+			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
+		});
 
 		const sidebar = document.querySelector('#quarto-sidebar');
 		if (!sidebar) return;
-		if (window.innerWidth > 991 && initializeCustomNav(sidebar)) {
+		if (initializeCustomNav(sidebar, { mobile: window.innerWidth <= 991 })) {
 			return;
 		}
 
