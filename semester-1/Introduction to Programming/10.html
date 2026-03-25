@@ -5121,10 +5121,14 @@ First car: Volvo</code></pre>
 		#inn-site-nav .menu-text,
 		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text,
 		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text,
-		#inn-site-nav .sidebar-link.active,
 		#inn-site-nav .sidebar-item > .sidebar-item-container > .sidebar-item-text.active,
 		#inn-site-nav .sidebar-item-section > .sidebar-item-container > .sidebar-item-text.active {
 			color: #ffffff !important;
+		}
+
+		#inn-site-nav .sidebar-link.active,
+		#inn-site-nav .sidebar-link.active .menu-text {
+			color: #6ea8ff !important;
 		}
 
 		#inn-site-nav .sidebar-link:hover,
@@ -5323,6 +5327,26 @@ First car: Volvo</code></pre>
 			const html = root.innerHTML || '';
 			return /\\\(|\\\[|\$\$/.test(html);
 		};
+		const typesetMathContent = async (root) => {
+			if (!root || !containsMathContent(root) || !window.Quarto?.typesetMath) return;
+			if (window.MathJax?.startup?.promise) {
+				try {
+					await window.MathJax.startup.promise;
+				} catch {}
+			} else if (!window.MathJax) {
+				for (let attempt = 0; attempt < 40 && !window.MathJax; attempt += 1) {
+					await new Promise((resolve) => window.setTimeout(resolve, 120));
+				}
+				if (window.MathJax?.startup?.promise) {
+					try {
+						await window.MathJax.startup.promise;
+					} catch {}
+				}
+			}
+			try {
+				window.Quarto.typesetMath(root);
+			} catch {}
+		};
 		const fitDisplayMath = () => {};
 		const scheduleFitDisplayMath = () => {};
 		const pageCache = new Map();
@@ -5388,6 +5412,36 @@ First car: Volvo</code></pre>
 			const url = new URL(withOffset(base), window.location.href);
 			if (query) url.searchParams.set('q', query);
 			return `${url.pathname}${url.search}${hash ? `#${hash}` : ''}`;
+		};
+
+		const getMermaidBlocks = (root = document) => Array.from(root.querySelectorAll('pre.mermaid, pre.mermaid-js, .mermaid-js'));
+		const rerenderMermaid = async (root = document) => {
+			const mermaidBlocks = getMermaidBlocks(root);
+			if (!mermaidBlocks.length) return;
+			for (let attempt = 0; attempt < 40 && !window.mermaid; attempt += 1) {
+				await new Promise((resolve) => window.setTimeout(resolve, 120));
+			}
+			if (!window.mermaid) return;
+			mermaidBlocks.forEach((block) => {
+				block.removeAttribute('data-processed');
+			});
+			try {
+				if (typeof window.mermaid.run === 'function') {
+					await window.mermaid.run({ nodes: mermaidBlocks });
+				} else if (typeof window.mermaid.init === 'function') {
+					window.mermaid.init(undefined, mermaidBlocks);
+				}
+			} catch {}
+		};
+		const ensureMermaidRendered = async (root = document) => {
+			if (!getMermaidBlocks(root).length) return;
+			for (let attempt = 0; attempt < 4; attempt += 1) {
+				await rerenderMermaid(root);
+				if (!getMermaidBlocks(root).some((block) => /^(PRE|DIV)$/.test(block.tagName) && /^(mermaid|mermaid-js)$/.test(block.className.trim()))) {
+					return;
+				}
+				await new Promise((resolve) => window.setTimeout(resolve, 180));
+			}
 		};
 
 		const escapeHtml = (value) => (value || '')
@@ -5502,6 +5556,7 @@ First car: Volvo</code></pre>
 			applyProgressiveContent(document.querySelector('main#quarto-document-content'));
 			syncSidebarReadState();
 			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
+			ensureMermaidRendered(document.querySelector('main#quarto-document-content'));
 		};
 
 		rememberPage(getPageCacheKey(window.location.href), {
@@ -5669,7 +5724,7 @@ First car: Volvo</code></pre>
 			}
 
 			const updateActiveNavState = () => {
-				const currentPath = getPathKey();
+				const currentPath = normalizePath(getPathKey());
 				nav.querySelectorAll('.sidebar-link.active').forEach((link) => link.classList.remove('active'));
 				nav.querySelectorAll('.inn-site-nav__menu .sidebar-link[href]').forEach((link) => {
 					const href = normalizePath(link.getAttribute('data-original-href') || link.getAttribute('href') || '');
@@ -5734,14 +5789,10 @@ First car: Volvo</code></pre>
 					updateActiveNavState();
 					advanceLoader(92);
 					const swappedMain = document.querySelector('main#quarto-document-content');
-					if (window.Quarto?.typesetMath && containsMathContent(swappedMain)) {
-						window.requestAnimationFrame(() => {
-							window.Quarto.typesetMath(swappedMain);
-							scheduleFitDisplayMath(swappedMain);
-						});
-					} else {
+					window.requestAnimationFrame(async () => {
+						await typesetMathContent(swappedMain);
 						scheduleFitDisplayMath(swappedMain);
-					}
+					});
 					if (url.hash) {
 						const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
 						target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -6102,6 +6153,12 @@ First car: Volvo</code></pre>
 			return true;
 		};
 		applyArticleUI();
+		window.requestAnimationFrame(async () => {
+			const mainContent = document.querySelector('main#quarto-document-content');
+			await typesetMathContent(mainContent);
+			await ensureMermaidRendered(mainContent);
+			scheduleFitDisplayMath(mainContent);
+		});
 		window.addEventListener('resize', () => {
 			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
 		});
