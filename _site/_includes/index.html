@@ -96,6 +96,55 @@
 })();
 </script>
 
+<script>
+// Patch WebSocket BEFORE quarto-preview.js so its messages don't interfere
+// with SPA navigation. quarto-preview sends three relevant message types:
+//   render:start  – shows render overlay
+//   render:stop   – hides render overlay
+//   reload        – reloads / replaces location
+// All three are suppressed while window._innNavigating is true.
+// onclose (socket disconnect) is also suppressed to prevent spurious reload.
+(function () {
+	if (!window.WebSocket) return;
+	var Orig = window.WebSocket;
+	function InnWS(url, proto) {
+		var ws = proto !== undefined ? new Orig(url, proto) : new Orig(url);
+		var _om = null, _oc = null;
+		Object.defineProperty(ws, 'onmessage', {
+			configurable: true,
+			get: function () { return _om; },
+			set: function (fn) {
+				_om = fn;
+				ws.addEventListener('message', function (e) {
+					if (window._innNavigating &&
+						typeof e.data === 'string' &&
+						(e.data.startsWith('reload') || e.data.startsWith('render:'))) return;
+					fn.call(ws, e);
+				});
+			}
+		});
+		Object.defineProperty(ws, 'onclose', {
+			configurable: true,
+			get: function () { return _oc; },
+			set: function (fn) {
+				_oc = fn;
+				ws.addEventListener('close', function (e) {
+					if (window._innNavigating) return;
+					fn.call(ws, e);
+				});
+			}
+		});
+		return ws;
+	}
+	InnWS.prototype = Orig.prototype;
+	InnWS.CONNECTING = Orig.CONNECTING;
+	InnWS.OPEN = Orig.OPEN;
+	InnWS.CLOSING = Orig.CLOSING;
+	InnWS.CLOSED = Orig.CLOSED;
+	window.WebSocket = InnWS;
+})();
+</script>
+
 <style>
 	:root {
 		--inn-bg: rgba(255, 255, 255, 0.88);
@@ -1721,6 +1770,7 @@
 		const scheduleFitDisplayMath = () => {};
 		const pageCache = new Map();
 		const maxPageCacheEntries = 24;
+		const assetLoadCache = new Map();
 		const getPageCacheKey = (value) => {
 			const url = new URL(value, window.location.href);
 			url.hash = '';
@@ -1738,7 +1788,74 @@
 		const clonePagePayload = (payload) => ({
 			title: payload.title,
 			main: payload.main.cloneNode(true),
+			assets: { ...payload.assets },
 		});
+		const collectPageAssets = (doc, pageHref) => {
+			const collectUrls = (selector, attr) => Array.from(doc.querySelectorAll(selector))
+				.map((node) => node.getAttribute(attr))
+				.filter(Boolean)
+				.map((value) => new URL(value, pageHref).href);
+			const collectInlineStyles = () => Array.from(doc.head.querySelectorAll('style'))
+				.map((node) => node.textContent || '')
+				.map((value) => value.trim())
+				.filter(Boolean);
+			return {
+				stylesheets: collectUrls('link[rel="stylesheet"][href]', 'href'),
+				inlineStyles: collectInlineStyles(),
+				mathScripts: collectUrls('script[src*="mathjax"]', 'src'),
+				mermaidScripts: collectUrls('script[src*="quarto-diagram/mermaid.min.js"]', 'src'),
+				mermaidStyles: collectUrls('link[rel="stylesheet"][href*="quarto-diagram/mermaid.css"]', 'href'),
+			};
+		};
+		const hasAsset = (selector, targetHref, attr) => Array.from(document.querySelectorAll(selector)).some((node) => {
+			const value = node.getAttribute(attr);
+			if (!value) return false;
+			try {
+				return new URL(value, window.location.href).href === targetHref;
+			} catch {
+				return value === targetHref;
+			}
+		});
+		const ensureScriptAsset = (src) => {
+			if (!src) return Promise.resolve();
+			if (hasAsset(`script[src]`, src, 'src')) return Promise.resolve();
+			if (assetLoadCache.has(src)) return assetLoadCache.get(src);
+			const promise = new Promise((resolve, reject) => {
+				const script = document.createElement('script');
+				script.src = src;
+				script.async = false;
+				script.onload = () => resolve();
+				script.onerror = () => reject(new Error(`Failed to load ${src}`));
+				document.head.appendChild(script);
+			}).catch(() => {});
+			assetLoadCache.set(src, promise);
+			return promise;
+		};
+		const ensureStyleAsset = (href) => {
+			if (!href || hasAsset(`link[rel="stylesheet"][href]`, href, 'href')) return;
+			const link = document.createElement('link');
+			link.rel = 'stylesheet';
+			link.href = href;
+			document.head.appendChild(link);
+		};
+		const ensureInlineStyleAsset = (content) => {
+			if (!content) return;
+			const normalized = content.trim();
+			const existing = Array.from(document.head.querySelectorAll('style')).some((node) => (node.textContent || '').trim() === normalized);
+			if (existing) return;
+			const style = document.createElement('style');
+			style.setAttribute('data-inn-dynamic-style', 'true');
+			style.textContent = normalized;
+			document.head.appendChild(style);
+		};
+		const ensurePageAssets = async (assets = {}) => {
+			(assets.stylesheets || []).forEach(ensureStyleAsset);
+			(assets.inlineStyles || []).forEach(ensureInlineStyleAsset);
+			await Promise.all([
+				...(assets.mathScripts || []).map((src) => ensureScriptAsset(src)),
+				...(assets.mermaidScripts || []).map((src) => ensureScriptAsset(src)),
+			]);
+		};
 		const fetchPagePayload = async (value) => {
 			const url = new URL(value, window.location.href);
 			const key = getPageCacheKey(url.href);
@@ -1756,6 +1873,7 @@
 			const payload = {
 				title: doc.title,
 				main,
+				assets: collectPageAssets(doc, url.href),
 			};
 			rememberPage(key, payload);
 			return clonePagePayload(payload);
@@ -2175,6 +2293,7 @@
 					window.location.assign(url.href);
 					return;
 				}
+				await ensurePageAssets(payload.assets);
 				advanceLoader(54);
 				const nextMain = payload.main;
 
