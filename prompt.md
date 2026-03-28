@@ -143,6 +143,8 @@ This distinction is mandatory:
 
 Model the article around that distinction.
 
+Do not create a separate top-level `Tasks` section. Place both `Example` and `Task` items inside one shared `Examples` section, and order them only by the canonical source-block order.
+
 ### Core rule
 
 If the source item is presented as a teacher demonstration, label it as `Example`.
@@ -159,22 +161,44 @@ Include all source problems that matter for study:
 
 ### Ordering
 
-Never reorder content across source files.
+Use the repository's canonical source-block order. Do not improvise or choose a convenient order.
 
 Rules:
 
-- preserve the original source-file order from the input
+- when multiple source types are present, order blocks in this exact sequence:
+  - `Lab`
+  - `Homework`
+  - `Assignment`
+  - `Exercises`
+  - `Lecture`
+  - `Tutorial`
+  - `Chapter`
+  - `Recap`
+  - `Test`
+  - `Midterm`
+  - `Final`
+- if a source type is absent, skip it; do not invent empty blocks
+- inside each source-type block, preserve the original item order from the input
 - inside each source file, preserve the original item order
-- do not mix Lecture items into Tutorial blocks, or Lab items into Lecture blocks
-- if the input contains `Lecture`, then `Tutorial`, then `Lab`, keep that exact order from the source corpus
+- do not mix items across source-type blocks
+- do not move a `Lab` item into a `Lecture` block, or a `Lecture` item into a `Tutorial` block, etc.
+- this canonical order overrides arbitrary transcript concatenation order
 
 ### Solution policy
 
 - `Example`: include a full worked solution inside `<details>`
-- `Task`: by default, include the problem statement only
-- include a full solution for a `Task` only if the source explicitly solved it or if the local folder style clearly expects solved Tasks
+- `Task`: include a full worked solution inside `<details>`
+- never leave a `Task` as statement-only
+- never omit a `Task` solution just because it is student-facing
 
-This is important: articles should feel like a mix of teacher-worked examples and student practice, not a giant answer sheet by default.
+This is important: the final article must be fully usable for self-study, so both `Example` and `Task` must contain complete pedagogical solutions.
+
+### Example writing standard
+- apply the same writing standard to solved `Task` items as well
+- solutions must be very detailed, step-by-step, and must not skip algebraic or logical transitions that a student would need to see
+- do not give compressed "answer-key style" solutions
+- when a computation has multiple stages, structure the explanation so that each stage is explicit and motivated
+- when a substitution, theorem, identity, or transformation is used, name it and explain why it is valid
 
 ### Example/Task heading format
 
@@ -192,6 +216,30 @@ Examples:
 - `(Homework 2, Task 1)`
 - `(Chapter 3, Example 12)`
 - `(Midterm, Task 4)`
+
+### Example of format
+Strictly follow this format exactly
+```
+##### **4.29. Reversing the Order of Integration** (Chapter 3, Example 9)
+
+Calculate $I = \displaystyle\iint_R \frac{\sin x}{x}\,dA$, where $R$ is the triangle bounded by the $x$-axis, $y = x$, and $x = 1$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The integrand $(\sin x)/x$ has no elementary antiderivative with respect to $x$. Switch to integrating $y$ first (vertically simple).
+
+1.  **Describe $R$ as a vertically simple region:** For fixed $x \in [0,1]$, $y$ ranges from $0$ to $x$. So:
+    $$I = \int_0^1\int_0^x \frac{\sin x}{x}\,dy\,dx.$$
+2.  **Inner integral** (the integrand does not depend on $y$):
+    $$\int_0^x \frac{\sin x}{x}\,dy = \frac{\sin x}{x}\cdot x = \sin x.$$
+3.  **Outer integral:**
+    $$I = \int_0^1 \sin x\,dx = [-\cos x]_0^1 = -\cos 1 + 1 = 1 - \cos 1.$$
+
+**Answer:** $I = 1 - \cos 1$.
+
+</details>
+```
 
 ## 9. Naming, Numbering, and Metadata Rules
 
@@ -445,4 +493,4 @@ Use this only when the folder context does not already make the author obvious.
 
 ## 16. Non-Negotiable Principle
 
-Do not generate a generic article template. Generate one article that looks like it belongs in this exact folder, written by the same invisible editor, with the same structure, naming discipline, and source ordering as the neighboring files.
+Do not generate a generic article template. Generate one article that looks like it belongs in this exact folder, written by the same invisible editor, with the same structure, naming discipline, and source ordering as the neighboring files. Read at least 3 neighboring `.qmd` files from the same folder and infer the dominant local style.

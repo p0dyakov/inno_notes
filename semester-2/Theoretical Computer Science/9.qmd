@@ -1,0 +1,933 @@
+---
+title: "W10. Nondeterministic FSA, Regular Expressions, Turing Machines, and Computability"
+author: "Manuel Mazzara"
+date: "March 28, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Determinism vs. Nondeterminism**
+
+###### **1.1.1 Deterministic Computation**
+
+A **Deterministic Finite State Automaton (DFSA)** is the classical model in which every state-input pair maps to *exactly one* next state. Formally, a DFSA is a 5-tuple $\langle Q, \Sigma, \delta, q_0, F \rangle$ where:
+
+*   $Q$ is a finite set of **states**;
+*   $\Sigma$ is a finite **input alphabet**;
+*   $\delta : Q \times \Sigma \rightarrow Q$ is a total **transition function** — for every state and every input symbol, the next state is uniquely determined;
+*   $q_0 \in Q$ is the **initial state**;
+*   $F \subseteq Q$ is the set of **accepting states**.
+
+The transition function $\delta$ is *total*: it is defined for every pair $(q, a) \in Q \times \Sigma$. This means a DFSA never gets stuck — it always has exactly one transition to follow.
+
+###### **1.1.2 Nondeterministic Computation**
+
+**Nondeterminism** extends the deterministic model by allowing, from a single state on a single input symbol, *zero, one, or more* possible transitions. Rather than following one fixed path, a nondeterministic machine conceptually explores all branches simultaneously.
+
+A **Nondeterministic Finite State Automaton (NFSA)** (also written NDFSA) is a tuple $\langle Q, \Sigma, \delta, q_0, F \rangle$ where all components are as in a DFSA, except:
+
+$$\delta : Q \times \Sigma \rightarrow \mathbb{P}(Q)$$
+
+where $\mathbb{P}(Q)$ denotes the **power set** of $Q$ — the set of all subsets of $Q$. The transition function now returns a *set* of successor states (possibly empty, possibly containing more than one state).
+
+```{dot}
+//| fig-cap: "Deterministic (left) vs. nondeterministic (right) transitions from q₀"
+//| fig-width: 2
+//| fig-height: 3.5
+digraph comparison {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  subgraph cluster_det {
+    label="Deterministic"; style=filled; fillcolor="#f9fbfd"; color="#355c7d";
+    dq0 [label="q₀"]; dq1 [label="q₁"]; dq2 [label="q₂"];
+    dq0 -> dq1 [label="a"];
+    dq0 -> dq2 [label="b"];
+  }
+
+  subgraph cluster_nd {
+    label="Nondeterministic"; style=filled; fillcolor="#f9fbfd"; color="#355c7d";
+    nq0 [label="q₀"]; nq1 [label="q₁"]; nq2 [label="q₂"]; nq3 [label="q₃"];
+    nq0 -> nq1 [label="a"];
+    nq0 -> nq2 [label="a"];
+    nq0 -> nq3 [label="b"];
+  }
+}
+```
+
+The key intuition is that nondeterminism models **parallel exploration**: the machine simultaneously pursues every possible transition. In terms of implementation, think of it as forking a thread for each possible next state.
+
+###### **1.1.3 The Extended Transition Function $\delta^*$**
+
+For both deterministic and nondeterministic automata, we extend the transition function from single symbols to whole strings.
+
+For an NFSA $M = \langle Q, \Sigma, \delta, q_0, F \rangle$, the **extended transition function** $\delta^* : Q \times \Sigma^* \rightarrow \mathbb{P}(Q)$ is defined inductively:
+
+1.  For every $q \in Q$: $\delta^*(q, \epsilon) = \{q\}$ — reading the empty string leaves the machine in the same state.
+2.  For every $q \in Q$, $y \in \Sigma^*$, and $i \in \Sigma$:
+    $$\delta^*(q, yi) = \bigcup_{q' \in \delta^*(q, y)} \delta(q', i)$$
+    That is, after reading $y$ the machine is in some set of states; reading one more symbol $i$ applies $\delta$ to each of those states and takes the union of all resulting sets.
+
+**Example.** Suppose $\delta(q_1, a) = \{q_2, q_3\}$, $\delta(q_2, b) = \{q_4, q_5\}$, $\delta(q_3, b) = \{q_5, q_6\}$. Then:
+$$\delta^*(q_1, ab) = \delta(q_2, b) \cup \delta(q_3, b) = \{q_4, q_5\} \cup \{q_5, q_6\} = \{q_4, q_5, q_6\}$$
+
+###### **1.1.4 Acceptance Condition for an NFSA**
+
+A string $x \in \Sigma^*$ is **accepted** by an NFSA $M$ if and only if at least one of the states reachable after reading $x$ is an accepting state:
+
+$$x \in L(M) \iff \delta^*(q_0, x) \cap F \neq \emptyset$$
+
+This is called **existential nondeterminism**: it is *sufficient* that *one* computation path leads to an accepting state. If even one branch succeeds, the string is accepted.
+
+There is also a **universal interpretation** (used in different contexts): $\delta^*(q_0, x) \subseteq F$, meaning *all* reachable states must be accepting. The standard NFSA uses the existential interpretation.
+
+###### **1.1.5 NFSA with $\epsilon$-Transitions**
+
+An **$\epsilon$-NFSA** extends the NFSA by allowing transitions on the empty string $\epsilon$. The transition function becomes:
+
+$$\delta : Q \times (\Sigma \cup \{\epsilon\}) \rightarrow \mathbb{P}(Q)$$
+
+An **$\epsilon$-closure** of a state $q$ is the set of all states reachable from $q$ using only $\epsilon$-transitions (zero or more), including $q$ itself:
+
+$$\epsilon\text{-closure}(q) = \{q' \mid q \xrightarrow{\epsilon^*} q'\}$$
+
+The extended transition function for $\epsilon$-NFSAs is modified so that after reading any real symbol, the machine also follows all reachable $\epsilon$-transitions:
+
+1.  $\delta^*(q, \epsilon) = \epsilon\text{-closure}(\{q\})$
+2.  $\delta^*(q, yi) = \epsilon\text{-closure}\!\left(\bigcup_{q' \in \delta^*(q, y)} \delta(q', i)\right)$
+
+$\epsilon$-transitions are *not strictly necessary* — any $\epsilon$-NFSA can be converted to an equivalent NFSA without $\epsilon$-transitions — but they often make automata design significantly simpler (especially in Thompson's Construction for regular expressions).
+
+##### **1.2 Equivalence of DFSA and NFSA**
+
+One of the fundamental results of automata theory is that **DFSA and NFSA recognize exactly the same class of languages** — the regular languages. Nondeterminism does not add expressive power for finite automata; it only offers a convenience for design.
+
+###### **1.2.1 Subset Construction Algorithm**
+
+Given an NFSA $A_{ND} = \langle Q, \Sigma, \delta, q_0, F \rangle$, the equivalent DFSA $A_D = \langle Q_D, \Sigma, \delta_D, q_{0D}, F_D \rangle$ is constructed as follows:
+
+*   $Q_D = \mathbb{P}(Q)$ — each state of the DFSA corresponds to a *subset* of NFSA states (hence the name **subset construction** or **powerset construction**).
+*   $q_{0D} = \{q_0\}$ — the DFSA starts in the singleton set containing the NFSA's initial state.
+*   $F_D = \{S \in Q_D \mid S \cap F \neq \emptyset\}$ — a DFSA state is accepting if it contains at least one NFSA accepting state.
+*   $\delta_D(S, a) = \bigcup_{q \in S} \delta(q, a)$ for each $S \in Q_D$ and $a \in \Sigma$.
+
+**Stepwise procedure:**
+
+1.  Build the NFSA transition table.
+2.  Create a DFSA table; mark the start state as $\{q_0\}$.
+3.  For each DFSA state (which is a set of NFSA states) and each input symbol, compute $\delta_D$ by unioning the NFSA transitions from all states in the set.
+4.  Each new set computed in step 3 that has not been seen before becomes a new DFSA state; repeat step 3 for it.
+5.  Terminate when no new DFSA states are produced.
+6.  Mark all DFSA states that contain an NFSA accepting state as accepting.
+
+**Worst-case cost:** If the NFSA has $n$ states, the DFSA may need up to $2^n$ states. In practice, many subsets are unreachable and the actual number is often much smaller.
+
+###### **1.2.2 Why Use NFSA if They Add No Power?**
+
+Even though NFSAs recognize no more languages than DFSAs, they are valuable for two reasons:
+
+*   **Ease of design.** An NFSA for a pattern is often far simpler to construct. For example, the NFSA recognizing strings containing the substring $abbaab$ is a linear chain of 7 states, while the equivalent DFSA requires careful handling of every possible partial match failure.
+*   **Exponential state compression.** An NFSA with $n$ states can represent a language whose minimal DFSA requires $2^n$ states. NFSAs are therefore an important intermediate representation in compiler construction (lexical analysis) and pattern matching.
+
+##### **1.3 Regular Expressions**
+
+**Regular expressions** (RegExps) were introduced by Stephen Kleene as a compact algebraic notation for describing regular languages. They are used ubiquitously in text search, compilers, and formal verification.
+
+###### **1.3.1 Syntax and Inductive Definition**
+
+A **regular expression** over an alphabet $\Sigma$ is defined inductively:
+
+**Basis:**
+
+*   $\emptyset$ is a RegExp, denoting the **empty language** $L(\emptyset) = \emptyset$.
+*   $\epsilon$ is a RegExp, denoting $L(\epsilon) = \{\epsilon\}$ — the language containing only the empty string.
+*   Each symbol $\sigma \in \Sigma$ is a RegExp, denoting $L(\sigma) = \{\sigma\}$.
+
+**Induction.** If $r$ and $s$ are RegExps, then:
+
+*   $(r \mid s)$ is a RegExp: **union**, $L(r \mid s) = L(r) \cup L(s)$.
+*   $(r \cdot s)$ is a RegExp (dot often omitted): **concatenation**, $L(r \cdot s) = \{uv \mid u \in L(r),\, v \in L(s)\}$.
+*   $r^*$ is a RegExp: **Kleene star**, $L(r^*) = \{x_1 x_2 \cdots x_k \mid k \geq 0,\, x_i \in L(r)\}$.
+
+The additional notation $r^+ = r \cdot r^*$ denotes one or more repetitions: $L(r^+) = \{x_1 \cdots x_k \mid k \geq 1,\, x_i \in L(r)\}$.
+
+###### **1.3.2 Operator Precedence**
+
+When parentheses are omitted, operations are evaluated in this order (highest to lowest priority):
+
+1.  ${}^*$ (Kleene star)
+2.  $\cdot$ (concatenation)
+3.  $\mid$ (union)
+
+So $\epsilon \mid a^* \cdot b$ is parsed as $\epsilon \mid ((a)^* \cdot b)$, which denotes $\{\epsilon\} \cup \{a^n b \mid n \geq 0\}$.
+
+###### **1.3.3 Examples**
+
+*   $0 \mid 1 = \{0, 1\}$
+*   $\epsilon \mid a = \{\epsilon, a\}$
+*   $0 \cdot 1 = \{01\}$
+*   $(0 \mid 1) \cdot (\epsilon \mid 0) = \{0, 1, 00, 10\}$
+*   $\{0, 1\}^* =$ any string over $\{0, 1\}$
+*   $\{00, 11\}^* = \{\epsilon, 00, 11, 0000, 0011, 1100, 1111, \ldots\}$
+*   $(0 \cdot (0 \mid 1)^*) \mid ((0 \mid 1)^* \cdot 0)$ = strings over $\{0,1\}$ that start *or* end with 0.
+
+##### **1.4 Thompson's Construction: RegExp to NFSA**
+
+**Thompson's Construction** is an algorithm that systematically converts any regular expression into an $\epsilon$-NFSA. Each structural component of the RegExp maps to a small, standard NFA fragment.
+
+###### **1.4.1 Base Cases**
+
+For a single symbol $x \in \Sigma \cup \{\epsilon\}$: create two states $q$ (start) and $f$ (accepting) with a single transition $q \xrightarrow{x} f$.
+
+###### **1.4.2 Concatenation: $s \cdot t$**
+
+Connect the accepting state of $N(s)$ to the start state of $N(t)$ via an $\epsilon$-transition. The overall machine starts at the start of $N(s)$ and accepts at the accepting state of $N(t)$.
+
+###### **1.4.3 Union: $s \mid t$**
+
+Create a new start state $q$ and a new accepting state $f$. Add $\epsilon$-transitions $q \xrightarrow{\epsilon} q_s$ and $q \xrightarrow{\epsilon} q_t$ (to the starts of $N(s)$ and $N(t)$), and $f_s \xrightarrow{\epsilon} f$ and $f_t \xrightarrow{\epsilon} f$ (from their accepting states).
+
+###### **1.4.4 Kleene Star: $s^*$**
+
+Create a new start state $q$ and a new accepting state $f$. Add:
+
+*   $q \xrightarrow{\epsilon} q_s$ (enter the inner machine),
+*   $q \xrightarrow{\epsilon} f$ (bypass, for zero repetitions),
+*   $f_s \xrightarrow{\epsilon} q_s$ (loop back for additional repetitions),
+*   $f_s \xrightarrow{\epsilon} f$ (exit).
+
+###### **1.4.5 $\epsilon$-Elimination (Simplification)**
+
+After Thompson's Construction, the resulting NFSA often contains redundant $\epsilon$-transitions. These can be eliminated: if a state $q$ has only an $\epsilon$-transition to $q'$, and $q$ is otherwise unremarkable, it can often be merged with $q'$. This produces a smaller, cleaner NFSA without affecting the recognized language.
+
+##### **1.5 Historical Background of Turing Machines**
+
+The Turing Machine emerged from a profound philosophical and mathematical crisis in the early 20th century.
+
+###### **1.5.1 Principia Mathematica and Logicism**
+
+In 1910–1913, Bertrand Russell and Alfred North Whitehead published the *Principia Mathematica* — a monumental 2,000-page attempt to **axiomatize all of mathematics** from pure logical principles. The project embodied **logicism**: the philosophical thesis that mathematical truths are reducible to, and derivable from, pure logic. The authors claimed their system was both *complete* (every mathematical truth could be derived) and *consistent* (no falsehood could be derived).
+
+###### **1.5.2 Gödel's Incompleteness Theorems (1931)**
+
+Kurt Gödel shattered the logicist program. In 1931, he proved his **Incompleteness Theorems**: in any sufficiently powerful logical system, there exist statements that are *true* but *cannot be proven* within the system. No consistent formal system powerful enough to describe arithmetic can prove all arithmetic truths. Gödel's result showed that the goals of *Principia Mathematica* were unachievable: completeness and consistency cannot coexist for sufficiently rich systems.
+
+###### **1.5.3 Hilbert's Entscheidungsproblem (1928)**
+
+David Hilbert, also committed to the formalization of mathematics, posed the *Entscheidungsproblem* (German: *decision problem*) in 1928: is there an **algorithm** that, given any mathematical proposition and a set of axioms, decides whether that proposition is provable from the axioms? Hilbert called it *"the fundamental problem of mathematical logic"* — an affirmative answer would reduce all of mathematics to mechanical calculation.
+
+###### **1.5.4 Church and Turing's Negative Answer (1936)**
+
+In 1936, independently, **Alonzo Church** (using $\lambda$-calculus) and **Alan Turing** (using his machine model) proved that **no such general algorithm exists** — the Entscheidungsproblem has a negative answer. To give a rigorous proof of this impossibility, Turing had to first define precisely what an *algorithm* is. His answer was the **Turing Machine**.
+
+Turing's key insight was to model the mechanical process of following rules: a human mathematician, he argued, is essentially a machine that reads symbols, maintains a finite amount of state, and applies rules. By formalizing this as a mathematical object, he could then prove precise limitations.
+
+###### **1.5.5 The Church–Turing Thesis**
+
+The **Church–Turing thesis** (not a theorem, but a widely accepted conjecture) states that:
+
+> Any computation that can be carried out by *any* realizable physical process can be computed by a Turing Machine (equivalently, expressed in $\lambda$-calculus).
+
+This thesis equates the informal notion of "effectively computable" with the formal notion of "Turing-computable." It is the foundation of modern computability theory.
+
+###### **1.5.6 Turing's Philosophical Contribution**
+
+Before Turing, the prevailing view was **idealist**: through pure mathematical reasoning, the human mind accesses a Platonic realm of eternal truths. After Turing, the view became **materialist**: the Turing Machine is a model of the human mathematician. The limits of the machine are the limits of mathematical reasoning. Mathematics is grounded in what the physical world allows — not in a transcendent Platonic domain. Turing's work marked a fundamental **epistemological break** in the philosophy of mathematics.
+
+##### **1.6 Turing Machines: Architecture and Formal Definition**
+
+###### **1.6.1 Components of a Turing Machine**
+
+A **Turing Machine (TM)** consists of:
+
+*   An **input tape**: a read-only, one-directional sequence of cells containing the input string, followed by blank cells.
+*   A **control device** (finite state control): maintains the current state $q$ and specifies transitions.
+*   **Memory tapes** ($k \geq 0$ tapes): read/write tapes with a movable head; each cell holds a symbol from the memory alphabet $\Gamma$. The memory tapes are **non-destructive** — writing to a cell does not erase other cells.
+*   An **output tape**: a write-only tape.
+
+The key distinction from a PDA is memory persistence: the TM can re-read previously written memory symbols, whereas a PDA's stack destroys symbols on pop.
+
+###### **1.6.2 Formal Definition**
+
+A TM with $k$ memory tapes is a 7-tuple $T = \langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$ where:
+
+*   $Q$: finite set of **states**;
+*   $I$: **input alphabet** (symbols on the input tape);
+*   $\Gamma$: **memory alphabet** (symbols writable on memory tapes; $\Gamma$ and $I$ may differ);
+*   $\delta$: **transition function**;
+*   $q_0 \in Q$: **initial state**;
+*   $Z_0 \in \Gamma$: **initial memory symbol** (initially fills each memory tape — analogous to the bottom-of-stack marker);
+*   $F \subseteq Q$: set of **accepting states**.
+
+###### **1.6.3 The Transition Function**
+
+$$\delta : (Q \setminus F) \times (I \cup \{\_\}) \times (\Gamma \cup \{\_\})^k \;\rightarrow\; Q \times (\Gamma \cup \{\_\})^k \times \{R, L, S\}^{k+1}$$
+
+Reading this left to right:
+
+*   **Domain**: The machine is in a non-accepting state, has read one symbol from the input tape, and one symbol from each of the $k$ memory tapes.
+*   **Codomain**: The machine transitions to a new state, writes a new symbol on each memory tape, and moves each of the $k+1$ heads (one input head plus $k$ memory heads).
+
+The three **head movement directions** are:
+
+*   $R$ — move right
+*   $L$ — move left
+*   $S$ — stay in place
+
+A transition is depicted graphically as an edge $q \to q'$ labeled:
+$$i,\; \langle A_1, \ldots, A_k \rangle \;\Big|\; \langle A'_1, \ldots, A'_k \rangle,\; \langle M_0, M_1, \ldots, M_k \rangle$$
+where $i$ is the input symbol read, $A_j$ is the symbol read from memory tape $j$, $A'_j$ is the symbol written to memory tape $j$, $M_0$ is the direction of the input head, and $M_j$ is the direction of memory head $j$.
+
+##### **1.7 Turing Machine Examples**
+
+###### **1.7.1 Recognizing $a^n b^n c^n$**
+
+The language $L = \{a^n b^n c^n \mid n > 0\}$ cannot be recognized by any PDA (the stack is destructive; once it counts the $a$'s to match the $b$'s, those counts are gone and cannot be used to verify the $c$'s). A TM handles it using a memory tape:
+
+1.  Read each $a$ from the input and write an $M$ on the memory tape (store $n$ markers).
+2.  When all $a$'s are read, move left on the memory tape and start reading $b$'s. For each $b$, consume one $M$ from memory (move left).
+3.  When we've consumed all $n$ $M$'s (reached $Z_0$) and the input shows a $c$, move right on the memory tape and start reading $c$'s, consuming one $M$ per $c$.
+4.  Accept when both the input and the memory tape are fully consumed simultaneously.
+
+This works because the memory tape is **persistent** — the $M$ markers remain until explicitly moved past, so the count of $a$'s is available for verifying both $b$'s and $c$'s.
+
+###### **1.7.2 Recognizing $a^n b^{2n} a^n$**
+
+For $L = \{a^n b^{2n} a^n \mid n \geq 1\}$:
+
+1.  For each $a$ read, write *two* $A$'s on the memory tape (so the tape holds $2n$ $A$'s total).
+2.  Read $b$'s from the input while consuming $A$'s leftward on the memory tape (one $A$ per $b$), verifying $2n$ $b$'s.
+3.  Read the final $n$ $a$'s while consuming $A$'s rightward on the memory tape (consuming the tape a second time for the trailing $a$'s).
+4.  Accept when both tapes are exhausted simultaneously.
+
+###### **1.7.3 Recognizing $a^n b^n \cup a^n b^{2n}$**
+
+The TM stores $n$ $A$'s, then counts the first $n$ $b$'s. At that point it either (a) finds the end of input and accepts (the $a^n b^n$ case), or (b) finds more $b$'s and re-traverses the memory tape to count $n$ more (the $a^n b^{2n}$ case), then accepts when both input and memory are exhausted.
+
+##### **1.8 Variants of Turing Machines and Their Equivalence**
+
+###### **1.8.1 Single-Tape TM**
+
+A **single-tape TM** uses one tape for input, memory, and output. The tape is unbounded in both directions. Despite this apparent restriction, the single-tape TM is **equivalent in expressive power** to the multi-tape TM: any multi-tape TM can be simulated by a single-tape TM. The simulation encodes all tapes onto one tape using separator markers, and tracks all head positions. This may incur a polynomial or quadratic slowdown but does not change what can be computed.
+
+###### **1.8.2 Multidimensional-Tape TM**
+
+A **2D-tape TM** (or $d$-dimensional TM) uses a grid rather than a line as its tape, with a head that can move in up to $2d$ directions. Again, all such models are equivalent to the standard TM.
+
+###### **1.8.3 Universal Equivalence**
+
+All reasonable TM variants (single tape, multi-tape, multi-dimensional, non-deterministic TM, etc.) recognize exactly the same class of languages — the **recursively enumerable languages**. This robustness is evidence that the TM captures the right notion of computation, as stated by the Church–Turing thesis.
+
+##### **1.9 Closure Properties of Turing Machines**
+
+The class of **recursively enumerable languages** (languages recognized by TMs) is closed under:
+
+*   **Union**: Given TMs $M_1$ and $M_2$, build a TM that simulates both in parallel; accept if either accepts.
+*   **Intersection**: Simulate both in series; accept only if both accept.
+*   **Concatenation**: Nondeterministically guess a split point; run $M_1$ on the first part and $M_2$ on the second.
+*   **Kleene star**: Nondeterministically guess decompositions; verify each part.
+
+The intuition for union and intersection is that a TM can easily simulate two other TMs in series or in parallel.
+
+**Not closed under complement.** TMs are *not* closed under complement. The reason is that a TM that does not accept a string may either *reject* it (halt in a non-accepting state) or *loop forever*. Swapping accepting and non-accepting halting states works for loop-free TMs, but cannot handle non-terminating computations.
+
+**Loop-free TMs are closed under complement:** For TMs that are guaranteed to halt on all inputs (called *recursive* or *decidable*), swapping accepting and rejecting states produces a TM for the complemented language. This is the class of **recursive languages** (a strict subset of the recursively enumerable languages).
+
+##### **1.10 The Language Hierarchy**
+
+The following diagram summarizes the Chomsky hierarchy as discussed throughout the course:
+
+```{dot}
+//| fig-cap: "The full language hierarchy (Chomsky) with corresponding machine models"
+//| fig-width: 8
+//| fig-height: 6
+digraph hierarchy {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=ellipse, style=filled, color="#355c7d", penwidth=1.1];
+  edge [style=invis];
+
+  nre  [label="Non-Turing-recognizable\n(no machine model)", fillcolor="#f9d9e2", width=6.0, height=1.1];
+  re   [label="Recursively Enumerable — TM\n(aⁿbⁿcⁿ, aⁿb²ⁿ ∪ aⁿbⁿ)", fillcolor="#fff3cd", width=5.2, height=1.1];
+  rec  [label="Recursive (Decidable) — halting TM", fillcolor="#eef3f7", width=4.4, height=0.95];
+  cfl  [label="Context-Free — Nondeterministic PDA\n(aⁿbⁿ)", fillcolor="#d6eef5", width=3.6, height=0.95];
+  dcfl [label="Deterministic CFL — DPDA", fillcolor="#d7f0c2", width=2.8, height=0.8];
+  reg  [label="Regular — FSA, RegExp", fillcolor="#e8f4f8", width=2.2, height=0.7];
+
+  nre -> re -> rec -> cfl -> dcfl -> reg;
+}
+```
+
+Key observations:
+
+*   **Regular languages** (recognized by FSA): only fixed, finite memory — no generic counting to $n$.
+*   **Deterministic CFL** (recognized by DPDA): stack memory, but restricted to deterministic transitions.
+*   **Context-free languages** (recognized by nondeterministic PDA): stack is destructive; cannot count multiple independent quantities simultaneously.
+*   **Recursive (Decidable) languages**: TMs that always halt; closed under complement.
+*   **Recursively enumerable languages**: TMs that may loop; not closed under complement.
+*   **Non-Turing-recognizable**: languages that no TM can recognize.
+
+The difference between recursive and recursively enumerable languages can be illustrated with C programs:
+
+*   The set of C programs that *never* run into an infinite loop (on any input) is **recursive**.
+*   The set of C programs that *contain* an infinite loop (on at least one input) is **recursively enumerable** but not recursive — this is related to the **Halting Problem**.
+
+##### **1.11 The Memory Model Perspective**
+
+The choice of memory model determines the expressive power of a computational model:
+
+*   **FSA — fixed, finite memory**: the current state is the only memory. You can only "count" up to the finite number of states. No generic variable $n$.
+*   **PDA — extensible but destructive memory (stack)**: can count to a variable $n$, but once a symbol is popped from the stack, it is gone. Cannot simultaneously verify two independent counting constraints.
+*   **TM — persistent memory (tape)**: symbols written to the tape remain and can be re-read. Behaves like the **von Neumann architecture** (random-access, persistent memory). Can handle any computable language.
+
+##### **1.12 Countability and Undecidability (Spoilers)**
+
+An important meta-result motivates why undecidable problems exist:
+
+*   The set of all **programs** (over any fixed programming language) is **countably infinite** — programs can be listed lexicographically.
+*   The set of all **problems** (functions $\mathbb{N} \to \mathbb{N}$, or equivalently subsets of $\mathbb{N}$) is **uncountably infinite** (by Cantor's diagonal argument).
+
+Therefore, there are infinitely more problems than programs. Most problems — in a set-theoretic sense — have no algorithm. However, naturally occurring, well-structured problems are often decidable. The most famous undecidable problem is the **Halting Problem**: given a program $P$ and an input $x$, does $P$ halt on $x$? Turing proved no TM can decide this for all $(P, x)$.
+
+---
+
+#### **2. Definitions**
+
+*   **DFSA (Deterministic Finite State Automaton)**: A 5-tuple $\langle Q, \Sigma, \delta, q_0, F \rangle$ with a total transition function $\delta : Q \times \Sigma \to Q$; each state-input pair leads to exactly one next state.
+*   **NFSA (Nondeterministic Finite State Automaton)**: A 5-tuple $\langle Q, \Sigma, \delta, q_0, F \rangle$ with $\delta : Q \times \Sigma \to \mathbb{P}(Q)$; each state-input pair may lead to zero, one, or many next states.
+*   **$\epsilon$-NFSA**: An NFSA whose transition function also allows $\epsilon$-transitions: $\delta : Q \times (\Sigma \cup \{\epsilon\}) \to \mathbb{P}(Q)$.
+*   **$\epsilon$-closure**: For a state $q$, $\epsilon\text{-closure}(q)$ is the set of all states reachable from $q$ via $\epsilon$-transitions alone (including $q$ itself).
+*   **Extended transition function $\delta^*$**: For an NFSA, $\delta^* : Q \times \Sigma^* \to \mathbb{P}(Q)$ is the inductive extension of $\delta$ to strings; $\delta^*(q, \epsilon) = \{q\}$ and $\delta^*(q, yi) = \bigcup_{q' \in \delta^*(q, y)} \delta(q', i)$.
+*   **Acceptance (NFSA)**: A string $x$ is accepted iff $\delta^*(q_0, x) \cap F \neq \emptyset$ (existential nondeterminism).
+*   **Power set $\mathbb{P}(Q)$**: The set of all subsets of $Q$, including $\emptyset$ and $Q$ itself.
+*   **Subset construction**: Algorithm converting an NFSA to a DFSA by treating sets of NFSA states as individual DFSA states; yields $Q_D = \mathbb{P}(Q)$ in the worst case.
+*   **Regular expression (RegExp)**: A formula built from $\emptyset$, $\epsilon$, alphabet symbols, union ($r \mid s$), concatenation ($r \cdot s$), and Kleene star ($r^*$); denotes a regular language.
+*   **Kleene star ($r^*$)**: The set of all strings formed by concatenating zero or more strings from $L(r)$.
+*   **Thompson's Construction**: Algorithm converting a RegExp to an $\epsilon$-NFSA by structural induction on the RegExp.
+*   **Logicism**: A philosophy of mathematics holding that mathematical truths are derivable from pure logical principles (*Principia Mathematica*).
+*   **Gödel's Incompleteness Theorem**: In any sufficiently powerful consistent formal system, there exist true statements that are unprovable within the system (1931).
+*   **Entscheidungsproblem**: Hilbert's 1928 question asking for an algorithm to decide whether any mathematical proposition is provable from given axioms.
+*   **Church–Turing thesis**: The conjecture that any effectively computable function is computable by a Turing Machine.
+*   **Turing Machine (TM)**: A 7-tuple $\langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$ consisting of states, input alphabet, memory alphabet, transition function, initial state, initial memory symbol, and accepting states; uses persistent read/write memory tapes.
+*   **Recursively enumerable language**: A language recognized by some TM (the TM may loop on rejected inputs).
+*   **Recursive (decidable) language**: A language recognized by a TM that halts on all inputs; closed under complement.
+*   **Halting Problem**: The problem of deciding, given a program $P$ and input $x$, whether $P$ halts on $x$; proven undecidable by Turing.
+*   **Existential nondeterminism**: Acceptance criterion requiring that *at least one* computation path accepts.
+*   **Universal nondeterminism**: Acceptance criterion requiring that *all* computation paths accept.
+
+---
+
+#### **3. Formulas**
+
+*   **DFSA transition function**: $\delta : Q \times \Sigma \rightarrow Q$
+*   **NFSA transition function**: $\delta : Q \times \Sigma \rightarrow \mathbb{P}(Q)$
+*   **$\epsilon$-NFSA transition function**: $\delta : Q \times (\Sigma \cup \{\epsilon\}) \rightarrow \mathbb{P}(Q)$
+*   **Extended transition (NFSA, base)**: $\delta^*(q, \epsilon) = \{q\}$
+*   **Extended transition (NFSA, step)**: $\delta^*(q, yi) = \displaystyle\bigcup_{q' \in \delta^*(q,\,y)} \delta(q', i)$
+*   **NFSA acceptance**: $x \in L(M) \iff \delta^*(q_0, x) \cap F \neq \emptyset$
+*   **Subset construction — DFSA transition**: $\delta_D(S, a) = \displaystyle\bigcup_{q \in S} \delta(q, a)$
+*   **Subset construction — accepting states**: $F_D = \{S \in \mathbb{P}(Q) \mid S \cap F \neq \emptyset\}$
+*   **TM transition function ($k$ tapes)**: $\delta : (Q \setminus F) \times (I \cup \{\_\}) \times (\Gamma \cup \{\_\})^k \rightarrow Q \times (\Gamma \cup \{\_\})^k \times \{R, L, S\}^{k+1}$
+
+---
+
+#### **4. Examples**
+##### **4.1. Build NFSAs for Three Languages** (Lab 8, Task 1)
+
+Build NFSAs that recognize the following languages:
+
+(a) $L_a = \{x \in \{0, 1\}^* \mid x \text{ ends with } 101\}$
+
+(b) $L_b = \{xy \mid x \in \{a\}^* \land y \in \{a, b\}^* \land y \text{ does not start with } b \land \text{every } a \text{ in } y \text{ is followed by exactly one } b\}$
+
+(c) $L_c = \{x \in \{a, b, c\}^* \mid x \text{ ends with } ab,\; bc, \text{ or } ca\}$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) $L_a$: strings ending with $101$.**
+
+Use the standard suffix-guessing pattern: the NFSA "guesses" the start of the final $101$ and then verifies it deterministically.
+
+*   $q_0$: start state, self-loop on $0, 1$; transition to $q_1$ on $1$ (guess: the final $101$ starts here).
+*   $q_1$: transition to $q_2$ on $0$.
+*   $q_2$: transition to $q_3$ on $1$.
+*   $q_3$: accepting state (no outgoing transitions needed).
+
+**(b) $L_b$: strings of the form $a^* \cdot y$ where $y$ does not start with $b$ and every $a$ in $y$ is followed by exactly one $b$.**
+
+The language consists of a (possibly empty) block of $a$'s, followed by a pattern where each $a$ is paired with exactly one $b$ (and no leading $b$).
+
+*   $q_0$ (accepting): self-loop on $a$; transition to $q_1$ on $a$ (enter the $y$ part where $a$ must be followed by $b$).
+*   $q_1$: transition to $q_2$ (accepting) on $b$.
+*   $q_2$ (accepting): transition to $q_1$ on $a$ (each new $a$ in $y$ must be followed by a $b$).
+
+**(c) $L_c$: strings ending with $ab$, $bc$, or $ca$.**
+
+Three parallel suffix-detector branches, each two steps long:
+
+*   $q_0$: self-loop on $a, b, c$; transitions to $q_1$ on $a$, to $q_2$ on $b$, to $q_3$ on $c$.
+*   $q_1$: transition to $q_4$ (accepting) on $b$ (detected $ab$).
+*   $q_2$: transition to $q_4$ (accepting) on $c$ (detected $bc$).
+*   $q_3$: transition to $q_4$ (accepting) on $a$ (detected $ca$).
+*   $q_4$: single shared accepting state.
+
+**Answer:** Three simple NFSA designs using the suffix-guessing pattern.
+
+</details>
+
+##### **4.2. Convert NFSA to DFSA: Language Ending in 101** (Lab 8, Task 2)
+
+The NFSA for $L_1 = \{x \in \{0, 1\}^* \mid x \text{ ends with } 101\}$ has four states: start state $q_0$ with a self-loop on $0, 1$; transitions $q_0 \xrightarrow{1} q_1 \xrightarrow{0} q_2 \xrightarrow{1} q_3$ (accepting).
+
+Apply the subset construction algorithm to produce the equivalent DFSA. Write out the full DFSA transition table and identify all accepting states.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**NFSA transition table:**
+
+| $q$ | $\delta(q, 0)$ | $\delta(q, 1)$ |
+|:----|:--------------|:--------------|
+| $\rightarrow q_0$ | $\{q_0\}$ | $\{q_0, q_1\}$ |
+| $q_1$ | $\{q_2\}$ | $\emptyset$ |
+| $q_2$ | $\emptyset$ | $\{q_3\}$ |
+| $*q_3$ | $\emptyset$ | $\emptyset$ |
+
+**Subset construction:**
+
+Start: $D_0 = \{q_0\}$.
+
+| DFSA state | on $0$ | on $1$ |
+|:-----------|:-------|:-------|
+| $\rightarrow \{q_0\}$ | $\{q_0\}$ | $\{q_0, q_1\}$ |
+| $\{q_0, q_1\}$ | $\{q_0, q_2\}$ | $\{q_0, q_1\}$ |
+| $\{q_0, q_2\}$ | $\{q_0\}$ | $\{q_0, q_1, q_3\}$ |
+| $*\{q_0, q_1, q_3\}$ | $\{q_0, q_2\}$ | $\{q_0, q_1\}$ |
+
+The DFSA has 4 states. The only accepting state is $\{q_0, q_1, q_3\}$ (contains $q_3 \in F$).
+
+**Verification:** Starting from $\{q_0\}$, reading $101$:
+$\{q_0\} \xrightarrow{1} \{q_0,q_1\} \xrightarrow{0} \{q_0,q_2\} \xrightarrow{1} \{q_0,q_1,q_3\}$ ✓ (accepting).
+
+**Answer:** 4-state DFSA with accepting state $\{q_0, q_1, q_3\}$.
+
+</details>
+
+##### **4.3. Convert NFSA to DFSA: Constrained Language over $\{a, b\}$** (Lab 8, Task 3)
+
+The NFSA for $L_2$ has three states: $q_0$ (accepting) with a self-loop on $a$ and a transition to $q_1$ on $a$; $q_1$ transitions to $q_2$ (accepting) on $b$; $q_2$ transitions back to $q_1$ on $a$.
+
+Apply subset construction to this NFSA and produce the equivalent DFSA.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**NFSA transition table** (accepting states: $q_0, q_2$):
+
+| $q$ | $\delta(q, a)$ | $\delta(q, b)$ |
+|:----|:--------------|:--------------|
+| $*q_0$ | $\{q_0, q_1\}$ | $\emptyset$ |
+| $q_1$ | $\emptyset$ | $\{q_2\}$ |
+| $*q_2$ | $\{q_1\}$ | $\emptyset$ |
+
+**Subset construction:**
+
+Start: $\{q_0\}$ (accepting, since $q_0 \in F$).
+
+| DFSA state | on $a$ | on $b$ |
+|:-----------|:-------|:-------|
+| $*\{q_0\}$ | $\{q_0, q_1\}$ | $\emptyset$ |
+| $*\{q_0, q_1\}$ | $\{q_0, q_1\}$ | $\{q_2\}$ |
+| $\emptyset$ | $\emptyset$ | $\emptyset$ |
+| $*\{q_2\}$ | $\{q_1\}$ | $\emptyset$ |
+| $\{q_1\}$ | $\emptyset$ | $\{q_2\}$ |
+
+Accepting DFSA states: $\{q_0\}$, $\{q_0, q_1\}$, $\{q_2\}$ (each contains at least one of $q_0, q_2$).
+
+**Answer:** 5-state DFSA. The sink state $\emptyset$ handles rejected prefixes (e.g., strings starting with $b$).
+
+</details>
+
+##### **4.4. Convert NFSA to DFSA: Strings Ending in $ab$, $bc$, or $ca$** (Lab 8, Task 4)
+
+The NFSA for $L_3 = \{x \in \{a, b, c\}^* \mid x \text{ ends with } ab,\; bc, \text{ or } ca\}$ is the one from Task 4.5(c). Apply subset construction and produce the full DFSA transition table.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**NFSA** (from Task 4.5(c)): $Q = \{q_0, q_1, q_2, q_3, q_4\}$, accepting: $\{q_4\}$.
+
+| $q$ | $\delta(q, a)$ | $\delta(q, b)$ | $\delta(q, c)$ |
+|:----|:--------------|:--------------|:--------------|
+| $\rightarrow q_0$ | $\{q_0, q_1\}$ | $\{q_0, q_2\}$ | $\{q_0, q_3\}$ |
+| $q_1$ | $\emptyset$ | $\{q_4\}$ | $\emptyset$ |
+| $q_2$ | $\emptyset$ | $\emptyset$ | $\{q_4\}$ |
+| $q_3$ | $\{q_4\}$ | $\emptyset$ | $\emptyset$ |
+| $*q_4$ | $\emptyset$ | $\emptyset$ | $\emptyset$ |
+
+**Subset construction** (reachable states only):
+
+Start: $\{q_0\}$.
+
+| DFSA state | on $a$ | on $b$ | on $c$ |
+|:-----------|:-------|:-------|:-------|
+| $\rightarrow\{q_0\}$ | $\{q_0,q_1\}$ | $\{q_0,q_2\}$ | $\{q_0,q_3\}$ |
+| $\{q_0,q_1\}$ | $\{q_0,q_1\}$ | $\{q_0,q_2,q_4\}$ | $\{q_0,q_3\}$ |
+| $\{q_0,q_2\}$ | $\{q_0,q_1\}$ | $\{q_0,q_2\}$ | $\{q_0,q_3,q_4\}$ |
+| $\{q_0,q_3\}$ | $\{q_0,q_1,q_4\}$ | $\{q_0,q_2\}$ | $\{q_0,q_3\}$ |
+| $*\{q_0,q_2,q_4\}$ | $\{q_0,q_1\}$ | $\{q_0,q_2\}$ | $\{q_0,q_3,q_4\}$ |
+| $*\{q_0,q_3,q_4\}$ | $\{q_0,q_1,q_4\}$ | $\{q_0,q_2\}$ | $\{q_0,q_3\}$ |
+| $*\{q_0,q_1,q_4\}$ | $\{q_0,q_1\}$ | $\{q_0,q_2,q_4\}$ | $\{q_0,q_3\}$ |
+
+Accepting DFSA states: those containing $q_4$.
+
+**Answer:** 7-state DFSA. Accepting states are $\{q_0,q_2,q_4\}$, $\{q_0,q_3,q_4\}$, and $\{q_0,q_1,q_4\}$.
+
+</details>
+
+##### **4.5. Describe Languages of Regular Expressions** (Lab 8, Task 5)
+
+Over $\Sigma = \{0, 1\}$, give a concise English description of each language:
+
+1.  $\emptyset$
+2.  $\emptyset^*$
+3.  $(0^* 1^*)^* 000 (0 \mid 1)^*$
+4.  $(1 \mid \epsilon)(00^* 1)^* 0^*$
+
+<details>
+<summary>Click to see the solution</summary>
+
+1.  $\emptyset$: **The empty language** — no string is accepted, not even the empty string.
+2.  $\emptyset^*$: **The language containing only the empty string** $\{\epsilon\}$. The Kleene star of the empty set allows zero repetitions of nothing, producing exactly $\epsilon$.
+3.  $(0^* 1^*)^* 000 (0 \mid 1)^*$: **All binary strings that contain the substring $000$**. The prefix $(0^*1^*)^*$ matches any binary string (it generates $\{0,1\}^*$); then $000$ requires a block of three zeros; then $(0 \mid 1)^*$ allows any suffix. So the language is $\{x \in \{0,1\}^* \mid x \text{ contains } 000 \text{ as a substring}\}$.
+4.  $(1 \mid \epsilon)(00^* 1)^* 0^*$: Strings in which every $1$ is immediately preceded by at least one $0$ (no leading $1$ without a preceding $0$, except the optional leading single $1$ covered by the $1 \mid \epsilon$ choice). More precisely: an optional leading $1$, followed by zero or more blocks of the form $00^*1$ (one or more zeros then a one), followed by zero or more trailing zeros. This is the set of **binary strings in which $1$ never appears without a preceding $0$, except possibly the very first character**.
+
+**Answer:** (1) empty language; (2) $\{\epsilon\}$; (3) strings containing $000$; (4) strings where every $1$ (except possibly the first character) is preceded by at least one $0$.
+
+</details>
+
+##### **4.6. Build Regular Expressions over $\{a, b\}$** (Lab 8, Task 6)
+
+Construct regular expressions over $\Sigma = \{a, b\}$ for:
+
+5.  The set of strings consisting of alternating $a$'s and $b$'s.
+6.  The set of strings containing an odd number of $a$'s.
+7.  The set of strings ending with $b$ and not containing the substring $aa$.
+8.  The set of strings in which both the number of $a$'s and the number of $b$'s are even.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**5. Alternating $a$'s and $b$'s.**
+
+Alternating strings start with either $a$ or $b$ and strictly alternate. This gives four possible shapes: $\epsilon$, $a$, $b$, and the infinite families starting with $a$ or $b$:
+
+$$(\epsilon \mid a)(ba)^* (\epsilon \mid b)$$
+
+Expanded: the string is either empty, or starts with an optional $a$, then zero or more $ba$ pairs, then an optional trailing $b$. This generates all alternating strings: $\epsilon, a, b, ab, ba, aba, bab, abab, baba, \ldots$
+
+**6. Odd number of $a$'s.**
+
+Track parity of $a$'s. Strings of $b$'s interspersed with $a$'s. After an even number of $a$'s we need one more $a$, then possibly more even-count additions:
+
+$$b^* (a b^* a b^*)^* a b^*$$
+
+This reads as: any number of $b$'s, then zero or more pairs of $a$'s (each pair maintaining even count) interleaved with $b$'s, then exactly one $a$ (making the total odd), then trailing $b$'s.
+
+**7. Strings ending with $b$, not containing $aa$.**
+
+Since $aa$ is forbidden, any $a$ must be immediately followed by $b$ (or be the last character, but the string must end in $b$, so every $a$ must be followed by $b$). The pattern is: blocks of $b$'s, interleaved with single $a$'s each immediately followed by $b$:
+
+$$(b \mid ab)^*$$
+
+This generates all strings over $\{a, b\}$ where every $a$ is immediately followed by $b$. All such strings end in $b$ (since the last character comes from $b$ or $ab$, both ending in $b$) and contain no $aa$.
+
+**8. Even number of $a$'s and even number of $b$'s.**
+
+We need to track parity of both $a$-count and $b$-count. Think of the four states: (even-$a$, even-$b$), (odd-$a$, even-$b$), (even-$a$, odd-$b$), (odd-$a$, odd-$b$). We want strings that start and end in state (even, even).
+
+The regular expression is:
+
+$$(aa \mid bb \mid (ab \mid ba)(aa \mid bb)^*(ab \mid ba))^*$$
+
+Interpretation: we build the string from blocks that preserve even parity on both counts. Each block is either $aa$ (adds 2 to $a$-count), $bb$ (adds 2 to $b$-count), or a pair of "cross" moves $(ab \mid ba)$ separated by optional even-blocks — which together contribute 1+1 to each count, keeping both parities even overall.
+
+**Answer:** (5) $(\epsilon \mid a)(ba)^*(\epsilon \mid b)$; (6) $b^*(ab^*ab^*)^*ab^*$; (7) $(b \mid ab)^*$; (8) $(aa \mid bb \mid (ab \mid ba)(aa \mid bb)^*(ab \mid ba))^*$.
+
+</details>
+
+##### **4.7. Construct NFSAs for Homework Languages** (Lab 8, Task 7)
+
+Construct NFSAs over $\Sigma_1 = \{a, b\}$ and $\Sigma_2 = \{0, 1\}$ for each language below, then convert each to a DFSA.
+
+1.  $L_0 = \{x \in \Sigma_2^* \mid \text{any } 0 \text{ in } x \text{ is followed by at least one } 1\}$. Example strings: $010111$, $1111$, $01110111011$.
+2.  $L_1 = \{x \in \Sigma_1^* \mid x \text{ contains the substring } abbaab\}$
+3.  $L_2 = \{x \in \Sigma_1^* \mid |x| \geq 2 \land \text{the final two symbols of } x \text{ are the same}\}$
+4.  $L_3 = \{x \in \Sigma_2^* \mid x \text{ contains exactly 5 zeros}\}$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**$L_0$: any $0$ is followed by at least one $1$.**
+
+*NFSA.* We need to reject strings where a $0$ appears at the very end or is followed immediately by another $0$ without an intervening $1$.
+
+*   $q_0$ (accepting, start): self-loop on $1$; transition to $q_1$ on $0$.
+*   $q_1$: transition to $q_0$ on $1$ (the required $1$ after the $0$); transition to $q_2$ (dead/rejecting) on $0$ (a $0$ immediately following another $0$ with no intervening $1$).
+*   $q_2$ (dead): self-loop on $0, 1$.
+
+*DFSA conversion.* The NFSA is already nearly deterministic. The DFSA is identical; $q_2$ becomes the explicit trap state. $q_0$ and $q_1$ are the live states. Note that the empty string is accepted (start state is accepting).
+
+**$L_1$: contains substring $abbaab$.**
+
+*NFSA.* A linear chain spelling out $abbaab$, with a self-loop at the start:
+
+*   $q_0$: self-loop on $a, b$; transition to $q_1$ on $a$.
+*   $q_1 \xrightarrow{b} q_2 \xrightarrow{b} q_3 \xrightarrow{a} q_4 \xrightarrow{a} q_5 \xrightarrow{b} q_6$.
+*   $q_6$ (accepting): self-loop on $a, b$.
+
+*DFSA conversion.* Apply subset construction. The resulting DFSA has up to $2^7 = 128$ states in the worst case, but due to the failure-function structure (similar to KMP), most states collapse. In practice the DFSA has 8 states corresponding to the longest proper suffix of $abbaab$ that is also a prefix of $abbaab$.
+
+**$L_2$: $|x| \geq 2$ and last two symbols are the same.**
+
+*NFSA.* The machine guesses when the second-to-last symbol starts:
+
+*   $q_0$: self-loop on $a, b$; transition to $q_1$ on $a$; transition to $q_2$ on $b$.
+*   $q_1$: transition to $q_3$ (accepting) on $a$ (last two were $aa$).
+*   $q_2$: transition to $q_3$ (accepting) on $b$ (last two were $bb$).
+*   $q_3$: accepting state (no outgoing transitions — the match is complete).
+
+*DFSA conversion.* Apply subset construction starting from $\{q_0\}$:
+
+| DFSA state | on $a$ | on $b$ |
+|:-----------|:-------|:-------|
+| $\rightarrow\{q_0\}$ | $\{q_0,q_1\}$ | $\{q_0,q_2\}$ |
+| $\{q_0,q_1\}$ | $\{q_0,q_1,q_3\}$ | $\{q_0,q_2\}$ |
+| $\{q_0,q_2\}$ | $\{q_0,q_1\}$ | $\{q_0,q_2,q_3\}$ |
+| $*\{q_0,q_1,q_3\}$ | $\{q_0,q_1,q_3\}$ | $\{q_0,q_2\}$ |
+| $*\{q_0,q_2,q_3\}$ | $\{q_0,q_1\}$ | $\{q_0,q_2,q_3\}$ |
+
+**$L_3$: strings containing exactly 5 zeros.**
+
+*NFSA.* Count zeros with states $q_0$ through $q_5$, each with a self-loop on $1$, and a transition on $0$ to the next state. After $q_5$ (accepting), reject any additional $0$:
+
+*   $q_i$ for $i = 0, \ldots, 4$: self-loop on $1$; transition to $q_{i+1}$ on $0$.
+*   $q_5$ (accepting): self-loop on $1$; transition to $q_6$ (dead) on $0$.
+*   $q_6$ (dead): self-loop on $0, 1$.
+
+*DFSA conversion.* This NFSA is already deterministic — the transition function is single-valued. The DFSA equals the NFSA directly (7 states: $q_0$ through $q_5$ active, $q_6$ dead).
+
+**Answer:** NFSAs and DFSAs as described above for each of the four languages.
+
+</details>
+
+
+##### **4.8. Prove Closure of NFSA Languages under Complement** (Lecture 9, Task 1)
+
+Is the class of languages recognized by NFSAs **closed under complement**? Provide a formal proof.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Claim:** Yes, the class of languages recognized by NFSAs is closed under complement.
+
+**Proof.**
+
+Let $L$ be a language recognized by some NFSA $N$. We want to show that $\overline{L} = \Sigma^* \setminus L$ is also recognized by some finite automaton.
+
+**Step 1 — Convert NFSA to DFSA.**
+
+By the subset construction theorem, every NFSA is equivalent to some DFSA $D$ that recognizes the same language $L$. That is, $L(N) = L(D) = L$.
+
+**Step 2 — Complement the DFSA.**
+
+Given a *complete* (total) DFSA $D = \langle Q_D, \Sigma, \delta_D, q_{0D}, F_D \rangle$, construct a new DFSA $D' = \langle Q_D, \Sigma, \delta_D, q_{0D}, Q_D \setminus F_D \rangle$ by swapping the accepting and non-accepting states. Since $D$ is total (every state has a transition for every input symbol), $D'$ is also a valid complete DFSA.
+
+**Step 3 — Verify correctness.**
+
+For any string $x \in \Sigma^*$:
+
+*   $D$ accepts $x$ iff $\delta_D^*(q_{0D}, x) \in F_D$.
+*   $D'$ accepts $x$ iff $\delta_D^*(q_{0D}, x) \in Q_D \setminus F_D$, i.e., $\delta_D^*(q_{0D}, x) \notin F_D$.
+
+Therefore $D'$ accepts exactly those strings that $D$ rejects:
+$$L(D') = \Sigma^* \setminus L(D) = \overline{L}.$$
+
+Since $D'$ is a DFSA (in particular, an NFSA), $\overline{L}$ is recognized by an NFSA.
+
+**Conclusion.** The class of NFSA-recognized languages (= regular languages) is closed under complement. $\square$
+
+**Why this argument does not work directly for NFSAs.** The complement trick (swap $F$ and $Q \setminus F$) does *not* work directly on an NFSA, because an NFSA accepts if *any* branch accepts. Swapping accepting states would yield a machine that rejects if any branch rejects — i.e., accepts only if *all* branches accept (universal nondeterminism), which is a different semantics. The correctness of the argument relies critically on going through the deterministic construction first.
+
+</details>
+
+
+##### **4.9. Verify $a^nb^nc^n$ Requires a Turing Machine** (Lecture 9, Example 1)
+
+Explain why the language $L = \{a^n b^n c^n \mid n > 0\}$ cannot be recognized by any PDA, and describe the Turing Machine solution.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Why PDAs fail.** A PDA can recognize $a^n b^n$ by pushing one stack symbol per $a$ and popping one per $b$. But after matching all $b$'s, the stack is empty — the count of $n$ has been destroyed. There are no remaining stack symbols to count the $c$'s. Formally, $a^n b^n c^n$ is not a context-free language (proven by the Pumping Lemma for context-free languages).
+
+**TM solution using one memory tape.**
+
+The TM uses the memory tape to store $n$ marker symbols $M$:
+
+1.  **State $q_0$ (initialization):** Read the first $a$ and the initial symbol $Z_0$ on the memory tape. Move: input stays, memory tape moves right ($\langle S, R \rangle$). Go to $q_1$.
+2.  **State $q_1$ (counting $a$'s):** Self-loop: for each $a$ read, write $M$ on the memory tape and advance both heads rightward ($\langle R, R \rangle$). When the input shows $b$: stay on input, move memory head left ($\langle S, L \rangle$); go to $q_2$.
+3.  **State $q_2$ (matching $b$'s):** Self-loop: for each $b$ read, read $M$ (still present) on memory tape, advance input right but move memory left ($\langle R, L \rangle$). When input shows $c$ and memory shows $Z_0$: stay on input, move memory right ($\langle S, R \rangle$); go to $q_3$.
+4.  **State $q_3$ (matching $c$'s):** Self-loop: for each $c$ read, read $M$ on memory tape, advance both rightward. When input is blank and memory is blank: stay ($\langle S, S \rangle$); go to $q_F$ (accepting).
+
+**Key insight:** The $M$ markers persist on the memory tape. They are read but *not erased* during the $b$-counting phase (the head merely moves backward over them); they are available again for the $c$-counting phase when the head moves forward once more.
+
+**Answer:** A TM recognizes $a^n b^n c^n$ precisely because its tape memory is non-destructive, allowing the count $n$ to be verified twice.
+
+</details>
+
+##### **4.10. Compare NFSA and DFSA for Strings Ending in 00** (Tutorial 10, Example 1)
+
+Construct both an NFSA and a DFSA accepting all binary strings ending with $00$, over $\Sigma = \{0, 1\}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The DFSA must explicitly track all possible "suffixes in progress," leading to more states. The NFSA can "guess" when the final $00$ begins.
+
+**DFSA approach.** The machine must remember the last two symbols seen:
+
+*   $q_0$: last symbol was $1$ (or start) — self-loop on $1$; go to $q_1$ on $0$.
+*   $q_1$: last symbol was $0$ — go back to $q_0$ on $1$; go to $q_2$ on $0$.
+*   $q_2$ (accepting): last two symbols were $00$ — self-loop on $0$; go back to $q_0$ on $1$.
+
+```{dot}
+//| fig-cap: "DFSA accepting strings ending in 00"
+//| fig-width: 5
+//| fig-height: 1.6
+digraph dfsa_00 {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.1, fillcolor=black];
+  q2 [shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0;
+  q0 -> q0 [label="1"];
+  q0 -> q1 [label="0"];
+  q1 -> q0 [label="1"];
+  q1 -> q2 [label="0"];
+  q2 -> q2 [label="0"];
+  q2 -> q0 [label="1"];
+}
+```
+
+**NFSA approach.** Much simpler — the machine "guesses" when the last $00$ starts:
+
+*   $q_0$: self-loop on $0, 1$; go to $q_1$ on $0$ (guess this is the start of the final $00$).
+*   $q_1$: go to accepting $q_2$ on $0$.
+
+```{dot}
+//| fig-cap: "NFSA accepting strings ending in 00 (3 states vs. 3 states with fewer transitions)"
+//| fig-width: 4
+//| fig-height: 1.4
+digraph nfsa_00 {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.1, fillcolor=black];
+  q2 [shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0;
+  q0 -> q0 [label="0,1"];
+  q0 -> q1 [label="0"];
+  q1 -> q2 [label="0"];
+}
+```
+
+**Answer:** The NFSA uses the same number of states here but has far fewer transitions. For longer patterns the advantage becomes exponential.
+
+</details>
+
+##### **4.11. Convert NFSA to DFSA via Subset Construction** (Tutorial 10, Example 2)
+
+Given the NFSA for strings ending in $00$ (from Example 4.1 above), apply the subset construction to produce an equivalent DFSA.
+
+**NFSA transition table:**
+
+| $q$ | $\delta(q, 0)$ | $\delta(q, 1)$ |
+|:----|:--------------|:--------------|
+| $\rightarrow q_0$ | $\{q_0, q_1\}$ | $\{q_0\}$ |
+| $q_1$ | $\{q_2\}$ | $\emptyset$ |
+| $*q_2$ | $\emptyset$ | $\emptyset$ |
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1.** Start with DFSA state $\{q_0\}$.
+
+**Step 2.** Compute transitions from $\{q_0\}$:
+
+*   On $0$: $\delta(q_0, 0) = \{q_0, q_1\}$ → new DFSA state $\{q_0, q_1\}$
+*   On $1$: $\delta(q_0, 1) = \{q_0\}$ → DFSA state $\{q_0\}$ (already known)
+
+**Step 3.** Compute transitions from $\{q_0, q_1\}$:
+
+*   On $0$: $\delta(q_0, 0) \cup \delta(q_1, 0) = \{q_0, q_1\} \cup \{q_2\} = \{q_0, q_1, q_2\}$ → new state
+*   On $1$: $\delta(q_0, 1) \cup \delta(q_1, 1) = \{q_0\} \cup \emptyset = \{q_0\}$
+
+**Step 4.** Compute transitions from $\{q_0, q_1, q_2\}$:
+
+*   On $0$: $\{q_0,q_1\} \cup \{q_2\} \cup \emptyset = \{q_0, q_1, q_2\}$
+*   On $1$: $\{q_0\} \cup \emptyset \cup \emptyset = \{q_0\}$
+
+No new states. The DFSA transition table is:
+
+| $q$ | $\delta_D(q, 0)$ | $\delta_D(q, 1)$ |
+|:----|:----------------|:----------------|
+| $\rightarrow \{q_0\}$ | $\{q_0, q_1\}$ | $\{q_0\}$ |
+| $\{q_0, q_1\}$ | $\{q_0, q_1, q_2\}$ | $\{q_0\}$ |
+| $*\{q_0, q_1, q_2\}$ | $\{q_0, q_1, q_2\}$ | $\{q_0\}$ |
+
+$\{q_0, q_1, q_2\}$ is accepting because it contains $q_2 \in F$.
+
+**Answer:** The DFSA has 3 states, matching the DFSA from Example 4.1 (the states $q_0 \leftrightarrow \{q_0\}$, $q_1 \leftrightarrow \{q_0, q_1\}$, $q_2 \leftrightarrow \{q_0, q_1, q_2\}$).
+
+</details>
+
+##### **4.12. Apply Thompson's Construction to $(1 \mid 01)^*$** (Tutorial 10, Example 3)
+
+Build an $\epsilon$-NFSA for the regular expression $(1 \mid 01)^*$ using Thompson's Construction, then simplify by removing redundant $\epsilon$-transitions.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1 — Build $N(1)$:** Two states $q_1 \xrightarrow{1} f_1$.
+
+**Step 2 — Build $N(0)$ and $N(1)$ for the concatenation $01$:** $q_0 \xrightarrow{0} f_0$ and $q_1' \xrightarrow{1} f_1'$. Connect via $f_0 \xrightarrow{\epsilon} q_1'$ to get $N(01)$: $q_0 \xrightarrow{0} f_0 \xrightarrow{\epsilon} q_1' \xrightarrow{1} f_1'$.
+
+**Step 3 — Union $N(1 \mid 01)$:** Create new start $q_u$ and new accepting $f_u$.
+*   $q_u \xrightarrow{\epsilon} q_1$ (into $N(1)$), $f_1 \xrightarrow{\epsilon} f_u$
+*   $q_u \xrightarrow{\epsilon} q_0$ (into $N(01)$), $f_1' \xrightarrow{\epsilon} f_u$
+
+**Step 4 — Kleene star $N((1 \mid 01)^*)$:** Create new start $q'$ and new accepting $f'$.
+*   $q' \xrightarrow{\epsilon} f'$ (bypass for zero repetitions)
+*   $q' \xrightarrow{\epsilon} q_u$ (enter the union)
+*   $f_u \xrightarrow{\epsilon} q_u$ (loop back)
+*   $f_u \xrightarrow{\epsilon} f'$ (exit)
+
+**Step 5 — Simplify.** After $\epsilon$-elimination, the resulting simplified NFSA has:
+
+*   A single start/accepting state $q$ (which also plays the role of $f'$).
+*   $q \xrightarrow{1} f$ (read a $1$ directly).
+*   $q \xrightarrow{0} m$ (an intermediate state), then $m \xrightarrow{1} f$ (read $01$).
+*   $f \xrightarrow{\epsilon} q$ (loop for repetition, or equivalently $f$ is identified with $q$ after simplification).
+
+**Answer:** The simplified NFSA accepts any concatenation of strings from $\{1, 01\}$, including the empty string. The machine collapses to a compact form with start/accept coinciding.
+
+</details>
