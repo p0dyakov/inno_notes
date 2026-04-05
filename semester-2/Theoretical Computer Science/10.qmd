@@ -1,0 +1,777 @@
+---
+title: "W11. Non-deterministic PDA and TM, Kleene's Algorithm, and Generative Grammars"
+author: "Manuel Mazzara"
+date: "April 2, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Non-deterministic Pushdown Automata**
+
+###### **1.1.1 Recap: Deterministic PDA**
+
+A **Deterministic Pushdown Automaton (DPDA)** is a 7-tuple $\langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$ where:
+
+*   $Q$ is a finite set of **states**;
+*   $I$ is a finite **input alphabet**;
+*   $\Gamma$ is a finite **stack alphabet**;
+*   $\delta : Q \times (I \cup \{\epsilon\}) \times \Gamma \rightarrow Q \times \Gamma^*$ is the (partial) **transition function** — for each state, optional input symbol, and top-of-stack symbol, at most one next configuration is defined;
+*   $q_0 \in Q$ is the **initial state**;
+*   $Z_0 \in \Gamma$ is the **initial stack symbol**;
+*   $F \subseteq Q$ is the set of **accepting states**.
+
+The key constraint that makes the automaton deterministic is that the transition function is *at most single-valued*: for any $(q, i, A)$ there is at most one possible move. Additionally, there is a no-conflict rule for $\epsilon$-moves: if $\delta(q, \epsilon, A)$ is defined, then $\delta(q, i, A)$ must be undefined for all $i \in I$.
+
+###### **1.1.2 Non-deterministic PDA: Formal Definition**
+
+A **Non-deterministic Pushdown Automaton (NPDA)** is defined with the same 7-tuple structure, but the transition function is allowed to return a *set* of possible next configurations:
+
+$$\delta : Q \times (I \cup \{\epsilon\}) \times \Gamma \rightarrow \mathbb{P}_F(Q \times \Gamma^*)$$
+
+where $\mathbb{P}_F$ denotes finite subsets of $Q \times \Gamma^*$. The machine may have **zero, one, or more** possible transitions from any configuration. A string $x$ is **accepted** if *at least one* possible computation path leads to an accepting state — this is the standard *existential* acceptance condition.
+
+The crucial difference from DPDA is that the no-conflict constraint for $\epsilon$-moves is removed: from state $q$ with top-of-stack $A$, both $\delta(q, \epsilon, A)$ and $\delta(q, i, A)$ may simultaneously be non-empty, creating genuine non-determinism.
+
+###### **1.1.3 NPDA versus DPDA: Expressiveness**
+
+Non-determinism strictly *adds* expressive power to PDAs — unlike the situation with finite automata, where NFSA and DFSA recognise exactly the same languages.
+
+The canonical example is $L = \{a^n b^n \mid n \geq 1\} \cup \{a^n b^{2n} \mid n \geq 1\}$. No DPDA can recognise this language, because after reading the $a$s, the automaton would need to simultaneously prepare two different stack configurations (one $a$ per $b$, or one $a$ per two $b$s). An NPDA handles this by *guessing* non-deterministically which language the input belongs to: it pushes $a$s (in pairs or singly) and then pops while reading $b$s.
+
+This leads to the fundamental hierarchy:
+
+$$\text{REG} \subsetneq \text{DCFL} \subsetneq \text{CFL}$$
+
+where **CFL** (context-free languages) is exactly the class of languages recognisable by NPDAs. DCFLs (deterministic context-free languages) are a proper subset of CFLs.
+
+```{dot}
+//| fig-cap: "NPDA for {aⁿbⁿ | n ≥ 1} ∪ {aⁿb²ⁿ | n ≥ 1}: non-deterministic branch on reading the first b"
+//| fig-width: 6.5
+//| fig-height: 2.8
+digraph npda_union {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q0 [label="q₀"];
+  q1 [label="q₁", fillcolor="#d7f0c2"];
+  q3 [label="q₃"];
+  q4 [label="q₄"];
+  q5 [label="q₅", fillcolor="#d7f0c2"];
+
+  start -> q0;
+  q0 -> q0 [label="a,Z₀/AAZ₀\na,A/AAA"];
+  q0 -> q1 [label="b,A/ε  (branch: aⁿb²ⁿ)"];
+  q1 -> q1 [label="b,A/ε"];
+  q1 -> q5 [label="ε,Z₀/Z₀"];
+  q0 -> q3 [label="b,A/ε  (branch: aⁿbⁿ)"];
+  q3 -> q4 [label="b,A/ε"];
+  q4 -> q3 [label="ε,A/ε"];
+  q4 -> q5 [label="ε,Z₀/Z₀"];
+}
+```
+
+##### **1.2 Closure Properties of NPDA**
+
+The class of languages recognised by NPDAs (context-free languages, CFLs) has a fundamentally different closure profile from regular languages and from deterministic CFLs.
+
+###### **1.2.1 Union: NPDA is Closed**
+
+Given two NPDAs, NPDA$_1$ recognising $L_1$ and NPDA$_2$ recognising $L_2$, we construct an NPDA for $L_1 \cup L_2$ as follows: introduce a new initial state $q_0$ and two $\epsilon$-transitions — one into the start state of NPDA$_1$ and one into the start state of NPDA$_2$. On any input, the machine non-deterministically enters one of the two original automata.
+
+$$L_1, L_2 \in \textbf{CFL} \implies L_1 \cup L_2 \in \textbf{CFL}$$
+
+**CFL is closed under $\cup$.**
+
+###### **1.2.2 Intersection: NPDA is Not Closed**
+
+Consider the two languages over $\{a, b, c\}$:
+
+$$L_1 = \{a^n b^n c^m \mid n, m > 0\} \in \textbf{DPDA} \subseteq \textbf{CFL}$$
+$$L_2 = \{a^m b^n c^n \mid n, m > 0\} \in \textbf{DPDA} \subseteq \textbf{CFL}$$
+
+Their intersection is:
+
+$$L_1 \cap L_2 = \{a^n b^n c^n \mid n > 0\}$$
+
+This language is not context-free (it requires a two-counter check that no stack machine can perform). Therefore:
+
+**CFL is not closed under $\cap$.**
+
+The underlying reason is that a pushdown stack is a *single linear memory*. Once it is used to count $a$s against $b$s, it cannot simultaneously count $b$s against $c$s.
+
+###### **1.2.3 Complement: NPDA is Not Closed**
+
+This follows immediately from closure under union and non-closure under intersection via **De Morgan's law**:
+
+$$L_1 \cap L_2 = (L_1^c \cup L_2^c)^c$$
+
+If CFL were closed under complement, then since it is closed under union, it would also be closed under intersection — contradicting the result above. Therefore:
+
+**CFL is not closed under complement $(\,\cdot\,)^c$.**
+
+Note: DPDA *is* closed under complement (swap accepting and non-accepting states after completing the automaton), but NPDA is not, because the existential acceptance condition makes state-swapping unsound. If input $w$ is processed non-deterministically along two paths — one accepting, one rejecting — then $w$ is accepted. After swapping, path A rejects and path B accepts, so $w$ is *still* accepted, even though it should be rejected in a correct complement.
+
+###### **1.2.4 Difference: NPDA is Not Closed**
+
+Since $L^c = I^* \setminus L$, closure under set difference would imply closure under complement. Because CFL is not closed under complement:
+
+**CFL is not closed under $\setminus$.**
+
+###### **1.2.5 Closure Table**
+
+| | $\cup$ | $\cap$ | $\setminus$ | complement |
+|:---|:---:|:---:|:---:|:---:|
+| **Regular (FSA)** | yes | yes | yes | yes |
+| **DCFL (DPDA)** | no | no | no | yes |
+| **CFL (NPDA)** | yes | no | no | no |
+
+###### **1.2.6 Pumping Lemma for Context-Free Languages (Bar-Hillel Lemma)**
+
+Just as the pumping lemma for regular languages lets us prove a language is not regular, the **Bar-Hillel lemma** provides a necessary condition for a language to be context-free. If $L$ is recognised by some NPDA, then there exists a constant $m \geq 1$ such that every string $w \in L$ with $|w| \geq m$ can be decomposed as $w = x_1 x_2 x_3 x_4 x_5$ satisfying:
+
+1.  $|x_2 x_4| > 0$ — at least one of $x_2, x_4$ is non-empty;
+2.  $|x_2 x_3 x_4| \leq m$ — the "pumped" portion is not too long;
+3.  $x_1 x_2^i x_3 x_4^i x_5 \in L$ for every $i \geq 0$.
+
+**Application.** $L = \{a^n b^n c^n \mid n > 0\}$ is not context-free. Any pumping attempt on a string like $a^m b^m c^m$ would require $x_2$ and $x_4$ to span at most two of the three character types, so pumping changes the counts of at most two letter types, breaking the $a^n = b^n = c^n$ balance.
+
+##### **1.3 Non-deterministic Turing Machine**
+
+###### **1.3.1 Formal Definition**
+
+A **Non-deterministic Turing Machine (NTM)** is obtained from a deterministic TM by modifying only the transition function. The NTM is still the 7-tuple $\langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$ where $Q, I, \Gamma, q_0, Z_0, F$ are defined exactly as in a DTM. The transition function becomes:
+
+$$\delta : (Q - F) \times (I \cup \{\_\}) \times (\Gamma \cup \{\_\})^k \rightarrow \mathbb{P}\!\left(Q \times (\Gamma \cup \{\_\})^k \times \{R, L, S\}^{k+1}\right)$$
+
+Instead of returning a single next configuration, $\delta$ returns a *set* of possible next configurations (state, tape symbol(s) to write, head direction(s)). For a transducer variant, the output mapping $\eta$ is similarly modified to return a set.
+
+**Acceptance condition.** A string $x$ is accepted by an NTM if and only if *at least one* of the possible computation paths starting from the initial configuration on input $x$ reaches an accepting state. This is again *existential* nondeterminism: one successful path is sufficient.
+
+###### **1.3.2 Computation Tree**
+
+A deterministic TM's computation on a fixed input traces a single sequence of configurations — a line. An NTM's computation is a *tree*: at each step, the machine may fork into multiple branches, one for each element of the $\delta$ set. The tree can expand exponentially with depth.
+
+The **acceptance condition** says: the input is accepted if *any* path in the computation tree reaches an accepting (final) state $F$. Paths that halt in a non-accepting state represent rejection on that branch; paths that run forever represent non-terminating branches.
+
+```{dot}
+//| fig-cap: "NTM computation tree: a branching structure where any path reaching an accepting configuration (blue square) means the input is accepted"
+//| fig-width: 5.5
+//| fig-height: 3.5
+digraph ntm_tree {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+
+  c0  [label="c₀", shape=circle, fillcolor="#e8f4f8"];
+  c11 [label="c₁₁", shape=circle, fillcolor="#e8f4f8"];
+  c12 [label="c₁₂", shape=circle, fillcolor="#e8f4f8"];
+  c13 [label="c₁₃", shape=circle, fillcolor="#e8f4f8"];
+  c21 [label="c₂₁", shape=circle, fillcolor="#e8f4f8"];
+  c22 [label="c₂₂", shape=circle, fillcolor="#e8f4f8"];
+  c23 [label="c₂₃", shape=circle, fillcolor="#e8f4f8"];
+  c31 [label="reject", shape=oval, fillcolor="#f9d9e2"];
+  acc1 [label="accept", shape=box, fillcolor="#d7f0c2"];
+  acc2 [label="accept", shape=box, fillcolor="#d7f0c2"];
+  acc3 [label="accept", shape=box, fillcolor="#d7f0c2"];
+  rej2 [label="reject", shape=oval, fillcolor="#f9d9e2"];
+
+  c0  -> c11; c0  -> c12; c0  -> c13;
+  c11 -> c21; c11 -> c22;
+  c21 -> c31; c21 -> acc1 [style=dashed];
+  c22 -> acc2;
+  c12 -> c23;
+  c23 -> rej2; c23 -> acc3 [style=dashed];
+  c13 -> acc3 [style=invis];
+}
+```
+
+###### **1.3.3 Simulating an NTM with a DTM: Breadth-First Search**
+
+Can a deterministic TM simulate a non-deterministic one? The answer is *yes*, using **breadth-first search (BFS)** over the computation tree.
+
+**Why not depth-first search?** A DFS visit follows one branch all the way down. If that branch is infinite (a non-terminating computation), the DFS never backtracks and never explores other branches, potentially missing accepting configurations that exist on other paths. This is analogous to the Halting Problem: you cannot tell in advance whether a branch will be infinite or merely long.
+
+**BFS simulation.** A DTM simulating the NTM visits all computation tree nodes level by level: first all configurations reachable in 0 steps, then all reachable in 1 step, then 2 steps, and so on. If an accepting configuration exists at any finite depth, BFS will reach it in finite time.
+
+The BFS simulation uses a multi-tape DTM:
+1.  One tape holds the input string.
+2.  One tape maintains the queue of configurations to explore (serialised as strings).
+3.  One tape performs the simulation of each NTM step.
+
+**Consequence.** Every language recognised by an NTM is also recognised by some DTM. Non-determinism does **not add expressive power** to Turing Machines, only (potentially exponential) algorithmic speed.
+
+###### **1.3.4 Summary: DTM vs NTM**
+
+*   **DFSA and NFSA**: same expressive power (regular languages).
+*   **DPDA and NPDA**: different expressive power — NPDA is strictly more powerful.
+*   **DTM and NTM**: same expressive power (recursively enumerable languages).
+
+The PDA family is the unique case where determinism and non-determinism produce genuinely different language classes.
+
+##### **1.4 DFSA to Regular Expression: Kleene's Algorithm**
+
+###### **1.4.1 Intuitive Foundation**
+
+Every finite automaton can be converted to an equivalent regular expression. The conversion rests on three algebraic observations:
+
+*   **Union**: two parallel edges $q \xrightarrow{x} p$ and $q \xrightarrow{y} p$ can be merged into a single edge $q \xrightarrow{x \mid y} p$.
+*   **Concatenation**: a path $q \xrightarrow{x} t \xrightarrow{y} p$ through an intermediate state $t$ can be collapsed into a single edge $q \xrightarrow{x \cdot y} p$, eliminating $t$.
+*   **Kleene star**: a self-loop $q \xrightarrow{x} q$ means the machine can repeat $x$ any number of times, giving the expression $x^*$.
+
+By systematically eliminating intermediate states using these three rules, the entire automaton is collapsed into a single regular expression labelling a direct edge from the initial state to each accepting state.
+
+###### **1.4.2 Formal Algorithm**
+
+Let $M = \langle Q, \Sigma, \delta, q_0, F \rangle$ be a DFSA with $Q = \{q_0, q_1, \ldots, q_n\}$.
+
+**Base case ($k = -1$).** Define $R_{ij}^{-1}$ as the regular expression for all direct transitions from $q_i$ to $q_j$:
+
+$$R_{ij}^{-1} = \begin{cases}
+a_1 \mid \cdots \mid a_m \mid \epsilon, & i = j \text{ and } \delta(q_i, a_t) = q_j \text{ for some } a_t \\
+a_1 \mid \cdots \mid a_m, & i \neq j \text{ and } \delta(q_i, a_t) = q_j \text{ for some } a_t \\
+\emptyset, & \text{no direct transition from } q_i \text{ to } q_j
+\end{cases}$$
+
+The $\epsilon$ on the diagonal ($i = j$) represents the possibility of staying in $q_i$ without reading anything.
+
+**Inductive step ($k = 0, 1, \ldots, n$).** Each iteration "unlocks" paths that may pass through $q_k$:
+
+$$R_{ij}^k = R_{ik}^{k-1} \left(R_{kk}^{k-1}\right)^* R_{kj}^{k-1} \;\mid\; R_{ij}^{k-1}$$
+
+Interpretation: $R_{ij}^k$ captures all paths from $q_i$ to $q_j$ that may visit any of $q_0, \ldots, q_k$ as intermediate states. The first term adds paths that go from $q_i$ to $q_k$, loop around $q_k$ any number of times, and then proceed to $q_j$.
+
+**Final answer.** If $F = \{q_{i_1}, \ldots, q_{i_f}\}$ is the set of accepting states, the regular expression for $L(M)$ is:
+
+$$R_{0,i_1}^n \mid R_{0,i_2}^n \mid \cdots \mid R_{0,i_f}^n$$
+
+**Semantic meaning of $R_{ij}^k$.** The set $R_{ij}^k$ represents all strings that take $M$ from state $q_i$ to state $q_j$ without passing through any state with index *greater* than $k$ (as intermediate states). At $k = n$ there are no restrictions, so $R_{0j}^n$ represents all strings leading from the start state to $q_j$.
+
+##### **1.5 $\epsilon$-moves and Pushdown Automata**
+
+###### **1.5.1 FSA with $\epsilon$-Transitions**
+
+In this course, PDAs are already defined with $\epsilon$-moves (spontaneous transitions that consume no input). For FSAs, $\epsilon$-transitions were not considered until now. A **Nondeterministic FSA with $\epsilon$-moves** (NFSA-$\epsilon$) allows $\delta(q, \epsilon) \neq \emptyset$. However:
+
+$$\text{NFSA-}\epsilon \equiv \text{NFSA} \equiv \text{FSA}$$
+
+All three models recognise exactly the regular languages. $\epsilon$-transitions add no power to finite automata.
+
+###### **1.5.2 PDA Sensitivity to Model Variations**
+
+Unlike FSAs, PDAs are *highly sensitive* to seemingly minor variations in the model definition. The following changes all affect the set of recognisable languages:
+
+*   Acceptance by **final state** versus acceptance by **empty stack** — these are equivalent for NPDAs but not always for DPDAs.
+*   The **number of stacks** — a 2-stack PDA already has the power of a TM.
+*   **Deterministic vs non-deterministic** — strictly different language classes (DCFL $\subsetneq$ CFL).
+*   **With vs without $\epsilon$-moves** — removing $\epsilon$-moves from DPDAs reduces their power.
+
+This sensitivity makes the PDA family a rich object of study for exploring the boundaries between computational models.
+
+###### **1.5.3 Realtime Deterministic Pushdown Automata**
+
+A **realtime DPDA** is a DPDA *without* $\epsilon$-moves: every transition must consume exactly one input symbol. This strictness means the automaton processes input in real time — no internal work without reading input.
+
+Realtime DPDAs are strictly less powerful than DPDAs with $\epsilon$-moves:
+
+$$\text{REG} \subsetneq \text{RTDCFL} \subsetneq \text{DCFL} \subsetneq \text{CFL}$$
+
+**Example.** The language $L = \{a^n b^p c\, a^n \mid p, n > 0\} \cup \{a^n b^p d\, b^p \mid p, n > 0\}$ requires a DPDA but cannot be recognised by any realtime DPDA. In path 2 (the $c$-branch), after reading $c$ the machine must pop all $b$-symbols from the stack to retrieve the $a$-count underneath, but it has no input to consume while doing so — $\epsilon$-moves are unavoidable.
+
+###### **1.5.4 The Complement of NPDA**
+
+For deterministic machines whose computation always terminates, taking the complement is straightforward: complete the automaton (add a dead state) and swap accepting/non-accepting states. This works for DPDA.
+
+For NPDA, this approach fails because of the existential acceptance condition. Consider a non-deterministic computation of $w$ along two branches:
+
+*   Branch A: accepts.
+*   Branch B: rejects.
+
+Because of existential nondeterminism, $w$ is **accepted** by the original NPDA. After swapping states, branch A now rejects and branch B accepts — so $w$ is **still accepted** by the swapped automaton, even though it should be rejected for a correct complement. The state-swap approach breaks under non-determinism.
+
+###### **1.5.5 Languages Recognised by NDPDA**
+
+Languages recognisable by NDPDAs are exactly the **context-free languages (CFLs)**. CFLs sit strictly between the deterministic CFLs and the recursively enumerable languages.
+
+```{dot}
+//| fig-cap: "Language hierarchy: regular ⊊ deterministic CFL ⊊ context-free ⊊ recursively enumerable"
+//| fig-width: 5.5
+//| fig-height: 3.0
+digraph hierarchy {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=ellipse, style=filled, color="#355c7d", penwidth=1.1];
+  edge [style=invis];
+
+  re  [label="Recursively enumerable\n(Turing Machines)", fillcolor="#f9d9e2", width=4.2, height=1.0];
+  cfl [label="Context-free (NDPDA / CFL)", fillcolor="#fff3cd", width=3.0, height=0.75];
+  dcfl [label="Deterministic CFL (DPDA)", fillcolor="#d6eef5", width=2.5, height=0.65];
+  reg [label="Regular (FSA)", fillcolor="#d7f0c2", width=1.8, height=0.55];
+
+  re -> cfl -> dcfl -> reg;
+}
+```
+
+##### **1.6 Generative Grammars**
+
+###### **1.6.1 Operational vs Generative Models**
+
+So far this course has studied **operational models** (automata): machines that *receive* input and decide whether to accept it. There is a complementary family of **generative models** (grammars): sets of rules that *produce* the strings of a language.
+
+*   **Automata** (operational): answer "Is $x$ in the language?"
+*   **Grammars** (generative): answer "How can strings of the language be constructed?"
+
+Both views are equally important and, as the Chomsky hierarchy shows, correspond to each other: every automaton class has a corresponding grammar class.
+
+In **parsing**, grammars define the syntax of programming languages, while automata process source code to check syntactic correctness. Grammars are often nondeterministic, but practical parser generators use carefully designed deterministic grammars with lookahead.
+
+###### **1.6.2 Formal Definition of a Grammar**
+
+A **formal grammar** is a 4-tuple $G = \langle V_N, V_T, P, S \rangle$ where:
+
+*   $V_N$ is the finite **nonterminal alphabet** (variables; by convention written in upper case);
+*   $V_T$ is the finite **terminal alphabet** (the symbols of the generated language; by convention written in lower case);
+*   $V = V_N \cup V_T$ is the combined vocabulary;
+*   $S \in V_N$ is the **axiom** (initial symbol or start symbol);
+*   $P \subseteq V^* \cdot V_N \cdot V^* \times V^*$ is the finite set of **production rules** (or **rewriting rules**), written $\alpha \rightarrow \beta$.
+
+**Productions.** A production $\alpha \rightarrow \beta$ consists of:
+
+*   **Left-hand side** $\alpha \in V^* \cdot V_N \cdot V^*$: a string containing *at least one* nonterminal;
+*   **Right-hand side** $\beta \in V^*$: any (possibly empty) string of terminals and nonterminals.
+
+The grammar generates strings by repeatedly replacing substrings matching the left-hand side of a production with the corresponding right-hand side.
+
+###### **1.6.3 Immediate Derivation and Language Generated**
+
+**Immediate derivation.** $\alpha \Rightarrow \beta$ (read "$\beta$ is obtained by immediate derivation from $\alpha$") if and only if:
+
+$$\alpha = \alpha_1 \alpha_2 \alpha_3, \quad \beta = \alpha_1 \beta_2 \alpha_3, \quad \text{and} \quad \alpha_2 \rightarrow \beta_2 \in P$$
+
+That is, $\alpha_2$ is rewritten as $\beta_2$ in the *context* $\langle \alpha_1, \alpha_3 \rangle$. The word "context" is intentional: context-sensitive grammars are defined precisely by allowing the left-hand side to carry non-trivial context.
+
+**Language generated.** Given $G = \langle V_N, V_T, P, S \rangle$, the **language generated by $G$** is:
+
+$$L(G) = \{x \mid x \in V_T^* \text{ and } S \Rightarrow^+ x\}$$
+
+That is, $L(G)$ consists of all strings over the terminal alphabet that can be derived from the axiom $S$ in one or more steps, using the productions of $P$ in any order.
+
+###### **1.6.4 Chomsky Hierarchy of Grammars**
+
+The Chomsky hierarchy classifies grammars by the form of their production rules, creating a nested family of language classes:
+
+| Chomsky type | Grammar | Language class | Minimal automaton |
+|:---|:---|:---|:---|
+| **Type 0** | Unrestricted | Recursively enumerable | Turing Machine |
+| **Type 1** | Context-sensitive | Context-sensitive | Linear Bounded Automaton |
+| **Type 2** | Context-free | Context-free | NDPDA |
+| **Type 3** | Regular | Regular | FSA |
+
+Each level is a strict subset of the one above. The class of context-free grammars (Type 2) is particularly important for programming language design: every CFG can be parsed by an NDPDA, and carefully designed deterministic grammars can be parsed efficiently by standard parser generators (LL, LR).
+
+---
+
+#### **2. Definitions**
+
+*   **DPDA (Deterministic Pushdown Automaton)**: A 7-tuple $\langle Q, I, \Gamma, \delta, q_0, Z_0, F \rangle$ with transition function $\delta : Q \times (I \cup \{\epsilon\}) \times \Gamma \rightarrow Q \times \Gamma^*$; at most one move from each configuration, with no $\epsilon$-conflict.
+*   **NPDA (Non-deterministic Pushdown Automaton)**: Same structure as DPDA but $\delta : Q \times (I \cup \{\epsilon\}) \times \Gamma \rightarrow \mathbb{P}_F(Q \times \Gamma^*)$; multiple moves allowed from any configuration.
+*   **Context-free language (CFL)**: A language recognised by some NPDA; equivalently, generated by a context-free grammar (Type 2 Chomsky).
+*   **Deterministic context-free language (DCFL)**: A language recognised by some DPDA; a proper subset of the CFLs.
+*   **Bar-Hillel (pumping) lemma**: If $L$ is a CFL, there exists $m \geq 1$ such that any $w \in L$ with $|w| \geq m$ can be split $w = x_1 x_2 x_3 x_4 x_5$ with $|x_2 x_4| > 0$, $|x_2 x_3 x_4| \leq m$, and $x_1 x_2^i x_3 x_4^i x_5 \in L$ for all $i \geq 0$.
+*   **NTM (Non-deterministic Turing Machine)**: A TM with $\delta$ returning a set of configurations; accepts if any computation path reaches $F$.
+*   **Computation tree**: The branching tree of all possible NTM configurations reachable from the initial configuration; accepted if any node in the tree is an accepting configuration.
+*   **Existential nondeterminism**: Acceptance criterion requiring that *at least one* computation path accepts (standard for NFSA, NPDA, NTM).
+*   **BFS simulation**: A DTM technique for simulating an NTM by exploring the computation tree level by level, guaranteeing discovery of any accepting configuration at finite depth.
+*   **Kleene's Algorithm**: A procedure that converts a DFSA $M$ with $n+1$ states into an equivalent regular expression by computing $R_{ij}^k$ for $k = -1, 0, \ldots, n$, where $R_{ij}^k$ denotes all strings taking $M$ from $q_i$ to $q_j$ via intermediate states with index at most $k$.
+*   **$R_{ij}^{-1}$**: Base-case expressions in Kleene's algorithm; captures only direct (single-step) transitions between $q_i$ and $q_j$ (plus $\epsilon$ on the diagonal).
+*   **Realtime DPDA**: A DPDA without $\epsilon$-moves; every transition consumes exactly one input symbol; strictly less powerful than DPDA with $\epsilon$-moves.
+*   **Formal grammar**: A 4-tuple $\langle V_N, V_T, P, S \rangle$ with nonterminals, terminals, productions, and start symbol; generates a language by rewriting.
+*   **Production**: A rewriting rule $\alpha \rightarrow \beta$ where $\alpha$ contains at least one nonterminal and $\beta$ is any string of terminals and nonterminals.
+*   **Axiom (start symbol)**: The nonterminal $S \in V_N$ from which all derivations begin.
+*   **Immediate derivation ($\Rightarrow$)**: $\alpha \Rightarrow \beta$ if $\beta$ is obtained from $\alpha$ by applying a single production in some context.
+*   **Language generated by $G$**: $L(G) = \{x \in V_T^* \mid S \Rightarrow^+ x\}$ — all terminal strings derivable from $S$ in one or more steps.
+*   **Chomsky hierarchy**: Four-level classification of grammars (Type 0–3) corresponding to TM, LBA, NPDA, and FSA respectively.
+
+---
+
+#### **3. Formulas**
+
+*   **NPDA transition function**: $\delta : Q \times (I \cup \{\epsilon\}) \times \Gamma \rightarrow \mathbb{P}_F(Q \times \Gamma^*)$
+*   **NTM transition function ($k$ tapes)**: $\delta : (Q - F) \times (I \cup \{\_\}) \times (\Gamma \cup \{\_\})^k \rightarrow \mathbb{P}(Q \times (\Gamma \cup \{\_\})^k \times \{R, L, S\}^{k+1})$
+*   **NTM acceptance**: $x$ accepted $\iff$ $\exists$ computation path in the tree of $M$ on $x$ reaching a state in $F$
+*   **Kleene base case**: $R_{ij}^{-1} = \begin{cases} a_1 \mid \cdots \mid a_m \mid \epsilon & i = j \\ a_1 \mid \cdots \mid a_m & i \neq j \\ \emptyset & \text{no direct transition} \end{cases}$
+*   **Kleene inductive step**: $R_{ij}^k = R_{ik}^{k-1}(R_{kk}^{k-1})^* R_{kj}^{k-1} \mid R_{ij}^{k-1}$
+*   **Kleene final answer**: $R_{0,i_1}^n \mid \cdots \mid R_{0,i_f}^n$ where $F = \{q_{i_1}, \ldots, q_{i_f}\}$
+*   **Language of grammar**: $L(G) = \{x \in V_T^* \mid S \Rightarrow^+ x\}$
+*   **Productions domain**: $P \subseteq V^* \cdot V_N \cdot V^* \times V^*$
+*   **Immediate derivation**: $\alpha \Rightarrow \beta \iff \exists\, \alpha_1, \alpha_2, \alpha_3, \beta_2 : \alpha = \alpha_1\alpha_2\alpha_3,\; \beta = \alpha_1\beta_2\alpha_3,\; \alpha_2 \rightarrow \beta_2 \in P$
+
+---
+
+#### **4. Examples**
+
+##### **4.1. Build NPDAs for Three Languages** (Lab 10, Task 1)
+
+Build NPDAs that recognise the following languages:
+
+(a) $L_1 = \{ww^R \mid w \in \{a, b\}^+\}$, where $w^R$ is the reverse of $w$.
+
+(b) $L_2 = \{a^n b^n \mid n \geq 1\} \cup \{a^n b^{2n} \mid n \geq 1\}$.
+
+(c) $L_3 = \{a^i b^j c^k d^l \mid (i = k \text{ or } j = l),\; i \geq 1,\; j \geq 1\}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) $L_1 = \{ww^R \mid w \in \{a, b\}^+\}$ — even-length palindromes.**
+
+The key idea: the NPDA non-deterministically guesses the midpoint of the string. In the first half it pushes every symbol onto the stack; in the second half it pops and matches. Since $w \in \{a,b\}^+$, both halves are non-empty.
+
+*   **States:** $q_0$ (push phase), $q_1$ (pop phase), $q_2$ (accepting).
+*   **Push phase** ($q_0$):
+    *   $a, Z_0 / AZ_0$ and $a, A / AA$ and $a, B / AB$ — push $A$ for each $a$.
+    *   $b, Z_0 / BZ_0$ and $b, A / BA$ and $b, B / BB$ — push $B$ for each $b$.
+    *   Non-deterministic $\epsilon$-transitions to $q_1$: $\epsilon, Z_0/Z_0$, $\epsilon, A/A$, $\epsilon, B/B$ — guess the midpoint (spontaneous move).
+*   **Pop phase** ($q_1$):
+    *   $a, A/\epsilon$ — match $a$ against $A$ on stack.
+    *   $b, B/\epsilon$ — match $b$ against $B$ on stack.
+*   **Acceptance** ($q_1 \to q_2$): $\epsilon, Z_0/Z_0$ — accept when stack is back to $Z_0$ (all symbols matched).
+
+The NPDA is correct because the $\epsilon$-transitions allow it to guess the midpoint at any position; along the correct branch the stack will empty exactly when $w^R$ is consumed.
+
+**(b) $L_2 = \{a^n b^n \mid n \geq 1\} \cup \{a^n b^{2n} \mid n \geq 1\}$.**
+
+Use the union construction: non-deterministically choose one of two branches at the start.
+
+*   **Common start** $q_0$: pushes two $A$s per $a$ read (self-loops: $a, Z_0/AAZ_0$; $a, A/AAA$).
+*   **Branch for $a^n b^{2n}$** (transition $q_0 \xrightarrow{b, A/\epsilon} q_1$): pop one $A$ per $b$; accept when $Z_0$ is exposed.
+    *   $q_1$: self-loop $b, A/\epsilon$; transition $q_1 \xrightarrow{\epsilon, Z_0/Z_0} q_{\text{acc}}$.
+*   **Branch for $a^n b^n$** (transition $q_0 \xrightarrow{b, A/\epsilon} q_3$, then $q_3 \xrightarrow{b, A/\epsilon} q_4 \xrightarrow{\epsilon, A/\epsilon} q_3$): pop one $A$ per two $b$s; accept when $Z_0$ is exposed.
+    *   $q_4 \xrightarrow{\epsilon, Z_0/Z_0} q_{\text{acc}}$.
+
+Since the initial push phase doubles the count ($AA$ per $a$), popping one $A$ per $b$ in the first branch gives $2n$ $b$s, and the alternating two-$b$-per-$A$ pattern in the second branch gives $n$ $b$s.
+
+**(c) $L_3 = \{a^i b^j c^k d^l \mid (i = k \text{ or } j = l),\; i \geq 1,\; j \geq 1\}$.**
+
+Use the union $L_3 = L_A \cup L_B$ where $L_A = \{a^i b^j c^i d^l\}$ (count $a$ against $c$) and $L_B = \{a^i b^j c^k d^j\}$ (count $b$ against $d$). Non-deterministically choose:
+
+*   **Branch A** ($i = k$): push $A$ for each $a$; read $b$s without touching stack; pop $A$ for each $c$; read $d$s freely; accept when stack empties.
+*   **Branch B** ($j = l$): read $a$s freely; push $B$ for each $b$; read $c$s freely; pop $B$ for each $d$; accept when stack empties.
+
+Each branch is a standard DPDA; the NPDA is their union via a shared initial state with two $\epsilon$-outgoing transitions.
+
+</details>
+
+##### **4.2. Build NTMs for Two Languages** (Lab 10, Task 2)
+
+Build NTMs that recognise the following languages:
+
+(a) $L_1 = \{ww \mid w \in \{a, b\}^+\}$ — strings that are the concatenation of a non-empty word with itself.
+
+(b) $L_2 = \{ww^R \mid w \in \{a, b\}^+\}$ — even-length palindromes.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) $L_1 = \{ww \mid w \in \{a,b\}^+\}$.**
+
+The string must have even length $2n$ and the first and second halves must be identical. A standard DTM approach uses multiple passes, but an NTM can guess the midpoint.
+
+**Two-tape NTM construction:**
+
+1.  **Non-deterministically guess the midpoint**: the NTM writes a marker at some position in the input (guessing where the first half ends and the second half begins).
+2.  **Copy the first half** onto tape 2.
+3.  **Compare tape 2 with the second half** symbol by symbol.
+4.  **Accept** if and only if the comparison succeeds and both halves have the same length.
+
+Along the correctly-guessing branch, the NTM accepts; along all other branches, it rejects. By existential acceptance, the NTM accepts $ww$ if any branch succeeds.
+
+**(b) $L_2 = \{ww^R \mid w \in \{a,b\}^+\}$.**
+
+Similar to (a), but the second half must be the *reverse* of the first.
+
+**Two-tape NTM construction:**
+
+1.  **Non-deterministically guess the midpoint**.
+2.  **Copy the first half** onto tape 2 in *reversed* order (write symbols right-to-left on tape 2).
+3.  **Compare tape 2 with the second half** symbol by symbol (left to right).
+4.  **Accept** if the comparison succeeds.
+
+Alternatively, a single-tape NTM can:
+1.  Non-deterministically guess the midpoint and mark it.
+2.  Check the first symbol against the last, the second against the second-to-last, etc. by traversing back and forth and marking matched pairs.
+
+</details>
+
+##### **4.3. Build NPDA for a Union Language** (Lab 10, Homework 1)
+
+Build an NPDA that recognises the language:
+$$L_1 = \{a^n b^n \mid n \geq 0\} \cup \{a^{2n} \mid n \geq 0\}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+The language is a union of two simpler languages:
+
+*   $L_A = \{a^n b^n \mid n \geq 0\}$: the empty string plus $a^n b^n$ for $n \geq 1$.
+*   $L_B = \{a^{2n} \mid n \geq 0\}$: strings of even-length blocks of $a$s (including $\epsilon$).
+
+**NPDA construction via union:**
+
+Introduce a new start state $q_{\text{start}}$ with $\epsilon$-transitions into the start states of two sub-automata.
+
+**Sub-automaton for $L_A$** (standard DPDA for $a^n b^n$):
+
+*   $s_0$: push $A$ per $a$. Transition to $s_1$ on first $b$.
+*   $s_1$: pop $A$ per $b$. Transition to accepting state $s_2$ when stack is $Z_0$.
+*   $s_2$ (accepting): also accept $\epsilon$ from $s_0$ via $\epsilon, Z_0/Z_0$ transition.
+
+**Sub-automaton for $L_B$** (even number of $a$s):
+
+*   $t_0$ (accepting): read $a$, go to $t_1$.
+*   $t_1$: read $a$, return to $t_0$ (accepting).
+*   Stack operations: push/pop a marker each two $a$s, or simply use the state to count parity (no stack needed beyond $Z_0$).
+
+**Accepting states of $L_B$ sub-automaton:** $t_0$ (after even number of $a$s, including zero).
+
+The full NPDA:
+
+*   $q_{\text{start}} \xrightarrow{\epsilon, Z_0/Z_0} s_0$ and $q_{\text{start}} \xrightarrow{\epsilon, Z_0/Z_0} t_0$.
+*   Internally each sub-automaton works as described.
+
+Both $\epsilon$ and the empty string are accepted (both $s_0$ with empty stack and $t_0$ are accepting states reachable from $q_{\text{start}}$ on $\epsilon$).
+
+</details>
+
+##### **4.4. Build NTM for a Union of Counting Languages** (Lab 10, Homework 2)
+
+Build an NTM that recognises the language:
+$$L_2 = \{a^n b^n \mid n \geq 0\} \cup \{a^n b^{2n} \mid n \geq 0\}$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+The language requires the NTM to non-deterministically choose which sub-language the input belongs to, then verify deterministically.
+
+**Non-deterministic choice.** At the outset, the NTM non-deterministically branches into two computation paths:
+
+*   **Path A**: verify $a^n b^n$.
+*   **Path B**: verify $a^n b^{2n}$.
+
+**Verification of $a^n b^n$ (Path A) on a 2-tape TM:**
+
+1.  Scan tape 1 to find the number of $a$s: mark each $a$ on tape 1 and write a tally mark on tape 2.
+2.  For each $b$, erase one tally on tape 2.
+3.  Accept if tape 2 is empty exactly when all $b$s are consumed.
+
+**Verification of $a^n b^{2n}$ (Path B) on a 2-tape TM:**
+
+1.  Scan $a$s and write *two* tally marks on tape 2 per $a$.
+2.  For each $b$, erase one tally on tape 2.
+3.  Accept if tape 2 is empty exactly when all $b$s are consumed.
+
+Both sub-computations can be implemented as standard deterministic TM procedures. The NTM wraps them with a non-deterministic initial branch. Since the language is a union, if either path accepts, the input is accepted.
+
+</details>
+
+##### **4.5. DPDA for $a^n b^n$** (Tutorial 10, Example 1)
+
+Construct a DPDA for $L_1 = \{a^n b^n \mid n \geq 1\}$ and trace its behaviour on the string $aabb$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**States:** $q_0$ (push phase), $q_1$ (pop phase), $q_2$ (accepting).
+
+**Transition function:**
+
+*   $q_0, a, Z_0 \to q_0, AZ_0$ — push first $A$ onto $Z_0$.
+*   $q_0, a, A \to q_0, AA$ — push additional $A$.
+*   $q_0, b, A \to q_1, \epsilon$ — switch to pop phase on first $b$; pop $A$.
+*   $q_1, b, A \to q_1, \epsilon$ — continue popping $A$ for each $b$.
+*   $q_1, \epsilon, Z_0 \to q_2, Z_0$ — stack returned to initial symbol; accept.
+
+**Trace on $aabb$:**
+
+| Step | Input | State | Stack (top first) |
+|:----:|:-----:|:-----:|:-----------------|
+| 0 | $aabb$ | $q_0$ | $Z_0$ |
+| 1 | $abb$ | $q_0$ | $AZ_0$ |
+| 2 | $bb$ | $q_0$ | $AAZ_0$ |
+| 3 | $b$ | $q_1$ | $AZ_0$ |
+| 4 | $\epsilon$ | $q_1$ | $Z_0$ |
+| 5 | $\epsilon$ | $q_2$ | $Z_0$ |
+
+The DPDA reaches $q_2$ (accepting) with an empty remaining input. ✓
+
+</details>
+
+##### **4.6. NPDA for $a^n b^n$** (Tutorial 10, Example 2)
+
+Construct an NPDA for $L_1 = \{a^n b^n \mid n \geq 1\}$ using a non-deterministic $\epsilon$-transition to switch phases, and explain how this differs from the DPDA version.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**States:** $q_0$ (push phase), $q_1$ (pop phase), $q_2$ (accepting).
+
+**Transition function:**
+
+*   $q_0, a, Z_0 \to q_0, AZ_0$ and $q_0, a, A \to q_0, AA$ — push $A$ for each $a$.
+*   **Non-deterministic spontaneous move**: $q_0, \epsilon, A \to q_1, A$ — non-deterministically guess that all $a$s have been read and switch to the pop phase (without consuming input).
+*   $q_1, b, A \to q_1, \epsilon$ — pop $A$ for each $b$.
+*   $q_1, \epsilon, Z_0 \to q_2, Z_0$ — accept when stack is $Z_0$.
+
+**Difference from DPDA.** In the DPDA, the switch from push to pop is triggered by actually reading the first $b$. In this NPDA, the switch happens via an $\epsilon$-transition at any point during the $a$-reading phase. Along most branches the guess will be wrong and those paths reject; only the branch where the $\epsilon$-transition fires after exactly $n$ $a$s will correctly enter the pop phase and accept $a^n b^n$.
+
+This is the canonical illustration of how non-determinism can "guess" structural boundaries that a deterministic machine would determine by reading input.
+
+</details>
+
+##### **4.7. NPDA for Even-Length Palindromes** (Tutorial 10, Example 3)
+
+Construct an NPDA for $L = \{vv^R \mid v \in \{a, b\}^*\}$ and explain why no DPDA can recognise this language.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**States:** $q_0$ (push phase), $q_1$ (pop / match phase), $q_2$ (accepting).
+
+**Push phase transitions** ($q_0$, push symbol onto stack for each input symbol):
+
+| Input | Top of stack | New stack top | Meaning |
+|:-----:|:------------:|:-------------:|:--------|
+| $a$ | $Z_0$ | $AZ_0$ | push $A$ |
+| $a$ | $A$ | $AA$ | push $A$ |
+| $a$ | $B$ | $AB$ | push $A$ |
+| $b$ | $Z_0$ | $BZ_0$ | push $B$ |
+| $b$ | $A$ | $BA$ | push $B$ |
+| $b$ | $B$ | $BB$ | push $B$ |
+
+**Non-deterministic midpoint transitions** (from $q_0$ to $q_1$, $\epsilon$-moves):
+
+*   $\epsilon, Z_0 / Z_0$, $\epsilon, A / A$, $\epsilon, B / B$ — guess the midpoint at any time.
+
+**Pop / match phase** ($q_1$):
+
+*   $a, A / \epsilon$ — input $a$ matches $A$ on stack; pop.
+*   $b, B / \epsilon$ — input $b$ matches $B$ on stack; pop.
+
+**Acceptance:** $q_1, \epsilon, Z_0 / Z_0 \to q_2$ — accept when stack is $Z_0$ (all symbols matched).
+
+**Why no DPDA can recognise this.** A DPDA would need to know exactly when the middle of the string occurs. For the string $abba$, the midpoint is between the two $b$s. But for $abba$ and $abbaabba$, the midpoint positions are different, and without a separator (like $vcv^R$), a deterministic machine cannot tell when to stop pushing and start popping. The non-deterministic $\epsilon$-transitions allow the NPDA to "guess" the midpoint on every possible branch; exactly one correct branch accepts.
+
+</details>
+
+##### **4.8. Kleene's Algorithm on a 2-State Automaton** (Tutorial 10, Example 4)
+
+Apply Kleene's Algorithm to the DFSA with $Q = \{q_0, q_1\}$ defined by: $q_0$ is the start and accepting state; $q_0$ has a self-loop on $0$; there is a transition $q_0 \xrightarrow{1} q_1$; there is a transition $q_1 \xrightarrow{0} q_0$.
+
+Compute $R_{ij}^k$ for all $(i, j)$ at steps $k = -1$, $k = 0$, and $k = 1$, and state the final regular expression.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step $k = -1$ (direct transitions only).**
+
+*   $R_{00}^{-1} = 0 \mid \epsilon$ — self-loop on $0$, plus $\epsilon$ (stay in $q_0$ by reading nothing).
+*   $R_{01}^{-1} = 1$ — direct edge $q_0 \to q_1$ on $1$.
+*   $R_{10}^{-1} = 0$ — direct edge $q_1 \to q_0$ on $0$.
+*   $R_{11}^{-1} = \epsilon$ — no self-loop, only $\epsilon$ (stay in $q_1$).
+
+**Step $k = 0$ (paths may now pass through $q_0$).**
+
+Apply $R_{ij}^0 = R_{i0}^{-1}(R_{00}^{-1})^* R_{0j}^{-1} \mid R_{ij}^{-1}$:
+
+*   $R_{00}^0 = (0 \mid \epsilon)(0 \mid \epsilon)^*(0 \mid \epsilon) \mid (0 \mid \epsilon) = 0^*$
+*   $R_{01}^0 = (0 \mid \epsilon)(0 \mid \epsilon)^* \cdot 1 \mid 1 = 0^* 1$
+*   $R_{10}^0 = 0 \cdot (0 \mid \epsilon)^* \cdot (0 \mid \epsilon) \mid 0 = 00^*$
+*   $R_{11}^0 = 0 \cdot (0 \mid \epsilon)^* \cdot 1 \mid \epsilon = 00^* 1 \mid \epsilon$
+
+**Step $k = 1$ (paths may now pass through $q_0$ and $q_1$).**
+
+Apply $R_{ij}^1 = R_{i1}^0 (R_{11}^0)^* R_{1j}^0 \mid R_{ij}^0$:
+
+*   $R_{00}^1 = R_{01}^0(R_{11}^0)^* R_{10}^0 \mid R_{00}^0$
+    $= 0^*1 \cdot (00^*1 \mid \epsilon)^* \cdot 00^* \mid 0^*$
+    $= 0^*1(00^*1)^* 00^* \mid 0^*$
+    $= (0^*100^*)^*$
+
+**Final answer.** The accepting state set is $F = \{q_0\}$, so the answer is $R_{00}^1 = (0^*100^*)^*$.
+
+This is the language of all strings over $\{0, 1\}$ where every $1$ is followed by at least one $0$ — equivalently, no string ends in $1$ (every $1$ appears within a block $0^*10^+$).
+
+</details>
+
+##### **4.9. Kleene's Algorithm on a 3-State Automaton** (Tutorial 10, Example 5)
+
+Apply Kleene's Algorithm to the DFSA with $Q = \{q_0, q_1, q_2\}$, accepting states $F = \{q_1, q_2\}$, and transitions:
+
+*   $q_0 \xrightarrow{a} q_0$ (self-loop), $q_0 \xrightarrow{b} q_1$
+*   $q_1 \xrightarrow{b} q_1$ (self-loop), $q_1 \xrightarrow{a} q_2$
+*   $q_2 \xrightarrow{a} q_1$, $q_2 \xrightarrow{b} q_1$
+
+Compute all $R_{ij}^k$ values through $k = 2$ and give the final regular expression.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step $k = -1$.**
+
+*   $R_{00}^{-1} = a \mid \epsilon$, $R_{01}^{-1} = b$, $R_{02}^{-1} = \emptyset$
+*   $R_{10}^{-1} = \emptyset$, $R_{11}^{-1} = b \mid \epsilon$, $R_{12}^{-1} = a$
+*   $R_{20}^{-1} = \emptyset$, $R_{21}^{-1} = a \mid b$, $R_{22}^{-1} = \epsilon$
+
+**Step $k = 0$ (unlocking paths through $q_0$).**
+
+Using $R_{ij}^0 = R_{i0}^{-1}(R_{00}^{-1})^* R_{0j}^{-1} \mid R_{ij}^{-1}$:
+
+*   $R_{00}^0 = (a \mid \epsilon)(a \mid \epsilon)^*(a \mid \epsilon) \mid (a \mid \epsilon) = a^*$
+*   $R_{01}^0 = (a \mid \epsilon)(a \mid \epsilon)^* b \mid b = a^* b$
+*   $R_{02}^0 = (a \mid \epsilon)(a \mid \epsilon)^* \emptyset \mid \emptyset = \emptyset$
+*   $R_{10}^0 = \emptyset(a \mid \epsilon)^*(a \mid \epsilon) \mid \emptyset = \emptyset$
+*   $R_{11}^0 = \emptyset(a \mid \epsilon)^* b \mid (b \mid \epsilon) = b \mid \epsilon$
+*   $R_{12}^0 = \emptyset(a \mid \epsilon)^* \emptyset \mid a = a$
+*   $R_{20}^0 = \emptyset$, $R_{21}^0 = a \mid b$, $R_{22}^0 = \epsilon$
+
+**Step $k = 1$ (unlocking paths through $q_0$ and $q_1$).**
+
+Using $R_{ij}^1 = R_{i1}^0 (R_{11}^0)^* R_{1j}^0 \mid R_{ij}^0$:
+
+*   $R_{00}^1 = a^* b (b \mid \epsilon)^* \emptyset \mid a^* = a^*$
+*   $R_{01}^1 = a^* b (b \mid \epsilon)^* (b \mid \epsilon) \mid a^* b = a^* b b^* = a^* bb^*$
+*   $R_{02}^1 = a^* b (b \mid \epsilon)^* a \mid \emptyset = a^* bb^* a$
+*   $R_{10}^1 = \emptyset$, $R_{11}^1 = (b \mid \epsilon)(b \mid \epsilon)^*(b \mid \epsilon) \mid (b \mid \epsilon) = b^*$
+*   $R_{12}^1 = (b \mid \epsilon)(b \mid \epsilon)^* a \mid a = b^* a$
+*   $R_{20}^1 = \emptyset$
+*   $R_{21}^1 = (a \mid b)(b \mid \epsilon)^*(b \mid \epsilon) \mid (a \mid b) = (a \mid b)b^*$
+*   $R_{22}^1 = (a \mid b)(b \mid \epsilon)^* a \mid \epsilon = (a \mid b)b^* a \mid \epsilon$
+
+**Step $k = 2$ (unlocking all paths through $q_0$, $q_1$, $q_2$).**
+
+Key computation for the final answer (accepting states are $q_1$ and $q_2$):
+
+$R_{01}^2 = R_{02}^1(R_{22}^1)^* R_{21}^1 \mid R_{01}^1$
+
+$= a^* bb^* a \cdot ((a \mid b)b^* a \mid \epsilon)^* \cdot (a \mid b)b^* \mid a^* bb^*$
+
+$= a^* bb^* \bigl(a(a \mid b)b^*\bigr)^*$
+
+$R_{02}^2 = R_{02}^1(R_{22}^1)^* R_{22}^1 \mid R_{02}^1$
+
+$= a^* bb^* a \cdot ((a \mid b)b^*a \mid \epsilon)^* \cdot ((a \mid b)b^*a \mid \epsilon) \mid a^*bb^*a$
+
+$= a^* bb^* \bigl(a(a \mid b)b^*\bigr)^* a$
+
+**Final answer.** Since $F = \{q_1, q_2\}$:
+
+$$R_{01}^2 \mid R_{02}^2 = a^* bb^*\bigl(a(a \mid b)b^*\bigr)^*(\epsilon \mid a)$$
+
+This is the language of strings that start with any number of $a$s, then have at least one $b$, and continue with blocks of the form $(a(a \mid b)b^*)$, optionally ending with one more $a$.
+
+</details>

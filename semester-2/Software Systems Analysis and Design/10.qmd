@@ -1,0 +1,1504 @@
+---
+title: "W11. Design Patterns: Facade, Decorator, Proxy"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "March 31, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Design Patterns in Context**
+
+This week continues the study of structural design patterns from the Gang of Four (GoF) catalogue. Recall that **structural patterns** describe how classes and objects can be combined to form larger, more useful structures. The three patterns covered this week — **Facade**, **Decorator**, and **Proxy** — are all structural, yet each solves a different class of problem:
+
+*   **Facade** hides a complex subsystem behind a simple, unified interface.
+*   **Decorator** adds behaviors to an individual object at runtime without modifying its class.
+*   **Proxy** controls access to another object by acting as its substitute.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "This week's three patterns within the GoF structural category"
+%%| fig-width: 6.2
+%%| fig-height: 2.8
+flowchart TB
+    Patterns["Design Patterns"]
+    S["Structural"]
+    F["Facade"]
+    D["Decorator"]
+    P["Proxy"]
+    Patterns --> S
+    S --> F
+    S --> D
+    S --> P
+```
+
+##### **1.2 Facade**
+
+###### **1.2.1 Motivation: Simplifying Complex Subsystems**
+
+Real-world software systems often contain deeply interconnected subsystems. A **compiler**, for example, involves a source reader, a scanner, a parser, an AST node hierarchy, a semantic analyzer, a code generator, and a diagnostic message system. Each of these components has its own interface, and clients who need to compile source code must understand *all* of them, coordinate initialization order, and manage their lifecycle. This creates two serious problems:
+
+1.  **Client complexity**: Clients must understand many interfaces, not just the one they care about.
+2.  **Tight coupling**: Any change deep inside the subsystem forces changes in all client code.
+
+The **Facade pattern** solves this by introducing a single class with a simplified interface that internally delegates to the appropriate subsystem components. The client only sees the facade — the underlying complexity is hidden.
+
+The key applicability criteria for Facade are:
+
+*   You need a limited but straightforward interface to a complex subsystem.
+*   You want to layer a subsystem so that higher-level code doesn't depend on lower-level details.
+
+###### **1.2.2 Structure**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Facade pattern structure: the Client interacts only with the Facade"
+%%| fig-width: 7
+%%| fig-height: 4
+classDiagram
+    class Client
+    class Facade {
+        -linksToSubsystemObjects
+        +subsystemOperation()
+    }
+    class SubsystemClass1 {
+        +operationA()
+    }
+    class SubsystemClass2 {
+        +operationB()
+    }
+    class SubsystemClass3 {
+        +operationC()
+    }
+    Client --> Facade
+    Facade --> SubsystemClass1
+    Facade --> SubsystemClass2
+    Facade --> SubsystemClass3
+```
+
+The key participants are:
+
+*   **Facade**: Declares the simplified interface. Knows which subsystem classes handle which requests. Delegates client requests to appropriate subsystem objects. May also initialize and manage the lifecycle of subsystem objects.
+*   **Subsystem classes**: Implement subsystem functionality. Handle work assigned by the Facade object. Have no knowledge of the Facade — they do not hold references to it.
+*   **Client**: Only communicates with the subsystem via the Facade. It is decoupled from all subsystem internals.
+
+###### **1.2.3 How to Apply Facade**
+
+1.  **Check whether a simpler interface is possible.** You're on the right track if that interface would make client code independent of many subsystem classes.
+2.  **Declare and implement the interface in a new Facade class.** The facade should redirect calls to appropriate subsystem objects and manage their initialization and lifecycle (unless the client already does this).
+3.  **Make all client code communicate with the subsystem only via the Facade.** This protects client code from subsystem changes — when a subsystem is upgraded, only the Facade needs modification.
+4.  **If the Facade grows too large, consider splitting it.** Extract part of the behavior into a new, more focused facade class.
+
+###### **1.2.4 Pros and Cons**
+
+*   **Pros**
+    *   You can isolate your code from the complexity of a subsystem.
+    *   Reduces coupling between clients and subsystem internals.
+    *   Enables layered architecture: higher-level components depend only on the Facade, not on individual low-level classes.
+*   **Cons**
+    *   A facade can become a **god object** — a class that is coupled to all other classes in the application. If it accumulates too much responsibility, it becomes a maintenance problem itself.
+
+###### **1.2.5 The Compiler Example**
+
+The lecture uses a compiler as a textbook Facade scenario. The compiler subsystem contains seven components (Reader, Token hierarchy, Scanner, Parser, AST Node hierarchy, Generator, Message hierarchy), each with its own interface. A client who just wants to "compile this source to bytecode" should not have to know any of this.
+
+The solution is layered facades:
+
+*   `LexicalAnalyzer` is a Facade over `Reader` and `Scanner`. Its public interface exposes only `getToken()`. The internal `Reader` and `Scanner` are private implementation details.
+*   `Compiler` is a higher-level Facade over `LexicalAnalyzer`, `Parser`, and `CodeGenerator`. Its public interface exposes only `compile()`. The client invokes `new Compiler(input, output).compile()` and knows nothing about the seven subsystem components.
+
+```cpp
+class LexicalAnalyzer {
+public:
+    LexicalAnalyzer(istream& input) : reader(input) {
+        scanner = new Scanner(reader);
+    }
+    Token* getToken() {
+        return scanner->getToken();  // Own interface: hides Reader
+    }
+private:
+    Reader reader;
+    Scanner* scanner;
+};
+
+class Compiler {
+public:
+    Compiler(istream& input, BytecodeStream& output)
+        : lexer(input), generator(output), parser(lexer.scanner) {}
+    void compile() {
+        Program* program = parser.parseProgram();
+        generator.visit(program);
+    }
+private:
+    LexicalAnalyzer lexer;
+    Parser          parser;
+    CodeGenerator   generator;
+};
+```
+
+Notice how each Facade holds its subsystem components as **private members** and exposes only a narrow public interface.
+
+##### **1.3 Decorator**
+
+###### **1.3.1 Motivation: Adding Behavior Dynamically**
+
+Consider designing a text editor. You need to support windows with various optional features: a scrollbar, a border, a menu bar, a status bar, or any combination thereof. How should you model this?
+
+The obvious approach — **inheritance** — leads to a combinatorial explosion. A `ScrolledBorderedTextWithMenu` subclass is a rigid, static configuration. You cannot create it at runtime, you cannot remove the border later, and every new combination requires a new class. With $n$ optional features, you potentially need $2^n$ subclasses.
+
+A second approach — **Strategy** (embedding each feature as a field) — works but makes the host class heavyweight: every instance carries fields for every possible feature, even when most features are inactive.
+
+The **Decorator pattern** solves this cleanly: an individual object can be *wrapped* by one or more decorator objects at runtime. Each decorator adds one behavior. Wrapping can be composed arbitrarily: `ScrollDecorator(BorderDecorator(new TextView()))` creates a scrolled, bordered text view. The two wrappings can also be reversed: `BorderDecorator(ScrollDecorator(new TextView()))` — giving a different visual result.
+
+The key applicability criteria for Decorator are:
+
+*   You need to assign extra behaviors to objects at runtime without breaking existing code that uses those objects.
+*   Extending behavior via inheritance is awkward or impossible (e.g., the class is `final`, or the combination space is too large).
+
+###### **1.3.2 Why Inheritance Fails**
+
+Consider adding optional behaviors with subclassing:
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Inheritance-based approach: combinatorial explosion of subclasses"
+%%| fig-width: 7
+%%| fig-height: 3.5
+classDiagram
+    class TextView
+    class ScrolledText
+    class BorderedText
+    class TextWithMenu
+    class ScrolledBorderedText
+    TextView <|-- ScrolledText
+    TextView <|-- BorderedText
+    TextView <|-- TextWithMenu
+    TextView <|-- ScrolledBorderedText
+```
+
+With four optional features (scroll, border, menu, status bar), you would need up to 15 non-trivial subclasses just to cover all combinations. You also cannot change a window's decoration dynamically at runtime — the subclass is fixed at object creation time.
+
+###### **1.3.3 The Decorator Solution**
+
+The insight behind Decorator is that a decorator is *both a subtype of* and *a container for* the component it wraps:
+
+```cpp
+class TextView {
+    virtual void Draw() { ... }
+    virtual void Resize(int) { ... }
+};
+
+class BorderDecorator : TextView {   // IS-A TextView (same interface)
+    override void Draw() {
+        component.Draw();            // Delegates to wrapped object
+        DrawBorder(borderWidth);     // Adds border behavior
+    }
+    override void Resize(int s) { component.Resize(s); }
+
+    protected TextView component;    // HAS-A TextView (wraps it)
+    private void DrawBorder(int w) { ... }
+    private int borderWidth;
+
+    public BorderDecorator(TextView c, int w)
+    { component = c; borderWidth = w; }
+};
+```
+
+Because `BorderDecorator` inherits from `TextView`, it is a valid `TextView` from the client's perspective — full **polymorphism** is preserved. The client does not know whether it is working with a plain `TextView` or a decorated one:
+
+```cpp
+class AnotherClass {
+    var ws = new TextView();
+    var wb = new BorderDecorator(new TextView(), 2);
+
+    TextView w = condition ? ws : wb;
+    w.Draw();    // Works for both — client is unaware of decoration
+    w.Resize(4);
+}
+```
+
+Decorators can be stacked arbitrarily:
+
+```cpp
+// ScrollDecorator wrapping a BorderDecorator wrapping a TextView
+var wb = new ScrollDecorator(new BorderDecorator(new TextView(), 2));
+
+// Or reversed — different visual result
+var wb2 = new BorderDecorator(new ScrollDecorator(new TextView()), 2);
+```
+
+Dynamic addition and removal of behaviors also becomes possible. Adding a decorator:
+
+```cpp
+var w  = new TextView();           // simple window
+var w1 = new ScrollDecorator(w);   // same window + scroll bar, at runtime
+```
+
+###### **1.3.4 Structure**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Decorator pattern structure: decorators wrap a component through the same interface"
+%%| fig-width: 7.5
+%%| fig-height: 4.5
+classDiagram
+    class Component {
+        <<interface>>
+        +execute()
+    }
+    class ConcreteComponent {
+        +execute()
+    }
+    class BaseDecorator {
+        -wrappee: Component
+        +BaseDecorator(c: Component)
+        +execute()
+    }
+    class ConcreteDecorator1 {
+        +execute()
+        +extra()
+    }
+    class ConcreteDecorator2 {
+        +execute()
+    }
+    class Client
+    Component <|.. ConcreteComponent
+    Component <|.. BaseDecorator
+    BaseDecorator o-- Component : wraps
+    BaseDecorator <|-- ConcreteDecorator1
+    BaseDecorator <|-- ConcreteDecorator2
+    Client --> Component
+```
+
+The key participants are:
+
+*   **Component** (interface or abstract class): Declares the common interface for both wrappers and wrapped objects.
+*   **Concrete Component**: The basic object that actually carries the core behavior being decorated.
+*   **Base Decorator**: Holds a reference (`wrappee`) to the wrapped component, typed as the `Component` interface. Delegates all work to the wrapped object. This is the class all concrete decorators extend.
+*   **Concrete Decorators**: Add behaviors before and/or after calling the parent (base decorator) method. Each concrete decorator is responsible for exactly one extra behavior.
+*   **Client**: Wraps components in decorators as needed. Because all decorators conform to `Component`, the client can work with any combination.
+
+###### **1.3.5 How to Apply Decorator**
+
+1.  Confirm that your business domain can be modeled as a primary component with optional layers stacked on top.
+2.  Find the methods common to both the primary component and all optional layers. Declare a **Component interface** with those methods.
+3.  Create a **Concrete Component** class that implements the base behavior.
+4.  Create a **Base Decorator** class implementing the same interface. It stores a `wrappee` field typed as `Component` and delegates all method calls to `wrappee`.
+5.  Ensure all classes (concrete component and all decorators) implement the Component interface.
+6.  Create **Concrete Decorators** by extending Base Decorator. Each concrete decorator calls `super.execute()` (which forwards to the wrapped object) and adds its own behavior before or after that call.
+7.  The **client** creates decorators and chains them. The client controls what is wrapped and in what order.
+
+###### **1.3.6 Pros and Cons**
+
+*   **Pros**
+    *   You can extend an object's behavior without making a new subclass.
+    *   You can add or remove responsibilities from an object at runtime.
+    *   You can combine several behaviors by wrapping an object into multiple decorators.
+    *   *Single Responsibility Principle*: A monolithic class with many behavioral variants can be split into several smaller classes, each responsible for one behavior.
+*   **Cons**
+    *   It is hard to remove a *specific* wrapper from the middle of a wrapper stack without rebuilding the stack.
+    *   It is hard to implement a decorator whose behavior does not depend on the order of decorators in the stack.
+    *   The initial configuration code (chaining many `new DecoratorX(new DecoratorY(...))` calls) can look verbose and hard to read.
+
+##### **1.4 Proxy**
+
+###### **1.4.1 Motivation: Controlling Object Access**
+
+A **Proxy** is a substitute or placeholder for another object. It implements the same interface as the *real subject* it represents, so clients can interact with the proxy exactly as they would with the real object. The difference is that the proxy intercepts every access and can perform additional work — before and/or after forwarding the request to the real object.
+
+The canonical motivation: you have a **very heavyweight object** (large image, database connection, remote service) that is expensive to create. You do not want to create it until it is actually needed, and once created, you may want to cache results, control access, log calls, etc.
+
+###### **1.4.2 Proxy Variants**
+
+*   **Virtual Proxy (Lazy Initialization)**: The proxy postpones creating the real heavyweight object until the first access. The object is only created if and when it is actually needed.
+*   **Remote Proxy**: The real object lives on a remote server. The proxy provides a local representative that handles network communication transparently.
+*   **Protection Proxy (Access Control)**: The proxy checks permissions before forwarding requests. Different clients may be allowed different operations on the same object.
+*   **Caching Proxy**: The proxy stores results of expensive operations and returns cached results for repeated requests with the same parameters.
+*   **Logging Proxy**: The proxy keeps a history of all requests to the real object.
+*   **Smart Reference**: The proxy counts references to the real object and frees it automatically when no references remain (similar to C++ smart pointers). It can also check whether the object is locked before access.
+
+###### **1.4.3 Structure**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Proxy pattern structure: Proxy and Service share the same interface"
+%%| fig-width: 7
+%%| fig-height: 4
+classDiagram
+    class ServiceInterface {
+        <<interface>>
+        +operation()
+    }
+    class Service {
+        +operation()
+    }
+    class Proxy {
+        -realService: Service
+        +Proxy(s: Service)
+        +checkAccess(): bool
+        +operation()
+    }
+    class Client
+    ServiceInterface <|.. Service
+    ServiceInterface <|.. Proxy
+    Proxy o-- Service : realService
+    Client --> ServiceInterface
+```
+
+The key participants are:
+
+*   **ServiceInterface**: Declares the interface of the Service. The Proxy must implement this interface to be substitutable for the Service.
+*   **Service**: The real object that implements the actual business logic. It does not know about the Proxy.
+*   **Proxy**: Holds a reference to the Service (`realService`). After completing its pre- or post-processing work, it delegates to `realService`. It often creates and manages the lifecycle of the Service object.
+*   **Client**: Works with both Service and Proxy through the `ServiceInterface`. The client typically does not know whether it is using a real service or a proxy.
+
+###### **1.4.4 C++ Implementation via Operator Overloading**
+
+In C++, the Proxy pattern can be implemented at the language level using **operator overloading**. The two relevant operators are `->` (member access via pointer) and `*` (dereferencing). Because C++ allows these to be overloaded, a `Proxy` class can behave syntactically *exactly like a pointer* to the real object.
+
+```cpp
+class Object {
+public:
+    int m;
+    // ... other public members
+};
+
+class Proxy {
+public:
+    Proxy(Object* o) : object(o) { }
+    Object* operator->() { return object; }   // Enables p->m syntax
+    Object& operator*()  { return *object; }  // Enables (*p).m syntax
+private:
+    Object* object;
+};
+```
+
+Usage:
+
+```cpp
+Proxy p(new Object());
+p->m = 77;       // equivalent to (p.operator->()).m = 77
+int x = (*p).m;  // equivalent to (p.operator*()).m
+```
+
+This basic proxy is just a thin wrapper. A more useful variant is the **Virtual Proxy** for lazy initialization:
+
+```cpp
+class ProxyForHeavy {
+public:
+    ProxyForHeavy() : object(nullptr) { }
+    VeryHeavyObject* operator->() { LoadObject(); return object; }
+    VeryHeavyObject& operator*()  { LoadObject(); return *object; }
+private:
+    void LoadObject() {
+        if (object == nullptr)
+            object = new VeryHeavyObject();   // Create only on first access
+    }
+    VeryHeavyObject* object;
+};
+```
+
+Why this proxy is useful:
+1.  **Deferred creation**: The `VeryHeavyObject` is not allocated until the first time its members are accessed — even if many `ProxyForHeavy` variables exist.
+2.  **Null-safety**: The proxy guarantees that `object` is always initialized before any access, eliminating null-pointer dereference bugs.
+
+Key C++ rules for operator overloading: you can redefine `+`, `-`, `*`, `/`, `[]`, `()`, `new`, `delete`, `->`, and `*`. You cannot redefine `.` (dot access). You cannot invent new operators and cannot change an operator's arity or precedence.
+
+###### **1.4.5 How to Apply Proxy**
+
+1.  **Create a service interface** (if one does not already exist) so that Proxy and Service are interchangeable. If you cannot modify existing Service clients, consider making the Proxy a subclass of the Service class to inherit its interface.
+2.  **Create the Proxy class** with a field storing a reference to the Service. In most cases the Proxy creates and manages the Service's lifecycle; rarely, the Service is passed via the constructor.
+3.  **Implement the Proxy methods** to perform their pre/post-processing (access check, logging, caching) and then delegate to the Service object.
+4.  **Consider a creation method** (a factory) that decides whether the client gets a Proxy or the real Service. This can be a static method in the Proxy class or a full factory method.
+5.  **Consider lazy initialization** for the Service object where appropriate.
+
+###### **1.4.6 Proxy vs. Related Patterns**
+
+*   **Adapter**: An Adapter provides a *different* interface to the object it adapts. A Proxy provides the *same* interface as its subject.
+*   **Decorator**: Decorators have similar implementations to Proxies (both wrap an object), but different purposes. A Decorator adds one or more responsibilities; a Proxy *controls access* to the object. In practice: if you are adding behavior → Decorator; if you are mediating access or managing lifecycle → Proxy.
+
+###### **1.4.7 Pros and Cons**
+
+*   **Pros**
+    *   You can control the service object without clients knowing about it.
+    *   You can manage the lifecycle of the service object when clients do not care about it.
+    *   The proxy works even if the service object is not yet ready or is temporarily unavailable.
+    *   *Open/Closed Principle*: You can introduce new proxies without changing the service or its clients.
+*   **Cons**
+    *   The code becomes more complex because of new classes.
+    *   The response from the service may be delayed (especially relevant for remote or lazy-loading proxies).
+
+---
+
+#### **2. Definitions**
+
+*   **Design Pattern**: An architectural scheme — a certain organization of classes, objects, and methods — that provides a standardized, reusable solution to a recurring OOP design problem.
+*   **Structural Pattern**: A GoF pattern category describing how classes and objects can be combined to form larger structures. Facade, Decorator, and Proxy all belong to this category.
+*   **Facade**: A structural pattern that provides a simplified, unified interface to a complex subsystem, hiding the complexity from clients.
+*   **God Object**: An anti-pattern where a single class knows too much or does too much. A poorly designed Facade can degenerate into a god object.
+*   **Decorator**: A structural pattern that attaches new behaviors to objects by wrapping them inside special wrapper objects (decorators) that implement the same interface as the wrapped object.
+*   **Wrappee**: The object held inside a decorator; the object whose behavior is being extended.
+*   **Base Decorator**: An abstract intermediate class that implements the component interface and holds a reference to the wrappee. All concrete decorators inherit from it.
+*   **Concrete Decorator**: A specific decorator class that adds one behavior before or after delegating to the wrappee.
+*   **Proxy**: A structural pattern that provides a substitute or placeholder for another object, controlling access to it and optionally performing pre/post-processing on every request.
+*   **Virtual Proxy**: A proxy that delays the creation of an expensive object until the first time it is accessed (lazy initialization).
+*   **Remote Proxy**: A proxy that represents an object located on a remote server, handling network communication transparently.
+*   **Protection Proxy**: A proxy that enforces access control by checking client permissions before forwarding requests to the real object.
+*   **Caching Proxy**: A proxy that stores results of expensive operations and serves cached results for repeated requests.
+*   **Smart Reference**: A proxy that counts the number of references to the real object and automatically frees it when the count reaches zero (similar to C++ `shared_ptr`).
+*   **Operator Overloading**: A C++ feature allowing user-defined classes to redefine the behavior of operators (including `->` and `*`), enabling Proxy objects to behave syntactically like pointers.
+*   **Lazy Initialization**: A technique where the creation of an expensive resource is deferred until the first moment it is actually needed.
+*   **Open/Closed Principle**: A SOLID principle stating that software entities should be open for extension but closed for modification.
+*   **Single Responsibility Principle**: A SOLID principle stating that a class should have only one reason to change.
+
+---
+
+#### **3. Examples**
+
+##### **3.1. Lecture Recap — Theory Questions** (Lab 10, Task 1)
+
+Answer the following six questions to confirm your understanding of the three patterns covered this week.
+
+**(a)** What is the purpose of the **Facade** design pattern? Which problem does it solve?
+
+**(b)** Describe a real-world scenario where the **Facade** pattern could be beneficial.
+
+**(c)** What is the purpose of the **Decorator** design pattern?
+
+**(d)** Describe a real-world scenario where the **Decorator** pattern could be beneficial.
+
+**(e)** What is the purpose of the **Proxy** design pattern?
+
+**(f)** Describe a real-world scenario where the **Proxy** pattern could be beneficial.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Purpose of Facade:**
+The Facade pattern solves the problem of *subsystem complexity*. When a system is composed of many interacting classes, each with its own interface, clients who need to accomplish a high-level task must understand and coordinate all of those classes. This creates tight coupling and makes the client fragile to internal changes. Facade introduces a single class with a simple, focused interface that internally handles all the coordination. The client no longer depends on subsystem internals — it only depends on the Facade.
+
+**(b) Real-world scenario for Facade:**
+A **home theater system** consists of a projector, a DVD player, a surround sound system, lighting controls, and a screen actuator — each with its own interface and startup sequence. A `HomeTheaterFacade` class provides a single `watchMovie()` method that turns on every component in the correct order. The user (client) calls one method and the entire setup is handled automatically; they never interact with the individual devices.
+
+**(c) Purpose of Decorator:**
+The Decorator pattern solves the problem of *dynamic behavior extension*. When you need objects of the same type to carry different combinations of optional behaviors, using subclasses leads to a combinatorial explosion of classes and does not allow runtime changes. Decorator lets you wrap an object in one or more decorator objects, each adding one behavior, without changing the object's class or breaking any code that already uses it.
+
+**(d) Real-world scenario for Decorator:**
+A **text I/O library** has a basic `FileStream` that reads bytes from a file. Clients often need additional behaviors: compressed I/O, encrypted I/O, or buffered I/O. Instead of creating `CompressedEncryptedBufferedFileStream`, you create three decorators — `CompressionDecorator`, `EncryptionDecorator`, `BufferingDecorator` — that can be stacked in any order around any stream. New behaviors are added without changing `FileStream` at all.
+
+**(e) Purpose of Proxy:**
+The Proxy pattern solves the problem of *controlled access* to an object. Sometimes you want to add pre/post-processing when a client accesses an object (e.g., check access rights, log the request, or defer expensive initialization) without changing the object's interface or the client's code. A Proxy implements the same interface as the real object and intercepts every call, performing its additional work before (and/or after) forwarding to the real object.
+
+**(f) Real-world scenario for Proxy:**
+A **document viewer application** loads large images from disk. Instead of loading every image at startup, a `ProxyImage` is created for each image path. The first time `display()` is called on a `ProxyImage`, it loads the real image from disk and then displays it. Subsequent calls skip the loading step. The client code (`display()`) is identical whether it interacts with the proxy or the real image — the optimization is entirely transparent.
+
+</details>
+
+##### **3.2. Implement a Smart Home Facade** (Lab 10, Task 2)
+
+Develop a Facade to simplify the control of various smart home devices.
+
+**Requirements:**
+
+*   Implement classes for three smart devices:
+    *   `Light` with methods `on()` and `off()`
+    *   `Thermostat` with method `setTemperature(int temp)`
+    *   `SecurityCamera` with methods `activate()` and `deactivate()`
+*   Design a `SmartHomeFacade` class that provides two scenario methods:
+    *   `leavingHome()`: turns off lights, sets thermostat to eco mode (15°C), activates security cameras.
+    *   `arrivingHome()`: turns on lights, sets thermostat to comfortable temperature (22°C).
+*   Demonstrate both scenarios in `main`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The Facade hides three independent subsystem classes behind two high-level scenario methods. The client only calls `facade.leavingHome()` or `facade.arrivingHome()` — it never touches `Light`, `Thermostat`, or `SecurityCamera` directly.
+
+```java
+// Light.java — Subsystem class 1
+public class Light {
+    public void on()  { System.out.println("Light: on.");  }
+    public void off() { System.out.println("Light: off."); }
+}
+
+// Thermostat.java — Subsystem class 2
+public class Thermostat {
+    public void setTemperature(int temp) {
+        System.out.println("Thermostat: set to " + temp + "°C.");
+    }
+}
+
+// SecurityCamera.java — Subsystem class 3
+public class SecurityCamera {
+    public void activate()   { System.out.println("SecurityCamera: activated.");   }
+    public void deactivate() { System.out.println("SecurityCamera: deactivated."); }
+}
+
+// SmartHomeFacade.java — Facade
+public class SmartHomeFacade {
+    private Light          light;
+    private Thermostat     thermostat;
+    private SecurityCamera camera;
+
+    public SmartHomeFacade() {
+        // The Facade owns the lifecycle of subsystem objects
+        this.light      = new Light();
+        this.thermostat = new Thermostat();
+        this.camera     = new SecurityCamera();
+    }
+
+    public void leavingHome() {
+        System.out.println("--- Leaving home ---");
+        light.off();
+        thermostat.setTemperature(15);   // eco mode
+        camera.activate();
+    }
+
+    public void arrivingHome() {
+        System.out.println("--- Arriving home ---");
+        light.on();
+        thermostat.setTemperature(22);   // comfortable temperature
+        camera.deactivate();
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        SmartHomeFacade home = new SmartHomeFacade();
+        home.leavingHome();
+        System.out.println();
+        home.arrivingHome();
+    }
+}
+```
+
+**Expected output:**
+
+```
+--- Leaving home ---
+Light: off.
+Thermostat: set to 15°C.
+SecurityCamera: activated.
+
+--- Arriving home ---
+Light: on.
+Thermostat: set to 22°C.
+SecurityCamera: deactivated.
+```
+
+**Answer:** The `Main` class has *zero* knowledge of `Light`, `Thermostat`, or `SecurityCamera`. If the home theater gains a fourth device (`Blinds`), only `SmartHomeFacade` changes — `Main` is untouched. This is the core Facade benefit.
+
+</details>
+
+##### **3.3. Implement a Text Styling System with Decorator** (Lab 10, Task 3)
+
+Apply the Decorator pattern to build a flexible text styling system where styles (bold, italic, underline) can be dynamically added to text.
+
+**Requirements:**
+
+*   Define a `Text` interface with a method `write()` that displays the text with its applied styles.
+*   Implement a `PlainText` class that outputs the text without any styling.
+*   Create a `TextDecorator` abstract class implementing `Text`, serving as the base for all style decorators.
+*   Develop concrete decorators `Bold`, `Italic`, and `Underline`. Use the following ANSI escape codes:
+    *   Bold: wrap the text in `"\033[1m"` and `"\033[0m"`
+    *   Italic: wrap in `"\033[3m"` and `"\033[0m"`
+    *   Underline: wrap in `"\033[4m"` and `"\033[0m"`
+*   Demonstrate applying multiple styles to the same text object.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each decorator stores a reference to a `Text` object (which can itself be a decorator), calls `wrappee.write()` to obtain the inner text, and wraps the result in its own styling tags. Stacking decorators applies styles from innermost to outermost.
+
+```java
+// Text.java — Component interface
+public interface Text {
+    String write();
+}
+
+// PlainText.java — Concrete Component
+public class PlainText implements Text {
+    private final String content;
+
+    public PlainText(String content) {
+        this.content = content;
+    }
+
+    @Override
+    public String write() {
+        return content;
+    }
+}
+
+// TextDecorator.java — Base Decorator
+public abstract class TextDecorator implements Text {
+    protected Text wrappee;
+
+    public TextDecorator(Text text) {
+        this.wrappee = text;
+    }
+
+    @Override
+    public String write() {
+        return wrappee.write();   // Default: delegate unchanged
+    }
+}
+
+// Bold.java — Concrete Decorator
+public class Bold extends TextDecorator {
+    public Bold(Text text) { super(text); }
+
+    @Override
+    public String write() {
+        return "\033[1m" + wrappee.write() + "\033[0m";
+    }
+}
+
+// Italic.java — Concrete Decorator
+public class Italic extends TextDecorator {
+    public Italic(Text text) { super(text); }
+
+    @Override
+    public String write() {
+        return "\033[3m" + wrappee.write() + "\033[0m";
+    }
+}
+
+// Underline.java — Concrete Decorator
+public class Underline extends TextDecorator {
+    public Underline(Text text) { super(text); }
+
+    @Override
+    public String write() {
+        return "\033[4m" + wrappee.write() + "\033[0m";
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        Text plain = new PlainText("Hello, World!");
+        System.out.println(plain.write());
+
+        Text bold = new Bold(new PlainText("Hello, World!"));
+        System.out.println(bold.write());
+
+        // Stack three decorators: Bold + Italic + Underline
+        Text styled = new Bold(new Italic(new Underline(new PlainText("Hello, World!"))));
+        System.out.println(styled.write());
+    }
+}
+```
+
+**How the stacking works:** When `styled.write()` is called on the outermost `Bold` decorator:
+1.  `Bold.write()` calls `Italic.write()` (its wrappee).
+2.  `Italic.write()` calls `Underline.write()` (its wrappee).
+3.  `Underline.write()` calls `PlainText.write()`, which returns `"Hello, World!"`.
+4.  `Underline` wraps it: `"\033[4m" + "Hello, World!" + "\033[0m"`.
+5.  `Italic` wraps that: `"\033[3m" + underlined_text + "\033[0m"`.
+6.  `Bold` wraps that: `"\033[1m" + italic_underlined_text + "\033[0m"`.
+
+The final string carries all three ANSI styling layers. On a terminal that supports ANSI codes, the text renders as bold, italic, and underlined simultaneously. The order of decoration controls which style wraps which.
+
+</details>
+
+##### **3.4. Implement Role-Based Document Access with Proxy** (Lab 10, Task 4)
+
+Implement a Proxy to control access to sensitive documents based on user roles.
+
+**Requirements:**
+
+*   Define a `Document` interface with a method `display()`.
+*   Implement a `RealDocument` class representing a sensitive document.
+*   Create a `SecureDocumentProxy` class that also implements `Document` and contains security logic: it grants access to users with the `"ADMIN"` role and denies all others.
+*   Demonstrate using the proxy with different user roles.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The `SecureDocumentProxy` sits between the client and `RealDocument`. The proxy performs an access check (`checkAccess(role)`) before forwarding the `display()` call. The `RealDocument` is created *lazily* — only when an authorized user first requests it. Unauthorized users never cause the real document to be loaded.
+
+```java
+// Document.java — Service interface
+public interface Document {
+    void display(String userRole);
+}
+
+// RealDocument.java — Real Service
+public class RealDocument implements Document {
+    private final String content;
+
+    public RealDocument(String filename) {
+        // Simulate loading the document from secure storage
+        System.out.println("RealDocument: Loading sensitive document '" + filename + "'.");
+        this.content = "CONFIDENTIAL CONTENT of " + filename;
+    }
+
+    @Override
+    public void display(String userRole) {
+        System.out.println("RealDocument: " + content);
+    }
+}
+
+// SecureDocumentProxy.java — Proxy with protection logic
+public class SecureDocumentProxy implements Document {
+    private final String filename;
+    private RealDocument realDocument;   // created lazily
+
+    public SecureDocumentProxy(String filename) {
+        this.filename = filename;
+    }
+
+    private boolean checkAccess(String userRole) {
+        return "ADMIN".equalsIgnoreCase(userRole);
+    }
+
+    @Override
+    public void display(String userRole) {
+        if (!checkAccess(userRole)) {
+            System.out.println("SecureDocumentProxy: Access DENIED for role '" + userRole + "'.");
+            return;
+        }
+        // Lazy initialization: load the real document only for authorized users
+        if (realDocument == null) {
+            realDocument = new RealDocument(filename);
+        }
+        realDocument.display(userRole);
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new SecureDocumentProxy("financial_report_Q1.pdf");
+
+        System.out.println("=== User role: GUEST ===");
+        doc.display("GUEST");
+
+        System.out.println("\n=== User role: ADMIN ===");
+        doc.display("ADMIN");
+
+        System.out.println("\n=== User role: ADMIN (second request) ===");
+        doc.display("ADMIN");   // Real document already loaded; no re-load
+    }
+}
+```
+
+**Expected output:**
+
+```
+=== User role: GUEST ===
+SecureDocumentProxy: Access DENIED for role 'GUEST'.
+
+=== User role: ADMIN ===
+RealDocument: Loading sensitive document 'financial_report_Q1.pdf'.
+RealDocument: CONFIDENTIAL CONTENT of financial_report_Q1.pdf
+
+=== User role: ADMIN (second request) ===
+RealDocument: CONFIDENTIAL CONTENT of financial_report_Q1.pdf
+```
+
+**Answer:** Notice that the document is loaded exactly once (on the first admin access) and never loaded for non-admin users. The client (`Main`) calls `doc.display(role)` uniformly — it has no knowledge of the proxy's logic. This combines the Protection Proxy and Virtual Proxy (lazy initialization) variants in one class.
+
+</details>
+
+##### **3.5. Compile Source Code via Layered Facades** (Lecture 10, Example 1)
+
+The following C++ code models a compiler using layered Facade classes. Identify which classes act as Facades, explain what each Facade encapsulates, and trace what happens when a client calls `compiler.compile()`.
+
+```cpp
+class LexicalAnalyzer {
+public:
+    LexicalAnalyzer(istream& input) : reader(input) {
+        scanner = new Scanner(reader);
+    }
+    virtual ~LexicalAnalyzer() { delete scanner; }
+    Token* getToken() { return scanner->getToken(); }
+private:
+    Reader   reader;
+    Scanner* scanner;
+};
+
+class Compiler {
+public:
+    Compiler(istream& input, BytecodeStream& output)
+        : lexer(input), generator(output), parser(lexer.scanner)
+    {}
+    virtual ~Compiler() {}
+    void compile() {
+        Program* program = parser.parseProgram();
+        generator.visit(program);
+    }
+private:
+    LexicalAnalyzer lexer;
+    Parser          parser;
+    CodeGenerator   generator;
+};
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Two levels of Facade exist here. Each Facade hides the interfaces of its constituent components and exposes only what the next level above needs.
+
+**Facade 1 — `LexicalAnalyzer`:**
+
+*   Encapsulates: `Reader` (reads characters from a stream) and `Scanner` (converts characters into tokens).
+*   Own interface (the only thing visible externally): `getToken()`.
+*   The `Reader` and `Scanner` are private — users of `LexicalAnalyzer` have no idea they exist.
+
+**Facade 2 — `Compiler`:**
+
+*   Encapsulates: `LexicalAnalyzer`, `Parser`, and `CodeGenerator`.
+*   Own interface: `compile()`.
+*   Internally, `compile()` asks `parser.parseProgram()` to produce an AST and then `generator.visit(program)` to emit bytecode. The caller never touches any of these three components directly.
+
+**Trace of `compiler.compile()`:**
+1.  Client constructs `Compiler(input, output)`. The compiler's constructor initializes `lexer` (which internally creates `Reader` and `Scanner`), then `generator`, then `parser` (passing `lexer.scanner` to it).
+2.  Client calls `compiler.compile()`.
+3.  Inside `compile()`: `parser.parseProgram()` reads tokens from the scanner (via `lexer`) and builds an AST of type `Program*`.
+4.  `generator.visit(program)` traverses the AST and emits bytecode to the output stream.
+5.  The entire compiler subsystem (7+ classes) was used, but the client only saw one method call.
+
+**Answer:** `LexicalAnalyzer` is a low-level Facade over `Reader` and `Scanner`. `Compiler` is a high-level Facade over the entire compilation pipeline. This two-level Facade structure is idiomatic for complex systems: each layer only talks to the layer immediately below it.
+
+</details>
+
+##### **3.6. Analyze the Decorator Stacking Order** (Lecture 10, Example 2)
+
+The following code defines a `TextView` base class and two decorators in C++. Analyze the difference between these two construction expressions:
+
+```cpp
+var wb1 = new ScrollDecorator(new BorderDecorator(new TextView(), 2));
+var wb2 = new BorderDecorator(new ScrollDecorator(new TextView()), 2);
+```
+
+Explain what the visual result is in each case when `Draw()` is called. Then explain how dynamic decoration (adding a scroll bar to an existing window at runtime) works.
+
+```cpp
+class TextView {
+    virtual void Draw() { ... }
+    virtual void Resize(int) { ... }
+};
+
+class BorderDecorator : TextView {
+    override void Draw() {
+        component.Draw();          // 1. Draw contents
+        DrawBorder(borderWidth);   // 2. Draw border on top
+    }
+    override void Resize(int s) { component.Resize(s); }
+    protected TextView component;
+    private void DrawBorder(int w) { ... }
+    private int borderWidth;
+    public BorderDecorator(TextView c, int w) { component = c; borderWidth = w; }
+};
+
+class ScrollDecorator : BorderDecorator {
+    override void Draw() {
+        component.Draw();     // 1. Draw contents
+        DrawScrollBar();      // 2. Draw scroll bar on top
+    }
+    override void Resize(int s) { component.Resize(s); }
+    private void DrawScrollBar() { ... }
+    public ScrollDecorator(TextView c) { component = c; }
+};
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Because each decorator first calls `component.Draw()` (delegating inward) and then draws its own addition, the outermost decorator's addition is rendered *last* (on top of everything else). The order of wrapping directly determines the visual layering.
+
+**`wb1 = ScrollDecorator(BorderDecorator(TextView(), 2))`**
+
+Structure (outermost first): `ScrollDecorator` → `BorderDecorator` → `TextView`
+
+When `wb1.Draw()` is called:
+1.  `ScrollDecorator.Draw()` calls `component.Draw()` — which is `BorderDecorator.Draw()`.
+2.  `BorderDecorator.Draw()` calls `component.Draw()` — which is `TextView.Draw()`.
+3.  `TextView` draws its content (text).
+4.  `BorderDecorator` draws a border *around the text*.
+5.  `ScrollDecorator` draws a scroll bar *over the bordered text*.
+
+Visual result: text → border → scroll bar on top.
+
+**`wb2 = BorderDecorator(ScrollDecorator(TextView()), 2)`**
+
+Structure (outermost first): `BorderDecorator` → `ScrollDecorator` → `TextView`
+
+When `wb2.Draw()` is called:
+1.  `BorderDecorator.Draw()` calls `component.Draw()` — which is `ScrollDecorator.Draw()`.
+2.  `ScrollDecorator.Draw()` calls `component.Draw()` — which is `TextView.Draw()`.
+3.  `TextView` draws its content.
+4.  `ScrollDecorator` draws a scroll bar over the text.
+5.  `BorderDecorator` draws a border over *the scrolled text*, meaning the border encompasses the scroll bar area as well.
+
+Visual result: text → scroll bar → border on top. The border encloses the scroll bar, whereas in `wb1` the scroll bar was drawn on top of the border.
+
+**Dynamic decoration:**
+
+```cpp
+var w  = new TextView();           // A simple window exists
+...
+var w1 = new ScrollDecorator(w);   // At runtime: now w1 is a scrollable view of the same text
+```
+
+No new subclass was needed. No existing code was changed. The decoration was applied *after* the object was already created and potentially in use.
+
+**Answer:** The stacking order determines visual layering. Reversing `wb1` and `wb2` places the border either inside or outside the scroll bar area. Dynamic decoration is possible precisely because the decorator accepts any `TextView` at construction time — including one that was already live.
+
+</details>
+
+##### **3.7. Virtual Proxy for Lazy Initialization in C++** (Lecture 10, Example 3)
+
+The following `ProxyForHeavy` class implements a virtual proxy for a heavyweight object in C++ using operator overloading.
+
+```cpp
+class VeryHeavyObject {
+public:
+    int m;
+    // ... large private data, expensive constructor
+};
+
+class ProxyForHeavy {
+public:
+    ProxyForHeavy() : object(nullptr) { }
+    VeryHeavyObject* operator->() { LoadObject(); return object; }
+    VeryHeavyObject& operator*()  { LoadObject(); return *object; }
+private:
+    void LoadObject() {
+        if (object == nullptr)
+            object = new VeryHeavyObject();
+    }
+    VeryHeavyObject* object;
+};
+```
+
+Explain: (a) why the proxy is useful, (b) how `p->m = 77` works syntactically, and (c) what would happen without the proxy if you declared `VeryHeavyObject* ptr = nullptr` and accidentally called `ptr->m`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The proxy overloads `->` and `*` so that accessing the real object through the proxy is syntactically identical to pointer access, but the proxy guarantees the object exists before returning it.
+
+**(a) Why the proxy is useful:**
+
+Without the proxy, a client who wants lazy initialization of `VeryHeavyObject` must manually check whether the pointer is null before every access:
+
+```cpp
+VeryHeavyObject* obj = nullptr;
+// ... later ...
+if (obj == nullptr) obj = new VeryHeavyObject();
+obj->m = 77;   // Must remember to check every time
+```
+
+This null-check must be repeated everywhere the pointer is used, and forgetting it causes a crash. The proxy encapsulates this check once. The client writes:
+
+```cpp
+ProxyForHeavy p;
+p->m = 77;     // LoadObject() is called automatically; no null-check needed
+```
+
+The object is created on first access and reused on all subsequent accesses. The proxy also ensures that accessing `p->m` is always safe — there is no way to reach a null pointer through the proxy.
+
+**(b) How `p->m = 77` works:**
+
+C++ evaluates `p->m` as `(p.operator->()).m`. The call chain is:
+1.  `p.operator->()` is called. This is `ProxyForHeavy::operator->()`.
+2.  Inside, `LoadObject()` checks whether `object == nullptr`. If so, it allocates a new `VeryHeavyObject`.
+3.  `operator->()` returns the raw `VeryHeavyObject*` pointer.
+4.  The `.m` access is then applied to that raw pointer, giving `object->m`.
+5.  The assignment `= 77` stores 77 in `object->m`.
+
+So `p->m = 77` is exactly equivalent to: create the object if not yet created, then set its `m` field to 77.
+
+**(c) Without the proxy:**
+
+```cpp
+VeryHeavyObject* ptr = nullptr;
+ptr->m;   // Undefined behavior: dereference of null pointer → crash (segfault)
+```
+
+A raw null pointer gives no protection. The programmer must manually ensure the pointer is non-null at every access point. The proxy eliminates this responsibility from all call sites.
+
+**Answer:** The `ProxyForHeavy` combines lazy initialization (deferred allocation) with null-safety (guaranteed non-null before any member access). It uses C++ operator overloading to make this transparent to clients — the syntax `p->m` looks like ordinary pointer access but executes safe, guarded initialization internally.
+
+</details>
+
+##### **3.8. Implement a Smart Pointer with Reference Counting** (Lecture 10, Task 1)
+
+Using the `ProxyForHeavy` example from the lecture as a starting point, implement a **smart pointer** class in C++ that:
+
+1.  Counts the number of `SmartPtr` objects pointing to the same real object (ARC — Automatic Reference Counting).
+2.  Automatically frees the real object when the reference count drops to zero (no more `SmartPtr` instances reference it).
+3.  Additionally, think about how you would implement a Proxy for a language that does *not* support operator overloading of `->` and `*` (e.g., Java).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Reference counting requires a shared counter. Since multiple `SmartPtr` instances may point to the same object, the count cannot be stored inside `SmartPtr` itself (each copy would have its own count). Instead, use a heap-allocated `int*` counter that all copies share. When the count reaches zero, both the counter and the real object are freed.
+
+**C++ Smart Pointer implementation:**
+
+```cpp
+#include <iostream>
+
+class VeryHeavyObject {
+public:
+    int m;
+    VeryHeavyObject() { std::cout << "VeryHeavyObject: created\n"; }
+    ~VeryHeavyObject() { std::cout << "VeryHeavyObject: destroyed\n"; }
+};
+
+class SmartPtr {
+public:
+    // Constructor: creates the object and initializes count to 1
+    SmartPtr() {
+        object  = new VeryHeavyObject();
+        count   = new int(1);
+    }
+
+    // Copy constructor: share the same object and counter; increment count
+    SmartPtr(const SmartPtr& other) {
+        object = other.object;
+        count  = other.count;
+        ++(*count);
+        std::cout << "SmartPtr: copy — ref count now " << *count << "\n";
+    }
+
+    // Destructor: decrement count; destroy object when count reaches 0
+    ~SmartPtr() {
+        --(*count);
+        std::cout << "SmartPtr: destructor — ref count now " << *count << "\n";
+        if (*count == 0) {
+            delete object;
+            delete count;
+        }
+    }
+
+    // Overload -> : give access to the real object
+    VeryHeavyObject* operator->() { return object; }
+
+    // Overload * : give reference to the real object
+    VeryHeavyObject& operator*() { return *object; }
+
+    int refCount() const { return *count; }
+
+private:
+    VeryHeavyObject* object;
+    int*             count;
+};
+
+int main() {
+    SmartPtr p1;             // count = 1
+    p1->m = 42;
+    std::cout << "p1->m = " << p1->m << "\n";
+
+    {
+        SmartPtr p2 = p1;    // count = 2 (copy constructor)
+        std::cout << "Inside block: ref count = " << p2.refCount() << "\n";
+        p2->m = 99;
+    }                        // p2 destroyed → count = 1; object lives
+
+    std::cout << "After block: ref count = " << p1.refCount() << "\n";
+    std::cout << "p1->m = " << p1->m << "\n";   // 99, same object
+
+    // p1 destroyed at end of main → count = 0 → object is freed
+}
+```
+
+**Expected output:**
+
+```
+VeryHeavyObject: created
+p1->m = 42
+SmartPtr: copy — ref count now 2
+Inside block: ref count = 2
+SmartPtr: destructor — ref count now 1
+After block: ref count = 1
+p1->m = 99
+SmartPtr: destructor — ref count now 0
+VeryHeavyObject: destroyed
+```
+
+**Proxy in Java (without operator overloading):**
+
+Java does not support `->` or `*` overloading, so the proxy cannot be transparent at the syntax level. Instead, both `SmartProxy` and the real `Service` implement the same **interface**. The client calls a regular method on the proxy, which internally delegates to the real object.
+
+```java
+// Service interface
+public interface HeavyService {
+    void doWork();
+}
+
+// Real object
+public class RealHeavyService implements HeavyService {
+    public RealHeavyService() {
+        System.out.println("RealHeavyService: expensive initialization");
+    }
+    @Override
+    public void doWork() {
+        System.out.println("RealHeavyService: doing work");
+    }
+}
+
+// Proxy: lazy initialization — creates the real object on first use
+public class LazyProxy implements HeavyService {
+    private RealHeavyService real = null;
+
+    @Override
+    public void doWork() {
+        if (real == null) {
+            real = new RealHeavyService();   // created only on first call
+        }
+        real.doWork();
+    }
+}
+
+// Client
+public class Main {
+    public static void main(String[] args) {
+        HeavyService proxy = new LazyProxy();   // No object created yet
+        proxy.doWork();                          // First call: creates the object
+        proxy.doWork();                          // Second call: reuses it
+    }
+}
+```
+
+**Answer:** In C++, operator overloading lets the proxy be syntactically identical to a raw pointer. In Java, the proxy must be explicit: both the real service and the proxy implement the same interface, and the client is written to the interface. The structural intent (controlled access, deferred initialization) is identical; only the syntactic transparency differs.
+
+</details>
+
+##### **3.9. Video Conversion Facade** (Tutorial 10, Example 1)
+
+The following Java code demonstrates the Facade pattern applied to a video conversion subsystem. Study the code and explain: (a) which class is the Facade and what subsystem classes it encapsulates, (b) how the `convertVideo` method orchestrates the subsystem, and (c) what the client (`Demo`) needs to know about the subsystem.
+
+```java
+// VideoConversionFacade.java
+public class VideoConversionFacade {
+    public File convertVideo(String fileName, String format) {
+        System.out.println("VideoConversionFacade: conversion started.");
+        VideoFile file = new VideoFile(fileName);
+        Codec sourceCodec = CodecFactory.extract(file);
+        Codec destinationCodec;
+        if (format.equals("mp4")) {
+            destinationCodec = new MPEG4CompressionCodec();
+        } else if (format.equals("ogg")) {
+            destinationCodec = new OggCompressionCodec();
+        } else {
+            System.err.println("Error: Unsupported format");
+            destinationCodec = null;
+        }
+        if (sourceCodec != null && destinationCodec != null) {
+            VideoFile buffer             = BitrateReader.read(file, sourceCodec);
+            VideoFile intermediateResult = BitrateReader.convert(buffer, destinationCodec);
+            File result = (new AudioMixer()).fix(intermediateResult);
+            System.out.println("VideoConversionFacade: conversion completed.");
+            return result;
+        }
+        return null;
+    }
+}
+
+// Demo.java — Client
+public class Demo {
+    public static void main(String[] args) {
+        VideoConversionFacade converter = new VideoConversionFacade();
+        File mp4Video = converter.convertVideo("youtube_video.ogg", "mp4");
+        if (mp4Video != null) {
+            System.out.println(mp4Video);
+        }
+    }
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `VideoConversionFacade` encapsulates a multi-step pipeline involving codec detection, bitrate reading and conversion, and audio mixing. The client only needs to provide a filename and target format — everything else is managed internally.
+
+**(a) Facade class and encapsulated subsystem:**
+
+`VideoConversionFacade` is the Facade. It encapsulates five subsystem classes:
+
+*   `VideoFile` — represents the input video file, extracts metadata (e.g., source codec).
+*   `CodecFactory` — detects which codec was used to encode the source file.
+*   `MPEG4CompressionCodec` / `OggCompressionCodec` — specific codec implementations for the target format.
+*   `BitrateReader` — reads a video stream using a codec and converts a buffered stream to a different codec.
+*   `AudioMixer` — processes audio tracks of the converted video file and returns the final `java.io.File`.
+
+**(b) How `convertVideo` orchestrates the subsystem:**
+
+The method performs a four-stage pipeline:
+
+1.  **Source analysis**: Create a `VideoFile` object from the filename and use `CodecFactory.extract(file)` to detect the source codec.
+2.  **Codec selection**: Choose the appropriate `destinationCodec` based on the requested `format` string.
+3.  **Video conversion**:
+    a.  `BitrateReader.read(file, sourceCodec)` reads the raw video data using the source codec into an intermediate `VideoFile buffer`.
+    b.  `BitrateReader.convert(buffer, destinationCodec)` re-encodes the buffered data using the destination codec, producing `intermediateResult`.
+4.  **Audio finalization**: `new AudioMixer().fix(intermediateResult)` processes and mixes the audio track, producing the final `java.io.File`.
+
+**(c) What the client needs to know:**
+
+The `Demo` client knows *only* two things:
+1.  The existence of `VideoConversionFacade` and its `convertVideo(String fileName, String format)` method signature.
+2.  That the method returns a `java.io.File` (standard library type).
+
+The client has zero knowledge of `VideoFile`, `CodecFactory`, `BitrateReader`, `AudioMixer`, or the codec classes. If the subsystem changes (e.g., a new codec is supported, or `BitrateReader` is replaced), `Demo` requires no modification.
+
+**Answer:** This is a canonical Facade: one method call by the client triggers a multi-step, multi-object pipeline internally. The boundary between "what the client needs to know" and "what the subsystem does" is the Facade interface.
+
+</details>
+
+##### **3.10. Clothing Decorator in Java** (Tutorial 10, Example 2)
+
+The following Java code applies the Decorator pattern to model a human wearing clothes. Study the code and trace the output of `fullyDressed.dress()` and `fullyDressed.getDescription()` step by step.
+
+```java
+// Human.java — Component interface
+public interface Human {
+    String dress();
+    String getDescription();
+}
+
+// SimpleHuman.java — Concrete Component
+public class SimpleHuman implements Human {
+    private final String name;
+    public SimpleHuman(String name) { this.name = name; }
+    @Override public String dress()          { return name + " gets dressed: "; }
+    @Override public String getDescription() { return name + " - naked human";  }
+}
+
+// ClothingDecorator.java — Base Decorator
+public abstract class ClothingDecorator implements Human {
+    protected Human human;
+    public ClothingDecorator(Human human) { this.human = human; }
+    @Override public String dress()          { return human.dress(); }
+    @Override public String getDescription() { return human.getDescription(); }
+}
+
+// ShirtDecorator.java — Concrete Decorator
+public class ShirtDecorator extends ClothingDecorator {
+    public ShirtDecorator(Human human) { super(human); }
+    @Override public String dress()          { return super.dress() + "shirt, "; }
+    @Override public String getDescription() { return super.getDescription() + " + shirt"; }
+}
+
+// BootsDecorator.java — Concrete Decorator (others similar)
+public class BootsDecorator extends ClothingDecorator {
+    public BootsDecorator(Human human) { super(human); }
+    @Override public String dress()          { return super.dress() + "boots, "; }
+    @Override public String getDescription() { return super.getDescription() + " + boots"; }
+}
+
+// DecoratorPatternDemo.java — Client (excerpt)
+Human ivan = new SimpleHuman("Ivan");
+
+Human fullyDressed = new ShirtDecorator(
+        new PantsDecorator(
+                new SocksDecorator(
+                        new BootsDecorator(ivan))));
+
+System.out.println(fullyDressed.getDescription());
+System.out.println(fullyDressed.dress());
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each decorator's `dress()` calls `super.dress()` (which resolves to `human.dress()` via `ClothingDecorator`), propagating inward until `SimpleHuman.dress()` is reached, then appends its own clothing item as the chain unwinds outward.
+
+**Decorator stack (outermost → innermost):**
+
+```
+ShirtDecorator
+  └─ PantsDecorator
+       └─ SocksDecorator
+            └─ BootsDecorator
+                 └─ SimpleHuman("Ivan")
+```
+
+**Trace of `fullyDressed.getDescription()`:**
+
+Each call to `getDescription()` propagates down and builds the string on the way back up:
+
+1.  `ShirtDecorator.getDescription()` → calls `super.getDescription()` → `PantsDecorator.getDescription()`
+2.  `PantsDecorator.getDescription()` → calls `super.getDescription()` → `SocksDecorator.getDescription()`
+3.  `SocksDecorator.getDescription()` → calls `super.getDescription()` → `BootsDecorator.getDescription()`
+4.  `BootsDecorator.getDescription()` → calls `super.getDescription()` → `SimpleHuman.getDescription()`
+5.  `SimpleHuman.getDescription()` returns `"Ivan - naked human"`
+6.  `BootsDecorator` appends: `"Ivan - naked human + boots"`
+7.  `SocksDecorator` appends: `"Ivan - naked human + boots + socks"`
+8.  `PantsDecorator` appends: `"Ivan - naked human + boots + socks + pants"`
+9.  `ShirtDecorator` appends: `"Ivan - naked human + boots + socks + pants + shirt"`
+
+**Result of `getDescription()`:** `"Ivan - naked human + boots + socks + pants + shirt"`
+
+**Trace of `fullyDressed.dress()`:**
+
+The same propagation, but each decorator appends its clothing item:
+
+1–5. Propagates down to `SimpleHuman.dress()`, which returns `"Ivan gets dressed: "`.
+6.  `BootsDecorator` appends: `"Ivan gets dressed: boots, "`
+7.  `SocksDecorator` appends: `"Ivan gets dressed: boots, socks, "`
+8.  `PantsDecorator` appends: `"Ivan gets dressed: boots, socks, pants, "`
+9.  `ShirtDecorator` appends: `"Ivan gets dressed: boots, socks, pants, shirt, "`
+
+**Result of `dress()`:** `"Ivan gets dressed: boots, socks, pants, shirt, "`
+
+**Answer:** The clothing appears in innermost-first order (boots → socks → pants → shirt) because the innermost decorator returns first. Changing the wrapping order in `new ShirtDecorator(new PantsDecorator(...))` directly changes the order items appear in the output string.
+
+</details>
+
+##### **3.11. Implement a Lazy Image Proxy** (Tutorial 10, Task 1)
+
+The following interface and problem stub are provided:
+
+```java
+// Image.java — interface (given)
+public interface Image {
+    void display();
+}
+
+// problem/LoadImage.java — stub (given, must be completed into a solution)
+public class LoadImage implements Image {
+    @Override
+    public void display() {
+        // TODO: implement
+    }
+}
+```
+
+The scenario: you have a slow-loading image that is important to your application, but you do not want users to wait for it before they can use other features. Use the Proxy design pattern to:
+
+1.  Implement a `RealImage` class that simulates expensive loading from disk (use `Thread.sleep(3000)`).
+2.  Implement a `ProxyImage` class that loads the real image lazily (only when `display()` is called for the first time) and reuses it on subsequent calls.
+3.  Demonstrate in `Main` that the image is loaded only once even when `display()` is called multiple times.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `ProxyImage` holds a null reference to `RealImage`. On the first `display()` call, the proxy creates the `RealImage`, which triggers the expensive disk-loading simulation. On all subsequent `display()` calls, the proxy skips creation and calls `display()` on the already-loaded `RealImage` directly.
+
+```java
+// Image.java — interface (provided)
+public interface Image {
+    void display();
+}
+
+// RealImage.java — Real Service (expensive to create)
+public class RealImage implements Image {
+    private final String imageName;
+    private final String path;
+    private boolean isLoaded = false;
+
+    public RealImage(String imageName, String path) {
+        this.imageName = imageName;
+        this.path      = path;
+        loadFromDisk(imageName, path);    // Expensive: called in constructor
+    }
+
+    @Override
+    public void display() {
+        if (!isLoaded) {
+            throw new IllegalStateException("Image not loaded yet.");
+        }
+        System.out.println("Displaying image: " + imageName);
+    }
+
+    public void loadFromDisk(String imageName, String path) {
+        System.out.println("Loading '" + imageName + "' from disk path: " + path);
+        try {
+            Thread.sleep(3000);   // Simulate 3-second disk load
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        isLoaded = true;
+        System.out.println("Image '" + imageName + "' successfully loaded.");
+    }
+}
+
+// ProxyImage.java — Virtual Proxy
+public class ProxyImage implements Image {
+    private final String imageName;
+    private final String path;
+    private RealImage realImage = null;   // Null until first access
+
+    public ProxyImage(String imageName, String path) {
+        this.imageName = imageName;
+        this.path      = path;
+        // No loading here — ProxyImage construction is instant
+    }
+
+    @Override
+    public void display() {
+        if (realImage == null) {
+            // First access: create and load the real image
+            realImage = new RealImage(imageName, path);
+        }
+        realImage.display();
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("Creating ProxyImage (no loading yet)...");
+        ProxyImage image1 = new ProxyImage("cat", "some_path/cat.jpg");
+
+        System.out.println("\nFirst display() call:");
+        image1.display();    // Triggers loading (takes ~3 seconds)
+
+        System.out.println("\nSecond display() call:");
+        image1.display();    // Instant — real image already loaded
+
+        System.out.println("\nThird display() call:");
+        image1.display();    // Still instant
+
+        System.out.println("\n--- New proxy for a different image ---");
+        ProxyImage image2 = new ProxyImage("dog", "another_path/dog.jpg");
+        System.out.println("Displaying dog (first time):");
+        image2.display();
+        System.out.println("Displaying dog (second time):");
+        image2.display();
+    }
+}
+```
+
+**Expected output:**
+
+```
+Creating ProxyImage (no loading yet)...
+
+First display() call:
+Loading 'cat' from disk path: some_path/cat.jpg
+... (3-second pause) ...
+Image 'cat' successfully loaded.
+Displaying image: cat
+
+Second display() call:
+Displaying image: cat
+
+Third display() call:
+Displaying image: cat
+
+--- New proxy for a different image ---
+Displaying dog (first time):
+Loading 'dog' from disk path: another_path/dog.jpg
+... (3-second pause) ...
+Image 'dog' successfully loaded.
+Displaying image: dog
+Displaying dog (second time):
+Displaying image: dog
+```
+
+**Key observations:**
+1.  `ProxyImage` construction is instant — the 3-second delay appears only on the *first* `display()` call.
+2.  After the first call, the `RealImage` is cached in `realImage`; subsequent calls skip the `null` check and call `realImage.display()` directly.
+3.  Each `ProxyImage` instance manages its own `RealImage` independently.
+
+**Answer:** The proxy transparently delays the expensive object creation until it is actually needed, then caches it for reuse. From the client's perspective, `image1.display()` always works identically — the difference (loading vs. cached) is an internal detail of the proxy.
+
+</details>

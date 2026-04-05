@@ -1,0 +1,1179 @@
+---
+title: "W11. Positive Definite Matrices, Quadratic Forms, and Optimization"
+author: "Salman Ahmadi-Asl"
+date: "April 3, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Introduction and Motivation**
+
+In one dimension, the question "is this number positive?" has a clear answer: $a > 0$ if and only if $ax^2 > 0$ for every nonzero $x$. **Positive definite matrices** are the direct matrix analogue of positive numbers. A symmetric matrix $A$ is called positive definite if the quadratic expression $x^T A x$ is positive for every nonzero vector $x$. This single condition — sometimes called the positive-definite inequality — unlocks a rich theory that connects eigenvalues, determinants, matrix factorizations, function shapes, and optimization, all at once.
+
+Positive definite matrices appear throughout applied mathematics and engineering:
+
+- **Geometry:** The Hessian of a strictly convex function is positive definite; its level sets are ellipsoids.
+- **Optimization:** A critical point where the Hessian is positive definite is guaranteed to be a local minimum.
+- **Statistics:** Covariance matrices are positive semi-definite; valid correlation structures require this.
+- **Numerical methods:** Cholesky factorization — a fast, numerically stable solver — exists exactly when the matrix is positive definite.
+- **Machine learning:** Kernel matrices must be positive semi-definite for the theory to be well-posed.
+
+This article builds the complete theory from definition to application, covering the eigenvalue test, Sylvester's criterion, the Cholesky decomposition, the geometry of quadratic forms, optimization via the Hessian, convexity, and the extension to complex Hermitian matrices.
+
+##### **1.2 Positive Definite and Positive Semi-Definite Matrices**
+
+**Definition (Positive Definite, PD):** A *symmetric* matrix $A \in \mathbb{R}^{n \times n}$ is called **positive definite** if
+
+$$x^T A x > 0 \quad \text{for all } x \in \mathbb{R}^n,\; x \neq 0.$$
+
+We write $A \succ 0$.
+
+**Definition (Positive Semi-Definite, PSD):** A symmetric matrix $A$ is called **positive semi-definite** if
+
+$$x^T A x \geq 0 \quad \text{for all } x \in \mathbb{R}^n.$$
+
+We write $A \succeq 0$. The difference is that a PSD matrix allows equality for some nonzero $x$; a PD matrix does not.
+
+Two further cases arise in practice. A symmetric matrix is **negative definite** (ND) if $x^T A x < 0$ for all $x \neq 0$, i.e.\ $-A$ is PD. It is **indefinite** if $x^T A x$ takes both positive and negative values for different nonzero vectors. In the indefinite case the matrix is neither PD, PSD, ND, nor NSD.
+
+The expression $x^T A x$ is called a **quadratic form**; it is the subject of Section 1.3.
+
+###### **1.2.1 Simple Examples**
+
+A *diagonal* matrix $A = \text{diag}(d_1, d_2, \ldots, d_n)$ has $x^T A x = \sum_{i=1}^n d_i x_i^2$. This sum is positive for all $x \neq 0$ if and only if every $d_i > 0$. Thus:
+
+- A diagonal matrix is PD iff all diagonal entries are positive.
+- It is PSD iff all diagonal entries are nonneg­ative.
+
+For a $2 \times 2$ symmetric matrix $A = \begin{pmatrix} a & b \\ b & c \end{pmatrix}$, the quadratic form $x^T A x = ax_1^2 + 2bx_1 x_2 + cx_2^2$. **Completing the square** in $x_1$:
+
+$$ax_1^2 + 2bx_1 x_2 + cx_2^2 = a\!\left(x_1 + \frac{b}{a}x_2\right)^{\!2} + \left(c - \frac{b^2}{a}\right)x_2^2 \quad (a \neq 0).$$
+
+For this to be positive for all $(x_1, x_2) \neq (0, 0)$, both $a > 0$ and $c - b^2/a > 0$ (i.e.\ $ac - b^2 > 0$) are necessary and sufficient. This is Sylvester's criterion for the $2 \times 2$ case.
+
+##### **1.3 Quadratic Forms**
+
+###### **1.3.1 Definition and Matrix Representation**
+
+A **quadratic form** in $n$ variables is a homogeneous polynomial of degree 2:
+
+$$Q(x_1, \ldots, x_n) = \sum_{i=1}^n \sum_{j=1}^n c_{ij} x_i x_j.$$
+
+Every quadratic form can be written as $Q(x) = x^T A x$ where $A$ is a *symmetric* matrix. The symmetry is enforced by splitting each coefficient: if the original coefficient of $x_i x_j$ (with $i \neq j$) is $\alpha$, then $A_{ij} = A_{ji} = \alpha/2$; diagonal entries $A_{ii}$ equal the coefficient of $x_i^2$ directly.
+
+**Rule for reading off $A$:** Given $Q(x) = \sum_i a_{ii} x_i^2 + \sum_{i < j} \alpha_{ij} x_i x_j$,
+
+- $A_{ii} = a_{ii}$ (coefficient of $x_i^2$),
+- $A_{ij} = A_{ji} = \alpha_{ij}/2$ (half the coefficient of $x_i x_j$).
+
+**Example:** $Q(x_1, x_2) = 3x_1^2 + 4x_1 x_2 + 2x_2^2$. The coefficient of $x_1 x_2$ is $4$, so $A_{12} = 2$. Thus $A = \begin{pmatrix} 3 & 2 \\ 2 & 2 \end{pmatrix}$.
+
+Symmetry matters because it gives:
+
+- a *unique* matrix representation,
+- real eigenvalues (Spectral Theorem),
+- a direct connection between the sign of $Q$ and the eigenvalues of $A$.
+
+###### **1.3.2 Diagonalizing Quadratic Forms**
+
+The **Spectral Theorem** states that every real symmetric matrix has an orthogonal eigendecomposition $A = Q \Lambda Q^T$ with $Q$ orthogonal and $\Lambda = \text{diag}(\lambda_1, \ldots, \lambda_n)$. Under the change of variables $y = Q^T x$ (equivalently $x = Qy$):
+
+$$x^T A x = (Qy)^T A (Qy) = y^T (Q^T A Q) y = y^T \Lambda y = \sum_{i=1}^n \lambda_i y_i^2.$$
+
+The quadratic form becomes a *pure sum of squares* in the new coordinates. Since $Q$ is invertible, $y \neq 0 \iff x \neq 0$. Therefore:
+
+$$x^T A x > 0 \text{ for all } x \neq 0 \iff \sum_{i=1}^n \lambda_i y_i^2 > 0 \text{ for all } y \neq 0 \iff \text{all } \lambda_i > 0.$$
+
+This equivalence is the foundation of the eigenvalue test.
+
+##### **1.4 Equivalent Conditions for Positive Definiteness**
+
+For a symmetric matrix $A$, the following are *equivalent*:
+
+1. **Definition:** $x^T A x > 0$ for all $x \neq 0$.
+2. **Eigenvalue test:** All eigenvalues $\lambda_i(A) > 0$.
+3. **Sylvester's criterion:** All **leading principal minors** are positive, i.e.\ $\det(A_k) > 0$ for $k = 1, 2, \ldots, n$, where $A_k$ is the top-left $k \times k$ submatrix of $A$.
+4. **Cholesky factorization:** There exists an invertible lower-triangular matrix $L$ with positive diagonal such that $A = LL^T$.
+
+Each condition provides a different computational pathway.
+
+###### **1.4.1 Eigenvalue Test**
+
+The eigenvalue test follows from the diagonalization argument in Section 1.3.2. It is the most conceptually transparent but computationally expensive for large matrices (finding eigenvalues requires solving the characteristic polynomial).
+
+**For symmetric PSD:** All eigenvalues $\geq 0$ (the inequality is not strict; some eigenvalue may be zero).
+
+###### **1.4.2 Sylvester's Criterion**
+
+The leading principal minor of order $k$ is $\Delta_k = \det(A_k)$. Sylvester's criterion says:
+
+$$A \succ 0 \iff \Delta_1 > 0,\; \Delta_2 > 0,\; \ldots,\; \Delta_n > 0.$$
+
+For a $2 \times 2$ matrix $A = \begin{pmatrix} a & b \\ b & c \end{pmatrix}$, this reduces to $a > 0$ and $ac - b^2 > 0$. This is fast to check and does not require computing eigenvalues.
+
+**Important note on PSD:** For positive *semi*-definiteness, Sylvester's criterion does not simply become $\Delta_k \geq 0$. A matrix can have all non-negative leading principal minors yet fail to be PSD (it requires checking *all* principal minors, not just the leading ones). For the purposes of this course, use the eigenvalue test for PSD.
+
+###### **1.4.3 Checking Definiteness at a Glance**
+
+A quick workflow for a $2 \times 2$ symmetric matrix $A = \begin{pmatrix} a & b \\ b & c \end{pmatrix}$:
+
+| Condition | Classification |
+|:----------|:--------------|
+| $a > 0$ and $\det A > 0$ | Positive definite |
+| $a < 0$ and $\det A > 0$ | Negative definite |
+| $\det A < 0$ | Indefinite |
+| $\det A = 0$ | Positive or negative semi-definite (check sign of trace) |
+
+##### **1.5 The Cholesky Decomposition**
+
+**Theorem (Cholesky):** A symmetric matrix $A$ is positive definite *if and only if* there exists a unique lower-triangular matrix $L$ with strictly positive diagonal entries such that $A = LL^T$.
+
+The factorization $A = LL^T$ is the **Cholesky decomposition** of $A$. It is the matrix analogue of taking a positive square root of a number. Because $L$ is lower-triangular, the decomposition is easy to compute via forward substitution, and it is numerically very stable — roughly twice as fast as LU decomposition.
+
+**Why it implies PD:** For any $x \neq 0$, if $L$ is invertible then $Lx \neq 0$, so $x^T A x = x^T L L^T x = (L^T x)^T (L^T x) = \|L^T x\|^2 > 0$.
+
+**LDL^T factorization:** A closely related form is $A = LDL^T$ where $L$ is unit lower-triangular (diagonal 1's) and $D = \text{diag}(d_1, \ldots, d_n)$. This is obtained from Gaussian elimination and the pivots are the $d_i$'s. The Cholesky form $L_{\text{chol}} = L D^{1/2}$ follows when $A \succ 0$ (so $d_i > 0$). The $LDL^T$ form is useful because it directly exhibits the quadratic form as:
+
+$$x^T A x = x^T L D L^T x = (L^T x)^T D (L^T x) = \sum_{i=1}^n d_i y_i^2, \quad y = L^T x.$$
+
+The pivots $d_i$ in the $LDL^T$ factorization are positive if and only if $A \succ 0$.
+
+##### **1.6 Geometric Shapes of Quadratic Forms**
+
+The definiteness of $A$ determines the shape of the surface $z = x^T A x$:
+
+| Classification | Eigenvalue signs | Shape of $z = x^T Ax$ | Critical point |
+|:------------|:---------------|:----------------------|:-------------|
+| Positive definite | All $\lambda_i > 0$ | Elliptic paraboloid (bowl) | Unique global minimum |
+| Positive semi-definite | All $\lambda_i \geq 0$, some $= 0$ | Parabolic cylinder (trough) | Minimum along a line |
+| Indefinite | Mixed signs | Hyperbolic paraboloid (saddle) | Saddle point |
+| Negative definite | All $\lambda_i < 0$ | Inverted paraboloid | Unique global maximum |
+
+The level sets $\{x : x^T A x = c\}$ are:
+
+- **Ellipses** (or ellipsoids) when $A \succ 0$,
+- **Parallel lines** (or hyperplanes) when $A$ is PSD with a zero eigenvalue,
+- **Hyperbolas** when $A$ is indefinite.
+
+These shapes explain why a PD Hessian at a critical point signals a minimum.
+
+##### **1.7 Optimization: The Hessian and Critical Points**
+
+Consider a twice-differentiable function $f : \mathbb{R}^n \to \mathbb{R}$.
+
+- A point $x_0$ is a **critical point** if $\nabla f(x_0) = 0$.
+- The **Hessian matrix** $H(x_0)$ is the symmetric $n \times n$ matrix of second partial derivatives: $H_{ij}(x_0) = \dfrac{\partial^2 f}{\partial x_i \partial x_j}(x_0)$.
+
+**Second Derivative Test (multi-variable):**
+
+| Condition on $H(x_0)$ | Nature of $x_0$ |
+|:----------------------|:----------------|
+| $H(x_0) \succ 0$ | Strict local minimum |
+| $H(x_0) \prec 0$ | Strict local maximum |
+| $H(x_0)$ indefinite | Saddle point |
+| $H(x_0)$ singular | Test inconclusive |
+
+The intuition: the quadratic approximation $f(x_0 + \delta) \approx f(x_0) + \tfrac{1}{2}\delta^T H(x_0)\delta$ (the gradient term vanishes at a critical point) is a bowl when $H \succ 0$, an inverted bowl when $H \prec 0$, and a saddle when $H$ is indefinite.
+
+**Standard procedure:**
+
+1. Compute $\nabla f$ and solve $\nabla f(x_0) = 0$ to find all critical points.
+2. Compute $H(x_0)$ at each critical point.
+3. Apply the eigenvalue test or Sylvester's criterion to classify $H(x_0)$.
+
+##### **1.8 Convexity**
+
+**Definition (Convex function):** $f : \mathbb{R}^n \to \mathbb{R}$ is **convex** if for all $x, y \in \mathbb{R}^n$ and $t \in [0, 1]$:
+
+$$f(tx + (1-t)y) \leq t\,f(x) + (1-t)\,f(y).$$
+
+If the inequality is strict for $x \neq y$ and $t \in (0,1)$, then $f$ is **strictly convex**.
+
+**Hessian criterion for convexity:** For a twice-differentiable function $f$:
+
+- $f$ is convex $\iff$ $H(x) \succeq 0$ for all $x$,
+- $f$ is strictly convex $\Leftarrow$ $H(x) \succ 0$ for all $x$ (the converse is not quite true in general, but this sufficient condition is what we use).
+
+**Why convexity matters:** For a convex function, every local minimum is automatically a global minimum. This is the cornerstone of convex optimization, which underpins machine learning, signal processing, and operations research.
+
+##### **1.9 Hermitian Positive Definite Matrices**
+
+For complex matrices, the role of symmetric matrices is played by **Hermitian** matrices: $A \in \mathbb{C}^{n \times n}$ is Hermitian if $A^* = A$, where $A^*$ denotes the conjugate transpose ($A^*_{ij} = \overline{A_{ji}}$). For a Hermitian matrix, $x^* A x \in \mathbb{R}$ for every $x \in \mathbb{C}^n$, so positivity is well-defined.
+
+**Definition (HPD):** A Hermitian matrix $A \in \mathbb{C}^{n \times n}$ is **Hermitian positive definite** (HPD) if
+
+$$x^* A x > 0 \quad \text{for all } x \in \mathbb{C}^n,\; x \neq 0.$$
+
+**Definition (HPSD):** $A$ is **Hermitian positive semi-definite** (HPSD) if $x^* A x \geq 0$ for all $x \in \mathbb{C}^n$.
+
+Exactly the same equivalences hold as in the real case:
+
+| Condition | Equivalent statement |
+|:----------|:--------------------|
+| $A$ is HPD | All eigenvalues of $A$ are real and positive |
+| $A$ is HPD | $A = LL^*$ with $L$ lower-triangular invertible (Cholesky) |
+| $A$ is HPD | All leading principal minors of $A$ are positive (Sylvester) |
+| $A$ is HPSD | All eigenvalues of $A$ are real and nonneg­ative |
+| $A$ is HPSD | $A = LL^*$ for some possibly singular $L$ |
+
+Note that the eigenvalues of a Hermitian matrix are always real (a consequence of the Spectral Theorem for Hermitian matrices), so the condition "eigenvalues are positive" is non-vacuous over $\mathbb{C}$.
+
+**Construction via $A = LL^*$:** Any matrix of the form $A = LL^*$ with $L$ invertible is automatically HPD. This is analogous to how $a = b^2$ with $b \neq 0$ forces $a > 0$ in the scalar case.
+
+**Key warning:** Positivity is only defined for Hermitian matrices over $\mathbb{C}$. For a non-Hermitian complex matrix, $x^* Ax$ may not be real, and the notion of HPD does not apply.
+
+---
+
+#### **2. Definitions**
+
+*   **Positive definite (PD) matrix**: A symmetric matrix $A$ such that $x^T A x > 0$ for all nonzero $x$.
+*   **Positive semi-definite (PSD) matrix**: A symmetric matrix $A$ such that $x^T A x \geq 0$ for all $x$.
+*   **Negative definite (ND) matrix**: A symmetric matrix $A$ such that $x^T A x < 0$ for all nonzero $x$ (equivalently, $-A$ is PD).
+*   **Indefinite matrix**: A symmetric matrix that is neither PD, PSD, ND, nor NSD; equivalently, $x^T Ax$ takes both positive and negative values.
+*   **Quadratic form**: A homogeneous polynomial of degree 2 in $n$ variables, written as $Q(x) = x^T A x$ with $A$ symmetric.
+*   **Leading principal minor of order $k$**: The determinant of the top-left $k \times k$ submatrix of $A$, denoted $\Delta_k$.
+*   **Sylvester's criterion**: $A \succ 0 \iff \Delta_k > 0$ for all $k = 1, \ldots, n$.
+*   **Cholesky decomposition**: The factorization $A = LL^T$ (real) or $A = LL^*$ (complex), where $L$ is lower-triangular with positive diagonal entries; exists and is unique when $A \succ 0$.
+*   **LDL$^T$ factorization**: The factorization $A = LDL^T$ where $L$ is unit lower-triangular and $D$ is diagonal; the diagonal entries of $D$ (pivots) are positive iff $A \succ 0$.
+*   **Critical point**: A point $x_0$ where $\nabla f(x_0) = 0$.
+*   **Hessian matrix**: The $n \times n$ symmetric matrix of second partial derivatives of $f$, denoted $H(x)$; governs local curvature.
+*   **Convex function**: A function $f$ such that $f(tx + (1-t)y) \leq tf(x) + (1-t)f(y)$ for all $x,y$ and $t \in [0,1]$.
+*   **Hermitian matrix**: A complex matrix satisfying $A^* = A$ (conjugate transpose equals itself).
+*   **Hermitian positive definite (HPD)**: A Hermitian matrix $A$ with $x^* Ax > 0$ for all nonzero complex $x$.
+*   **Hermitian positive semi-definite (HPSD)**: A Hermitian matrix $A$ with $x^* Ax \geq 0$ for all complex $x$.
+
+---
+
+#### **3. Formulas**
+
+*   **Quadratic form in matrix notation**: $Q(x) = x^T A x$, where $A$ is symmetric.
+*   **Symmetric matrix from quadratic form**: $A_{ii} = $ coefficient of $x_i^2$; $A_{ij} = A_{ji} = \tfrac{1}{2}(\text{coefficient of } x_i x_j)$ for $i \neq j$.
+*   **Diagonalized quadratic form**: $x^T A x = \sum_{i=1}^n \lambda_i y_i^2$ where $y = Q^T x$ and $Q$ is the orthogonal matrix of eigenvectors.
+*   **Completing the square** ($2 \times 2$): $ax_1^2 + 2bx_1 x_2 + cx_2^2 = a\!\left(x_1 + \tfrac{b}{a}x_2\right)^{\!2} + \tfrac{ac - b^2}{a}\,x_2^2$.
+*   **Sylvester's criterion** ($2 \times 2$): $A = \begin{pmatrix} a & b \\ b & c \end{pmatrix} \succ 0 \iff a > 0$ and $ac - b^2 > 0$.
+*   **Cholesky decomposition**: $A = LL^T$ (real); $A = LL^*$ (complex Hermitian).
+*   **LDL$^T$ factorization and quadratic form**: $x^T A x = \sum_{i=1}^n d_i y_i^2$ where $y = L^T x$ and $d_i$ are the pivots.
+*   **Eigenvalue product formula**: $\det(A) = \prod_{i=1}^n \lambda_i$.
+*   **Second derivative test** (classification): at a critical point $x_0$, $H(x_0) \succ 0 \Rightarrow$ local min; $H(x_0) \prec 0 \Rightarrow$ local max; $H(x_0)$ indefinite $\Rightarrow$ saddle.
+*   **Hessian convexity criterion**: $f$ convex $\iff H(x) \succeq 0$ for all $x$.
+*   **Determinant of HPD matrix**: $\det(A) = \prod_{i} \lambda_i > 0$ (all $\lambda_i > 0$).
+
+---
+
+#### **4. Examples**
+
+##### **4.1 Design a Non-Positive-Definite Symmetric Matrix** (Lab 9, Task 1)
+
+Given a symmetric matrix $A = \begin{pmatrix} a & b \\ b & c \end{pmatrix}$ with positive coefficients $a, b, c$ satisfying $a + c > 2b$, construct a specific matrix that is **not** positive definite.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For a $2 \times 2$ symmetric matrix with $a > 0$, positive definiteness requires both $a > 0$ *and* $\det(A) = ac - b^2 > 0$. The condition $a + c > 2b$ does not imply $ac - b^2 > 0$; they are independent constraints.
+
+We need $a, b, c > 0$, $a + c > 2b$, but $ac - b^2 \leq 0$ (so that the matrix is not PD).
+
+**Construction:** Take $a = 1$, $c = 4$, $b = 2.4$.
+
+- Check $a + c > 2b$: $1 + 4 = 5 > 4.8 = 2(2.4)$. ✓
+- Compute $\det(A) = (1)(4) - (2.4)^2 = 4 - 5.76 = -1.76 < 0$.
+
+So $A = \begin{pmatrix} 1 & 2.4 \\ 2.4 & 4 \end{pmatrix}$ satisfies all conditions but is **indefinite** (not positive definite).
+
+**Why does this work?** The condition $a + c > 2b$ places a constraint on the arithmetic mean of the diagonal entries relative to the off-diagonal, but positive definiteness requires $b^2 < ac$ (the geometric mean condition). These two constraints are compatible — $a + c > 2b$ does *not* force $ac > b^2$ — so we can violate PD while satisfying the given constraint.
+
+</details>
+
+##### **4.2 Prove $A^{-1}$ is SPD When $A$ is SPD** (Lab 9, Task 2)
+
+If $A$ is symmetric positive definite, show that $A^{-1}$ is also symmetric positive definite.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Show $A^{-1}$ is symmetric.**
+
+Since $A$ is symmetric, $A^T = A$. Using the identity $(A^{-1})^T = (A^T)^{-1}$:
+
+$$(A^{-1})^T = (A^T)^{-1} = A^{-1}.$$
+
+So $A^{-1}$ is symmetric.
+
+**Step 2: Show $A^{-1}$ is positive definite.**
+
+Since $A$ is symmetric, by the Spectral Theorem it has real eigenvalues $\lambda_1, \ldots, \lambda_n$. Since $A \succ 0$, all $\lambda_i > 0$.
+
+The eigenvalues of $A^{-1}$ are $1/\lambda_1, \ldots, 1/\lambda_n$. Since each $\lambda_i > 0$, each $1/\lambda_i > 0$.
+
+Therefore all eigenvalues of $A^{-1}$ are positive, which (by the eigenvalue test) means $A^{-1} \succ 0$.
+
+**Conclusion:** $A^{-1}$ is both symmetric and positive definite, so $A^{-1}$ is SPD.
+
+</details>
+
+##### **4.3 Matrix of a Quadratic Form and LDL$^T$ Factorization** (Lab 9, Task 3)
+
+The quadratic form $f(x_1, x_2) = 3(x_1 + 2x_2)^2 + 4x_2^2$ is positive for all $(x_1, x_2) \neq (0, 0)$. Find its symmetric matrix $A$, compute the $LDL^T$ factorization, and identify the scalars $d_i$ and the linear substitution $y = L^T x$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Expand the quadratic form and read off $A$.**
+
+$$f(x_1, x_2) = 3(x_1 + 2x_2)^2 + 4x_2^2 = 3(x_1^2 + 4x_1x_2 + 4x_2^2) + 4x_2^2 = 3x_1^2 + 12x_1x_2 + 12x_2^2 + 4x_2^2.$$
+
+$$f(x_1, x_2) = 3x_1^2 + 12x_1x_2 + 16x_2^2.$$
+
+The coefficient of $x_1^2$ is $3$, the coefficient of $x_2^2$ is $16$, and the coefficient of $x_1 x_2$ is $12 = 2 \cdot 6$. So $A_{11} = 3$, $A_{22} = 16$, $A_{12} = A_{21} = 6$:
+
+$$A = \begin{pmatrix} 3 & 6 \\ 6 & 16 \end{pmatrix}.$$
+
+**Step 2: Compute $LDL^T$ via Gaussian elimination.**
+
+We eliminate the $(2,1)$ entry. The multiplier is $\ell_{21} = 6/3 = 2$.
+
+- Pivot 1: $d_1 = a_{11} = 3$.
+- New $(2,2)$ entry (Schur complement): $d_2 = a_{22} - \ell_{21}^2 d_1 = 16 - 4 \cdot 3 = 4$.
+
+Therefore:
+
+$$L = \begin{pmatrix} 1 & 0 \\ 2 & 1 \end{pmatrix}, \quad D = \begin{pmatrix} 3 & 0 \\ 0 & 4 \end{pmatrix}.$$
+
+**Verification:** $LDL^T = \begin{pmatrix} 1 & 0 \\ 2 & 1 \end{pmatrix}\begin{pmatrix} 3 & 0 \\ 0 & 4 \end{pmatrix}\begin{pmatrix} 1 & 2 \\ 0 & 1 \end{pmatrix} = \begin{pmatrix} 3 & 0 \\ 6 & 4 \end{pmatrix}\begin{pmatrix} 1 & 2 \\ 0 & 1 \end{pmatrix} = \begin{pmatrix} 3 & 6 \\ 6 & 16 \end{pmatrix} = A.$ ✓
+
+**Step 3: Identify the substitution.**
+
+Set $y = L^T x = \begin{pmatrix} 1 & 2 \\ 0 & 1 \end{pmatrix}\begin{pmatrix} x_1 \\ x_2 \end{pmatrix} = \begin{pmatrix} x_1 + 2x_2 \\ x_2 \end{pmatrix}$.
+
+Then $f = y^T D y = 3y_1^2 + 4y_2^2 = 3(x_1 + 2x_2)^2 + 4x_2^2$, which matches the original expression. ✓
+
+The pivots $d_1 = 3 > 0$ and $d_2 = 4 > 0$ confirm that $A \succ 0$.
+
+</details>
+
+##### **4.4 Test for Minimum via Hessian** (Lab 9, Task 4)
+
+Determine whether $F(x, y) = x^2 y^2 - 2x - 2y$ has a local minimum at the point $(1, 1)$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Verify $(1, 1)$ is a critical point.**
+
+$$\frac{\partial F}{\partial x} = 2xy^2 - 2, \quad \frac{\partial F}{\partial y} = 2x^2 y - 2.$$
+
+At $(1, 1)$: $\partial F/\partial x = 2(1)(1) - 2 = 0$ ✓ and $\partial F/\partial y = 2(1)(1) - 2 = 0$ ✓.
+
+**Step 2: Compute the Hessian at $(1, 1)$.**
+
+$$\frac{\partial^2 F}{\partial x^2} = 2y^2, \quad \frac{\partial^2 F}{\partial x \partial y} = 4xy, \quad \frac{\partial^2 F}{\partial y^2} = 2x^2.$$
+
+At $(1, 1)$:
+
+$$H(1,1) = \begin{pmatrix} 2 & 4 \\ 4 & 2 \end{pmatrix}.$$
+
+**Step 3: Classify using Sylvester's criterion.**
+
+- $a = 2 > 0$, but $\det(H) = (2)(2) - (4)^2 = 4 - 16 = -12 < 0$.
+
+Since $\det(H) < 0$, the Hessian is **indefinite**.
+
+**Conclusion:** $(1, 1)$ is a **saddle point**, not a local minimum.
+
+</details>
+
+##### **4.5 Find and Classify All Critical Points** (Lab 9, Task 5)
+
+Find and classify all critical points of $f(x, y) = 2x^3 - 3x^2 + 2y^3 + 3y^2 - 12x - 12y$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Find critical points.**
+
+$$\frac{\partial f}{\partial x} = 6x^2 - 6x - 12 = 6(x^2 - x - 2) = 6(x - 2)(x + 1) = 0 \implies x = 2 \text{ or } x = -1.$$
+
+$$\frac{\partial f}{\partial y} = 6y^2 + 6y - 12 = 6(y^2 + y - 2) = 6(y + 2)(y - 1) = 0 \implies y = -2 \text{ or } y = 1.$$
+
+Since the $x$- and $y$-equations are independent, the four critical points are all pairwise combinations: $(2, 1)$, $(2, -2)$, $(-1, 1)$, $(-1, -2)$.
+
+**Step 2: Compute the Hessian.**
+
+$$H(x,y) = \begin{pmatrix} 12x - 6 & 0 \\ 0 & 12y + 6 \end{pmatrix}.$$
+
+This is a diagonal Hessian, so definiteness is determined directly by the signs of the diagonal entries.
+
+**Step 3: Classify each critical point.**
+
+| Point | $H_{11} = 12x-6$ | $H_{22} = 12y+6$ | $\det H$ | Classification |
+|:------|:-----------------|:-----------------|:---------|:---------------|
+| $(2, 1)$ | $18 > 0$ | $18 > 0$ | $324 > 0$ | Local minimum |
+| $(2, -2)$ | $18 > 0$ | $-18 < 0$ | $-324 < 0$ | Saddle point |
+| $(-1, 1)$ | $-18 < 0$ | $18 > 0$ | $-324 < 0$ | Saddle point |
+| $(-1, -2)$ | $-18 < 0$ | $-18 < 0$ | $324 > 0$ | Local maximum |
+
+**Summary:** The function has one local minimum at $(2, 1)$, one local maximum at $(-1, -2)$, and two saddle points at $(2, -2)$ and $(-1, 1)$.
+
+</details>
+
+##### **4.6 Apply Sylvester's Criterion to Classify Four Matrices** (Lab 9, Task 6)
+
+Given:
+$$A_1 = \begin{pmatrix} 5 & 6 \\ 6 & 7 \end{pmatrix}, \quad A_2 = \begin{pmatrix} -1 & -2 \\ -2 & -5 \end{pmatrix}, \quad A_3 = \begin{pmatrix} 1 & 10 \\ 10 & 100 \end{pmatrix}, \quad A_4 = \begin{pmatrix} 1 & 10 \\ 10 & 101 \end{pmatrix}.$$
+
+Determine which matrix is positive definite (without computing eigenvalues). Then find $x$ such that $x^T A_1 x < 0$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Apply Sylvester's criterion to each $2 \times 2$ matrix $\begin{pmatrix} a & b \\ b & c \end{pmatrix}$: check $a > 0$ and $ac - b^2 > 0$.**
+
+**$A_1$:** $a = 5 > 0$; $\det(A_1) = (5)(7) - 36 = 35 - 36 = -1 < 0$ → **Indefinite** (not PD).
+
+**$A_2$:** $a = -1 < 0$ → **Negative definite** (not PD; all eigenvalues negative).
+
+**$A_3$:** $a = 1 > 0$; $\det(A_3) = (1)(100) - 100 = 0$ → **Positive semi-definite** (not PD; one zero eigenvalue).
+
+**$A_4$:** $a = 1 > 0$; $\det(A_4) = (1)(101) - 100 = 1 > 0$ → **$A_4$ is positive definite.** ✓
+
+**Finding $x$ with $x^T A_1 x < 0$:**
+
+Since $A_1$ is indefinite, $x^T A_1 x = 5x_1^2 + 12 x_1 x_2 + 7x_2^2$ takes negative values somewhere. We need $\det(A_1) < 0$, which means $A_1$ has one positive and one negative eigenvalue; there exist directions where the quadratic form is negative.
+
+Try $x = \begin{pmatrix} 6 \\ -5 \end{pmatrix}$:
+
+$$x^T A_1 x = 5(36) + 12(6)(-5) + 7(25) = 180 - 360 + 175 = -5 < 0. \checkmark$$
+
+</details>
+
+##### **4.7 Matrix, Pivots, Rank, Eigenvalues, and Determinant of a Degenerate Form** (Lab 9, Task 7)
+
+For the quadratic form $f(x_1, x_2, x_3) = 4(x_1 - x_2 + 2x_3)^2$, find the matrix $A$, its pivots, rank, eigenvalues, and determinant.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Write $A$ as an outer product.**
+
+Let $v = \begin{pmatrix} 1 \\ -1 \\ 2 \end{pmatrix}$. Then $f(x) = 4(v^T x)^2 = 4(v^T x)(v^T x) = x^T (4 v v^T) x$. So $A = 4 v v^T$.
+
+$$A = 4 \begin{pmatrix} 1 \\ -1 \\ 2 \end{pmatrix} \begin{pmatrix} 1 & -1 & 2 \end{pmatrix} = \begin{pmatrix} 4 & -4 & 8 \\ -4 & 4 & -8 \\ 8 & -8 & 16 \end{pmatrix}.$$
+
+**Step 2: Rank.**
+
+All rows of $A$ are scalar multiples of $\begin{pmatrix} 1 & -1 & 2 \end{pmatrix}$, so $\text{rank}(A) = 1$.
+
+**Step 3: Eigenvalues.**
+
+For a rank-1 matrix $A = 4vv^T$, the eigenvalues are:
+
+- $\lambda_1 = 4\|v\|^2 = 4(1 + 1 + 4) = 24$ (corresponding eigenvector $v$),
+- $\lambda_2 = \lambda_3 = 0$ (the two-dimensional null space is perpendicular to $v$).
+
+**Step 4: Pivots.**
+
+Performing row reduction on $A$: multiply row 1 by $-1$ and add to row 2 to get zero; multiply row 1 by $2$ and subtract from row 3 to get zero. All three operations reveal that only the first pivot is nonzero, $d_1 = 4$, and $d_2 = d_3 = 0$ (the subsequent rows become all zeros).
+
+**Step 5: Determinant.**
+
+$$\det(A) = \prod_{i=1}^3 \lambda_i = 24 \cdot 0 \cdot 0 = 0.$$
+
+This is consistent with rank 1: a singular matrix has determinant 0.
+
+</details>
+
+##### **4.8 Check Convexity via Hessian** (Lab 9, Task 8)
+
+Check the convexity of $f(x, y) = x^2 + 2y^2 - xy + 3x - 2y + 5$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A twice-differentiable function is convex iff its Hessian is positive semi-definite everywhere. Since $f$ is a polynomial of degree 2, its Hessian is constant (independent of $(x,y)$).
+
+**Compute the Hessian:**
+
+$$\frac{\partial^2 f}{\partial x^2} = 2, \quad \frac{\partial^2 f}{\partial x \partial y} = -1, \quad \frac{\partial^2 f}{\partial y^2} = 4.$$
+
+$$H = \begin{pmatrix} 2 & -1 \\ -1 & 4 \end{pmatrix}.$$
+
+**Check positive definiteness using Sylvester's criterion:**
+
+- $\Delta_1 = 2 > 0$. ✓
+- $\Delta_2 = \det(H) = (2)(4) - (-1)^2 = 8 - 1 = 7 > 0$. ✓
+
+Since $H \succ 0$ (which implies $H \succeq 0$), the Hessian is positive definite everywhere. Therefore $f$ is **strictly convex** on $\mathbb{R}^2$.
+
+</details>
+
+##### **4.9 Check Hermitian Positive Definiteness** (Lab 9, Task 9)
+
+Determine whether $A = \begin{pmatrix} 5 & 2 - i \\ 2 + i & 3 \end{pmatrix}$ is Hermitian positive definite.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Verify $A$ is Hermitian ($A^* = A$).**
+
+We need $A_{21} = \overline{A_{12}}$. Here $A_{12} = 2 - i$, so $\overline{A_{12}} = 2 + i = A_{21}$. ✓
+
+The diagonal entries are real: $A_{11} = 5$, $A_{22} = 3$. ✓
+
+So $A$ is Hermitian.
+
+**Step 2: Apply Sylvester's criterion.**
+
+For a $2 \times 2$ Hermitian matrix, the criterion is $A_{11} > 0$ and $\det(A) > 0$.
+
+- $A_{11} = 5 > 0$. ✓
+- $\det(A) = (5)(3) - (2-i)(2+i) = 15 - (4 + 1) = 15 - 5 = 10 > 0$. ✓
+
+(Note: $(2-i)(2+i) = 4 + 1 = 5$ because $|z|^2 = \text{Re}(z)^2 + \text{Im}(z)^2$.)
+
+**Conclusion:** $A$ is **Hermitian positive definite** (HPD).
+
+</details>
+
+##### **4.10 Classify Five Matrices** (Assignment 9, Task 1)
+
+Determine whether each of the following matrices is positive definite, positive semi-definite, or neither.
+
+(a) $A = \begin{pmatrix} 3 & 0 \\ 0 & 5 \end{pmatrix}$, (b) $B = \begin{pmatrix} 1 & 2 \\ 2 & 1 \end{pmatrix}$, (c) $C = \begin{pmatrix} 4 & 0 \\ 0 & 0 \end{pmatrix}$, (d) $D = \begin{pmatrix} 2 & -1 \\ -1 & 2 \end{pmatrix}$, (e) $E = \begin{pmatrix} -1 & 0 \\ 0 & -3 \end{pmatrix}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key tool:** For each symmetric $2 \times 2$ matrix, check $a_{11}$ and $\det$.
+
+**(a) $A = \begin{pmatrix} 3 & 0 \\ 0 & 5 \end{pmatrix}$:**
+
+Diagonal matrix with entries $3 > 0$ and $5 > 0$. **Positive definite.**
+
+**(b) $B = \begin{pmatrix} 1 & 2 \\ 2 & 1 \end{pmatrix}$:**
+
+$b_{11} = 1 > 0$, $\det(B) = 1 - 4 = -3 < 0$. **Indefinite** (neither PD nor PSD).
+
+**(c) $C = \begin{pmatrix} 4 & 0 \\ 0 & 0 \end{pmatrix}$:**
+
+Diagonal with entries $4$ and $0$: eigenvalues are $4 \geq 0$ and $0 \geq 0$. **Positive semi-definite** (not PD).
+
+**(d) $D = \begin{pmatrix} 2 & -1 \\ -1 & 2 \end{pmatrix}$:**
+
+$d_{11} = 2 > 0$, $\det(D) = 4 - 1 = 3 > 0$. **Positive definite.**
+
+**(e) $E = \begin{pmatrix} -1 & 0 \\ 0 & -3 \end{pmatrix}$:**
+
+Diagonal with entries $-1 < 0$ and $-3 < 0$. **Negative definite** (neither PD nor PSD).
+
+</details>
+
+##### **4.11 Find All $k$ That Make a Matrix Positive Definite** (Assignment 9, Task 2)
+
+For what values of $k$ is $A = \begin{pmatrix} 4 & k \\ k & 9 \end{pmatrix}$ positive definite?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Apply Sylvester's criterion:**
+
+- $\Delta_1 = 4 > 0$. ✓ (satisfied for all $k$).
+- $\Delta_2 = \det(A) = (4)(9) - k^2 = 36 - k^2 > 0 \implies k^2 < 36 \implies -6 < k < 6$.
+
+**Conclusion:** $A$ is positive definite if and only if $\mathbf{-6 < k < 6}$.
+
+</details>
+
+##### **4.12 Find All $c$ That Make a Matrix Positive Definite** (Assignment 9, Task 3)
+
+For what values of $c$ is $B = \begin{pmatrix} c & 2 \\ 2 & c \end{pmatrix}$ positive definite?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Apply Sylvester's criterion:**
+
+- $\Delta_1 = c > 0 \implies c > 0$.
+- $\Delta_2 = c^2 - 4 > 0 \implies c^2 > 4 \implies c > 2$ or $c < -2$.
+
+Combining both conditions (we need $c > 0$ AND $|c| > 2$): $c > 2$.
+
+**Conclusion:** $B \succ 0$ if and only if $\mathbf{c > 2}$.
+
+</details>
+
+##### **4.13 Sylvester's Criterion for a $3 \times 3$ Matrix** (Assignment 9, Task 4)
+
+Use Sylvester's criterion to determine whether $M = \begin{pmatrix} 2 & 1 & 0 \\ 1 & 2 & 1 \\ 0 & 1 & 2 \end{pmatrix}$ is positive definite.
+
+<details>
+<summary>Click to see the solution</summary>
+
+Compute the three leading principal minors.
+
+**$\Delta_1$:**
+
+$$\Delta_1 = 2 > 0. \checkmark$$
+
+**$\Delta_2$:**
+
+$$\Delta_2 = \det\begin{pmatrix} 2 & 1 \\ 1 & 2 \end{pmatrix} = 4 - 1 = 3 > 0. \checkmark$$
+
+**$\Delta_3 = \det(M)$:** Expand along the first row:
+
+$$\Delta_3 = 2 \det\begin{pmatrix} 2 & 1 \\ 1 & 2 \end{pmatrix} - 1 \cdot \det\begin{pmatrix} 1 & 1 \\ 0 & 2 \end{pmatrix} + 0 = 2(3) - 1(2) = 6 - 2 = 4 > 0. \checkmark$$
+
+All three leading principal minors are positive. By Sylvester's criterion, $M$ is **positive definite**.
+
+</details>
+
+##### **4.14 Eigenvalues and Definiteness of a $2 \times 2$ Matrix** (Assignment 9, Task 5)
+
+Find the eigenvalues of $A = \begin{pmatrix} 5 & 2 \\ 2 & 3 \end{pmatrix}$ and determine whether $A$ is positive definite.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Find the characteristic polynomial.**
+
+$$\det(A - \lambda I) = (5 - \lambda)(3 - \lambda) - 4 = \lambda^2 - 8\lambda + 15 - 4 = \lambda^2 - 8\lambda + 11 = 0.$$
+
+**Step 2: Solve using the quadratic formula.**
+
+$$\lambda = \frac{8 \pm \sqrt{64 - 44}}{2} = \frac{8 \pm \sqrt{20}}{2} = 4 \pm \sqrt{5}.$$
+
+So $\lambda_1 = 4 + \sqrt{5} \approx 6.24$ and $\lambda_2 = 4 - \sqrt{5} \approx 1.76$.
+
+**Step 3: Apply the eigenvalue test.**
+
+Both eigenvalues are positive (since $\sqrt{5} \approx 2.24 < 4$, so $\lambda_2 > 0$).
+
+**Conclusion:** $A$ is **positive definite**.
+
+</details>
+
+##### **4.15 Symmetric Matrix of a Quadratic Form in Three Variables** (Assignment 9, Task 6)
+
+Consider $Q(\mathbf{x}) = 3x_1^2 + 2x_2^2 + 4x_3^2 - 2x_1 x_2 + 4x_2 x_3$.
+
+(a) Write $Q$ as $\mathbf{x}^T A \mathbf{x}$ with $A$ symmetric.
+(b) Determine whether $A$ is positive definite.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Reading off the symmetric matrix.**
+
+| Term | Coefficient | Matrix entry |
+|:-----|:------------|:-------------|
+| $x_1^2$ | $3$ | $A_{11} = 3$ |
+| $x_2^2$ | $2$ | $A_{22} = 2$ |
+| $x_3^2$ | $4$ | $A_{33} = 4$ |
+| $x_1 x_2$ | $-2$ | $A_{12} = A_{21} = -1$ |
+| $x_2 x_3$ | $4$ | $A_{23} = A_{32} = 2$ |
+| $x_1 x_3$ | $0$ | $A_{13} = A_{31} = 0$ |
+
+$$A = \begin{pmatrix} 3 & -1 & 0 \\ -1 & 2 & 2 \\ 0 & 2 & 4 \end{pmatrix}.$$
+
+**(b) Sylvester's criterion.**
+
+- $\Delta_1 = 3 > 0$. ✓
+- $\Delta_2 = (3)(2) - (-1)^2 = 6 - 1 = 5 > 0$. ✓
+- $\Delta_3 = \det(A)$. Expand along the first row:
+
+$$\Delta_3 = 3\det\begin{pmatrix} 2 & 2 \\ 2 & 4 \end{pmatrix} - (-1)\det\begin{pmatrix} -1 & 2 \\ 0 & 4 \end{pmatrix} + 0 = 3(8 - 4) + 1(-4 - 0) = 12 - 4 = 8 > 0. \checkmark$$
+
+All three leading principal minors are positive, so $A$ is **positive definite**.
+
+</details>
+
+##### **4.16 Complete the Square to Verify Positive Definiteness** (Assignment 9, Task 7)
+
+For $Q(x, y) = 2x^2 + 2xy + 2y^2$:
+
+(a) Write the associated symmetric matrix.
+(b) Complete the square to express $Q$ as a sum of squares.
+(c) Determine whether $Q$ is positive definite.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Symmetric matrix.**
+
+The coefficient of $x^2$ is 2, of $y^2$ is 2, and of $xy$ is 2 so $A_{12} = 1$.
+
+$$A = \begin{pmatrix} 2 & 1 \\ 1 & 2 \end{pmatrix}.$$
+
+**(b) Complete the square.**
+
+$$Q = 2x^2 + 2xy + 2y^2.$$
+
+Factor out 2 from the $x$-terms:
+
+$$Q = 2\!\left(x^2 + xy\right) + 2y^2 = 2\!\left(x + \frac{y}{2}\right)^{\!2} - 2 \cdot \frac{y^2}{4} + 2y^2 = 2\!\left(x + \frac{y}{2}\right)^{\!2} + \frac{3}{2}y^2.$$
+
+So $Q = 2\!\left(x + \tfrac{y}{2}\right)^2 + \tfrac{3}{2}y^2$.
+
+**(c) Positive definiteness.**
+
+Both coefficients ($2 > 0$ and $\tfrac{3}{2} > 0$) are positive, and the expression is a sum of two squares in terms of independent linear combinations. Specifically:
+
+- If $y \neq 0$: the second term $\tfrac{3}{2}y^2 > 0$, so $Q > 0$.
+- If $y = 0$ and $x \neq 0$: the first term $2x^2 > 0$, so $Q > 0$.
+
+Therefore $Q > 0$ for all $(x, y) \neq (0, 0)$: **$Q$ is positive definite.**
+
+</details>
+
+##### **4.17 Prove Sylvester's Criterion for $2 \times 2$ Matrices** (Assignment 9, Task 8)
+
+Let $A = \begin{pmatrix} a & b \\ b & c \end{pmatrix}$ be a symmetric $2 \times 2$ matrix. Prove that $A$ is positive definite if and only if $a > 0$ and $ac - b^2 > 0$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+We prove both directions.
+
+**($\Rightarrow$) Assume $A \succ 0$.**
+
+- Take $x = \begin{pmatrix} 1 \\ 0 \end{pmatrix}$: $x^T A x = a > 0$. So $a > 0$.
+- Since $A \succ 0$, the quadratic $g(t) = x^T A x$ with $x = \begin{pmatrix} t \\ 1 \end{pmatrix}$ satisfies $g(t) = at^2 + 2bt + c > 0$ for all real $t$. A quadratic $at^2 + 2bt + c$ with $a > 0$ that is positive everywhere has negative discriminant: $(2b)^2 - 4ac < 0$, i.e.\ $b^2 - ac < 0$, i.e.\ $ac - b^2 > 0$.
+
+**($\Leftarrow$) Assume $a > 0$ and $ac - b^2 > 0$.**
+
+Complete the square:
+
+$$x^T A x = ax_1^2 + 2bx_1 x_2 + cx_2^2 = a\!\left(x_1 + \frac{b}{a}x_2\right)^{\!2} + \frac{ac - b^2}{a}\,x_2^2.$$
+
+Both coefficients are positive ($a > 0$ and $(ac - b^2)/a > 0$). For any $(x_1, x_2) \neq (0, 0)$:
+
+- If $x_2 \neq 0$: the second term $\frac{ac-b^2}{a} x_2^2 > 0$, so $x^T A x > 0$.
+- If $x_2 = 0$, $x_1 \neq 0$: the first term $ax_1^2 > 0$, so $x^T A x > 0$.
+
+Thus $A \succ 0$. $\square$
+
+</details>
+
+##### **4.18 Find and Classify a Critical Point** (Assignment 9, Task 9)
+
+Find and classify the critical points of $f(x, y) = x^2 + 2y^2 - 2xy - 4x + 2y$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Solve $\nabla f = 0$.**
+
+$$\frac{\partial f}{\partial x} = 2x - 2y - 4 = 0 \implies x - y = 2. \tag{1}$$
+
+$$\frac{\partial f}{\partial y} = 4y - 2x + 2 = 0 \implies -2x + 4y = -2 \implies -x + 2y = -1. \tag{2}$$
+
+From (1): $x = y + 2$. Substitute into (2): $-(y + 2) + 2y = -1 \implies y = 1$. Then $x = 3$.
+
+**Critical point:** $(3, 1)$.
+
+**Step 2: Compute and classify the Hessian.**
+
+$$H = \begin{pmatrix} 2 & -2 \\ -2 & 4 \end{pmatrix}.$$
+
+- $H_{11} = 2 > 0$, $\det(H) = 8 - 4 = 4 > 0$.
+
+$H \succ 0$, so $(3, 1)$ is a **local minimum**.
+
+</details>
+
+##### **4.19 Analyze Critical Points of a Quadratic Function** (Assignment 9, Task 10)
+
+For $f(x, y) = x^2 - xy + y^2$:
+
+(a) Find all critical points.
+(b) Compute the Hessian matrix.
+(c) Classify the critical point.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Find critical points.**
+
+$$\frac{\partial f}{\partial x} = 2x - y = 0 \implies y = 2x.$$
+$$\frac{\partial f}{\partial y} = -x + 2y = 0 \implies x = 2y.$$
+
+Substitute: $y = 2x = 2(2y) = 4y \implies 3y = 0 \implies y = 0$, $x = 0$.
+
+**Critical point:** $(0, 0)$.
+
+**(b) Hessian.**
+
+$$H = \begin{pmatrix} 2 & -1 \\ -1 & 2 \end{pmatrix}.$$
+
+**(c) Classification.**
+
+- $H_{11} = 2 > 0$, $\det(H) = 4 - 1 = 3 > 0$.
+
+$H \succ 0$, so $(0, 0)$ is a **local minimum** (and since $f$ is a positive definite quadratic, it is in fact the global minimum).
+
+</details>
+
+##### **4.20 Find and Classify Critical Points of a Cubic Function** (Assignment 9, Task 11)
+
+Find and classify all critical points of $f(x, y) = 2x^3 - 3x^2 + 2y^3 + 3y^2 - 12x - 12y$. (There are four critical points.)
+
+<details>
+<summary>Click to see the solution</summary>
+
+This is identical to Lab 9, Task 5. See the solution in **4.5** above for the complete derivation.
+
+**Summary of results:**
+
+| Critical Point | Classification |
+|:--------------|:--------------|
+| $(2, 1)$ | Local minimum |
+| $(2, -2)$ | Saddle point |
+| $(-1, 1)$ | Saddle point |
+| $(-1, -2)$ | Local maximum |
+
+</details>
+
+##### **4.21 Degenerate Critical Point Analysis** (Assignment 9, Task 12)
+
+Consider $f(x, y) = x^4 + y^4 - 4xy + 1$.
+
+(a) Compute the Hessian at $(0, 0)$.
+(b) Use the Hessian to analyze the nature of $(0, 0)$.
+(c) Is $(0, 0)$ actually a local minimum? Justify.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**First, verify $(0, 0)$ is a critical point:**
+
+$$\nabla f = \begin{pmatrix} 4x^3 - 4y \\ 4y^3 - 4x \end{pmatrix}. \quad \text{At } (0,0): \nabla f = \begin{pmatrix} 0 \\ 0 \end{pmatrix}. \checkmark$$
+
+**(a) Hessian at $(0, 0)$.**
+
+$$\frac{\partial^2 f}{\partial x^2} = 12x^2, \quad \frac{\partial^2 f}{\partial x \partial y} = -4, \quad \frac{\partial^2 f}{\partial y^2} = 12y^2.$$
+
+At $(0, 0)$:
+
+$$H(0, 0) = \begin{pmatrix} 0 & -4 \\ -4 & 0 \end{pmatrix}.$$
+
+**(b) Analysis via Hessian.**
+
+$\det(H(0,0)) = 0 - 16 = -16 < 0$. The Hessian is **indefinite**, so the second-order test is **inconclusive** (it cannot classify $(0, 0)$).
+
+**(c) Is $(0, 0)$ a local minimum?**
+
+Evaluate $f$ along the line $y = x$:
+
+$$f(t, t) = t^4 + t^4 - 4t^2 + 1 = 2t^4 - 4t^2 + 1.$$
+
+At $t = 0$, $f = 1$. For small $|t| \neq 0$: the dominant term is $-4t^2$, so $f(t,t) \approx 1 - 4t^2 < 1$.
+
+Therefore $f$ *decreases* along $y = x$ near $(0, 0)$, and $(0, 0)$ is **not** a local minimum. It is a saddle point (the second-order test failed because the Hessian was singular and indefinite).
+
+</details>
+
+##### **4.22 Prove Convexity of an Exponential Function** (Assignment 9, Task 13)
+
+Show that $f(x, y) = e^{x^2 + y^2}$ is convex on $\mathbb{R}^2$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Strategy:** Show that the Hessian $H(x,y) \succeq 0$ for all $(x, y) \in \mathbb{R}^2$.
+
+**Step 1: Compute the Hessian.**
+
+Let $g = x^2 + y^2$. Then $f = e^g$.
+
+$$\frac{\partial f}{\partial x} = 2x e^g, \quad \frac{\partial f}{\partial y} = 2y e^g.$$
+
+$$\frac{\partial^2 f}{\partial x^2} = 2e^g + 4x^2 e^g = (2 + 4x^2)e^g,$$
+$$\frac{\partial^2 f}{\partial y^2} = (2 + 4y^2)e^g,$$
+$$\frac{\partial^2 f}{\partial x \partial y} = 4xy e^g.$$
+
+$$H(x,y) = e^{x^2+y^2} \begin{pmatrix} 2 + 4x^2 & 4xy \\ 4xy & 2 + 4y^2 \end{pmatrix}.$$
+
+**Step 2: Check positive semi-definiteness of $H$.**
+
+Since $e^{x^2+y^2} > 0$, it suffices to check $M = \begin{pmatrix} 2 + 4x^2 & 4xy \\ 4xy & 2 + 4y^2 \end{pmatrix} \succeq 0$.
+
+- $M_{11} = 2 + 4x^2 > 0$ always.
+- $\det(M) = (2 + 4x^2)(2 + 4y^2) - 16x^2y^2 = 4 + 8y^2 + 8x^2 + 16x^2y^2 - 16x^2y^2 = 4 + 8(x^2 + y^2) > 0$ always.
+
+By Sylvester's criterion, $M \succ 0$ for all $(x,y)$. Therefore $H(x,y) \succ 0$ everywhere.
+
+**Conclusion:** $f(x,y) = e^{x^2+y^2}$ is **strictly convex** on $\mathbb{R}^2$.
+
+</details>
+
+##### **4.23 Determine Convexity of a Quadratic Function** (Assignment 9, Task 14)
+
+Determine whether $f(x, y) = x^2 + 2y^2 - xy + 3x - 2y + 5$ is convex.
+
+<details>
+<summary>Click to see the solution</summary>
+
+This is identical to Lab 9, Task 8. See the solution in **4.8** above.
+
+**Conclusion:** $H = \begin{pmatrix} 2 & -1 \\ -1 & 4 \end{pmatrix}$ is PD everywhere (determinant 7 > 0, $H_{11} = 2 > 0$). Therefore $f$ is **strictly convex**.
+
+</details>
+
+##### **4.24 Prove Convexity Iff Hessian Is PSD** (Assignment 9, Task 15)
+
+Let $f(\mathbf{x}) = \frac{1}{2}\mathbf{x}^T A \mathbf{x} - \mathbf{b}^T \mathbf{x}$ where $A$ is symmetric. Prove that $f$ is convex if and only if $A \succeq 0$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Compute the Hessian of $f$.**
+
+The gradient is $\nabla f(x) = Ax - b$, and the Hessian is:
+
+$$H(x) = A \quad \text{(constant, independent of } x\text{)}.$$
+
+**Step 2: Apply the Hessian convexity criterion.**
+
+A twice-differentiable function is convex if and only if its Hessian is positive semi-definite at every point. Since $H(x) = A$ is constant:
+
+$$f \text{ is convex} \iff A \succeq 0. \quad \square$$
+
+**Remark:** If $A \succ 0$, then $f$ is strictly convex and has a unique global minimizer $x^* = A^{-1}b$.
+
+</details>
+
+##### **4.25 Maximize a Profit Function** (Assignment 9, Task 16)
+
+A company's profit is $P(x, y) = -2x^2 - 3y^2 + 4xy + 20x + 30y - 100$.
+
+(a) Find the production levels $(x^*, y^*)$ that maximize profit.
+(b) Verify this is a maximum.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Find the critical point.**
+
+$$\frac{\partial P}{\partial x} = -4x + 4y + 20 = 0 \implies -x + y = -5 \implies x - y = 5. \tag{1}$$
+
+$$\frac{\partial P}{\partial y} = -6y + 4x + 30 = 0 \implies 4x - 6y = -30 \implies 2x - 3y = -15. \tag{2}$$
+
+From (1): $x = y + 5$. Substitute into (2): $2(y + 5) - 3y = -15 \implies -y = -25 \implies y = 25$. Then $x = 30$.
+
+**Critical point:** $(x^*, y^*) = (30, 25)$.
+
+**(b) Verify it is a maximum.**
+
+$$H = \begin{pmatrix} -4 & 4 \\ 4 & -6 \end{pmatrix}.$$
+
+- $H_{11} = -4 < 0$.
+- $\det(H) = (-4)(-6) - 16 = 24 - 16 = 8 > 0$.
+
+Since $H_{11} < 0$ and $\det(H) > 0$, the Hessian is **negative definite**. Therefore $(30, 25)$ is a **local maximum** (and, since $P$ is a concave quadratic, also the global maximum).
+
+</details>
+
+##### **4.26 Prove $\det(A) > 0$ for SPD Matrices** (Assignment 9, Task 17)
+
+Let $A$ be an $n \times n$ symmetric positive definite matrix. Prove that $\det(A) > 0$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+Since $A$ is symmetric, the Spectral Theorem guarantees that $A$ has $n$ real eigenvalues $\lambda_1, \lambda_2, \ldots, \lambda_n$ (counted with multiplicity).
+
+Since $A \succ 0$, the eigenvalue test states that all $\lambda_i > 0$.
+
+The determinant of a matrix equals the product of its eigenvalues:
+
+$$\det(A) = \prod_{i=1}^n \lambda_i.$$
+
+Since each $\lambda_i > 0$, the product is a product of positive numbers, hence positive:
+
+$$\det(A) = \prod_{i=1}^n \lambda_i > 0. \quad \square$$
+
+</details>
+
+##### **4.27 Prove Positive-Definite Inequality from Eigenvalue Condition** (Assignment 9, Task 18)
+
+Suppose $A$ is a symmetric $n \times n$ matrix with all eigenvalues positive. Prove that $\mathbf{x}^T A \mathbf{x} > 0$ for all $\mathbf{x} \neq \mathbf{0}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+Since $A$ is symmetric, by the Spectral Theorem there exists an orthogonal matrix $Q$ such that $A = Q \Lambda Q^T$, where $\Lambda = \text{diag}(\lambda_1, \ldots, \lambda_n)$ contains the eigenvalues with all $\lambda_i > 0$.
+
+**Step 1: Change coordinates.** Let $y = Q^T x$. Since $Q$ is orthogonal (hence invertible), $x \neq 0 \iff y \neq 0$.
+
+**Step 2: Expand the quadratic form.**
+
+$$x^T A x = x^T (Q\Lambda Q^T) x = (Q^T x)^T \Lambda (Q^T x) = y^T \Lambda y = \sum_{i=1}^n \lambda_i y_i^2.$$
+
+**Step 3: Bound from below.** Since $y \neq 0$, at least one component $y_k \neq 0$. Therefore at least the $k$-th term in the sum satisfies $\lambda_k y_k^2 > 0$ (as $\lambda_k > 0$ and $y_k^2 > 0$). All other terms are nonneg­ative. Thus:
+
+$$x^T A x = \sum_{i=1}^n \lambda_i y_i^2 \geq \lambda_k y_k^2 > 0. \quad \square$$
+
+</details>
+
+##### **4.28 Prove the Sum of Two PD Matrices Is PD** (Assignment 9, Task 19)
+
+Let $A$ and $B$ be two $n \times n$ symmetric positive definite matrices. Prove that $A + B$ is also positive definite.
+
+<details>
+<summary>Click to see the solution</summary>
+
+We need to show $x^T(A + B)x > 0$ for all $x \neq 0$.
+
+**Expand:**
+
+$$x^T(A + B)x = x^T A x + x^T B x.$$
+
+Since $A \succ 0$, we have $x^T A x > 0$ for all $x \neq 0$.
+
+Since $B \succ 0$, we have $x^T B x > 0$ for all $x \neq 0$.
+
+Therefore, for any $x \neq 0$:
+
+$$x^T(A + B)x = \underbrace{x^T A x}_{> 0} + \underbrace{x^T B x}_{> 0} > 0. \quad \square$$
+
+**Symmetry:** $A + B$ is symmetric because $(A + B)^T = A^T + B^T = A + B$.
+
+Hence $A + B$ is symmetric positive definite.
+
+</details>
+
+##### **4.29 Classify a General Quadratic Function** (Assignment 9, Task 20)
+
+Consider $f(x, y) = ax^2 + 2bxy + cy^2$ with $a > 0$.
+
+(a) Find the condition on $a, b, c$ for $f$ to have a local minimum at $(0, 0)$.
+(b) Find the condition for $(0, 0)$ to be a local maximum.
+(c) Find the condition for $(0, 0)$ to be a saddle point.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Identify the Hessian.** Since $f$ is a pure quadratic (degree 2 with no constant or linear terms), $(0, 0)$ is the only critical point, and the Hessian of $f$ is the constant matrix:
+
+$$H = \begin{pmatrix} 2a & 2b \\ 2b & 2c \end{pmatrix} = 2\begin{pmatrix} a & b \\ b & c \end{pmatrix}.$$
+
+Equivalently, the classification of $(0, 0)$ is determined by the definiteness of $\begin{pmatrix} a & b \\ b & c \end{pmatrix}$, which has $\Delta_1 = a$ and $\Delta_2 = ac - b^2$.
+
+**(a) Local minimum:** $H \succ 0 \iff a > 0$ and $ac - b^2 > 0$.
+
+Since $a > 0$ is already given, the condition is $\mathbf{ac - b^2 > 0}$.
+
+**(b) Local maximum:** $H \prec 0$ requires $2a < 0$, i.e.\ $a < 0$. But the problem specifies $a > 0$, so the first leading principal minor of $H$ is positive. A negative definite matrix requires all leading principal minors to alternate in sign starting negative, so $\Delta_1 = 2a > 0$ already contradicts $H \prec 0$. **No local maximum is possible when $a > 0$.**
+
+**(c) Saddle point:** $H$ is indefinite, i.e.\ $\det(H) < 0 \iff (2a)(2c) - (2b)^2 < 0 \iff ac - b^2 < 0$, i.e.\ $\mathbf{b^2 > ac}$.
+
+</details>
+
+##### **4.30 Verify Positive Definiteness by Direct Computation** (Lecture 9, Example 1)
+
+Let $A = \begin{pmatrix} 4 & 0 \\ 0 & 2 \end{pmatrix}$. Verify directly from the definition that $A$ is positive definite.
+
+<details>
+<summary>Click to see the solution</summary>
+
+Take any nonzero vector $x = \begin{pmatrix} x_1 \\ x_2 \end{pmatrix} \neq \begin{pmatrix} 0 \\ 0 \end{pmatrix}$.
+
+$$x^T A x = \begin{pmatrix} x_1 & x_2 \end{pmatrix} \begin{pmatrix} 4 & 0 \\ 0 & 2 \end{pmatrix} \begin{pmatrix} x_1 \\ x_2 \end{pmatrix} = 4x_1^2 + 2x_2^2.$$
+
+Since $x \neq 0$, at least one of $x_1, x_2$ is nonzero. If $x_1 \neq 0$, then $4x_1^2 > 0$; if $x_2 \neq 0$, then $2x_2^2 > 0$. In either case $4x_1^2 + 2x_2^2 > 0$.
+
+**Conclusion:** $A$ is positive definite by definition.
+
+</details>
+
+##### **4.31 Diagonalize a Quadratic Form and Verify Positivity** (Lecture 9, Example 2)
+
+For $Q(x, y) = 2x^2 - 4xy + 5y^2$, determine whether $Q$ is always positive using the eigenvalue test, and write $Q$ in diagonal form.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Write the symmetric matrix.**
+
+$A = \begin{pmatrix} 2 & -2 \\ -2 & 5 \end{pmatrix}$.
+
+**Step 2: Find eigenvalues.**
+
+$$\det(A - \lambda I) = (2 - \lambda)(5 - \lambda) - 4 = \lambda^2 - 7\lambda + 10 - 4 = \lambda^2 - 7\lambda + 6 = (\lambda - 1)(\lambda - 6) = 0.$$
+
+Eigenvalues: $\lambda_1 = 1 > 0$, $\lambda_2 = 6 > 0$.
+
+**Step 3: Eigenvalue test.**
+
+Both eigenvalues are positive, so $A \succ 0$ and $Q(x, y) > 0$ for all $(x, y) \neq (0, 0)$.
+
+**Step 4: Diagonal form.**
+
+After the orthogonal change of variables $y = Q^T x$ (where $Q$ is the matrix of normalized eigenvectors):
+
+$$Q(x, y) = \lambda_1 y_1^2 + \lambda_2 y_2^2 = y_1^2 + 6y_2^2.$$
+
+This is manifestly a sum of positive terms, confirming the quadratic form is always positive.
+
+</details>
+
+##### **4.32 Full Optimization Workflow** (Lecture 9, Example 3)
+
+Let $f(x, y) = x^2 + 2y^2 + 2xy - 2x + 1$. Find all critical points and classify them.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Compute the gradient and solve $\nabla f = 0$.**
+
+$$\frac{\partial f}{\partial x} = 2x + 2y - 2 = 0 \implies x + y = 1. \tag{1}$$
+
+$$\frac{\partial f}{\partial y} = 4y + 2x = 0 \implies 2x + 4y = 0 \implies x + 2y = 0. \tag{2}$$
+
+Subtract (2) from (1): $(x + y) - (x + 2y) = 1 - 0 \implies -y = 1 \implies y = -1$. Then $x = 1 - y = 2$.
+
+**Critical point:** $(x, y) = (2, -1)$.
+
+**Step 2: Compute the Hessian.**
+
+$$H = \begin{pmatrix} 2 & 2 \\ 2 & 4 \end{pmatrix}.$$
+
+**Step 3: Apply Sylvester's criterion.**
+
+- $H_{11} = 2 > 0$, $\det(H) = 8 - 4 = 4 > 0$.
+
+$H \succ 0$, so $(2, -1)$ is a **local minimum**.
+
+**Minimum value:** $f(2, -1) = 4 + 2 + (-4) - 4 + 1 = -1$.
+
+</details>
+
+##### **4.33 Cholesky Factorization** (Lecture 9, Example 4)
+
+Compute the Cholesky decomposition $A = LL^T$ for $A = \begin{pmatrix} 4 & 2 \\ 2 & 2 \end{pmatrix}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1: Verify $A \succ 0$.**
+
+$\Delta_1 = 4 > 0$, $\Delta_2 = (4)(2) - 4 = 4 > 0$. So $A \succ 0$ and a Cholesky factorization exists.
+
+**Step 2: Find $L = \begin{pmatrix} l_{11} & 0 \\ l_{21} & l_{22} \end{pmatrix}$.**
+
+Expand $LL^T = A$:
+
+$$\begin{pmatrix} l_{11} & 0 \\ l_{21} & l_{22} \end{pmatrix}\begin{pmatrix} l_{11} & l_{21} \\ 0 & l_{22} \end{pmatrix} = \begin{pmatrix} l_{11}^2 & l_{11}l_{21} \\ l_{11}l_{21} & l_{21}^2 + l_{22}^2 \end{pmatrix} = \begin{pmatrix} 4 & 2 \\ 2 & 2 \end{pmatrix}.$$
+
+- $(1,1)$: $l_{11}^2 = 4 \implies l_{11} = 2$ (positive diagonal required).
+- $(2,1)$: $l_{11} l_{21} = 2 \implies l_{21} = 1$.
+- $(2,2)$: $l_{21}^2 + l_{22}^2 = 2 \implies 1 + l_{22}^2 = 2 \implies l_{22} = 1$.
+
+$$L = \begin{pmatrix} 2 & 0 \\ 1 & 1 \end{pmatrix}.$$
+
+**Verification:**
+
+$$LL^T = \begin{pmatrix} 2 & 0 \\ 1 & 1 \end{pmatrix}\begin{pmatrix} 2 & 1 \\ 0 & 1 \end{pmatrix} = \begin{pmatrix} 4 & 2 \\ 2 & 2 \end{pmatrix} = A. \checkmark$$
+
+</details>

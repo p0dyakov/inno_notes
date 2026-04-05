@@ -1,0 +1,579 @@
+---
+title: "W11. Priority Queues, Binary Heaps, Heapsort, Fibonacci Heaps"
+author: "Nikolai Kudasov"
+date: "March 31, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Priority Queues**
+
+###### **1.1.1 Motivation**
+
+In many real applications, work items must be processed in order of importance rather than in the order they arrive. For example, an operating system scheduler might always run the highest-priority process first, or a network router might forward the most critical packets ahead of ordinary traffic. In a *static* setting — where all items are known in advance — you could simply sort them once and process them in order. But in a *dynamic* setting, new requests arrive continuously while processing is ongoing. Sorting from scratch after every insertion is far too slow.
+
+The abstract data type designed for this scenario is the **priority queue**: a collection that allows efficient insertion of new items and efficient retrieval (and removal) of the item with the highest (or lowest) priority.
+
+###### **1.1.2 Priority Queue ADT**
+
+A **max-priority queue** supports the following operations:
+
+- **`INSERT(x, p)`** — insert element $x$ with priority $p$ into the queue.
+- **`MAXIMUM()`** — return (but do not remove) the element with maximum priority.
+- **`EXTRACT-MAX()`** — remove and return the element with maximum priority.
+- **`INCREASE-KEY(x, p')`** — increase the priority of element $x$ to $p'$ (requires $p' \ge x.\text{key}$). This operation is critical for graph algorithms such as Dijkstra's shortest-path algorithm and Prim's minimum spanning tree algorithm, which need to reprioritize already-queued nodes.
+- **`UNION(Q_1, Q_2)`** *(optional)* — merge two priority queues into one. Useful in parallel or functional settings.
+
+A **min-priority queue** is the symmetric counterpart, offering `MINIMUM()`, `EXTRACT-MIN()`, and `DECREASE-KEY()` in place of the max versions.
+
+###### **1.1.3 Implementation Options**
+
+Different underlying data structures yield different asymptotic complexities for the priority-queue operations. The table below summarises the main options (see Cormen et al. 2022, §6.1 and Cormen et al. 2009, §19):
+
+| Structure | `INSERT` | `EXTRACT-MAX` | `INCREASE-KEY` | `UNION` |
+| :--- | :--- | :--- | :--- | :--- |
+| Unsorted list | $O(1)$ | $O(n)$ | $O(1)$ | $O(1)$ |
+| Sorted list | $O(n)$ | $O(1)$ | $O(n)$ | $O(n)$ |
+| Binary search tree | $O(\log n)$ | $O(\log n)$ | $O(\log n)$ | — |
+| Binary heap | $O(\log n)$ | $O(\log n)$ | $O(\log n)$ | — |
+| Binomial heap | $O(1)$ amort. | $O(\log n)$ | $O(\log n)$ | $O(\log n)$ |
+| Fibonacci heap | $O(1)$ | $O(\log n)$ amort. | $O(1)$ amort. | $O(1)$ |
+
+The **binary heap** is the standard practical choice: it achieves $O(\log n)$ for all three core operations, supports an elegant in-place array representation, and leads directly to the **heapsort** algorithm. The **Fibonacci heap** has superior theoretical amortized bounds and is theoretically important for graph algorithms, but its constant factors make it less attractive in practice.
+
+##### **1.2 Complete Binary Trees**
+
+###### **1.2.1 Definition**
+
+A **complete binary tree** is a binary tree satisfying two conditions:
+
+1. Every level except possibly the last is completely filled (i.e., every non-leaf node on those levels has exactly two children).
+2. All nodes on the last level are as far **left** as possible — there are no gaps to the left of any node on the bottom row.
+
+The height of a complete binary tree with $n$ nodes is $\Theta(\log n)$, because each level at most doubles the number of nodes. This logarithmic height is exactly what makes heap operations efficient.
+
+A common mistake is to confuse "complete" with "perfect" (every level fully filled) or "full" (every node has 0 or 2 children). A complete binary tree need not be perfect, but it must have all bottom-level nodes pushed to the left.
+
+###### **1.2.2 Array Representation**
+
+A complete binary tree with $n$ nodes can be stored compactly in an array of length $n$ using **level-order numbering**: nodes are assigned indices $0, 1, 2, \ldots, n-1$ by reading the tree level by level, left to right. This gives the following navigation formulas for node at index $i$ (0-based):
+
+$$\text{left}(i) = 2i + 1, \qquad \text{right}(i) = 2i + 2, \qquad \text{parent}(i) = \left\lfloor \frac{i-1}{2} \right\rfloor$$
+
+Because the tree is complete, every node with index $i \ge \lfloor n/2 \rfloor$ is a **leaf**: it has no children stored in the array. Nodes at indices $0$ through $\lfloor n/2 \rfloor - 1$ are internal nodes.
+
+**Example.** For the tree with 12 nodes numbered 0–11:
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 99 | 19 | 36 | 17 | 6 | 25 | 18 | 2 | 7 | 4 | 5 | 1 |
+
+Navigation check: node at index 4 (value 6) has left child at $2 \cdot 4 + 1 = 9$ (value 4) and right child at $2 \cdot 4 + 2 = 10$ (value 5). Node at index 11 (value 1) has parent at $\lfloor (11-1)/2 \rfloor = 5$ (value 25). ✓
+
+##### **1.3 Binary Heaps**
+
+###### **1.3.1 Heap Property**
+
+A **binary max-heap** is a complete binary tree in which every node satisfies the **max-heap property**:
+
+$$\text{parent.key} \ge \text{child.key} \quad \text{for every parent–child pair.}$$
+
+Equivalently, in the array representation: $A[\lfloor(i-1)/2\rfloor] \ge A[i]$ for every $i > 0$.
+
+A direct consequence is that the **root always holds the maximum key** of the entire heap. A **binary min-heap** satisfies $\text{parent.key} \le \text{child.key}$ and keeps the minimum at the root.
+
+Two common violations to watch for:
+
+- A child is *larger* than its parent — this breaks the max-heap property at that edge.
+- A node is *missing* where a left child should appear before a right child on the bottom level — this breaks the completeness requirement (not a valid complete binary tree at all).
+
+###### **1.3.2 MAX-HEAPIFY**
+
+The fundamental repair procedure is `MAX-HEAPIFY(A, i)`. It assumes the subtrees rooted at the left and right children of $i$ already satisfy the max-heap property, and it *pushes* the element at index $i$ downward until the heap property is restored at $i$ (Cormen et al. 2022, §6.2):
+
+```text
+MAX-HEAPIFY(A, i)
+1  l = LEFT(i)           // 2i + 1
+2  r = RIGHT(i)          // 2i + 2
+3  if l <= A.heap-size and A[l] > A[i]
+4      largest = l
+5  else largest = i
+6  if r <= A.heap-size and A[r] > A[largest]
+7      largest = r
+8  if largest != i
+9      exchange A[i] with A[largest]
+10     MAX-HEAPIFY(A, largest)
+```
+
+The idea: find the largest value among node $i$ and its (up to two) children. If $i$ already holds the largest value, the subtree is already a valid heap and we stop. Otherwise, swap $i$ with the larger child and recurse on that child's position, because the swap may have placed a smaller value into a subtree that previously satisfied the heap property.
+
+**Complexity.** At each level of the recursion, we do $O(1)$ work. The recursion descends at most one path from $i$ to a leaf, so the depth is $O(h)$ where $h$ is the height of the subtree rooted at $i$. In the worst case (the root, $h = \lfloor \log_2 n \rfloor$), this is $\Theta(\log n)$.
+
+###### **1.3.3 BUILD-MAX-HEAP**
+
+Given an arbitrary array of $n$ elements, we can convert it into a max-heap in-place using `BUILD-MAX-HEAP` (Cormen et al. 2022, §6.3):
+
+```text
+BUILD-MAX-HEAP(A, n)
+1  A.heap-size = n
+2  for i = floor(n/2) - 1 downto 0
+3      MAX-HEAPIFY(A, i)
+```
+
+We call `MAX-HEAPIFY` on every **internal** node, starting from the lowest internal node ($\lfloor n/2 \rfloor - 1$) up to the root (index 0). We start from the bottom because `MAX-HEAPIFY` requires the children's subtrees to already be valid heaps; when we process node $i$ from the bottom up, all nodes at larger indices (deeper in the tree) have already been heapified.
+
+Nodes at indices $\lfloor n/2 \rfloor$ through $n - 1$ are leaves. A single-node subtree is trivially a valid heap, so there is no work to do for leaves.
+
+**Complexity analysis.** Naively, each of $O(n)$ calls to `MAX-HEAPIFY` costs $O(\log n)$, giving $O(n \log n)$. However, a tighter analysis shows the true cost is $\Theta(n)$.
+
+The key observation is that most calls to `MAX-HEAPIFY` are made on subtrees of *small* height. The number of nodes at height $h$ in a complete binary tree of $n$ nodes is at most $\lceil n / 2^{h+1} \rceil$. Since `MAX-HEAPIFY` on a subtree of height $h$ costs $O(h)$:
+
+$$T(n) = \sum_{h=0}^{\lfloor \log_2 n \rfloor} \left\lceil \frac{n}{2^{h+1}} \right\rceil O(h) = O\!\left(n \sum_{h=0}^{\lfloor \log_2 n \rfloor} \frac{h}{2^{h+1}}\right) = O(n)$$
+
+The last step uses the identity $\displaystyle\sum_{h=0}^{\infty} \frac{h}{2^{h+1}} \le 1$, which follows from differentiating the geometric series $\sum_{h=0}^\infty x^h = 1/(1-x)$ and evaluating at $x = 1/2$.
+
+Therefore `BUILD-MAX-HEAP` runs in $\Theta(n)$ time.
+
+###### **1.3.4 EXTRACT-MAX**
+
+To remove and return the maximum (root) of the heap (Cormen et al. 2022, §6.5):
+
+```text
+MAX-HEAP-EXTRACT-MAX(A)
+1  max = MAX-HEAP-MAXIMUM(A)      // save root value
+2  A[1] = A[A.heap-size]          // move last element to root (1-based indexing)
+3  A.heap-size = A.heap-size - 1
+4  MAX-HEAPIFY(A, 1)              // restore heap property
+5  return max
+```
+
+The trick is to move the *last* element of the array to the root position (filling the hole left by removing the maximum) and then calling `MAX-HEAPIFY` to sink it to its correct position. This avoids any shifting. Since `MAX-HEAPIFY` costs $O(\log n)$, so does `EXTRACT-MAX`.
+
+###### **1.3.5 INCREASE-KEY and INSERT**
+
+**`INCREASE-KEY`** works by updating the key and then *bubbling up*: after increasing a key, the node may become larger than its parent, violating the heap property going *upward*. We fix this by repeatedly swapping the node with its parent as long as the parent is smaller (Cormen et al. 2022, §6.5):
+
+```text
+MAX-HEAP-INCREASE-KEY(A, x, k)
+1  if k < x.key
+2      error "new key is smaller than current key"
+3  x.key = k
+4  find the index i in array A where object x occurs
+5  while i > 1 and A[PARENT(i)].key < A[i].key
+6      exchange A[i] with A[PARENT(i)]
+7      i = PARENT(i)
+```
+
+The bubble-up traverses at most the height of the tree, costing $\Theta(\log n)$.
+
+**`INSERT`** is implemented by appending a new element with key $-\infty$ at the end of the array (making the heap one larger while trivially satisfying the heap property), then calling `INCREASE-KEY` to raise it to the desired key:
+
+```text
+MAX-HEAP-INSERT(A, x, n)
+1  if A.heap-size == n
+2      error "heap overflow"
+3  A.heap-size = A.heap-size + 1
+4  k = x.key
+5  x.key = -∞             // ensures heap property is not violated yet
+6  A[A.heap-size] = x
+7  MAX-HEAP-INCREASE-KEY(A, x, k)
+```
+
+Assigning $-\infty$ on line 5 guarantees that the new node is smaller than everything already in the heap, so appending it never violates the heap property. `INCREASE-KEY` then raises it to the correct value. The total cost is $\Theta(\log n)$.
+
+##### **1.4 Heapsort**
+
+**Heapsort** sorts an array in-place by combining `BUILD-MAX-HEAP` and repeated extraction (Cormen et al. 2022, §6.4):
+
+```text
+HEAPSORT(A, n)
+1  BUILD-MAX-HEAP(A, n)
+2  for i = n downto 2
+3      exchange A[1] with A[i]     // move current max to its final sorted position
+4      A.heap-size = A.heap-size - 1
+5      MAX-HEAPIFY(A, 1)
+```
+
+**How it works.** After `BUILD-MAX-HEAP`, `A[1]` holds the largest element. We swap it with `A[n]` (the last position in the array, which is its correct sorted position), shrink the heap by one, and call `MAX-HEAPIFY` to restore the heap property. Repeating this $n - 1$ times extracts elements in descending order, placing them in positions $n, n-1, \ldots, 2$ of the array. The result is a sorted array.
+
+**Properties of heapsort:**
+
+| Property | Value |
+| :--- | :--- |
+| **Time complexity (worst case)** | $\Theta(n \log n)$ |
+| **Extra space** | $\Theta(1)$ — in-place with iterative `MAX-HEAPIFY` |
+| **Stable?** | No |
+| **Deterministic?** | Yes |
+
+The $\Theta(n \log n)$ bound comes from the $\Theta(n)$ build phase plus $n - 1$ calls to `MAX-HEAPIFY`, each costing $O(\log n)$.
+
+Compared to **merge sort**: heapsort uses only $\Theta(1)$ extra memory (merge sort needs $\Theta(n)$), but heapsort tends to be *less cache-friendly* because `MAX-HEAPIFY` accesses memory at positions $i$, $2i+1$, $2i+2$, which can be far apart in large arrays, causing more cache misses than merge sort's sequential access patterns.
+
+##### **1.5 Fibonacci Heaps**
+
+Fibonacci heaps (Cormen et al. 2009, §19) provide an efficient implementation of *mergeable* priority queues with superior amortized complexity. They are theoretically important for graph algorithms such as Dijkstra's (with $O(E + V \log V)$ total time) and Prim's (with the same bound).
+
+###### **1.5.1 Structure**
+
+A **Fibonacci heap** $H$ is a collection (forest) of **min-heap-ordered trees**. Unlike binary heaps, the trees need not be binary or complete. The heap maintains:
+
+- A **root list**: a circular doubly linked list of the root nodes of all trees.
+- A pointer **`H.min`**: points to the root with the minimum key among all roots.
+- A count **`H.n`**: the total number of nodes.
+
+Each node $x$ stores: `x.key`, `x.degree` (number of children), `x.mark` (a boolean indicating whether $x$ has lost a child since it last became a non-root node), pointers to parent, one child, and left/right siblings in the doubly linked list.
+
+The **mark** field is the key mechanism that keeps trees from becoming too tall, which would degrade `EXTRACT-MIN` performance.
+
+###### **1.5.2 Insertion and Union**
+
+**Insertion** is $O(1)$: create a new single-node tree and splice it into the root list, updating `H.min` if necessary.
+
+```text
+FIB-HEAP-INSERT(H, x)
+1  x.degree = 0; x.p = NIL; x.child = NIL; x.mark = FALSE
+2  if H.min == NIL
+3      create root list for H containing just x; H.min = x
+4  else insert x into H's root list
+5      if x.key < H.min.key then H.min = x
+6  H.n = H.n + 1
+```
+
+**Union** is also $O(1)$: simply concatenate the two root lists (a pointer splice in the doubly linked lists) and update `H.min` to be the smaller of the two existing minima.
+
+```text
+FIB-HEAP-UNION(H1, H2)
+1  H = MAKE-FIB-HEAP()
+2  H.min = H1.min
+3  concatenate root list of H2 with root list of H
+4  if H1.min == NIL or (H2.min != NIL and H2.min.key < H1.min.key)
+5      H.min = H2.min
+6  H.n = H1.n + H2.n
+7  return H
+```
+
+No tree restructuring is done during insertion or union — all work is deferred to `EXTRACT-MIN`.
+
+###### **1.5.3 Extract-Min and Consolidation**
+
+`EXTRACT-MIN` is the most complex operation:
+
+1. Move all children of the minimum node to the root list (they become new roots).
+2. Remove the minimum node from the root list.
+3. **Consolidate**: reorganize the root list so that no two roots have the same degree. This is done by repeatedly linking two roots of equal degree (making the one with the larger key a child of the one with the smaller key) until all roots have distinct degrees.
+
+```text
+FIB-HEAP-EXTRACT-MIN(H)
+1  z = H.min
+2  if z != NIL
+3      for each child x of z: add x to root list, x.p = NIL
+4      remove z from root list
+5      if z == z.right then H.min = NIL
+6      else H.min = z.right; CONSOLIDATE(H)
+7      H.n = H.n - 1
+8  return z
+```
+
+The `CONSOLIDATE` procedure uses an auxiliary array $A[0 \ldots D(H.n)]$ indexed by degree, where $D(H.n) = O(\log n)$ is the maximum possible degree of any node. It scans the root list, and whenever two roots of the same degree $d$ are found, links them (smaller key becomes parent), incrementing the degree to $d+1$ and repeating until no two roots share a degree.
+
+**Complexity.** In the worst case, `EXTRACT-MIN` costs $\Theta(n)$ (if the root list is huge after many insertions). However, the *amortized* cost is $\Theta(\log n)$: the consolidation "pays back" the work done by many cheap insertions. Formally, a potential-function argument shows this amortized bound holds.
+
+###### **1.5.4 Decrease-Key and Cascading Cut**
+
+`DECREASE-KEY` decreases the key of a node $x$ to $k$. If this violates the min-heap property (i.e., $x$ becomes smaller than its parent $y$), we **cut** $x$ from its parent and move it to the root list. To prevent trees from becoming arbitrarily deep (which would hurt `EXTRACT-MIN`), we use the **cascading cut** mechanism:
+
+- When a node $y$ loses a child for the **first time**, mark it (`y.mark = TRUE`).
+- When a marked node $y$ loses a **second** child, cut $y$ itself from its parent and move it to the root list (unmarking it), then apply the same rule to $y$'s parent. This cascades up until either an unmarked node or the root is reached.
+
+```text
+FIB-HEAP-DECREASE-KEY(H, x, k)
+1  if k > x.key then error
+2  x.key = k; y = x.p
+3  if y != NIL and x.key < y.key
+4      CUT(H, x, y); CASCADING-CUT(H, y)
+5  if x.key < H.min.key then H.min = x
+
+CUT(H, x, y)
+1  remove x from child list of y, decrement y.degree
+2  add x to root list of H; x.p = NIL; x.mark = FALSE
+
+CASCADING-CUT(H, y)
+1  z = y.p
+2  if z != NIL
+3      if y.mark == FALSE then y.mark = TRUE
+4      else CUT(H, y, z); CASCADING-CUT(H, z)
+```
+
+**Complexity.** The worst-case cost is $\Theta(n)$ (a long cascading chain), but the *amortized* cost is $\Theta(1)$. Intuitively, every cascading cut is "pre-paid" by the earlier `DECREASE-KEY` that caused the mark to be set.
+
+###### **1.5.5 Amortized Bounds Summary**
+
+The full table of amortized time bounds for Fibonacci heaps (Cormen et al. 2009, §19):
+
+| Operation | Amortized time |
+| :--- | :--- |
+| `FIB-HEAP-INSERT` | $O(1)$ |
+| `FIB-HEAP-MINIMUM` | $O(1)$ |
+| `FIB-HEAP-UNION` | $O(1)$ |
+| `FIB-HEAP-EXTRACT-MIN` | $O(\log n)$ |
+| `FIB-HEAP-DECREASE-KEY` | $O(1)$ |
+| `FIB-HEAP-DELETE` | $O(\log n)$ |
+
+**Important caveat:** Fibonacci heaps have large constant factors and complex pointer manipulation. In practice, binary heaps or $d$-ary heaps often outperform them on real inputs. The theoretical advantage of Fibonacci heaps materialises mainly when $E \gg V$ in graph algorithms (where `DECREASE-KEY` is called many more times than `EXTRACT-MIN`).
+
+---
+
+#### **2. Definitions**
+
+- **Priority queue:** An abstract data type maintaining a collection of elements with associated priorities, supporting efficient insertion and retrieval/removal of the element with maximum (or minimum) priority.
+- **Max-priority queue:** A priority queue whose operations (`MAXIMUM`, `EXTRACT-MAX`, `INCREASE-KEY`) operate on the maximum-priority element.
+- **Min-priority queue:** A priority queue whose operations (`MINIMUM`, `EXTRACT-MIN`, `DECREASE-KEY`) operate on the minimum-priority element.
+- **Complete binary tree:** A binary tree in which every level except possibly the last is fully filled, and all nodes on the last level are as far left as possible.
+- **Binary max-heap:** A complete binary tree satisfying the max-heap property: every node's key is greater than or equal to the keys of its children.
+- **Binary min-heap:** A complete binary tree satisfying the min-heap property: every node's key is less than or equal to the keys of its children.
+- **Heap property:** The invariant that every parent key is $\ge$ (max-heap) or $\le$ (min-heap) all its children's keys.
+- **Heap-size:** The number of valid elements currently stored in the heap array (may be less than the array's allocated capacity).
+- **MAX-HEAPIFY:** A procedure that restores the max-heap property at node $i$, assuming its subtrees are already valid max-heaps, by sinking the element at $i$ downward.
+- **BUILD-MAX-HEAP:** A procedure that converts an arbitrary array into a max-heap in $\Theta(n)$ time by calling `MAX-HEAPIFY` on every internal node from bottom to top.
+- **EXTRACT-MAX:** A heap operation that removes and returns the maximum element (root) in $\Theta(\log n)$ time.
+- **INCREASE-KEY:** A heap operation that raises a node's key and restores the heap property by bubbling the node upward in $\Theta(\log n)$ time.
+- **Heapsort:** An in-place, deterministic, $\Theta(n \log n)$ comparison sort that builds a max-heap and then repeatedly extracts the maximum.
+- **Fibonacci heap:** A data structure implementing a mergeable priority queue as a forest of min-heap-ordered trees with lazy restructuring, achieving $O(1)$ amortized time for `INSERT`, `MINIMUM`, `UNION`, and `DECREASE-KEY`, and $O(\log n)$ amortized time for `EXTRACT-MIN` and `DELETE`.
+- **Root list:** In a Fibonacci heap, the circular doubly linked list of all tree roots.
+- **Degree of a node:** The number of children of a node in a Fibonacci heap.
+- **Mark:** A boolean attribute of a Fibonacci heap node indicating whether it has lost one child since it last became a non-root. Used to trigger cascading cuts.
+- **CUT:** The Fibonacci heap operation of removing a node from its parent's child list and adding it to the root list.
+- **CASCADING-CUT:** A recursive procedure that cuts a marked node from its parent and propagates upward, ensuring trees do not become too deep.
+- **CONSOLIDATE:** A Fibonacci heap subroutine called during `EXTRACT-MIN` that restructures the root list so no two roots have the same degree.
+
+---
+
+#### **3. Formulas**
+
+- **Node index navigation (0-based array):**
+  - Left child of $i$: $\text{left}(i) = 2i + 1$
+  - Right child of $i$: $\text{right}(i) = 2i + 2$
+  - Parent of $i$ ($i > 0$): $\text{parent}(i) = \lfloor (i-1)/2 \rfloor$
+- **Leaf range:** nodes at indices $\lfloor n/2 \rfloor$ through $n-1$ are leaves.
+- **Height of complete binary tree:** $h = \lfloor \log_2 n \rfloor = \Theta(\log n)$
+- **Number of nodes at height $h$:** $\le \lceil n / 2^{h+1} \rceil$
+- **BUILD-MAX-HEAP cost:**
+  $$T(n) = \sum_{h=0}^{\lfloor \log_2 n \rfloor} \left\lceil \frac{n}{2^{h+1}} \right\rceil O(h) = O(n) \quad \text{using } \sum_{h=0}^{\infty} \frac{h}{2^{h+1}} \le 1$$
+- **Heapsort time complexity:** $\Theta(n \log n)$ — from $\Theta(n)$ build plus $(n-1)$ calls to $\Theta(\log n)$ `MAX-HEAPIFY`.
+- **Heapsort space complexity:** $\Theta(1)$ extra memory (in-place, with iterative `MAX-HEAPIFY`).
+
+---
+
+#### **4. Examples**
+##### **4.1. Build a Max-Heap from an Array** (Lecture 9, Task 1)
+
+Build a max-heap from the following array (0-based indexing):
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 4 | 1 | 3 | 2 | 16 | 9 | 10 | 14 | 8 | 7 | 5 | 6 | 11 | 13 | 12 | 17 |
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `BUILD-MAX-HEAP` calls `MAX-HEAPIFY` on all internal nodes from index $\lfloor n/2 \rfloor - 1 = 7$ down to 0.
+
+With $n = 16$, internal nodes are at indices 0–7.
+
+1. **`MAX-HEAPIFY(A, 7)`:** Node 7 has value 14, left child at index 15 has value 17. Since $17 > 14$, swap: $A[7] \leftarrow 17$, $A[15] \leftarrow 14$. No further recursion (index 15 is a leaf).
+
+   Array after: `...14... 17...14` (positions 7 and 15 swapped).
+2. **`MAX-HEAPIFY(A, 6)`:** Node 6 has value 10, left child index 13 = 13, right child index 14 = 12. Largest child is 13 (value 13). $13 > 10$, swap: $A[6] \leftarrow 13$, $A[13] \leftarrow 10$. Node 13 is a leaf. Done.
+3. **`MAX-HEAPIFY(A, 5)`:** Node 5 has value 9, left child index 11 = 6, right child index 12 = 11. Largest child is 11 (value 11). $11 > 9$, swap: $A[5] \leftarrow 11$, $A[11] \leftarrow 9$. Node 11 is a leaf. Done.
+4. **`MAX-HEAPIFY(A, 4)`:** Node 4 has value 16, left child index 9 = 7, right child index 10 = 5. Largest is 16 (the node itself). No swap needed.
+5. **`MAX-HEAPIFY(A, 3)`:** Node 3 has value 2, left child index 7 = 17, right child index 8 = 8. Largest is 17 (index 7). Swap: $A[3] \leftarrow 17$, $A[7] \leftarrow 2$. Recurse on index 7: node 7 has value 2, left child index 15 = 14, right child doesn't exist ($2 \times 7 + 2 = 16 \ge 16$). $14 > 2$, swap: $A[7] \leftarrow 14$, $A[15] \leftarrow 2$. Done.
+6. **`MAX-HEAPIFY(A, 2)`:** Node 2 has value 3, left child index 5 = 11, right child index 6 = 13. Largest is 13 (index 6). Swap: $A[2] \leftarrow 13$, $A[6] \leftarrow 3$. Recurse on index 6: node 6 has value 3, left child index 13 = 10, right child index 14 = 12. Largest is 12 (index 14). Swap: $A[6] \leftarrow 12$, $A[14] \leftarrow 3$. Done.
+7. **`MAX-HEAPIFY(A, 1)`:** Node 1 has value 1, left child index 3 = 17, right child index 4 = 16. Largest is 17 (index 3). Swap: $A[1] \leftarrow 17$, $A[3] \leftarrow 1$. Recurse on index 3: node 3 has value 1, left child index 7 = 14, right child index 8 = 8. Largest is 14 (index 7). Swap: $A[3] \leftarrow 14$, $A[7] \leftarrow 1$. Recurse on index 7: node 7 has value 1, left child index 15 = 2, right child out of bounds. $2 > 1$, swap: $A[7] \leftarrow 2$, $A[15] \leftarrow 1$. Done.
+8. **`MAX-HEAPIFY(A, 0)`:** Node 0 has value 4, left child index 1 = 17, right child index 2 = 13. Largest is 17 (index 1). Swap: $A[0] \leftarrow 17$, $A[1] \leftarrow 4$. Recurse on index 1: node 1 has value 4, left child index 3 = 14, right child index 4 = 16. Largest is 16 (index 4). Swap: $A[1] \leftarrow 16$, $A[4] \leftarrow 4$. Recurse on index 4: node 4 has value 4, left child index 9 = 7, right child index 10 = 5. Largest is 7 (index 9). Swap: $A[4] \leftarrow 7$, $A[9] \leftarrow 4$. Node 9 is a leaf. Done.
+
+**Final heap array:**
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 17 | 16 | 13 | 14 | 7 | 11 | 12 | 2 | 8 | 4 | 5 | 9 | 11 | 10 | 3 | 1 |
+
+**Verification:** The root (17) is the largest. Each parent is $\ge$ its children. ✓
+
+</details>
+
+##### **4.2. Extract the Maximum Repeatedly** (Lecture 9, Task 2)
+
+Extract the maximum 12 times from the following max-heap (0-based):
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 15 | 13 | 9 | 5 | 12 | 8 | 7 | 4 | 0 | 6 | 2 | 1 |
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each `EXTRACT-MAX` call: (1) save `A[0]` (the current maximum), (2) copy the last element `A[heap-size - 1]` to position 0, (3) decrement heap-size, (4) call `MAX-HEAPIFY(A, 0)` to restore the heap property.
+
+The sequence of extracted maximums and the resulting heap roots are traced below. We show the root value after each heapify step.
+
+**Extraction 1:** Remove 15. Move $A[11] = 1$ to root. Heap has 11 elements.
+- `MAX-HEAPIFY(0)`: 1 → swap with 13 (index 1) → swap with 12 (index 4) → swap with 6 (index 9). Heap root is now **13**.
+
+**Extraction 2:** Remove 13. Move $A[10] = 2$ to root. Heap has 10 elements.
+- `MAX-HEAPIFY(0)`: 2 → swap with 12 (index 4) → swap with 6 (index 9). Root is **12**.
+
+**Extraction 3:** Remove 12. Move $A[9] = 6$ to root. Heap has 9 elements.
+- `MAX-HEAPIFY(0)`: 6 → swap with 9 (index 2) → swap with 8 (index 6). Root is **9**.
+
+**Extraction 4:** Remove 9. Move $A[8] = 0$ to root. Heap has 8 elements.
+- `MAX-HEAPIFY(0)`: 0 → swap with 8 (index 6). Root is **8**.
+
+**Extraction 5:** Remove 8. Move $A[7] = 4$ to root. Heap has 7 elements.
+- `MAX-HEAPIFY(0)`: 4 → swap with 7 (index 2). Root is **7**.
+
+**Extraction 6:** Remove 7. Move $A[6] = 0$ to root. Heap has 6 elements.
+- `MAX-HEAPIFY(0)`: 0 → swap with 5 (index 1) → swap with 4 (index 3). Root is **6**.
+
+**Extraction 7:** Remove 6. Move $A[5] = 5$ to root. Heap has 5 elements.
+- `MAX-HEAPIFY(0)`: 5 is already $\ge$ all children. Root is **5**.
+
+**Extraction 8:** Remove 5. Move $A[4] = 4$ to root. Heap has 4 elements.
+- `MAX-HEAPIFY(0)`: 4 is largest. Root is **4**.
+
+**Extraction 9:** Remove 4. Move $A[3] = 0$ to root. Heap has 3 elements.
+- `MAX-HEAPIFY(0)`: 0 → swap with 2 (index 1). Root is **2**.
+
+**Extraction 10:** Remove 2. Move $A[2] = 0$ to root. Heap has 2 elements.
+- `MAX-HEAPIFY(0)`: 0 → swap with 1 (index 1). Root is **1**.
+
+**Extraction 11:** Remove 1. Move $A[1] = 0$ to root. Heap has 1 element.
+- `MAX-HEAPIFY(0)`: single element, trivially a heap. Root is **0**.
+
+**Extraction 12:** Remove 0. Heap is now empty.
+
+**Result:** Elements extracted in sorted order: **15, 13, 12, 9, 8, 7, 6, 5, 4, 2, 1, 0**.
+
+This sequence confirms the max-heap correctly produces elements in descending order, just as heapsort relies on.
+
+</details>
+
+##### **4.3. Extract the Minimum from a Fibonacci Heap** (Lecture 9, Task 3)
+
+Extract the minimum from the Fibonacci heap whose root list (in left-to-right order) is: 23, 7, 3, 17, 24. Node 3 is `H.min`. The children of 3 are 18, 52, 38 (with 18 having child 39, and 38 having child 41). Node 17 has child 30. Node 24 has children 26, 46, where 26 has child 35.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** `FIB-HEAP-EXTRACT-MIN` removes the minimum node, promotes all its children to the root list, then calls `CONSOLIDATE` to ensure all roots have distinct degrees.
+
+**Step 1 — Remove the minimum and promote children.**
+
+The minimum node is 3 (with degree 3: children 18, 52, 38). Remove 3 from the root list. Add 18, 52, 38 to the root list, clearing their parent pointers.
+
+New root list: 23, 7, 18, 52, 38, 17, 24.
+
+**Step 2 — Consolidate.**
+
+Use auxiliary array $A[0 \ldots 3]$ (since $D(n) = O(\log n)$).
+
+Scan roots and group by degree:
+
+- Node 23: degree 0. $A[0] = 23$.
+- Node 7: degree 2 (children: ...). $A[2] = 7$.
+- Node 18: degree 1 (child 39). $A[1] = 18$.
+- Node 52: degree 0. Conflict with $A[0] = 23$. Link: 52 > 23, so 52 becomes child of 23. Now 23 has degree 1. Conflict with $A[1] = 18$. Link: 23 > 18, so 23 becomes child of 18. Now 18 has degree 2. Conflict with $A[2] = 7$. Link: 18 > 7, so 18 becomes child of 7. Now 7 has degree 3. $A[3] = 7$.
+- Node 38: degree 1 (child 41). $A[1] = 38$.
+- Node 17: degree 1 (child 30). Conflict with $A[1] = 38$. Link: 38 > 17, so 38 becomes child of 17. Now 17 has degree 2. Conflict with $A[2]$: currently empty after the cascade above. $A[2] = 17$.
+- Node 24: degree 2 (children 26, 46). Conflict with $A[2] = 17$. Link: 24 > 17, so 24 becomes child of 17. Now 17 has degree 3. Conflict with $A[3] = 7$. Link: 17 > 7, so 17 becomes child of 7. Now 7 has degree 4. $A[4] = 7$.
+
+**Result.** After consolidation, the root list contains only node 7 (with degree 4 and a large subtree beneath it). `H.min = 7`.
+
+**Answer:** The extracted minimum is **3**. The resulting Fibonacci heap has minimum **7** and `H.n` decremented by 1.
+
+</details>
+
+##### **4.4. Perform Decrease-Key Operations** (Lecture 9, Task 4)
+
+Starting from the Fibonacci heap in Task 3 (before extraction), perform the following decrease-key operations in order:
+1. Decrease key $46 \to 15$.
+2. Decrease key $35 \to 5$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** After each decrease, if the new key violates the min-heap property (is less than the parent's key), cut the node and move it to the root list. Apply cascading cut to the parent.
+
+**Initial state (from Figure 15):** `H.min = 3`. Notable structure:
+
+- Node 24 has children 26 and 46. Node 26 has child 35.
+- No nodes are initially marked.
+
+**Operation 1: Decrease $46 \to 15$.**
+
+1. Set $A[46].\text{key} = 15$.
+2. Parent of 46 is 24. Check: $15 < 24$? **Yes** — heap property violated.
+3. `CUT(H, node_{15}, node_{24})`: Remove 15 from 24's child list (24's degree decreases by 1). Add 15 to root list. Set $15.\text{parent} = \text{NIL}$, $15.\text{mark} = \text{FALSE}$.
+4. `CASCADING-CUT(H, node_{24})`: Parent of 24 is not NIL (24 is a child of... check structure: 24 is in the root list originally, so its parent is NIL). Parent of 24 is NIL → stop.
+5. Check if $15 < H.\text{min} = 3$? No.
+
+**State after Operation 1:** 15 is a new root. Node 24 now has one child (26, with child 35). Node 24 is **not** marked (it lost its first child and cascading cut found a NIL parent).
+
+**Note on cascading cut:** Node 24 is originally in the root list with children 26 and 46. Its parent pointer is NIL. After cutting 46 (now 15), `CASCADING-CUT(H, 24)` is called. Since $24.\text{parent} = \text{NIL}$, the function returns immediately. Node 24 is **not** marked.
+
+**Operation 2: Decrease $35 \to 5$.**
+
+1. Set $A[35].\text{key} = 5$.
+2. Parent of 5 (formerly 35) is 26. Check: $5 < 26$? **Yes** — heap property violated.
+3. `CUT(H, node_5, node_{26})`: Remove 5 from 26's child list. Add 5 to root list. $5.\text{mark} = \text{FALSE}$.
+4. `CASCADING-CUT(H, node_{26})`: Parent of 26 is 24. Is $26.\text{mark} = \text{FALSE}$? **Yes** (26 hasn't lost a child before). So set $26.\text{mark} = \text{TRUE}$. Stop.
+
+**State after Operation 2:**
+
+- Root list now contains: 23, 7, 3, 17, 24, **15**, **5**.
+- Node 26 is **marked** (it lost child 35→5).
+- Node 24 still has children 26 (marked). `H.min = 3` (unchanged since $5 > 3$).
+
+**Summary of cuts performed:** One regular cut (46→15 cut from 24), one regular cut (35→5 cut from 26). Node 26 is now marked. The cascading cut mechanism did not need to climb further in this example.
+
+</details>
+
+##### **4.5. Construct a Fibonacci Heap of Height $\Theta(n)$** (Lecture 9, Task 5)
+
+Show that for any $n$, there exists a sequence of operations such that a Fibonacci heap has $n$ elements and height $\Theta(n)$ (i.e., a single tree that is a long linear chain).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The height of trees in a Fibonacci heap is normally bounded by $O(\log n)$ due to the mark/cascading-cut mechanism. However, this bound relies on no node losing two children. We can exploit `DECREASE-KEY` to trigger cascading cuts that deliberately build a long chain.
+
+**Construction idea.** We alternate between building a tree of bounded degree (via inserts + extract-min) and then using `DECREASE-KEY` to strip its internal nodes one level at a time.
+
+The following protocol builds a chain of height $k$:
+
+**Base case ($k=1$):** Insert two elements, say 100 and 200. Extract-min: 100 becomes root, 200 becomes its child (degree 1 after consolidation). We have a chain of height 1.
+
+**Inductive step:** Suppose we have a chain $v_1 \to v_2 \to \cdots \to v_k$ (root $v_1$ with $v_k$ at depth $k-1$). We want to add a level.
+
+1. Insert a new minimum element $m < v_1.\text{key}$.
+2. Extract-min: $m$ is removed; consolidation may restructure things. By carefully choosing the key values, we can ensure the tree of depth $k$ is preserved.
+3. After the extract-min, insert $k+1$ fresh elements (with large keys so they don't affect the minimum). Extract-min from this combined forest — consolidation links trees of equal degree, extending the chain.
+
+**Concrete example demonstrating a chain of height 3:**
+
+1. Insert 45. Insert 23. Extract-min: forest $\{45\}$ and $\{23\}$ consolidate (after promoting 23's children, which are none) → after consolidation: tree 23→45. Chain of height 1.
+2. Insert 1. (Root list: 1, 23→45.) Extract-min: Remove 1. Add children of 1 (none). Root list: 23→45. Consolidate: only one tree. H.min = 23.
+
+The cleaner general approach is to repeatedly apply the following pattern to create longer and longer binomial-tree-like chains, then use decrease-key to strip all but one branch:
+
+1. Perform a sequence of $k$ insert + extract-min pairs to create a binomial tree $B_k$ of height $k$ and $2^k$ nodes.
+2. Apply `DECREASE-KEY` to strip all but the leftmost branch of $B_k$, reducing it to a chain of height $k$ with $k+1$ nodes.
+
+After step 2, we have a chain $v_0 \to v_1 \to \cdots \to v_k$ where every internal node $v_i$ ($1 \le i \le k-1$) is **marked** (it lost one child due to the decrease-key operations). Adding one more node as a child of $v_k$ (via insert + extract-min), and then applying `DECREASE-KEY` on a deeper node triggers a cascading cut that runs all the way up, producing a new valid tree.
+
+**Conclusion.** By a careful sequence of $\Theta(n)$ insert and extract-min operations followed by $\Theta(n)$ decrease-key operations, we can arrange for a Fibonacci heap of $n$ elements to contain a single tree that is a path (chain) of height $n - 1 = \Theta(n)$. This shows that the $O(\log n)$ degree bound is tight under adversarial operation sequences that deliberately exploit the mark mechanism.
+
+**Answer:** Yes, such a sequence exists. The construction relies on building a "degenerate" chain by alternating consolidation with cascading cuts, showing that the height $\Theta(n)$ is achievable (and thus the amortized analysis is needed; worst-case per-operation analysis alone would give $\Theta(n)$ for `EXTRACT-MIN`).
+
+</details>
