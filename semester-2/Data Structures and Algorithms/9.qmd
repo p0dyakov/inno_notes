@@ -367,7 +367,239 @@ The full table of amortized time bounds for Fibonacci heaps (Cormen et al. 2009,
 ---
 
 #### **4. Examples**
-##### **4.1. Build a Max-Heap from an Array** (Lecture 9, Task 1)
+
+##### **4.1. Analyze and Disprove WeirdMedian** (Problem Set 9, Task 1)
+
+Consider the following algorithm on an unsorted array $A[0..n-1]$:
+
+```text
+WEIRD-MEDIAN(A, n):
+  BUILD-MAX-HEAP(A)
+  s := ⌊n/2⌋
+  BUILD-MAX-HEAP(A[s..n-1])
+  return A[s]
+```
+
+**(a)** Compute the asymptotic running time of `WEIRD-MEDIAN` in $\Theta$-notation.
+
+**(b)** Determine whether `WEIRD-MEDIAN` always returns the median. Prove it, or give a counterexample.
+
+**(c)** Consider `WEIRD-MEDIAN-ASC`: before the first `BUILD-MAX-HEAP`, sort $A$ in ascending (nondecreasing) order. Does this modified version always return the median?
+
+**(d)** Consider `WEIRD-MEDIAN-DESC`: before the first `BUILD-MAX-HEAP`, sort $A$ in descending (nonincreasing) order. Does this modified version always return the median? For even $n$, either of the two middle elements is a valid median.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Running time of `WEIRD-MEDIAN`.**
+
+The first `BUILD-MAX-HEAP` operates on all $n$ elements and takes $\Theta(n)$. The second call operates on $A[s..n-1]$, which contains $n - \lfloor n/2 \rfloor = \lceil n/2 \rceil$ elements and therefore also takes $\Theta(n)$. The total is $\Theta(n) + \Theta(n) = \Theta(n)$.
+
+**Answer:** $\Theta(n)$.
+
+---
+
+**(b) Does `WEIRD-MEDIAN` always return the median? No.**
+
+**Counterexample.** Let $A = [1, 2, 4, 3, 5]$. The true median is $3$.
+
+1. `BUILD-MAX-HEAP`$([1,2,4,3,5])$ produces $[5, 3, 4, 1, 2]$ (5 at root; its children are 3 and 4; children of 3 are 1 and 2).
+2. $s = \lfloor 5/2 \rfloor = 2$, so the subarray is $A[2..4] = [4, 1, 2]$.
+3. `BUILD-MAX-HEAP`$([4,1,2])$: already a valid max-heap (4 is the root, children are 1 and 2).
+4. $A[s] = 4 \ne 3$.
+
+The algorithm returns $4$, which is not the median. $\square$
+
+---
+
+**(c) Does `WEIRD-MEDIAN-ASC` always return the median? No.**
+
+**Counterexample.** Let $A = [1,2,3,4,5,6,7,8,9]$. Already sorted ascending; the median is $5$.
+
+1. `BUILD-MAX-HEAP`$([1,\ldots,9])$ gives, for example, $[9, 8, 7, 4, 5, 6, 3, 2, 1]$.
+2. $s = \lfloor 9/2 \rfloor = 4$; subarray $A[4..8] = [5, 6, 3, 2, 1]$.
+3. `BUILD-MAX-HEAP`$([5,6,3,2,1])$ gives $[6, 5, 3, 2, 1]$ (6 floats to the root).
+4. $A[s] = 6 \ne 5$.
+
+The algorithm returns $6$, which is not the median. $\square$
+
+---
+
+**(d) Does `WEIRD-MEDIAN-DESC` always return the median? Yes.**
+
+**Proof.** After sorting $A$ in descending order, $A[0] \ge A[1] \ge \cdots \ge A[n-1]$.
+
+A sorted-descending array is already a valid max-heap: every parent $A[\lfloor(i-1)/2\rfloor] \ge A[i]$ by the sorted order. Therefore the first `BUILD-MAX-HEAP` does nothing — the array is unchanged.
+
+Set $s = \lfloor n/2 \rfloor$. The subarray $A[s..n-1]$ contains exactly $\lceil n/2 \rceil$ elements. Because the full array is sorted descending, these are the $\lceil n/2 \rceil$ *smallest* elements of $A$. The second `BUILD-MAX-HEAP` rearranges $A[s..n-1]$ into a max-heap, placing its maximum at index $s$:
+
+$$A[s] = \max(A[s..n-1]).$$
+
+Now consider the two cases:
+
+- **$n$ odd.** $s = (n-1)/2$, so $A[s..n-1]$ has $(n+1)/2$ elements. The maximum among the $(n+1)/2$ smallest elements of a sorted array of size $n$ is the element at rank $(n+1)/2$ in ascending order — exactly the median.
+- **$n$ even.** $s = n/2$, so $A[s..n-1]$ has $n/2$ elements. The maximum of the $n/2$ smallest elements is the *lower median*, which is a valid median by the problem statement.
+
+In both cases `WEIRD-MEDIAN-DESC` returns the median. $\square$
+
+</details>
+
+
+##### **4.2. Analyze a $d$-ary Min-Heap** (Problem Set 9, Task 2)
+
+A **$d$-ary min-heap** ($d \ge 2$) is a complete $d$-ary tree stored in an array in level order (root at index 0), satisfying the min-heap property: every parent key $\le$ each child key.
+
+**(a)** Derive formulas for the parent index of node $i > 0$, and the index of the $j$-th child ($j = 1, \dots, d$) of node $i$.
+
+**(b)** Give pseudocode for `MIN-HEAPIFY`$_d(A, i)$.
+
+**(c)** Analyze the worst-case running time of `INSERT`$_d$ on a $d$-ary min-heap of $n$ nodes.
+
+**(d)** Analyze the worst-case running time of `EXTRACT-MIN`$_d$ on a $d$-ary min-heap of $n$ nodes.
+
+**(e)** For $d = 4$ and node index $i = 5$, write the indices of all children of $i$.
+
+**(f)** Compute the asymptotic number of nodes in a $d$-ary heap of height $h$. Express complexities in $\Theta$-notation in terms of $d$ and $n$ (or $d$ and $h$ where appropriate).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Index formulas.**
+
+In level-order numbering, node $i$ has children at positions $di+1, di+2, \ldots, di+d$. If node $i$ is the $j$-th child of parent $p$, then $dp + j = i$, giving $p = \lfloor(i-1)/d\rfloor$.
+
+- **Parent of node $i > 0$:** $\displaystyle\left\lfloor \frac{i-1}{d} \right\rfloor$
+- **$j$-th child of node $i$** ($j = 1, \dots, d$): $d \cdot i + j$
+
+*Sanity check with $d = 2$:* parent of node 3 is $\lfloor 2/2 \rfloor = 1$; children of node 0 are indices 1 and 2. These match the standard binary heap formulas. $\checkmark$
+
+---
+
+**(b) Pseudocode for `MIN-HEAPIFY`$_d$.**
+
+```text
+MIN-HEAPIFY_d(A, i):
+  smallest := i
+  for j := 1 to d:
+    c := d * i + j
+    if c < A.heap-size and A[c] < A[smallest]:
+      smallest := c
+  if smallest != i:
+    swap A[i] and A[smallest]
+    MIN-HEAPIFY_d(A, smallest)
+```
+
+We scan all $d$ children of node $i$ to find the one with the smallest key. If that child is smaller than $A[i]$, we swap and recurse on the child. Each recursive call descends one level, and the recursion terminates when the node is already smaller than all its children or when we reach a leaf.
+
+---
+
+**(c) Worst-case running time of `INSERT`$_d$.**
+
+`INSERT`$_d$ appends the new element at the end of the array and then repeatedly compares it with its parent, swapping if the new element is smaller (bubble-up). Each step takes $O(1)$. The height of a $d$-ary heap with $n$ nodes is $\Theta(\log_d n)$ (since $d^h \approx n$ gives $h \approx \log_d n$), so there are at most $\Theta(\log_d n)$ bubble-up steps.
+
+**Worst-case:** $\Theta(\log_d n)$.
+
+---
+
+**(d) Worst-case running time of `EXTRACT-MIN`$_d$.**
+
+`EXTRACT-MIN`$_d$ removes the root, places the last array element at the root, decrements the heap size, and calls `MIN-HEAPIFY`$_d$. Each call to `MIN-HEAPIFY`$_d$ scans all $d$ children of the current node to find the minimum — this costs $\Theta(d)$ per level. Since the height is $\Theta(\log_d n)$, the total work is $\Theta(d) \times \Theta(\log_d n)$.
+
+**Worst-case:** $\Theta(d \log_d n)$.
+
+---
+
+**(e) Children of node $i = 5$ for $d = 4$.**
+
+Applying the formula $d \cdot i + j$ for $j = 1, 2, 3, 4$:
+
+$$4 \cdot 5 + 1 = 21, \quad 4 \cdot 5 + 2 = 22, \quad 4 \cdot 5 + 3 = 23, \quad 4 \cdot 5 + 4 = 24.$$
+
+**Children of node 5:** indices **21, 22, 23, 24**.
+
+---
+
+**(f) Number of nodes in a $d$-ary heap of height $h$.**
+
+Level $\ell$ (where the root is level 0) contains at most $d^\ell$ nodes for $\ell = 0, 1, \ldots, h$. Summing over all levels:
+
+$$\sum_{\ell=0}^{h} d^\ell = \frac{d^{h+1} - 1}{d - 1}.$$
+
+The dominant term is $d^{h+1}$, which is $\Theta(d^h)$.
+
+**Asymptotic number of nodes:** $\Theta(d^h)$.
+
+</details>
+
+
+##### **4.3. Frequency-Based Fibonacci Heap Filter** (Problem Set 9, Task 3)
+
+You are given an array $A[0..n-1]$ of integers and an integer $k$. Process elements from left to right, maintaining priorities for distinct values seen so far. For a value $x$ with current occurrence count $\mathsf{freq}(x)$, define:
+
+$$\mathsf{priority}(x) = -\,\mathsf{freq}(x).$$
+
+Use a **Fibonacci min-heap** over currently seen values. After processing each element, if the heap contains more than $k$ elements, perform one `EXTRACT-MIN` (which removes the element seen most frequently so far). At the end, output the sum of all elements remaining in the heap.
+
+**(a)** Propose an algorithm (pseudocode or clear steps). Specify the auxiliary data structure you use alongside the Fibonacci heap.
+
+**(b)** Derive the asymptotic worst-case time complexity in $\Theta$-notation in terms of $n$ and $k$, using standard amortized bounds for Fibonacci-heap operations and expected-time bounds for hash-table operations.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Algorithm.**
+
+We maintain a **hash table** `node_map` mapping each distinct value $x$ to a pair $(\mathsf{freq}(x),\; \text{pointer to its node in the heap})$. Storing the node pointer allows us to call `DECREASE-KEY` directly in $O(1)$ amortized time without searching for $x$ in the heap.
+
+```text
+FREQ-HEAP(A, n, k):
+  H        := empty Fibonacci min-heap
+  node_map := empty hash table      // x -> (freq, heap_node_ptr)
+
+  for i := 0 to n-1:
+    x := A[i]
+    if x not in node_map:
+      ptr := H.INSERT(x, key = -1)   // priority = -freq = -1
+      node_map[x] := (1, ptr)
+    else:
+      (f, ptr) := node_map[x]
+      f := f + 1
+      H.DECREASE-KEY(ptr, -f)        // new key = -f (more negative = higher priority)
+      node_map[x] := (f, ptr)
+    if H.size > k:
+      v := H.EXTRACT-MIN()           // removes the most-frequent element
+      delete node_map[v.value]
+
+  result := 0
+  for each node v remaining in H:
+    result := result + v.value
+  return result
+```
+
+**Why this works.** The Fibonacci min-heap stores keys equal to $-\mathsf{freq}(x)$. The element with the most negative key (i.e., the most frequent) is always at the minimum, so `EXTRACT-MIN` correctly removes the most-frequent element when the heap exceeds $k$ entries. `DECREASE-KEY` is called (not increase-key) because each new occurrence makes the key more negative.
+
+---
+
+**(b) Complexity analysis.**
+
+We execute exactly $n$ main iterations. In each iteration:
+
+- **Hash table lookup / update:** $O(1)$ expected.
+- **`Fib-INSERT`** (first occurrence of $x$): $O(1)$ amortized.
+- **`Fib-DECREASE-KEY`** (repeat occurrence of $x$): $O(1)$ amortized.
+- **`Fib-EXTRACT-MIN`** (only when heap size $> k$): $O(\log k)$ amortized, because at the moment of the call the heap contains at most $k+1$ elements.
+
+There are at most $n$ total `EXTRACT-MIN` calls (each removes one distinct element, and there are at most $n$ distinct elements). Each costs $O(\log k)$.
+
+Total cost:
+
+$$n \cdot O(1) + n \cdot O(\log k) = \Theta(n \log k).$$
+
+**Worst-case time complexity:** $\Theta(n \log k)$.
+
+</details>
+
+##### **4.4. Build a Max-Heap from an Array** (Lecture 9, Task 1)
 
 Build a max-heap from the following array (0-based indexing):
 
@@ -403,7 +635,7 @@ With $n = 16$, internal nodes are at indices 0–7.
 
 </details>
 
-##### **4.2. Extract the Maximum Repeatedly** (Lecture 9, Task 2)
+##### **4.5. Extract the Maximum Repeatedly** (Lecture 9, Task 2)
 
 Extract the maximum 12 times from the following max-heap (0-based):
 
@@ -459,7 +691,7 @@ This sequence confirms the max-heap correctly produces elements in descending or
 
 </details>
 
-##### **4.3. Extract the Minimum from a Fibonacci Heap** (Lecture 9, Task 3)
+##### **4.6. Extract the Minimum from a Fibonacci Heap** (Lecture 9, Task 3)
 
 Extract the minimum from the Fibonacci heap whose root list (in left-to-right order) is: 23, 7, 3, 17, 24. Node 3 is `H.min`. The children of 3 are 18, 52, 38 (with 18 having child 39, and 38 having child 41). Node 17 has child 30. Node 24 has children 26, 46, where 26 has child 35.
 
@@ -494,7 +726,7 @@ Scan roots and group by degree:
 
 </details>
 
-##### **4.4. Perform Decrease-Key Operations** (Lecture 9, Task 4)
+##### **4.7. Perform Decrease-Key Operations** (Lecture 9, Task 4)
 
 Starting from the Fibonacci heap in Task 3 (before extraction), perform the following decrease-key operations in order:
 1. Decrease key $46 \to 15$.
@@ -539,7 +771,7 @@ Starting from the Fibonacci heap in Task 3 (before extraction), perform the foll
 
 </details>
 
-##### **4.5. Construct a Fibonacci Heap of Height $\Theta(n)$** (Lecture 9, Task 5)
+##### **4.8. Construct a Fibonacci Heap of Height $\Theta(n)$** (Lecture 9, Task 5)
 
 Show that for any $n$, there exists a sequence of operations such that a Fibonacci heap has $n$ elements and height $\Theta(n)$ (i.e., a single tree that is a long linear chain).
 
@@ -577,3 +809,4 @@ After step 2, we have a chain $v_0 \to v_1 \to \cdots \to v_k$ where every inter
 **Answer:** Yes, such a sequence exists. The construction relies on building a "degenerate" chain by alternating consolidation with cascading cuts, showing that the height $\Theta(n)$ is achievable (and thus the amortized analysis is needed; worst-case per-operation analysis alone would give $\Theta(n)$ for `EXTRACT-MIN`).
 
 </details>
+
