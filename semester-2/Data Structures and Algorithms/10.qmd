@@ -1,0 +1,937 @@
+---
+title: "W12. Graph Representations, DFS, BFS, and Topological Sort"
+author: "Nikolai Kudasov"
+date: "April 7, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Graphs as a Model**
+
+###### **1.1.1 Why Graphs?**
+
+Most data structures studied previously — binary search trees, heaps, hash tables — are optimised for specific operations over general sets or ordered maps. Graphs take a different approach: instead of abstracting away structure, they *model* the inherent relationships in a problem directly. A graph makes the connections between objects first-class citizens of the data structure.
+
+Graphs arise whenever a problem has a natural **network** interpretation: pages on the web link to one another, tasks depend on other tasks before they can start, routers forward packets to neighbouring routers, researchers co-author papers. Once a problem is cast as a graph, a large library of classical algorithms becomes available.
+
+Typical graph problems include:
+
+- **Shortest paths** — finding the cheapest or fastest route between two points (navigation, network routing, planning).
+- **Visiting all vertices** — the Travelling Salesman Problem and its relaxations.
+- **Minimum-cost connectivity** — minimum spanning trees that connect all vertices with the least total edge cost.
+- **Ordering under constraints** — topological sort for scheduling tasks that have prerequisites.
+
+###### **1.1.2 Directed vs. Undirected Graphs**
+
+A **graph** $G = (V, E)$ consists of a finite set $V$ of **vertices** (also called *nodes*) and a set $E$ of **edges**, where each edge is a pair of vertices.
+
+The nature of an edge depends on whether the relationship it represents is symmetric:
+
+- In an **undirected graph**, edges are *unordered* pairs $\{u, v\}$. The relationship is symmetric: if $u$ is connected to $v$, then $v$ is connected to $u$. Examples: mutual friendship, co-authorship, bidirectional roads.
+- In a **directed graph** (or **digraph**), edges are *ordered* pairs $(u, v)$ and are drawn as arrows from $u$ to $v$. The relationship is asymmetric: a flight from SFO to JFK does not imply a return flight. Examples: prerequisite constraints, one-way streets, social-media "follows".
+
+```{dot}
+//| fig-height: 2.2
+//| fig-width: 10
+digraph side {
+  rankdir=LR
+  node [shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d",
+        fontcolor="#1f2d3d", width=0.5, fontsize=11]
+  edge [color="#355c7d", fontsize=10]
+
+  subgraph cluster_undirected {
+    label="Undirected graph"
+    style=filled fillcolor="#f9fbfd" color="#355c7d" fontcolor="#1f2d3d"
+    u1 [label="u"]
+    v1 [label="v"]
+    u1 -> v1 [label="  {u,v}", dir=none]
+  }
+
+  subgraph cluster_directed {
+    label="Directed graph"
+    style=filled fillcolor="#f9fbfd" color="#355c7d" fontcolor="#1f2d3d"
+    u2 [label="u"]
+    v2 [label="v"]
+    u2 -> v2 [label="  (u,v)"]
+  }
+}
+```
+
+###### **1.1.3 Adjacency, Paths, Cycles, and Weighted Graphs**
+
+Two vertices are **adjacent** if an edge connects them. In a directed graph, $(u,v) \in E$ makes $v$ an out-neighbour of $u$ and $u$ an in-neighbour of $v$.
+
+A **path** from $s$ to $t$ is a sequence of vertices $s = v_0, v_1, \ldots, v_k = t$ such that each consecutive pair is connected by an edge. A **simple path** visits no vertex more than once. A **cycle** is a path that starts and ends at the same vertex; a **simple cycle** visits no vertex more than once except the start/end.
+
+A **weighted graph** assigns a numeric **weight** to every edge representing, for instance, a distance, cost, bandwidth, or latency. Shortest-path algorithms for weighted graphs generalise BFS and are covered later (e.g., Dijkstra's algorithm).
+
+##### **1.2 Representing Graphs**
+
+###### **1.2.1 Graph ADT**
+
+A **dynamic graph** structure must support both structural updates and queries. The core operations are:
+
+- `insertVertex(v)` — add a new isolated vertex.
+- `insertEdge(u, v, w)` — add edge between $u$ and $v$ (with optional weight $w$).
+- `removeVertex(v)` — delete $v$ and all incident edges.
+- `removeEdge(e)` — delete edge $e$.
+- `getEdge(u, v)` — return the edge object between $u$ and $v$, or NIL.
+- `degree(v)` — return the number of edges incident to $v$.
+- `iterateNeighbors(v)` — iterate over all vertices adjacent to $v$.
+
+The right choice of representation depends on *which operations dominate* and on the **graph density**. A **sparse** graph has $|E| \ll |V|^2$; a **dense** graph has $|E| = \Theta(|V|^2)$.
+
+###### **1.2.2 Edge-List Structure**
+
+The simplest representation maintains:
+
+1. A **vertex list** — a doubly linked list of vertex objects; each object stores the vertex payload and a back-pointer into the list for $O(1)$ removal.
+2. An **edge list** — a doubly linked list of edge objects; each edge object stores references to its two endpoint vertices plus a back-pointer into the list.
+
+```{dot}
+//| fig-height: 2.5
+//| fig-width: 8
+digraph edgelist {
+  rankdir=LR
+  node [shape=record, style=filled, fillcolor="#e8f4f8", color="#355c7d",
+        fontcolor="#1f2d3d", fontsize=10]
+  edge [color="#355c7d"]
+
+  vlist [label="Vertex list | {A} | {B} | {C}"]
+  elist [label="Edge list | {x: A-B} | {y: B-C}"]
+
+  vlist -> elist [style=invis]
+}
+```
+
+**Time complexities (with back-pointers):**
+
+| Operation | Time |
+| :--- | :--- |
+| `insertVertex(v)` | $\Theta(1)$ |
+| `insertEdge(u, v, w)` | $\Theta(1)$ |
+| `removeEdge(e)` | $\Theta(1)$ |
+| `getEdge(u, v)` | $\Theta(\lvert E \rvert)$ — must scan the entire edge list |
+| `degree(v)` | $\Theta(\lvert E \rvert)$ — must scan the entire edge list |
+| `removeVertex(v)` | $\Theta(\lvert V \rvert + \lvert E \rvert)$ — must remove all incident edges |
+
+The edge-list structure is simple and mutation-friendly, but it is impractical for graphs that require frequent adjacency or degree queries.
+
+###### **1.2.3 Adjacency Lists**
+
+Each vertex $u$ stores an **adjacency list**: a list (or linked list) of edge objects incident to $u$. With doubly linked adjacency lists and cross-pointers from each edge object back to its position in each endpoint's list, removal becomes efficient.
+
+**Time complexities:**
+
+| Operation | Time |
+| :--- | :--- |
+| `degree(v)` | $\Theta(1)$ — list length stored explicitly |
+| `getEdge(u, v)` | $O(\min(\deg(u), \deg(v)))$ |
+| `removeVertex(v)` | $\Theta(\deg(v))$ — remove from each neighbour's list |
+| `removeEdge(e)` where $e = (u{-}v)$ | $\Theta(\deg(u) + \deg(v))$ without back-pointers; $\Theta(1)$ with |
+
+For an undirected graph: $0 \le \deg(v) \le |V| - 1$ and $0 \le |E| \le \tfrac{|V|(|V|-1)}{2}$. For a directed graph: $0 \le |E| \le |V|(|V|-1)$. Adjacency lists are the standard choice for sparse graphs; the graph algorithms DFS, BFS, and topological sort all run in $\Theta(V + E)$ with this representation.
+
+###### **1.2.4 Adjacency Matrix**
+
+Store a $|V| \times |V|$ matrix $A$ where $A[i][j]$ holds the edge between vertex $i$ and vertex $j$ (or NIL / 0 if there is none, and the edge weight if the graph is weighted). A separate array of vertex objects maps labels to matrix indices and provides back-pointers.
+
+<div style="display:inline-block; border:2px solid #355c7d; border-radius:8px; overflow:hidden; font-family:serif; font-size:1.05em;">
+<table style="border-collapse:collapse; margin:0;">
+  <tr>
+    <th style="background:#d6eef5; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px;"> </th>
+    <th style="background:#d6eef5; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px;"><b>u</b></th>
+    <th style="background:#d6eef5; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px;"><b>v</b></th>
+    <th style="background:#d6eef5; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px;"><b>w</b></th>
+    <th style="background:#d6eef5; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px;"><b>z</b></th>
+  </tr>
+  <tr>
+    <th style="background:#d6eef5; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px;"><b>u</b></th>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;">—</td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;"><i>e</i></td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;"><i>g</i></td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;">—</td>
+  </tr>
+  <tr>
+    <th style="background:#d6eef5; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px;"><b>v</b></th>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;"><i>e</i></td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;">—</td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;"><i>f</i></td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;">—</td>
+  </tr>
+  <tr>
+    <th style="background:#d6eef5; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px;"><b>w</b></th>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;"><i>g</i></td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;"><i>f</i></td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;">—</td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;"><i>h</i></td>
+  </tr>
+  <tr>
+    <th style="background:#d6eef5; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px;"><b>z</b></th>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;">—</td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;">—</td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;"><i>h</i></td>
+    <td style="background:#e8f4f8; color:#1f2d3d; border:1px solid #355c7d; padding:10px 18px; text-align:center;">—</td>
+  </tr>
+</table>
+</div>
+
+**Time complexities:**
+
+| Operation | Time |
+| :--- | :--- |
+| `insertEdge(u, v, w)` | $\Theta(1)$ |
+| `getEdge(u, v)` | $\Theta(1)$ |
+| `removeEdge(e)` | $\Theta(1)$ |
+| `degree(v)` | $\Theta(|V|)$ — or $\Theta(1)$ with explicit degree counters |
+| `insertVertex(v)` | $\Theta(|V|^2)$ to resize the matrix; $\Theta(1)$ amortised with dynamic arrays |
+| `removeVertex(v)` | $\Theta(|V|)$ with lazy deletion or row/column swap |
+
+The adjacency matrix shines when $|E| \approx |V|^2$ (dense graphs) and `getEdge` queries are frequent. It uses $\Theta(|V|^2)$ space, which is wasteful for sparse graphs.
+
+###### **1.2.5 Representation Comparison**
+
+Let $n = |V|$ and $m = |E|$.
+
+| Operation | Edge list | Adjacency lists | Adjacency matrix |
+| :--- | :--- | :--- | :--- |
+| `getEdge(u,v)` | $O(m)$ | $O(\min(\deg u, \deg v))$ | $O(1)$ |
+| `degree(v)` | $O(m)$ | $O(1)$\* | $O(n)$ or $O(1)$\* |
+| `iterateNeighbors(v)` | $O(m)$ | $O(\deg v)$ | $O(n)$ |
+| `insertVertex` | $O(1)$ | $O(1)$ | $O(n^2)$ / $O(1)$ amort. |
+| `removeVertex` | $O(m)$ | $O(\deg v)$ | $O(n^2)$ / $O(n)$ amort. |
+| `insertEdge` | $O(1)$ | $O(1)$ | $O(1)$ |
+| `removeEdge` | $O(1)$\*\* | $O(1)$\*\* | $O(1)$ |
+| Space | $O(n + m)$ | $O(n + m)$ | $O(n^2)$ |
+
+\*With explicit degree counters.
+\*\*Given a pointer to the edge object and doubly linked adjacency lists.
+
+**Rule of thumb:** prefer adjacency lists for sparse graphs and algorithm correctness guarantees; prefer adjacency matrices when $m \approx n^2$ and you need $O(1)$ edge existence queries.
+
+##### **1.3 Graph Traversals**
+
+###### **1.3.1 Motivation for Traversal**
+
+A **graph traversal** visits every vertex reachable from a start vertex (or every vertex in the entire graph) in a systematic order. Traversals are fundamental subroutines used for:
+
+- Computing **connected components** in undirected graphs.
+- Checking **reachability** and finding paths.
+- **Cycle detection** — detecting back edges during DFS.
+- Discovering **bridges** and **articulation points**.
+- Building a graph lazily from implicit data (vertices and edges are discovered on the fly).
+
+###### **1.3.2 Connected Components**
+
+In an undirected graph, vertices $u$ and $v$ are **connected** if a path joins them. A **connected component** is a maximal subset $C \subseteq V$ such that every pair of vertices in $C$ is connected and no vertex outside $C$ has an edge into $C$.
+
+To find all connected components, run DFS (or BFS) starting from any unvisited vertex; every vertex reached belongs to the same component. Restart from the next unvisited vertex to find the next component. The total work is still $\Theta(V + E)$.
+
+##### **1.4 Depth-First Search**
+
+###### **1.4.1 DFS Algorithm**
+
+**Depth-first search (DFS)** explores as *deep* as possible before backtracking. The intuition: follow a path until you hit a dead end, then retrace your steps until you find an unexplored branch.
+
+DFS can be implemented either recursively (the call stack plays the role of an explicit stack) or iteratively with an explicit stack:
+
+```text
+DFS-EXPLICIT-STACK(G, start):
+1  push start onto S
+2  while S is not empty:
+3      u = top of S
+4      if u is unvisited:
+5          mark u as visited
+6          push an unvisited neighbour of u (if any)
+7      else if u has no unvisited neighbours:
+8          pop u from S
+9      else:
+10         push an unvisited neighbour of u
+```
+
+The formal CLRS pseudocode uses the *recursive* form with discovery and finish timestamps:
+
+```text
+DFS(G):
+1  for each vertex u in G.V:
+2      u.color = WHITE;  u.π = NIL
+3  time = 0
+4  for each vertex u in G.V:
+5      if u.color == WHITE:
+6          DFS-VISIT(G, u)
+
+DFS-VISIT(G, u):
+1  time = time + 1;  u.d = time;  u.color = GRAY
+2  for each v in G.Adj[u]:
+3      if v.color == WHITE:
+4          v.π = u
+5          DFS-VISIT(G, v)
+6  time = time + 1;  u.f = time;  u.color = BLACK
+```
+
+Each vertex cycles through three colours: **WHITE** (undiscovered), **GRAY** (discovered, still being processed), **BLACK** (fully finished). The timestamp $u.d$ records when $u$ was first discovered; $u.f$ records when $u$'s subtree was fully explored. For any edge $(u, v)$ in the DFS forest, the interval $[u.d, u.f]$ *properly contains* $[v.d, v.f]$.
+
+**Visited representation.** To check $O(1)$ whether a vertex is visited, use a boolean array indexed by vertex number, or store a colour field directly in the vertex object.
+
+###### **1.4.2 DFS Example**
+
+Consider the following undirected graph with vertices $A$–$I$. Edges: $B{-}A$, $B{-}D$, $B{-}E$, $A{-}H$, $A{-}C$, $D{-}F$, $F{-}E$, $F{-}G$, $E{-}I$.
+
+```{dot}
+//| fig-height: 2.8
+//| fig-width: 6
+graph example {
+  rankdir=LR
+  node [shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d",
+        fontcolor="#1f2d3d", fontsize=12, width=0.55]
+  edge [color="#355c7d", penwidth=1.5]
+  B -- A
+  B -- D
+  B -- E
+  A -- H
+  A -- C
+  D -- F
+  F -- E
+  F -- G
+  E -- I
+}
+```
+
+Starting DFS at $B$ (with the convention of exploring neighbours in alphabetical order):
+
+| Step | Event | Stack (top → bottom) |
+| :--- | :--- | :--- |
+| 1 | visit $B$ | $B$ |
+| 2 | visit $A$ | $A, B$ |
+| 3 | visit $H$ | $H, A, B$ |
+| 4 | backtrack | $A, B$ |
+| 5 | visit $C$ | $C, A, B$ |
+| 6 | backtrack twice | $B$ |
+| 7 | visit $D$ | $D, B$ |
+| 8 | visit $F$ | $F, D, B$ |
+| 9 | visit $E$ | $E, F, D, B$ |
+| 10 | visit $I$ | $I, E, F, D, B$ |
+| 11 | backtrack twice | $F, D, B$ |
+| 12 | visit $G$ | $G, F, D, B$ |
+| 13 | unwind | $\emptyset$ |
+
+DFS visit order: $B, A, H, C, D, F, E, I, G$.
+
+###### **1.4.3 DFS Analysis**
+
+**With adjacency lists:** initialising colours takes $\Theta(V)$. Each `DFS-VISIT` call processes $\deg(u)$ edges. Since each edge is examined at most twice (once per endpoint for undirected graphs):
+
+$$T_{\text{DFS}} = \Theta(V) + \sum_{u \in V} \Theta(\deg(u)) = \Theta(V) + \Theta(2E) = \Theta(V + E).$$
+
+**With an adjacency matrix:** each call to `DFS-VISIT(G, u)` scans all $V$ potential neighbours regardless of actual degree:
+
+$$T_{\text{DFS}} = \Theta(V) + \sum_{u \in V} \Theta(V) = \Theta(V^2).$$
+
+###### **1.4.4 DFS Timestamps and Edge Types**
+
+The discovery/finish timestamps $u.d$ and $u.f$ enable classification of every edge $(u, v)$ in a directed graph:
+
+- **Tree edge** — $v$ is discovered via $(u, v)$; $v$ was WHITE.
+- **Back edge** — $v$ is an ancestor of $u$ in the DFS tree; $v$ is GRAY when $(u, v)$ is explored. *Back edges indicate directed cycles.*
+- **Forward edge** — $v$ is a descendant of $u$ already finished; $v$ is BLACK with $u.d < v.d$.
+- **Cross edge** — $v$ is neither ancestor nor descendant; BLACK with $u.d > v.d$.
+
+The **parenthesis theorem** states: for two vertices $u$ and $v$, exactly one of three cases holds — $[u.d, u.f]$ and $[v.d, v.f]$ are disjoint (neither is an ancestor of the other), or one interval properly contains the other (one is an ancestor).
+
+##### **1.5 Breadth-First Search**
+
+###### **1.5.1 BFS Algorithm**
+
+**Breadth-first search (BFS)** expands *level by level* outward from the source vertex. Instead of going deep, it processes all neighbours before moving further away. BFS uses a **queue** (FIFO) to maintain the frontier.
+
+```text
+BFS(G, s):
+1  for each vertex u in G.V - {s}:
+2      u.color = WHITE;  u.d = ∞;  u.π = NIL
+3  s.color = GRAY;  s.d = 0;  s.π = NIL
+4  Q = ∅;  ENQUEUE(Q, s)
+5  while Q ≠ ∅:
+6      u = DEQUEUE(Q)
+7      for each v in G.Adj[u]:
+8          if v.color == WHITE:
+9              v.color = GRAY;  v.d = u.d + 1;  v.π = u
+10             ENQUEUE(Q, v)
+11     u.color = BLACK
+```
+
+Line 7 processes all neighbours of each dequeued vertex exactly once. The queue ensures vertices at distance $k$ are all processed before any vertex at distance $k+1$.
+
+###### **1.5.2 BFS Example**
+
+Using the same graph from the DFS example, starting BFS at $B$:
+
+| Step | Event | Queue (front → back) |
+| :--- | :--- | :--- |
+| 0 | init | $B$ |
+| 1 | visit $B$ | $A, D, E$ |
+| 2 | visit $A$ | $D, E, H, C$ |
+| 3 | visit $D$ | $E, H, C, F$ |
+| 4 | visit $E$ | $H, C, F, I$ |
+| 5 | visit $H$ | $C, F, I$ |
+| 6 | visit $C$ | $F, I$ |
+| 7 | visit $F$ | $I, G$ |
+| 8 | visit $I$ | $G$ |
+| 9 | visit $G$ | $\emptyset$ |
+
+BFS visit order: $B, A, D, E, H, C, F, I, G$.
+
+The BFS naturally partitions vertices into **distance layers** $L_k = \{v : \delta(s, v) = k\}$:
+
+$$L_0 = \{B\}, \quad L_1 = \{A, D, E\}, \quad L_2 = \{H, C, F, I\}, \quad L_3 = \{G\}.$$
+
+```{dot}
+//| fig-height: 3.2
+//| fig-width: 8
+graph bfs_layers {
+  rankdir=LR
+  node [shape=circle, style=filled, fontcolor="#1f2d3d", fontsize=12, width=0.55]
+  edge [color="#355c7d", penwidth=1.5]
+
+  B [fillcolor="#fff3cd", color="#355c7d"]
+  A [fillcolor="#d6eef5", color="#355c7d"]
+  D [fillcolor="#d6eef5", color="#355c7d"]
+  E [fillcolor="#d6eef5", color="#355c7d"]
+  H [fillcolor="#e8f4f8", color="#355c7d"]
+  C [fillcolor="#e8f4f8", color="#355c7d"]
+  F [fillcolor="#e8f4f8", color="#355c7d"]
+  I [fillcolor="#e8f4f8", color="#355c7d"]
+  G [fillcolor="#d7f0c2", color="#355c7d"]
+
+  B -- A
+  B -- D
+  B -- E
+  A -- H
+  A -- C
+  D -- F
+  F -- E
+  F -- G
+  E -- I
+}
+```
+
+*Yellow: $L_0$; light blue: $L_1$; light grey-blue: $L_2$; green: $L_3$.*
+
+###### **1.5.3 BFS Analysis**
+
+The initialisation loop at lines 1–4 takes $\Theta(V)$. Each vertex is enqueued and dequeued at most once. The inner loop at line 7 iterates over all edges incident to $u$; summing over all dequeued vertices visits each edge at most twice (undirected) or once (directed). Thus:
+
+$$T_{\text{BFS}} = \Theta(V) + \Theta(E) = \Theta(V + E) \quad \text{with adjacency lists.}$$
+
+With an adjacency matrix, scanning each row takes $\Theta(V)$ per vertex, giving $\Theta(V^2)$ overall.
+
+###### **1.5.4 Shortest Paths in Unweighted Graphs**
+
+BFS computes the **shortest-path distance** $\delta(s, v)$ — the minimum number of edges on any path from $s$ to $v$ — for all vertices $v$. The field $v.d$ stores this value after BFS completes; the field $v.\pi$ stores the predecessor on the shortest path, enabling path reconstruction.
+
+**Why BFS gives shortest paths.** BFS processes vertices in non-decreasing order of their distance from $s$. When vertex $v$ is first discovered (coloured GRAY), it is reached via a path of exactly $v.d$ edges, which is optimal because any shorter path would have discovered $v$ earlier.
+
+**Why BFS fails for weighted shortest paths.** BFS counts hops, not weights. Consider three vertices $S$, $U$, $V$ with edges $S \to U$ (weight 1), $U \to V$ (weight 1), and $S \to V$ (weight 100). BFS reports $\delta(S, V) = 1$ (one hop), but the true minimum-weight path $S \to U \to V$ has total weight 2. For weighted graphs, use Dijkstra's algorithm instead.
+
+##### **1.6 DFS vs. BFS**
+
+| Property | DFS | BFS |
+| :--- | :--- | :--- |
+| **Data structure** | Stack (explicit or call stack) | Queue |
+| **Exploration style** | Deepest-first, then backtrack | Layer by layer from source |
+| **Asymptotic time** | $\Theta(V + E)$ adj. lists | $\Theta(V + E)$ adj. lists |
+| **Asymptotic time** | $\Theta(V^2)$ adj. matrix | $\Theta(V^2)$ adj. matrix |
+| **Shortest paths** | No (in general) | Yes (unweighted only) |
+| **Cycle detection** | Yes (back edges) | Less direct |
+| **Topological sort** | Yes (via finish times) | No |
+| **Memory usage** | $O(V)$ stack depth | $O(V)$ queue size |
+| **Extra info** | Discovery/finish times, edge types | Distance labels, BFS tree |
+
+Both algorithms are **complete** on finite graphs when every vertex is visited: running DFS or BFS from each unvisited vertex ensures all connected components are processed. DFS's recursive nature makes it natural for problems that exploit the parenthesis structure of finish times (cycle detection, topological sort, SCCs). BFS is the canonical choice whenever layer-by-layer expansion or minimum hop counts are needed.
+
+##### **1.7 Topological Sorting**
+
+###### **1.7.1 Directed Acyclic Graphs**
+
+A **directed acyclic graph (DAG)** is a directed graph with no directed cycles. DAGs arise naturally whenever a problem has precedence constraints: course prerequisites, build-system dependencies, spreadsheet recalculation order, or instruction scheduling in compilers. If the constraint graph contained a cycle, the constraints would be mutually contradictory (task $A$ must finish before $B$, and $B$ before $A$ — impossible).
+
+###### **1.7.2 Topological Order**
+
+A **topological sort** of a DAG $G = (V, E)$ is a linear ordering $\prec$ of all vertices such that for every directed edge $(u, v) \in E$, vertex $u$ appears before $v$ in the ordering. Equivalently: arrange all vertices on a line so that every edge points left-to-right.
+
+A topological order exists *if and only if* the graph is a DAG. Topological orders are generally not unique — any order that respects all edge constraints is valid. The number of valid orders ranges from 1 (a single directed chain) to $n!$ (no edges at all).
+
+###### **1.7.3 DFS-Based Topological Sort**
+
+**Algorithm** (Cormen et al. 2022, §20.4):
+
+```text
+TOPOLOGICAL-SORT(G):
+1  run DFS(G) to compute finish times v.f for all v
+2  as each vertex is finished, prepend it to a linked list
+3  return the linked list
+```
+
+**Why it works.** In a DAG, DFS produces no back edges (a back edge would imply a cycle). For every directed edge $(u, v)$ explored during DFS: if $v$ was WHITE when $(u, v)$ is first encountered, $v$ finishes before $u$, so $v.f < u.f$; if $v$ was already BLACK (a cross or forward edge), $v.f < u.f$ likewise. In both cases $u.f > v.f$, so $u$ appears *earlier* in the sorted list (which is ordered by decreasing finish time). Thus every edge points from a vertex with larger finish time to one with smaller finish time — exactly the required direction.
+
+**Running time:** $\Theta(V + E)$ — just the cost of DFS.
+
+The dressing-order DAG illustrates a canonical example:
+
+```{dot}
+//| fig-height: 3.5
+//| fig-width: 8
+digraph dressing {
+  rankdir=LR
+  node [shape=box, style="filled,rounded", fillcolor="#e8f4f8",
+        color="#355c7d", fontcolor="#1f2d3d", fontsize=11, width=0.9]
+  edge [color="#355c7d", penwidth=1.3, arrowsize=0.8]
+
+  socks  [label="socks\n(13/14)"]
+  pants  [label="pants\n(9/12)"]
+  shoes  [label="shoes\n(10/11)"]
+  shirt  [label="shirt\n(5/8)"]
+  tie    [label="tie\n(6/7)"]
+  belt   [label="belt\n(1/4)"]
+  jacket [label="jacket\n(2/3)"]
+
+  socks  -> shoes
+  pants  -> shoes
+  pants  -> belt
+  shirt  -> belt
+  shirt  -> tie
+  tie    -> jacket
+  belt   -> jacket
+}
+```
+
+*Numbers in parentheses are DFS discovery/finish timestamps from one execution.*
+Sorted by decreasing finish time: socks (14) → pants (12) → shoes (11) → shirt (8) → tie (7) → belt (4) → jacket (3).
+
+###### **1.7.4 When Topological Sort Fails**
+
+If $G$ has a directed cycle, no linear ordering can satisfy all edge constraints — there will always be at least one edge pointing "backward" in any arrangement. DFS detects this automatically: a **back edge** (reaching a GRAY vertex) is found if and only if the graph has a directed cycle. The algorithm can be augmented to output the cycle as a witness.
+
+---
+
+#### **2. Definitions**
+
+*   **Graph** $G = (V, E)$: a finite set $V$ of vertices and a set $E$ of edges (unordered or ordered pairs of vertices).
+*   **Undirected graph**: a graph in which edges are unordered pairs $\{u, v\}$, representing symmetric relationships.
+*   **Directed graph (digraph)**: a graph in which edges are ordered pairs $(u, v)$, representing asymmetric relationships.
+*   **Weighted graph**: a graph in which each edge carries a numeric weight (distance, cost, etc.).
+*   **Adjacent**: two vertices are adjacent if an edge connects them directly.
+*   **Path**: a sequence of vertices $v_0, v_1, \ldots, v_k$ where consecutive pairs share an edge.
+*   **Simple path**: a path that visits no vertex more than once.
+*   **Cycle**: a path that starts and ends at the same vertex.
+*   **Connected component** (undirected): a maximal subset of vertices in which every pair is connected by a path.
+*   **Sparse graph**: a graph with $|E| \ll |V|^2$.
+*   **Dense graph**: a graph with $|E| = \Theta(|V|^2)$.
+*   **Edge-list structure**: graph representation maintaining a list of vertex objects and a list of edge objects with back-pointers.
+*   **Adjacency list**: graph representation where each vertex stores a list of its incident edges or neighbouring vertices.
+*   **Adjacency matrix**: graph representation using a $|V| \times |V|$ matrix $A$ where $A[i][j]$ encodes the edge between vertices $i$ and $j$.
+*   **DFS (depth-first search)**: a graph traversal that explores as deep as possible before backtracking, using a stack or recursion.
+*   **BFS (breadth-first search)**: a graph traversal that expands level by level from a source using a queue; computes shortest hop distances in unweighted graphs.
+*   **Discovery time** $u.d$: the DFS timestamp when vertex $u$ is first reached (coloured GRAY).
+*   **Finish time** $u.f$: the DFS timestamp when all of $u$'s descendants are fully explored (coloured BLACK).
+*   **Tree edge**: an edge $(u,v)$ used by DFS to discover $v$ for the first time.
+*   **Back edge**: an edge $(u,v)$ to an ancestor $v$ of $u$ in the DFS tree; indicates a directed cycle.
+*   **Forward edge**: an edge $(u,v)$ to a non-tree descendant already finished (directed graphs only).
+*   **Cross edge**: an edge $(u,v)$ between vertices in different DFS subtrees (directed graphs only).
+*   **BFS tree**: the spanning tree formed by the tree edges of a BFS traversal; each tree edge represents the shortest path from the source.
+*   **DAG (directed acyclic graph)**: a directed graph containing no directed cycles; used to model precedence constraints.
+*   **Topological sort**: a linear ordering of the vertices of a DAG such that every directed edge $(u,v)$ has $u$ before $v$ in the ordering.
+
+---
+
+#### **3. Formulas**
+
+*   **DFS/BFS time complexity (adjacency lists):** $\Theta(V + E)$
+*   **DFS/BFS time complexity (adjacency matrix):** $\Theta(V^2)$
+*   **Handshaking lemma (undirected):** $\displaystyle\sum_{v \in V} \deg(v) = 2|E|$
+*   **Maximum edges (undirected):** $0 \le |E| \le \dfrac{|V|(|V|-1)}{2}$
+*   **Maximum edges (directed):** $0 \le |E| \le |V|(|V|-1)$
+*   **Parenthesis theorem:** for every pair $u, v$, exactly one holds: $[u.d, u.f]$ and $[v.d, v.f]$ are disjoint, or one properly contains the other.
+*   **Topological sort rule:** output vertices in decreasing order of DFS finish time $v.f$.
+*   **Shortest path via BFS:** $\delta(s, v) = v.d$ after `BFS(G, s)` (unweighted graph only).
+*   **Expected degree (Erdős–Rényi):** if each edge exists independently with probability $p$, then $\mathbb{E}[\deg(v)] = (|V| - 1)\,p$.
+*   **Expected number of edges (Erdős–Rényi):** $\mathbb{E}[|E|] = \dbinom{|V|}{2}\,p = \dfrac{|V|(|V|-1)}{2}\,p$.
+
+---
+
+#### **4. Examples**
+
+##### **4.1. Enumerate Topological Orderings and Removable Edges** (Problem Set 10, Task 1)
+
+Consider the following directed acyclic graph $\mathcal{G}_1$:
+
+```{dot}
+//| fig-height: 2.5
+//| fig-width: 7
+digraph G1 {
+  rankdir=LR
+  node [shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d",
+        fontcolor="#1f2d3d", fontsize=12, width=0.55]
+  edge [color="#355c7d", penwidth=1.3, arrowsize=0.8]
+  A -> B
+  A -> C
+  A -> D
+  B -> D
+  B -> F
+  C -> D
+  C -> G
+  D -> E
+  E -> F
+  E -> G
+  F -> H
+  G -> H
+}
+```
+
+**(a)** Write down **all** valid topological orderings of $\mathcal{G}_1$.
+
+**(b)** List **all** edges that can be deleted from $\mathcal{G}_1$ without changing the set of valid topological orderings.
+
+**(c)** What is the maximum possible number of distinct topological orderings for a DAG with 9 vertices? Briefly justify.
+
+**(d)** What is the maximum possible number of distinct topological orderings for a DAG with 7 vertices and exactly 10 edges? Briefly justify.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) All topological orderings.**
+
+First, identify structural constraints from the edges:
+
+- $A$ has no incoming edges → $A$ must come first.
+- $B$ and $C$ both require only $A$ → either can come second.
+- $D$ requires both $B$ and $C$ → $D$ comes after both.
+- $E$ requires $D$ → $E$ comes after $D$.
+- $F$ requires $B$ and $E$ (through B→F and E→F); $G$ requires $C$ and $E$ (through C→G and E→G) → $F$ and $G$ may appear in either order after $E$.
+- $H$ requires both $F$ and $G$ → $H$ must come last.
+
+The only freedom is: (i) the relative order of $B$ and $C$, and (ii) the relative order of $F$ and $G$ after $E$. This gives $2 \times 2 = 4$ valid orderings:
+
+1. $A \to B \to C \to D \to E \to F \to G \to H$
+2. $A \to B \to C \to D \to E \to G \to F \to H$
+3. $A \to C \to B \to D \to E \to F \to G \to H$
+4. $A \to C \to B \to D \to E \to G \to F \to H$
+
+**Answer:** exactly 4 valid topological orderings.
+
+---
+
+**(b) Removable edges.**
+
+An edge $(u, v)$ can be removed without affecting the set of topological orderings if and only if the constraint "$u$ before $v$" is already implied by some other directed path from $u$ to $v$ (i.e., the edge is *transitive*). Such edges are:
+
+- $A \to D$: already forced by $A \to B \to D$ and $A \to C \to D$.
+- $B \to F$: already forced by $B \to D \to E \to F$.
+- $C \to G$: already forced by $C \to D \to E \to G$.
+
+Removing any of these three edges leaves the ordering set unchanged. Every other edge provides a constraint not reachable via another path and cannot be removed.
+
+**Answer:** $A \to D$, $B \to F$, $C \to G$.
+
+---
+
+**(c) Maximum orderings for 9 vertices.**
+
+The maximum is $9! = 362{,}880$. This is achieved by the DAG with **no edges**: with zero constraints, every permutation of the 9 vertices is a valid topological ordering. Adding any edge $(u, v)$ eliminates at least one permutation (any ordering where $v$ precedes $u$), so the edgeless graph maximises the count.
+
+---
+
+**(d) Maximum orderings for 7 vertices and exactly 10 edges.**
+
+The maximum is $\mathbf{240} = 2! \cdot 5!$. The optimal structure is a **complete bipartite DAG**: let $S = \{u_1, u_2\}$ (2 sources) and $T = \{v_1, \ldots, v_5\}$ (5 sinks), with all $2 \times 5 = 10$ edges directed from $S$ to $T$.
+
+The only constraint is that both $u_1$ and $u_2$ must appear before all five $v_i$. There are $2! = 2$ ways to order the sources and $5! = 120$ ways to order the sinks, giving $2 \times 120 = 240$ valid orderings. Any other 10-edge DAG on 7 vertices would impose at least one additional constraint *within* a group, reducing the count below 240.
+
+</details>
+
+##### **4.2. Probabilistic Analysis of BST-Based Adjacency Structure** (Problem Set 10, Task 2)
+
+Consider a large undirected graph $\mathcal{G}_2 = (V, E)$ whose vertex labels are integers. The graph is stored using an adjacency-list variant: for each vertex $v$, its set of neighbours is kept in a **binary search tree** (BST) keyed by neighbour references. Vertex arguments are references to vertex objects. Assume every unordered pair of distinct vertices exists as an edge independently with probability $p \in (0, 1)$, and assume **worst-case** time for all BST operations.
+
+**(a)** Compute $\mathbb{E}[|E|]$.
+
+**(b)** Compute $\mathbb{E}[\deg(v)]$ for a randomly chosen vertex $v$.
+
+**(c)** Compute $\mathbb{E}[T_{\texttt{areAdjacent}(v,u)}]$.
+
+**(d)** Compute $\mathbb{E}[T_{\texttt{removeEdge}(\text{from},\,\text{to})}]$.
+
+**(e)** Compute $\mathbb{E}[T_{\texttt{removeVertex}(v)}]$.
+
+**(f)** Compute $\mathbb{E}[T_{\texttt{iterateNeighbors}(v)}]$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Expected number of edges.**
+
+There are $\binom{|V|}{2} = \frac{|V|(|V|-1)}{2}$ possible unordered pairs. Each exists independently with probability $p$. By linearity of expectation:
+
+$$\mathbb{E}[|E|] = \frac{|V|(|V|-1)}{2}\,p.$$
+
+---
+
+**(b) Expected degree.**
+
+Vertex $v$ may be connected to each of the $|V| - 1$ other vertices independently with probability $p$. Each indicator variable $X_{vu}$ equals 1 if edge $\{v, u\}$ exists, 0 otherwise. By linearity of expectation:
+
+$$\mathbb{E}[\deg(v)] = \sum_{u \neq v} \mathbb{E}[X_{vu}] = (|V| - 1)\,p.$$
+
+---
+
+**(c) Expected time of** `areAdjacent(v, u)`.
+
+This operation searches for $u$ in $v$'s BST. Under worst-case BST behaviour (the BST may be a sorted chain of all neighbours), the search takes $O(\deg(v))$. Taking expectations:
+
+$$\mathbb{E}[T_{\texttt{areAdjacent}}] = O(\mathbb{E}[\deg(v)]) = O((|V|-1)\,p).$$
+
+---
+
+**(d) Expected time of** `removeEdge(from, to)`.
+
+Since the graph is undirected, `removeEdge` must delete `to` from `from`'s BST *and* delete `from` from `to`'s BST. Each deletion costs $O(\deg(\cdot))$ in the worst case. Both endpoints have the same expected degree:
+
+$$\mathbb{E}[T_{\texttt{removeEdge}}] = O(\mathbb{E}[\deg(\texttt{from})] + \mathbb{E}[\deg(\texttt{to})]) = O((|V|-1)\,p).$$
+
+---
+
+**(e) Expected time of** `removeVertex(v)`.
+
+`removeVertex(v)` must (i) remove $v$ from each neighbour $u$'s BST (costing $O(\deg(u))$ per neighbour) and (ii) delete $v$'s own BST. There are $\deg(v)$ neighbours. Given that $u$ is a neighbour of $v$, vertex $u$ has one guaranteed edge to $v$ plus each of the remaining $|V| - 2$ vertices independently with probability $p$:
+
+$$\mathbb{E}[\deg(u) \mid u \sim v] = 1 + (|V|-2)\,p.$$
+
+The total expected work over all neighbours plus the deletion of $v$'s BST is:
+
+$$\mathbb{E}[T_{\texttt{removeVertex}}]
+= \mathbb{E}[\deg(v)] \cdot \mathbb{E}[\deg(u) \mid u \sim v] + O(\mathbb{E}[\deg(v)])
+= O\!\left((|V|-1)p\,(1 + (|V|-2)p)\right).$$
+
+---
+
+**(f) Expected time of** `iterateNeighbors(v)`.
+
+Iterating over all neighbours requires visiting every node of $v$'s BST exactly once (e.g., via an in-order traversal), costing $\Theta(\deg(v))$:
+
+$$\mathbb{E}[T_{\texttt{iterateNeighbors}}] = \Theta(\mathbb{E}[\deg(v)]) = \Theta((|V|-1)\,p).$$
+
+</details>
+
+##### **4.3. Construct a Tree Not Achievable by BFS or DFS** (Problem Set 10, Task 3)
+
+Exhibit a directed graph $\mathcal{G}_3 = (V, E)$, a root $r \in V$, and a spanning tree $T \subseteq E$ with root $r$ such that all of the following hold:
+
+- $(V, E)$ is weakly connected (the underlying undirected graph is connected).
+- $(V, T)$ is weakly connected.
+- $5 \le |V| \le 10$.
+- $T$ **cannot** be the BFS spanning tree from $r$ under any ordering of adjacency lists.
+- $T$ **cannot** be the DFS spanning tree from $r$ under any ordering of adjacency lists.
+- **Extra credit:** for *every* fixed adjacency ordering, the BFS and DFS spanning trees are different from each other.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Construction.** Let $V = \{r, a, b, c, d\}$ with $r$ as root, and
+
+$$E = \{r\!\to\!a,\; r\!\to\!b,\; r\!\to\!c,\; r\!\to\!d,\; a\!\to\!b,\; a\!\to\!d,\; b\!\to\!a\},$$
+$$T = \{r\!\to\!a,\; r\!\to\!b,\; r\!\to\!c,\; a\!\to\!d\}.$$
+
+```{dot}
+//| fig-height: 3
+//| fig-width: 5
+digraph G3 {
+  node [shape=circle, style=filled, fontcolor="#1f2d3d", fontsize=12, width=0.55]
+  edge [penwidth=1.4, arrowsize=0.8]
+
+  r [fillcolor="#fff3cd", color="#355c7d"]
+  a [fillcolor="#e8f4f8", color="#355c7d"]
+  b [fillcolor="#e8f4f8", color="#355c7d"]
+  c [fillcolor="#d7f0c2", color="#355c7d"]
+  d [fillcolor="#e8f4f8", color="#355c7d"]
+
+  // T edges (solid purple)
+  r -> a [color="#5b2c8a", penwidth=2.5]
+  r -> b [color="#5b2c8a", penwidth=2.5]
+  r -> c [color="#5b2c8a", penwidth=2.5]
+  a -> d [color="#5b2c8a", penwidth=2.5]
+
+  // non-T edges (gray)
+  r -> d [color="#aaaaaa", style=dashed]
+  a -> b [color="#aaaaaa", style=dashed]
+  b -> a [color="#aaaaaa", style=dashed]
+}
+```
+
+*Bold purple: tree edges of $T$. Dashed gray: remaining edges of $E$.*
+
+**Checking the constraints.**
+
+1. **Weak connectivity.** The underlying undirected graph connects all five vertices: $r$ reaches $a, b, c, d$ directly; $a$ and $b$ are connected bidirectionally; $a$ reaches $d$. $T$ is a spanning tree so it is also weakly connected.
+2. **$T$ is not a BFS tree.** BFS from $r$ discovers $d$ at distance 1 via the direct edge $r \to d$. But in $T$, vertex $d$ is a child of $a$ (distance 2 from $r$). Since BFS always assigns each vertex its true shortest-path distance, $d$ can never appear at distance 2 in any BFS tree — so $T$ is not achievable by BFS for any adjacency ordering.
+3. **$T$ is not a DFS tree.** In $T$, both $a$ and $b$ are direct children of $r$. However, $G$ contains the edges $a \to b$ and $b \to a$. In any DFS from $r$, whichever of $a$ or $b$ is visited first (say $a$) will reach the other ($b$ via $a \to b$) before DFS returns to $r$, making $b$ a descendant of $a$, not a sibling. Therefore the edge $r \to b$ can never be a tree edge for any adjacency ordering — so $T$ is not achievable by DFS.
+4. **Extra credit: BFS $\neq$ DFS for every adjacency ordering.** The unique BFS tree from $r$ is $\{r \to a, r \to b, r \to c, r \to d\}$ (all four out-neighbours discovered at depth 1). Every DFS tree must use either $a \to b$ or $b \to a$ as a tree edge (because of the mutual edges between $a$ and $b$). Therefore no DFS tree can coincide with the BFS tree (which has only edges out of $r$). This holds for all $5!$ adjacency orderings.
+
+</details>
+
+##### **4.4. Choose a Graph Representation** (Lecture 10, Task 1)
+
+For each scenario, choose among **edge list**, **adjacency lists**, and **adjacency matrix**, and justify in one sentence:
+
+1. A very dense graph with frequent "is $(u,v)$ an edge?" queries and rare structural changes.
+2. A sparse social graph with frequent neighbour iteration.
+3. A dynamic graph with frequent edge insert/delete, given pointers to edge objects.
+
+<details>
+<summary>Click to see the solution</summary>
+
+1. **Adjacency matrix.** For dense graphs ($m \approx n^2$) the $O(n^2)$ space cost is acceptable, and `getEdge(u,v)` runs in $O(1)$ — exactly what is needed when edge-existence queries dominate.
+2. **Adjacency lists.** A sparse social graph has $m \ll n^2$, so an adjacency matrix would waste $\Theta(n^2)$ space. Iterating over the neighbours of vertex $v$ takes $\Theta(\deg(v))$ with adjacency lists versus $\Theta(n)$ with an adjacency matrix.
+3. **Edge list with back-pointers.** With a pointer to the edge object, `removeEdge` runs in $\Theta(1)$ (splice out from the doubly linked edge list) and `insertEdge` is also $\Theta(1)$. Adjacency lists would require $\Theta(\deg)$ to find and remove the cross-references; adjacency matrices support $O(1)$ removal only if you forego the edge-object abstraction.
+
+</details>
+
+##### **4.5. Alternative BFS Order and Layer Sets** (Lecture 10, Task 2)
+
+On the example graph (vertices $A$–$I$, start at $B$), give a BFS visit order that differs from the table in the lecture while still being valid under the "enqueue all undiscovered neighbours" rule. Then state the layer sets $L_0, L_1, L_2, L_3$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+The layer sets are **uniquely determined** by shortest-path distances and do not depend on tie-breaking:
+
+$$L_0 = \{B\}, \quad L_1 = \{A, D, E\}, \quad L_2 = \{H, C, F, I\}, \quad L_3 = \{G\}.$$
+
+Within each layer the order of processing depends on the order in which neighbours are enqueued. One alternative valid BFS order (enqueue $B$'s neighbours in the order $E, D, A$ instead of $A, D, E$):
+
+$B \to E \to D \to A \to I \to F \to H \to C \to G$
+
+Verification: $E$ is dequeued first at layer 1 ($B$'s neighbour), then $D$, then $A$; from $E$ we enqueue $I$ (since $F$ is not yet visited at this point from $E$, but $F$ is adjacent to $D$ as well — exact order depends on edge ordering), etc. Any order that processes all $L_k$ vertices before any $L_{k+1}$ vertex is valid; the layer partition is fixed.
+
+</details>
+
+##### **4.6. Topological Sort on a Small DAG** (Lecture 10, Task 4)
+
+Perform topological sort on the DAG with vertices $\{1, 2, 3, 4\}$ and edges $(1,2), (1,3), (2,4), (3,4)$ by running DFS and listing vertices by decreasing finish time. Is the answer unique?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1 — draw the DAG:**
+
+$$1 \to 2 \to 4, \quad 1 \to 3 \to 4.$$
+
+Vertex 1 is the unique source (no incoming edges); vertex 4 is the unique sink (no outgoing edges).
+
+**Step 2 — run DFS** (starting at 1, then 2 before 3 in the adjacency list order):
+
+| Event | Timestamps |
+| :--- | :--- |
+| Discover 1 | $1.d = 1$ |
+| Discover 2 (from 1) | $2.d = 2$ |
+| Discover 4 (from 2) | $4.d = 3$ |
+| Finish 4 | $4.f = 4$ |
+| Finish 2 | $2.f = 5$ |
+| Discover 3 (from 1) | $3.d = 6$ |
+| 4 is already BLACK | — |
+| Finish 3 | $3.f = 7$ |
+| Finish 1 | $1.f = 8$ |
+
+**Step 3 — sort by decreasing finish time:**
+
+$$1\ (f=8) \to 3\ (f=7) \to 2\ (f=5) \to 4\ (f=4).$$
+
+**Is the answer unique?** No. Vertices 2 and 3 are independent (neither depends on the other). If DFS had visited 3 before 2, it would produce the equally valid order $1 \to 2 \to 3 \to 4$.  Both orderings satisfy all edge constraints: $1$ before $2$ and $3$, and $2$ and $3$ both before $4$.
+
+</details>
+
+##### **4.7. DFS Timestamps: Counterexample to a False Implication** (Lecture 10, Task 5)
+
+Give a counterexample to: *If a directed graph $G$ contains a path from $u$ to $v$, and a DFS yields $u.d < v.d$, then $v$ is a descendant of $u$ in the DFS forest.*
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key idea.** A counterexample requires a directed path from $u$ to $v$ that passes through a GRAY (ancestor) vertex — a *back edge* from $u$ to an ancestor $w$ of $u$, followed by a tree edge from $w$ to $v$. When DFS-VISIT($u$) encounters the back edge $u \to w$, vertex $w$ is GRAY and is skipped; $v$ remains undiscovered until DFS backtracks to $w$ and processes $w \to v$ *after* $u$ has already finished. This gives $u.d < v.d$ (premise holds) while $v$ ends up as a sibling of $u$, not a descendant.
+
+**Counterexample.** Let $V = \{S, u, v\}$, $E = \{S \to u,\; S \to v,\; u \to S\}$.
+
+Run DFS starting at $S$, with $S$'s adjacency list in order $[u, v]$:
+
+| Event | Time |
+| :--- | :--- |
+| Discover $S$ | $S.d = 1$ |
+| Discover $u$ (via $S \to u$) | $u.d = 2$ |
+| Explore $u \to S$: $S$ is GRAY — back edge, skip | — |
+| Finish $u$ | $u.f = 3$ |
+| Discover $v$ (via $S \to v$) | $v.d = 4$ |
+| Finish $v$ | $v.f = 5$ |
+| Finish $S$ | $S.f = 6$ |
+
+**Verification.** The directed path $u \to S \to v$ exists in $G$. We have $u.d = 2 < v.d = 4$ — the premise holds. Yet $v$ is discovered from $S$ (not from $u$), so $v$ is a child of $S$ and a sibling of $u$ in the DFS tree. Thus $v$ is **not** a descendant of $u$, falsifying the conjecture. $\square$
+
+</details>
+
+##### **4.8. DFS Finish Times: Another False Implication** (Lecture 10, Task 6)
+
+Give a counterexample to: *If $G$ contains a directed path from $u$ to $v$, then every DFS of $G$ satisfies $v.d \le u.f$.*
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key idea.** The same construction from Task 5 serves here. When the path from $u$ to $v$ goes through a GRAY ancestor and that ancestor's edge to $v$ is explored *after* $u$ finishes, we get $v.d > u.f$ — directly falsifying the claim.
+
+**Counterexample.** Same graph: $V = \{S, u, v\}$, $E = \{S \to u,\; S \to v,\; u \to S\}$. Same DFS run (adjacency order $[u, v]$ at $S$):
+
+$$S.d = 1,\quad u.d = 2,\quad u.f = 3,\quad v.d = 4,\quad v.f = 5,\quad S.f = 6.$$
+
+The directed path $u \to S \to v$ exists. Checking the claim: $v.d = 4 > u.f = 3$, so $v.d \le u.f$ is **false**. $\square$
+
+**Why this works.** The edge $u \to S$ is a back edge (to the GRAY ancestor $S$); DFS skips it and finishes $u$ at time 3. Only then does DFS-VISIT($S$) resume and discover $v$ at time 4. The path from $u$ to $v$ crosses outside $u$'s DFS subtree via this back edge, allowing $v$ to be discovered entirely after $u$ finishes.
+
+</details>
+
+##### **4.9. Implement Iterative DFS** (Lecture 10, Task 7)
+
+Rewrite `DFS`/`DFS-VISIT` replacing recursion with an explicit stack. The iterative version must replicate the discovery/finish timestamps of the recursive version exactly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+The key challenge is replicating the recursive call-return mechanism: when DFS-VISIT returns from a recursive call on child $v$, execution continues scanning $u$'s adjacency list from the next neighbour after $v$. The standard technique pushes a *resume state* $(u, i)$ — vertex $u$ and the index $i$ of the next neighbour to examine — instead of pushing a bare vertex.
+
+```text
+DFS-ITERATIVE(G):
+1  for each u in G.V:
+2      u.color = WHITE;  u.π = NIL
+3  time = 0
+4  for each u in G.V:
+5      if u.color == WHITE:
+6          S = empty stack
+7          push (u, 0) onto S            // (vertex, next-neighbour index)
+8          time = time + 1
+9          u.d = time;  u.color = GRAY
+10         while S not empty:
+11             (v, i) = top of S
+12             if i < |G.Adj[v]|:
+13                 w = G.Adj[v][i]
+14                 S.top = (v, i + 1)    // advance the resume index
+15                 if w.color == WHITE:
+16                     w.π = v;  w.color = GRAY
+17                     time = time + 1;  w.d = time
+18                     push (w, 0) onto S
+19             else:
+20                 pop S                  // v is finished
+21                 time = time + 1;  v.f = time;  v.color = BLACK
+```
+
+**How it works.** The stack frame $(v, i)$ represents: "we are in the middle of DFS-VISIT for $v$, and the next unexamined neighbour is $\text{G.Adj}[v][i]$." When a WHITE neighbour $w$ is found, we push $(w, 0)$ (start examining $w$'s adjacency list from the beginning) before incrementing $i$ in $v$'s frame. When all neighbours of $v$ are exhausted ($i = |\text{G.Adj}[v]|$), $v$ is finished and popped.
+
+**Maximum stack depth.** On a graph consisting of a single directed chain $v_1 \to v_2 \to \cdots \to v_n$, the stack grows to depth $n$ (one frame per vertex along the chain). So the worst-case stack depth is $O(V)$, matching the maximum recursion depth of the recursive version.
+
+</details>
