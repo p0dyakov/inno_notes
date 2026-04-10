@@ -1,0 +1,1079 @@
+---
+title: "W12. Thompson's Construction, Kleene's Algorithm, Chomsky Hierarchy, and Computability"
+author: "Manuel Mazzara"
+date: "April 9, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Thompson's Construction: From Regular Expression to ε-NFSA**
+
+###### **1.1.1 Motivation and Overview**
+
+Given a **regular expression** over an alphabet, we often need a computational device — a finite automaton — that accepts exactly the language the expression describes. **Thompson's Construction** is a classical algorithm that converts any regular expression into an equivalent **ε-Nondeterministic Finite State Automaton (ε-NFSA)**. The resulting automaton can then be used to match strings against the original regular expression (this is precisely how most regular-expression engines work internally).
+
+The algorithm works *recursively*: a regular expression is broken into its constituent subexpressions, an automaton fragment is built for each, and the fragments are combined using a fixed set of composition rules. Every subexpression $r$ produces an automaton $N(r)$ with exactly one start state and one accepting state (with no transitions entering the start state or leaving the accepting state from outside the fragment). This structural discipline makes recursive composition straightforward.
+
+###### **1.1.2 Base Case Rules**
+
+There are two base cases that handle atomic regular expressions.
+
+**The empty expression $\epsilon$.**  The regular expression $\epsilon$ (recognising only the empty string) is converted to a two-state automaton: a start state $q$ and an accepting state $f$ connected by a single $\epsilon$-transition.
+
+```{dot}
+//| fig-cap: "Thompson's rule for ε: a single ε-transition"
+//| fig-width: 3
+//| fig-height: 1.0
+digraph tc_eps {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q [label="q"];
+  f [label="f", shape=doublecircle, fillcolor="#d7f0c2"];
+
+  start -> q;
+  q -> f [label="ε"];
+}
+```
+
+**A single symbol $a$.**  A symbol $a$ from the input alphabet is converted to a two-state automaton with a single $a$-labelled transition from the start state $q$ to the accepting state $f$.
+
+```{dot}
+//| fig-cap: "Thompson's rule for a single symbol a"
+//| fig-width: 3
+//| fig-height: 1.0
+digraph tc_sym {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q [label="q"];
+  f [label="f", shape=doublecircle, fillcolor="#d7f0c2"];
+
+  start -> q;
+  q -> f [label="a"];
+}
+```
+
+###### **1.1.3 Composition Rules**
+
+Given automata $N(s)$ and $N(t)$ for subexpressions $s$ and $t$, three rules cover all compound expressions.
+
+**Concatenation $st$.**  The accepting state of $N(s)$ is *merged* with (or connected by an $\epsilon$-transition to) the start state of $N(t)$. The resulting automaton starts where $N(s)$ starts and accepts where $N(t)$ accepts. Informally: first consume a string from $L(s)$, then consume a string from $L(t)$.
+
+```{dot}
+//| fig-cap: "Thompson's rule for concatenation st: the two fragments are chained end-to-start"
+//| fig-width: 5.5
+//| fig-height: 1.2
+digraph tc_concat {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  qs  [label="qₛ"];
+  mid [label="fₛ/q_t", fillcolor="#fff3cd"];
+  qf  [label="f_t", shape=doublecircle, fillcolor="#d7f0c2"];
+
+  subgraph cluster_s {
+    label="N(s)"; style=filled; fillcolor="#f9fbfd"; color="#355c7d";
+    qs; mid;
+  }
+  subgraph cluster_t {
+    label="N(t)"; style=filled; fillcolor="#f9fbfd"; color="#355c7d";
+    qf;
+  }
+
+  start -> qs;
+  qs  -> mid [label="…"];
+  mid -> qf  [label="…"];
+}
+```
+
+**Union $s\,|\,t$.**  A new start state $q$ is introduced with two $\epsilon$-transitions leading into the start states of $N(s)$ and $N(t)$ respectively. A new accepting state $f$ is introduced, with $\epsilon$-transitions from the accepting states of both $N(s)$ and $N(t)$ into $f$. The resulting automaton non-deterministically *guesses* which alternative to pursue.
+
+```{dot}
+//| fig-cap: "Thompson's rule for union s|t: a new start fans out, both branches converge to a new accept state"
+//| fig-width: 5.5
+//| fig-height: 2.4
+digraph tc_union {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q  [label="q"];
+  qs [label="qₛ"];
+  fs [label="fₛ"];
+  qt [label="q_t"];
+  ft [label="f_t"];
+  f  [label="f", shape=doublecircle, fillcolor="#d7f0c2"];
+
+  subgraph cluster_s {
+    label="N(s)"; style=filled; fillcolor="#f9fbfd"; color="#355c7d";
+    qs; fs;
+  }
+  subgraph cluster_t {
+    label="N(t)"; style=filled; fillcolor="#f9fbfd"; color="#355c7d";
+    qt; ft;
+  }
+
+  start -> q;
+  q -> qs [label="ε"];
+  q -> qt [label="ε"];
+  qs -> fs [label="…"];
+  qt -> ft [label="…"];
+  fs -> f  [label="ε"];
+  ft -> f  [label="ε"];
+}
+```
+
+**Kleene star $s^*$.**  A new start state $q$ and a new accepting state $f$ are introduced. An $\epsilon$-transition connects $q$ directly to $f$ (allowing zero repetitions). An $\epsilon$-transition connects $q$ to the start of $N(s)$, and an $\epsilon$-transition connects the accepting state of $N(s)$ back to the start of $N(s)$ (allowing repetition) and also forward to $f$.
+
+```{dot}
+//| fig-cap: "Thompson's rule for Kleene star s*: loop back from the end of N(s) to its start, plus a bypass for zero repetitions"
+//| fig-width: 6
+//| fig-height: 2.2
+digraph tc_star {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q  [label="q"];
+  qs [label="qₛ"];
+  fs [label="fₛ", fillcolor="#fff3cd"];
+  f  [label="f", shape=doublecircle, fillcolor="#d7f0c2"];
+
+  subgraph cluster_s {
+    label="N(s)"; style=filled; fillcolor="#f9fbfd"; color="#355c7d";
+    qs; fs;
+  }
+
+  start -> q;
+  q -> qs [label="ε"];
+  qs -> fs [label="…"];
+  fs -> qs [label="ε", style=dashed];
+  fs -> f  [label="ε"];
+  q  -> f  [label="ε", constraint=false];
+}
+```
+
+###### **1.1.4 Properties of the Construction**
+
+The ε-NFSA produced by Thompson's Construction has a number of useful structural properties: it has at most $2n$ states for a regular expression of length $n$; each state has at most two outgoing $\epsilon$-transitions; and no $\epsilon$-transition ever enters the overall start state or leaves the overall accepting state. These properties guarantee that composition steps remain well-defined at every level of recursion.
+
+##### **1.2 Kleene's Algorithm: From FSA to Regular Expression**
+
+###### **1.2.1 Overview**
+
+The converse problem — given a finite automaton, find a regular expression that describes its language — is solved by **Kleene's Algorithm** (sometimes called the *state elimination algorithm* in variants). Given an FSA $M = (Q, A, \delta, q_0, F)$ with states $Q = \{q_0, q_1, \ldots, q_n\}$, the algorithm systematically computes, for each pair $(i,j)$ and each $k$, the set $R_{ij}^{k}$:
+
+$$R_{ij}^{k} = \text{all strings that take } M \text{ from } q_i \text{ to } q_j \text{ without passing through any state with index } > k$$
+
+Each such set is represented as a regular expression. The algorithm computes these expressions step by step for $k = -1, 0, 1, \ldots, n$.
+
+Because no state has index greater than $n$, the expression $R_{0j}^{n}$ describes every string that takes $M$ from its start state $q_0$ to state $q_j$ with *no restriction on intermediate states*. If $F = \{q_{f_1}, q_{f_2}, \ldots\}$ is the set of accepting states, then:
+
+$$L(M) = R_{0f_1}^{n} \,|\, R_{0f_2}^{n} \,|\, \cdots$$
+
+###### **1.2.2 Initial Expressions ($k = -1$)**
+
+For $k = -1$, paths use no intermediate states at all — only direct transitions:
+
+$$R_{ij}^{-1} = a_1 \mid a_2 \mid \cdots \mid a_m \qquad (i \neq j), \text{ where } \delta(q_i, a_\ell) = q_j \text{ for all } \ell$$
+
+$$R_{ii}^{-1} = a_1 \mid \cdots \mid a_m \mid \epsilon \qquad (i = j), \text{ where } \delta(q_i, a_\ell) = q_i \text{ for all } \ell$$
+
+$$R_{ij}^{-1} = \emptyset \qquad \text{if there is no direct transition from } q_i \text{ to } q_j$$
+
+The $\epsilon$ in the self-loop case reflects the fact that zero steps (staying in $q_i$) is always possible.
+
+###### **1.2.3 Recursive Step**
+
+Once $R_{ij}^{k-1}$ has been computed for all pairs, the next level is:
+
+$$R_{ij}^{k} = R_{ik}^{k-1}\left(R_{kk}^{k-1}\right)^* R_{kj}^{k-1} \;\Big|\; R_{ij}^{k-1}$$
+
+**Intuition:** a path from $q_i$ to $q_j$ using states up to index $k$ either (a) never visits $q_k$ at all (captured by $R_{ij}^{k-1}$), or (b) reaches $q_k$ for the first time (via $R_{ik}^{k-1}$), loops through $q_k$ zero or more times (via $\left(R_{kk}^{k-1}\right)^*$), and then leaves $q_k$ for the last time toward $q_j$ (via $R_{kj}^{k-1}$).
+
+This single recurrence is the heart of the algorithm; applying it for $k = 0, 1, \ldots, n$ in order eventually produces $R_{0j}^{n}$ for every accepting state $q_j$.
+
+##### **1.3 Models for Languages: Operational vs. Generative**
+
+###### **1.3.1 Two Fundamental Paradigms**
+
+Formal languages can be described in two fundamentally different ways:
+
+*   **Operational models (automata)** receive an input string and decide whether to accept or reject it. They are recognizers or transducers. Examples: FSA, PDA, Turing Machine.
+*   **Generative models (grammars)** provide a set of rewriting rules that can be applied to derive (generate) all and only the strings of a language. A grammar does not process input — it *produces* output.
+
+Both paradigms describe the same underlying objects (formal languages), but from opposite directions. Each paradigm has advantages: automata are closer to implementation, while grammars are closer to specification.
+
+###### **1.3.2 Grammars in Parsing**
+
+In compiler construction, these two perspectives meet in **parsing**:
+
+*   A **grammar** (typically a context-free grammar or its BNF notation) *defines* the programming language syntax — it specifies what syntactically correct programs look like.
+*   An **automaton** (parser) *processes* source code — it reads the token stream and verifies that the program conforms to the grammar, recovering its syntactic structure for subsequent compilation phases.
+
+Grammars may be nondeterministic in general, but actual parser generators (e.g., LL(1), LR(1)) often impose grammar restrictions and use limited lookahead to ensure deterministic parsing.
+
+##### **1.4 Chomsky Hierarchy**
+
+###### **1.4.1 Classification of Grammars**
+
+**Noam Chomsky** (born 1928), the *father of modern linguistics*, introduced the formal classification of grammars in 1959. He observed that grammars differ in the *form* of their production rules, and that this form determines what class of languages the grammar can generate. His classification yields four nested types.
+
+```{dot}
+//| fig-cap: "Chomsky hierarchy: nested language classes with their corresponding grammar types and automata"
+//| fig-width: 6
+//| fig-height: 4.2
+digraph chomsky_h {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=ellipse, style=filled, color="#355c7d", penwidth=1.2];
+  edge [style=invis];
+
+  t0  [label="Type-0: Recursively Enumerable\nUnrestricted Grammar  ↔  Turing Machine\nα → β  (α non-empty)", fillcolor="#f9d9e2", width=5.5, height=1.3];
+  t1  [label="Type-1: Context-Sensitive\nαAβ → αγβ  ↔  Linear Bounded Automaton", fillcolor="#fff3cd", width=4.4, height=1.0];
+  t2  [label="Type-2: Context-Free\nA → γ  ↔  Nondeterministic PDA", fillcolor="#d6eef5", width=3.2, height=0.9];
+  t3  [label="Type-3: Regular\nA → aB or A → a  ↔  FSA", fillcolor="#d7f0c2", width=2.2, height=0.8];
+
+  t0 -> t1 -> t2 -> t3;
+}
+```
+
+The four types form a strict hierarchy: every regular language is context-free, every context-free language is context-sensitive, and every context-sensitive language is recursively enumerable. The inclusions are *proper* — each class contains languages not in the class below it.
+
+###### **1.4.2 The Formal Definition of a Grammar**
+
+A **grammar** is a 4-tuple $G = \langle V_N, V_T, P, S \rangle$ where:
+
+*   $V_N$ is a finite set of **nonterminal symbols** (variables);
+*   $V_T$ is a finite set of **terminal symbols** (the actual alphabet of generated strings), disjoint from $V_N$;
+*   $P$ is a finite set of **production rules** (rewriting rules);
+*   $S \in V_N$ is the **start symbol**.
+
+A **derivation** is a sequence of strings $\alpha_0 \Rightarrow \alpha_1 \Rightarrow \cdots \Rightarrow \alpha_k$ where each step replaces a substring of $\alpha_i$ according to some rule in $P$. The **language generated by $G$** is:
+
+$$L(G) = \{w \in V_T^* \mid S \Rightarrow^* w\}$$
+
+That is, the set of all terminal strings derivable from the start symbol.
+
+##### **1.5 Grammar Types in Depth**
+
+###### **1.5.1 Type-0: Unrestricted Grammars**
+
+**Type-0 (general or unrestricted) grammars** impose no restrictions on production rules beyond the one that the left-hand side must be non-empty:
+
+$$\alpha \rightarrow \beta \quad (\alpha \neq \epsilon)$$
+
+Both $\alpha$ and $\beta$ may be arbitrary strings of terminals and nonterminals. The prohibition on $\epsilon \rightarrow \beta$ simply prevents generating symbols from nothing. All other grammar types are special cases of Type-0.
+
+Type-0 grammars correspond to **Turing Machines** — they generate exactly the **recursively enumerable** languages (those that a TM can accept, though it may loop forever on strings not in the language).
+
+###### **1.5.2 Type-1: Context-Sensitive Grammars**
+
+**Type-1 (context-sensitive) grammars** require all production rules to have the form:
+
+$$\alpha A \beta \rightarrow \alpha \gamma \beta$$
+
+where $A$ is a nonterminal, $\alpha$ and $\beta$ are (possibly empty) strings, and $\gamma$ is a *non-empty* string. The key restriction is that $\gamma$ must be non-empty — rules may not erase nonterminals (the grammar is *non-contracting* or *monotone*). The term *context-sensitive* reflects the fact that the nonterminal $A$ can only be rewritten in the specific context of $\alpha$ on its left and $\beta$ on its right.
+
+The canonical example is $L = \{a^n b^n c^n \mid n \geq 1\}$, which cannot be generated by any context-free grammar (intuitively: a single stack cannot count both the $a$s against $b$s and the $b$s against $c$s simultaneously). The corresponding machine model is the **Linear Bounded Automaton (LBA)**, a Turing machine whose tape head is restricted to the portion of the tape occupied by the input.
+
+**Why "linear bounded"?** The usable tape length is a linear function $f(n) = k \cdot n + c$ of the input length $n$. For instance, $f(n) = 2n$ allows two tape cells per input character. This bounded workspace corresponds precisely to the non-erasing constraint in context-sensitive grammars.
+
+###### **1.5.3 Type-2: Context-Free Grammars**
+
+**Type-2 (context-free) grammars (CFGs)** require all rules to have a single nonterminal on the left-hand side:
+
+$$A \rightarrow \gamma$$
+
+where $A \in V_N$ and $\gamma \in (V_N \cup V_T)^*$. The rewriting of $A$ is *independent of its context* — no matter what surrounds $A$ in the current string, the same set of rules applies. This is what "context-free" means.
+
+CFGs are of paramount practical importance because they are equivalent to **Backus-Naur Form (BNF)**, the notation used to specify the syntax of virtually all programming languages. The connection was discovered in 1960: the ALGOL-60 language, defined using BNF by John Backus and Peter Naur, was formally identical to Chomsky's context-free languages.
+
+**BNF** writes rules as `<LHS> ::= <RHS>`, where `<LHS>` is a nonterminal and `<RHS>` is any sequence of terminals and nonterminals. For example, the BNF rule `<expr> ::= <expr> + <term> | <term>` defines expressions as either sums or single terms.
+
+Context-free languages are recognised by **Nondeterministic Pushdown Automata (NPDAs)**. The stack provides exactly the "one level of nesting" needed to match balanced structures like parentheses or $a^n b^n$.
+
+###### **1.5.4 Type-3: Regular Grammars**
+
+**Type-3 (regular) grammars** impose the strictest constraints on production rules. All rules must be either **right-linear** or **left-linear** — but not a mix of both within the same grammar.
+
+A **right-linear grammar** allows only rules of the form:
+
+*   $A \rightarrow xB$ (a string of terminals followed by at most one nonterminal), or
+*   $A \rightarrow x$ (a string of terminals only).
+
+A **left-linear grammar** allows only rules of the form:
+
+*   $A \rightarrow Bx$, or
+*   $A \rightarrow x$.
+
+A grammar is regular if *all* its productions are right-linear, or *all* are left-linear; mixing the two orientations within one grammar is forbidden. Regular grammars generate exactly the **regular languages** — those accepted by **Finite State Automata** and described by **regular expressions**.
+
+##### **1.6 Correspondence Between Grammars and Automata**
+
+###### **1.6.1 Regular Grammars and FSAs are Equivalent**
+
+The equivalence between Regular Grammars (RGs) and FSAs is constructive in both directions.
+
+**From FSA to RG.** Given an FSA $A = \langle Q, I, \delta, q_0, F \rangle$, construct $G = \langle V_N, V_T, S, P \rangle$ as follows:
+
+*   $V_N = Q$ (each state becomes a nonterminal);
+*   $V_T = I$ (the input alphabet becomes the terminals);
+*   $S = \langle q_0 \rangle$ (the initial state becomes the start symbol);
+*   For each transition $\delta(q, i) = q'$, add rule $\langle q \rangle \rightarrow i\langle q' \rangle$;
+*   For each accepting state $q' \in F$, add rule $\langle q' \rangle \rightarrow \epsilon$.
+
+The key invariant is $\delta^*(q, x) = q'$ if and only if $\langle q \rangle \Rightarrow^* x\langle q' \rangle$.
+
+**From RG to FSA.** Given $G = \langle V_N, V_T, S, P \rangle$, construct $A = \langle Q, I, \delta, q_0, F \rangle$ as follows:
+
+*   $Q = V_N \cup \{q_F\}$ (nonterminals become states; add one extra accepting state);
+*   $I = V_T$;
+*   $q_0 = S$;
+*   $F = \{q_F\}$;
+*   For each rule $A \rightarrow bC$, add transition $\delta(A, b) = C$;
+*   For each rule $A \rightarrow b$ (no trailing nonterminal), add transition $\delta(A, b) = q_F$.
+
+This construction confirms that **Regular Grammars, Finite State Automata, and Regular Expressions** are three equivalent formalisms for describing the same family of languages.
+
+###### **1.6.2 Context-Free Grammars and NDPDAs are Equivalent**
+
+Context-free grammars are equivalent to Nondeterministic Pushdown Automata. The proof is the theoretical core of compiler construction. The intuition is as follows: an NPDA can simulate the left-most derivation of a CFG by storing the current *sentential form* on the stack. When the top of the stack is a nonterminal $A$, the NPDA non-deterministically applies one of $A$'s production rules (replacing $A$ on the stack with the right-hand side). When the top of the stack is a terminal $a$, the NPDA reads the next input symbol and checks it matches.
+
+Conversely, any NPDA can be converted to an equivalent CFG (this direction is more involved but equally constructive). Therefore:
+
+$$\text{Context-free languages} = \text{Languages accepted by NPDAs}$$
+
+###### **1.6.3 Unrestricted Grammars and Turing Machines are Equivalent**
+
+General (unrestricted) grammars and Turing Machines recognise exactly the same class of languages — the **recursively enumerable** languages. Given a general grammar, a Turing Machine can simulate derivations by non-deterministically applying production rules. Conversely, given a Turing Machine, a general grammar can encode its configuration transitions as rewriting rules. This confirms the top of the Chomsky hierarchy.
+
+###### **1.6.4 Linear Bounded Automaton**
+
+A **Linear Bounded Automaton (LBA)** is a Turing Machine with one key restriction: the read/write head is constrained to remain within the portion of the tape occupied by the input string (bounded by end-markers `[` and `]`). The machine cannot access tape cells beyond the input boundaries.
+
+The accessible tape length is a linear function of the input length $n$ — hence the name. An LBA for an input of length $n$ can use at most $c \cdot n$ tape cells for some constant $c$. This restricted workspace corresponds precisely to the non-contracting property of context-sensitive grammars. LBAs recognise exactly the **context-sensitive** languages.
+
+##### **1.7 Post Correspondence Problem**
+
+###### **1.7.1 Definition**
+
+The **Post Correspondence Problem (PCP)**, introduced by **Emil Post** in 1946, is one of the simplest examples of an undecidable problem. It is often used in computability theory as a stepping-stone for proving other problems undecidable (by reduction from PCP).
+
+**Input:** Two lists $A = (w_1, w_2, \ldots, w_k)$ and $B = (x_1, x_2, \ldots, x_k)$ of strings over some alphabet.
+
+**Question:** Does there exist a finite sequence of indices $i_1, i_2, \ldots, i_m$ (each in $\{1, \ldots, k\}$, with $m \geq 1$) such that:
+
+$$w_{i_1} w_{i_2} \cdots w_{i_m} = x_{i_1} x_{i_2} \cdots x_{i_m}$$
+
+That is, concatenating the $A$-strings in the chosen order yields the same result as concatenating the $B$-strings in the same order. A pair $(w_i, x_i)$ is called a **corresponding pair**.
+
+###### **1.7.2 The Problem is Undecidable**
+
+No algorithm can decide the Post Correspondence Problem for arbitrary inputs. This means there is no Turing Machine that, given any PCP instance $(A, B)$, always halts and outputs "yes" if a solution exists and "no" otherwise. The PCP is therefore **undecidable** (like the Halting Problem), but it has the advantage of being simple to state without reference to Turing Machines or programs.
+
+##### **1.8 Computability Theory**
+
+###### **1.8.1 The Two Central Questions**
+
+The theory of computation addresses two fundamental questions:
+
+1.  *Mathematical*: **What can be computed?** — Is there a mechanical procedure for solving this problem at all?
+2.  *Engineering*: **How efficiently can it be computed?** — How much time or memory does an algorithm require?
+
+**Computability theory** addresses the first question. It studies the limits of mechanical problem solving, identifying which problems are solvable by any computational device and which are not — regardless of how powerful the device is or how much time it is given.
+
+A useful metaphor: computability theory studies the *speed of light of computer science* — the fundamental ceiling that no computation can exceed. Just as physical laws constrain what is physically possible, computability limits what is mathematically computable.
+
+###### **1.8.2 The Church-Turing Thesis**
+
+The **Church-Turing Thesis** is the central claim of computability theory. It states (informally):
+
+> *Any function that is intuitively computable by a systematic mechanical procedure can be computed by a Turing Machine.*
+
+This is a *thesis* (not a theorem) because "intuitively computable" is not a mathematical concept. The thesis cannot be proved, only supported by evidence: every computational model ever proposed (lambda calculus, partial recursive functions, RAM machines, quantum computers, etc.) has been shown to be equivalent in expressive power to Turing Machines, or strictly weaker.
+
+The practical consequence: if we wish to show that some problem *cannot* be solved by any algorithm, it suffices to show it cannot be solved by a Turing Machine.
+
+###### **1.8.3 The Halting Problem and Undecidability**
+
+The **Halting Problem** is the question: given a program $P$ and an input $x$, does $P$ terminate (halt) when run on $x$? Alan Turing proved in 1936 that no Turing Machine can solve the Halting Problem in general — it is **undecidable**.
+
+A problem is **decidable** (also called *recursive* or *computable*) if there exists a Turing Machine that:
+
+*   halts and accepts for every input in the language, and
+*   halts and rejects for every input not in the language.
+
+A problem is **semi-decidable** (recursively enumerable) if a Turing Machine accepts every input in the language but may loop forever on inputs not in the language.
+
+A problem is **undecidable** if no Turing Machine can decide it. Undecidable problems exist; the Halting Problem and the Post Correspondence Problem are classic examples.
+
+```{dot}
+//| fig-cap: "Decidability landscape: nested classes of computational problems"
+//| fig-width: 6
+//| fig-height: 4.0
+digraph decidability {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=ellipse, style=filled, color="#355c7d", penwidth=1.2];
+  edge [style=invis];
+
+  re   [label="Recursively Enumerable (Semi-Decidable)\nHalting Problem, Post Correspondence Problem", fillcolor="#f9d9e2", width=5.8, height=1.2];
+  dec  [label="Decidable (Recursive)\nCFL membership, primality testing", fillcolor="#fff3cd", width=4.2, height=0.9];
+  cfl  [label="Context-Free\naⁿbⁿ membership", fillcolor="#d6eef5", width=3.0, height=0.8];
+  reg  [label="Regular\nstring matching, pattern recognition", fillcolor="#d7f0c2", width=2.2, height=0.7];
+
+  re -> dec -> cfl -> reg;
+}
+```
+
+---
+
+#### **2. Definitions**
+
+*   **Thompson's Construction**: An algorithm that converts any regular expression into an equivalent ε-NFSA by recursively building automaton fragments for each subexpression and composing them using fixed rules for concatenation, union, and Kleene star.
+*   **ε-NFSA (ε-Nondeterministic Finite State Automaton)**: An NFSA extended with ε-transitions — transitions that consume no input symbol, allowing the automaton to change state spontaneously.
+*   **Kleene's Algorithm**: An algorithm that converts a finite state automaton $M$ into a regular expression by computing, for each state pair $(i,j)$ and each intermediate-state bound $k$, the expression $R_{ij}^k$ representing all paths from $q_i$ to $q_j$ through states of index at most $k$.
+*   **Grammar**: A 4-tuple $G = \langle V_N, V_T, P, S \rangle$ specifying a set of rewriting rules (productions) over nonterminal and terminal symbols that can derive strings of a language from the start symbol $S$.
+*   **Derivation**: A sequence of strings $\alpha_0 \Rightarrow \alpha_1 \Rightarrow \cdots \Rightarrow \alpha_k$ where each step replaces a substring using one production rule. The derived language is the set of all terminal strings derivable from $S$.
+*   **Chomsky Hierarchy**: A classification of formal grammars (and the languages they generate) into four nested types — Type 0 (unrestricted), Type 1 (context-sensitive), Type 2 (context-free), and Type 3 (regular) — each corresponding to a class of automata.
+*   **Unrestricted Grammar (Type-0)**: A grammar with no restrictions on productions $\alpha \rightarrow \beta$ (other than $\alpha \neq \epsilon$). Equivalent in power to Turing Machines; generates recursively enumerable languages.
+*   **Context-Sensitive Grammar (Type-1)**: A grammar whose rules have the form $\alpha A \beta \rightarrow \alpha \gamma \beta$ ($\gamma \neq \epsilon$). The nonterminal $A$ is rewritten in the context of its surrounding strings. Equivalent to Linear Bounded Automata.
+*   **Context-Free Grammar (Type-2)**: A grammar whose rules have the form $A \rightarrow \gamma$ — a single nonterminal rewrites to any string, regardless of context. Equivalent to Nondeterministic Pushdown Automata.
+*   **Backus-Naur Form (BNF)**: A notation for context-free grammars used to specify programming language syntax, writing rules as `<nonterminal> ::= <RHS>`. Formally equivalent to CFGs.
+*   **Regular Grammar (Type-3)**: A grammar whose rules are all right-linear ($A \rightarrow xB$ or $A \rightarrow x$) or all left-linear ($A \rightarrow Bx$ or $A \rightarrow x$); mixing orientations is forbidden. Equivalent to FSAs and regular expressions.
+*   **Right-linear Grammar**: A grammar where every rule has the form $A \rightarrow xB$ or $A \rightarrow x$; the nonterminal (if any) always appears at the *right* end of the right-hand side.
+*   **Left-linear Grammar**: A grammar where every rule has the form $A \rightarrow Bx$ or $A \rightarrow x$; the nonterminal (if any) always appears at the *left* end of the right-hand side.
+*   **Linear Bounded Automaton (LBA)**: A Turing Machine whose read/write head is restricted to the tape cells occupied by the input (bounded by end-markers). LBAs recognise exactly the context-sensitive languages.
+*   **Parsing**: The process of using an automaton (parser) to verify that an input string (program) conforms to a grammar (language specification) and to recover its syntactic structure.
+*   **Post Correspondence Problem (PCP)**: The problem of determining, given two equal-length lists of strings $A$ and $B$, whether there exists a finite sequence of indices such that concatenating the $A$-strings in that order equals concatenating the $B$-strings in the same order. The PCP is undecidable.
+*   **Computability Theory**: The branch of theoretical computer science that studies which problems can (and cannot) be solved by any mechanical computational procedure, regardless of time or memory.
+*   **Decidable Problem**: A problem for which there exists a Turing Machine that always halts and correctly answers "yes" or "no" for every input.
+*   **Semi-decidable Problem**: A problem for which a Turing Machine accepts every positive instance but may loop forever on negative instances. Also called recursively enumerable.
+*   **Undecidable Problem**: A problem for which no Turing Machine can decide it. No algorithm exists that correctly answers all instances.
+*   **Church-Turing Thesis**: The claim that every intuitively computable function can be computed by a Turing Machine — equivalently, that Turing Machines capture the full extent of mechanical computation.
+
+---
+
+#### **3. Formulas**
+
+*   **Kleene's Algorithm — initial step ($k = -1$):**
+    $$R_{ij}^{-1} = \begin{cases} a_1 \mid \cdots \mid a_m & i \neq j,\ \delta(q_i, a_\ell) = q_j \\ a_1 \mid \cdots \mid a_m \mid \epsilon & i = j,\ \delta(q_i, a_\ell) = q_i \\ \emptyset & \text{no direct transition from } q_i \text{ to } q_j \end{cases}$$
+*   **Kleene's Algorithm — recursive step:**
+    $$R_{ij}^{k} = R_{ik}^{k-1}\left(R_{kk}^{k-1}\right)^* R_{kj}^{k-1} \;\Big|\; R_{ij}^{k-1}$$
+*   **Language accepted by FSA via Kleene:**
+    $$L(M) = \bigcup_{q_f \in F} R_{0f}^{n}$$
+*   **Thompson's Construction — Union:**
+    $$N(s\,|\,t): \text{new start} \xrightarrow{\epsilon} N(s) \text{ and } \xrightarrow{\epsilon} N(t); \text{ both accepting states} \xrightarrow{\epsilon} \text{new accept}$$
+*   **Thompson's Construction — Kleene Star:**
+    $$N(s^*): \text{new start} \xrightarrow{\epsilon} N(s) \xrightarrow{\epsilon} \text{loop back}; \text{ plus bypass } \xrightarrow{\epsilon} \text{new accept}$$
+
+---
+
+#### **4. Examples**
+
+##### **4.1. Construct ε-NFSA for $(1 \mid 01)^*$** (Lab 11, Example 1)
+
+Build the ε-NFSA for the regular expression $(1 \mid 01)^*$ using Thompson's Construction.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1 — Build $N(1)$.**  The symbol $1$ maps to a two-state automaton:
+
+```{dot}
+//| fig-cap: "N(1): automaton for the symbol 1"
+//| fig-width: 3
+//| fig-height: 1.0
+digraph n1 {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q1 [label="q₁"]; f1 [label="f₁", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q1; q1 -> f1 [label="1"];
+}
+```
+
+**Step 2 — Build $N(0)$.**  Similarly for the symbol $0$:
+
+```{dot}
+//| fig-cap: "N(0): automaton for the symbol 0"
+//| fig-width: 3
+//| fig-height: 1.0
+digraph n0 {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q0 [label="q₀"]; f0 [label="f₀", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0; q0 -> f0 [label="0"];
+}
+```
+
+**Step 3 — Build $N(01)$ by concatenation.**  Merge $f_0$ with $q_1$:
+
+```{dot}
+//| fig-cap: "N(01): concatenation of N(0) and N(1)"
+//| fig-width: 4.5
+//| fig-height: 1.0
+digraph n01 {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q0  [label="q₀"];
+  mid [label="f₀/q₁", fillcolor="#fff3cd"];
+  f1  [label="f₁", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0; q0 -> mid [label="0"]; mid -> f1 [label="1"];
+}
+```
+
+**Step 4 — Build $N(1 \mid 01)$ by union.**  Introduce a new start state $q'$ with $\epsilon$-transitions into $N(1)$ and $N(01)$, and a new accepting state $f$ with $\epsilon$-transitions from both accepting states:
+
+The resulting automaton has states $\{q', q_1, f_1', q_0, f_0q_1, f_1, f\}$ with:
+
+*   $q' \xrightarrow{\epsilon} q_1 \xrightarrow{1} f_1' \xrightarrow{\epsilon} f$ (the $N(1)$ branch);
+*   $q' \xrightarrow{\epsilon} q_0 \xrightarrow{0} f_0q_1 \xrightarrow{1} f_1 \xrightarrow{\epsilon} f$ (the $N(01)$ branch).
+
+**Step 5 — Apply Kleene star.**  Introduce a new start state $q''$ and new accepting state $f'$:
+
+*   $q'' \xrightarrow{\epsilon} q'$ (enter the union automaton);
+*   $f \xrightarrow{\epsilon} q'$ (loop back for another repetition);
+*   $q'' \xrightarrow{\epsilon} f'$ (bypass for zero repetitions);
+*   $f \xrightarrow{\epsilon} f'$ (accept after one or more repetitions).
+
+```{dot}
+//| fig-cap: "Complete N((1|01)*): full ε-NFSA produced by Thompson's Construction"
+//| fig-width: 8
+//| fig-height: 3.0
+digraph n1or01star {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  qpp  [label="q''"];
+  qp   [label="q'"];
+  q1   [label="q₁"];
+  fp1  [label="f'₁"];
+  q0   [label="q₀"];
+  mid  [label="f₀q₁", fillcolor="#fff3cd"];
+  f1   [label="f₁"];
+  f    [label="f",    fillcolor="#fff3cd"];
+  fp   [label="f'",  shape=doublecircle, fillcolor="#d7f0c2"];
+
+  start -> qpp;
+  qpp -> qp  [label="ε"];
+  qp  -> q1  [label="ε"];
+  qp  -> q0  [label="ε"];
+  q1  -> fp1 [label="1"];
+  q0  -> mid [label="0"];
+  mid -> f1  [label="1"];
+  fp1 -> f   [label="ε"];
+  f1  -> f   [label="ε"];
+  f   -> qp  [label="ε", style=dashed, constraint=false];
+  f   -> fp  [label="ε"];
+  qpp -> fp  [label="ε", style=dashed, constraint=false];
+}
+```
+
+**Answer:** The ε-NFSA has 9 states and recognises exactly $L((1 \mid 01)^*)$ — all strings formed by concatenating zero or more words from $\{1, 01\}$.
+
+</details>
+
+##### **4.2. Apply Kleene's Algorithm to a 2-State FSA** (Lab 11, Example 2)
+
+Find a regular expression for the language accepted by the FSA with states $\{q_0, q_1\}$, where $q_0$ is both the start state and the only accepting state, and transitions are:
+$\delta(q_0, 0) = q_0$, $\delta(q_0, 1) = q_1$, $\delta(q_1, 0) = q_0$.
+
+```{dot}
+//| fig-cap: "The 2-state FSA for Kleene's Algorithm example"
+//| fig-width: 4
+//| fig-height: 1.6
+digraph kleene_ex {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q0 [label="q₀", shape=doublecircle, fillcolor="#d7f0c2"];
+  q1 [label="q₁"];
+  start -> q0;
+  q0 -> q0 [label="0"];
+  q0 -> q1 [label="1"];
+  q1 -> q0 [label="0"];
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step $k = -1$ (initial expressions).**
+
+Inspect each pair of states:
+
+*   $R_{00}^{-1}$: from $q_0$ to $q_0$, direct transitions. $\delta(q_0, 0) = q_0$, so the symbol $0$ is a self-loop. Since $i = j$: $R_{00}^{-1} = 0 \mid \epsilon$.
+*   $R_{01}^{-1}$: from $q_0$ to $q_1$, direct transitions. $\delta(q_0, 1) = q_1$: $R_{01}^{-1} = 1$.
+*   $R_{10}^{-1}$: from $q_1$ to $q_0$, direct transitions. $\delta(q_1, 0) = q_0$: $R_{10}^{-1} = 0$.
+*   $R_{11}^{-1}$: from $q_1$ to $q_1$, no self-loop transition. Since $i = j$ and no real symbol loops: $R_{11}^{-1} = \epsilon$.
+
+**Step $k = 0$ (allow intermediate state $q_0$).**
+
+Apply the recurrence $R_{ij}^{0} = R_{i0}^{-1}(R_{00}^{-1})^* R_{0j}^{-1} \mid R_{ij}^{-1}$.
+
+*   $R_{00}^{0} = (0 \mid \epsilon)(0 \mid \epsilon)^*(0 \mid \epsilon) \mid (0 \mid \epsilon) = 0^*$
+
+    **Simplification:** $(0 \mid \epsilon)^* = 0^*$, and $(0 \mid \epsilon) \cdot 0^* \cdot (0 \mid \epsilon) \cup (0 \mid \epsilon) = 0^*$. Any finite number of $0$s is accepted, including zero.
+*   $R_{01}^{0} = (0 \mid \epsilon)(0 \mid \epsilon)^* \cdot 1 \mid 1 = 0^*1$
+
+    Going from $q_0$ to $q_0$ (possibly looping) and then taking the $1$-transition to $q_1$.
+*   $R_{10}^{0} = 0 \cdot (0 \mid \epsilon)^* \cdot (0 \mid \epsilon) \mid 0 = 00^*$
+
+    Taking the $0$-transition from $q_1$ to $q_0$, then optionally looping in $q_0$.
+*   $R_{11}^{0} = 0(0 \mid \epsilon)^* \cdot 1 \mid \epsilon = 00^*1 \mid \epsilon$
+
+    Reaching $q_0$ via $0$, looping, then going back to $q_1$ via $1$; or staying in $q_1$ with zero moves.
+
+**Step $k = 1$ (allow intermediate state $q_1$).**
+
+The only accepting state is $q_0$, so we only need $R_{00}^{1}$. Apply:
+
+$$R_{00}^{1} = R_{01}^{0}(R_{11}^{0})^* R_{10}^{0} \mid R_{00}^{0}$$
+
+Substituting:
+
+$$R_{00}^{1} = (0^*1)(00^*1 \mid \epsilon)^*(00^*) \mid 0^*$$
+
+**Simplification:** $(00^*1 \mid \epsilon)^* = (00^*1)^*$ (since any sequence of the pattern $00^*1$ including zero repetitions). Also $00^* = 0^+$. So:
+
+$$R_{00}^{1} = 0^*1(00^*1)^*00^* \mid 0^* = 0^*1(00^*1)^*0^+ \mid 0^*$$
+
+Since $F = \{q_0\}$ and $n = 1$ (two states, indexed $0$ and $1$), the final answer is $R_{00}^{1}$:
+
+$$L(M) = 0^*1(0^+1)^*0^+ \mid 0^*$$
+
+**Interpretation:** the language consists of all strings of $0$s and $1$s that either (a) contain only $0$s (ending in $q_0$ by looping), or (b) contain at least one $1$ and end with a block of $0$s — strings that always return to $q_0$ before the end.
+
+</details>
+
+##### **4.3. Build ε-NFSA for $01^*$** (Lab 11, Task 1)
+
+Using Thompson's Construction, build an ε-NFSA for the regular expression $01^*$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1 — Build $N(0)$:** a two-state automaton with a $0$-transition.
+
+**Step 2 — Build $N(1)$:** a two-state automaton with a $1$-transition.
+
+**Step 3 — Build $N(1^*)$ by Kleene star.**  Introduce new start $q_s$ and new accept $f_s$:
+
+*   $q_s \xrightarrow{\epsilon} q_1 \xrightarrow{1} f_1 \xrightarrow{\epsilon} q_1$ (loop);
+*   $f_1 \xrightarrow{\epsilon} f_s$ (exit);
+*   $q_s \xrightarrow{\epsilon} f_s$ (bypass for zero $1$s).
+
+**Step 4 — Build $N(01^*)$ by concatenation.**  Chain $N(0)$ into $N(1^*)$ by merging the accepting state of $N(0)$ with the start state of $N(1^*)$:
+
+$$q_0 \xrightarrow{0} f_0/q_s \xrightarrow{\epsilon} q_1 \xrightarrow{1} f_1 \xrightarrow{\epsilon} q_1 \text{ (loop)}, \quad f_1 \xrightarrow{\epsilon} f_s, \quad f_0/q_s \xrightarrow{\epsilon} f_s$$
+
+```{dot}
+//| fig-cap: "ε-NFSA for 01*: a 0-transition followed by zero or more 1-transitions"
+//| fig-width: 6.5
+//| fig-height: 1.6
+digraph nfa_01star {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q0  [label="q₀"];
+  qs  [label="f₀/qₛ", fillcolor="#fff3cd"];
+  q1  [label="q₁"];
+  f1  [label="f₁",   fillcolor="#fff3cd"];
+  fs  [label="fₛ",   shape=doublecircle, fillcolor="#d7f0c2"];
+
+  start -> q0;
+  q0  -> qs  [label="0"];
+  qs  -> q1  [label="ε"];
+  qs  -> fs  [label="ε"];
+  q1  -> f1  [label="1"];
+  f1  -> q1  [label="ε", style=dashed];
+  f1  -> fs  [label="ε"];
+}
+```
+
+The automaton accepts exactly the strings $\{0, 01, 011, 0111, \ldots\} = \{01^n \mid n \geq 0\}$.
+
+</details>
+
+##### **4.4. Build ε-NFSA for $(0 \mid 1)01$** (Lab 11, Task 2)
+
+Using Thompson's Construction, build an ε-NFSA for the regular expression $(0 \mid 1)01$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1 — Build $N(0 \mid 1)$ by union.**  Introduce start $q_u$ with $\epsilon$-transitions to $N(0)$ and $N(1)$, and accept $f_u$ with $\epsilon$-transitions from both:
+
+$$q_u \xrightarrow{\epsilon} q_0 \xrightarrow{0} f_0 \xrightarrow{\epsilon} f_u, \quad q_u \xrightarrow{\epsilon} q_1 \xrightarrow{1} f_1 \xrightarrow{\epsilon} f_u$$
+
+**Step 2 — Build $N((0 \mid 1)01)$ by concatenating with $N(0)$ and then $N(1)$.**
+
+Chain: the accepting state of $N(0 \mid 1)$ connects to the start of $N(0)$, which connects to $N(1)$:
+
+$$\underbrace{q_u \xrightarrow{\epsilon} \{\ldots\} \xrightarrow{\epsilon} f_u}_{N(0|1)} \xrightarrow{\text{ε (merge)}} q_0' \xrightarrow{0} f_0' \xrightarrow{\text{ε (merge)}} q_1' \xrightarrow{1} f_1'$$
+
+The full automaton:
+1. Start at $q_u$.
+2. Non-deterministically read $0$ or $1$ (the union fragment), reaching $f_u$.
+3. Read $0$, reaching an intermediate state.
+4. Read $1$, reaching the accepting state $f_1'$.
+
+The automaton accepts strings of length 3 of the form $(0 \text{ or } 1)$ followed by $01$: the language $L = \{001, 101\}$.
+
+</details>
+
+##### **4.5. Build ε-NFSA for $00(0 \mid 1)^*$** (Lab 11, Task 3)
+
+Using Thompson's Construction, build an ε-NFSA for $00(0 \mid 1)^*$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1 — Build $N(0)$ twice** (two separate fragments for the leading $00$).
+
+**Step 2 — Build $N(0 \mid 1)$** using the union rule (same as Task 2, Step 1).
+
+**Step 3 — Build $N((0 \mid 1)^*)$** using the Kleene star rule: introduce $q_s \xrightarrow{\epsilon} q_u \xrightarrow{\ldots} f_u \xrightarrow{\epsilon} q_u$ (loop) and $q_s \xrightarrow{\epsilon} f_s$, $f_u \xrightarrow{\epsilon} f_s$.
+
+**Step 4 — Build $N(00(0 \mid 1)^*)$** by concatenating $N(0)$, $N(0)$, and $N((0 \mid 1)^*)$:
+
+$$q_{01} \xrightarrow{0} f_{01}/q_{02} \xrightarrow{0} f_{02}/q_s \xrightarrow{\epsilon} N((0\mid1)^*) \text{ accepting at } f_s$$
+
+```{dot}
+//| fig-cap: "ε-NFSA for 00(0|1)*: two leading 0-transitions then a loop accepting any binary suffix"
+//| fig-width: 8
+//| fig-height: 2.6
+digraph nfa_00any {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+
+  q01 [label="q₁"];
+  q02 [label="q₂", fillcolor="#fff3cd"];
+  qs  [label="q₃", fillcolor="#fff3cd"];
+  qu  [label="q₄"];
+  q0l [label="q₅"];
+  f0l [label="f₅"];
+  q1l [label="q₆"];
+  f1l [label="f₆"];
+  fu  [label="f₄",  fillcolor="#fff3cd"];
+  fs  [label="fₛ",  shape=doublecircle, fillcolor="#d7f0c2"];
+
+  start -> q01;
+  q01  -> q02  [label="0"];
+  q02  -> qs   [label="0"];
+  qs   -> qu   [label="ε"];
+  qs   -> fs   [label="ε"];
+  qu   -> q0l  [label="ε"];
+  qu   -> q1l  [label="ε"];
+  q0l  -> f0l  [label="0"];
+  q1l  -> f1l  [label="1"];
+  f0l  -> fu   [label="ε"];
+  f1l  -> fu   [label="ε"];
+  fu   -> qu   [label="ε", style=dashed];
+  fu   -> fs   [label="ε"];
+}
+```
+
+The automaton accepts all strings starting with $00$ followed by any (possibly empty) binary string — i.e., $L = \{00w \mid w \in \{0,1\}^*\}$.
+
+</details>
+
+##### **4.6. Apply Kleene's Algorithm to FSA 1** (Lab 11, Task 4)
+
+Find a regular expression for the FSA with states $\{q_0, q_1\}$, where $q_1$ is the only accepting state, and transitions: $\delta(q_0, 1) = q_0$ (self-loop), $\delta(q_0, 0) = q_1$, $\delta(q_1, 0) = q_1$ (self-loop).
+
+```{dot}
+//| fig-cap: "FSA for Task 4: accepting state q₁"
+//| fig-width: 4
+//| fig-height: 1.6
+digraph fsa_t4 {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q0 [label="q₀"];
+  q1 [label="q₁", shape=doublecircle, fillcolor="#d7f0c2"];
+  start -> q0;
+  q0 -> q0 [label="1"];
+  q0 -> q1 [label="0"];
+  q1 -> q1 [label="0"];
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step $k = -1$:**
+
+*   $R_{00}^{-1} = 1 \mid \epsilon$ (self-loop on $1$, plus $\epsilon$ for staying).
+*   $R_{01}^{-1} = 0$ (direct $0$-transition to $q_1$).
+*   $R_{10}^{-1} = \emptyset$ (no transition from $q_1$ to $q_0$).
+*   $R_{11}^{-1} = 0 \mid \epsilon$ (self-loop on $0$).
+
+**Step $k = 0$ (allow intermediate $q_0$):**
+
+$$R_{01}^{0} = R_{00}^{-1}(R_{00}^{-1})^* R_{01}^{-1} \mid R_{01}^{-1} = (1 \mid \epsilon)(1 \mid \epsilon)^* 0 \mid 0 = 1^*0$$
+
+$$R_{11}^{0} = R_{10}^{-1}(R_{00}^{-1})^* R_{01}^{-1} \mid R_{11}^{-1} = \emptyset \cdot (\ldots) \mid (0 \mid \epsilon) = 0 \mid \epsilon$$
+
+**Step $k = 1$ (allow intermediate $q_1$):**
+
+We need $R_{01}^{1}$ (path from start $q_0$ to accept $q_1$):
+
+$$R_{01}^{1} = R_{01}^{0}(R_{11}^{0})^* R_{11}^{0} \mid R_{01}^{0} = 1^*0 \cdot (0 \mid \epsilon)^* \cdot (0 \mid \epsilon) \mid 1^*0 = 1^*00^*$$
+
+Since $F = \{q_1\}$: $L(M) = R_{01}^{1} = 1^*00^*$.
+
+**Interpretation:** the language is all strings of the form (zero or more $1$s), then (one or more $0$s). The automaton accepts strings that consist of any number of leading $1$s followed by at least one $0$.
+
+</details>
+
+##### **4.7. Apply Kleene's Algorithm to FSA 2** (Lab 11, Task 5)
+
+Find a regular expression for the FSA with states $\{q_0, q_1\}$, where $q_0$ is the start and only accepting state, and transitions: $\delta(q_0, 0) = q_0$ (self-loop), $\delta(q_0, 1) = q_1$, $\delta(q_1, 0) = q_1$ (self-loop), $\delta(q_1, 1) = q_0$.
+
+```{dot}
+//| fig-cap: "FSA for Task 5: accepting state q₀"
+//| fig-width: 4.5
+//| fig-height: 1.8
+digraph fsa_t5 {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q0 [label="q₀", shape=doublecircle, fillcolor="#d7f0c2"];
+  q1 [label="q₁"];
+  start -> q0;
+  q0 -> q0 [label="0"];
+  q0 -> q1 [label="1"];
+  q1 -> q1 [label="0"];
+  q1 -> q0 [label="1"];
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step $k = -1$:**
+
+*   $R_{00}^{-1} = 0 \mid \epsilon$
+*   $R_{01}^{-1} = 1$
+*   $R_{10}^{-1} = 1$
+*   $R_{11}^{-1} = 0 \mid \epsilon$
+
+**Step $k = 0$:**
+
+$$R_{00}^{0} = (0 \mid \epsilon)(0 \mid \epsilon)^*(0 \mid \epsilon) \mid (0 \mid \epsilon) = 0^*$$
+
+$$R_{01}^{0} = (0 \mid \epsilon)(0 \mid \epsilon)^* \cdot 1 \mid 1 = 0^*1$$
+
+$$R_{10}^{0} = 1 \cdot (0 \mid \epsilon)^* \cdot (0 \mid \epsilon) \mid 1 = 10^*$$
+
+$$R_{11}^{0} = 1 \cdot (0 \mid \epsilon)^* \cdot 1 \mid (0 \mid \epsilon) = 10^*1 \mid 0 \mid \epsilon$$
+
+**Step $k = 1$:**
+
+$$R_{00}^{1} = R_{01}^{0}(R_{11}^{0})^* R_{10}^{0} \mid R_{00}^{0}$$
+$$= 0^*1 \cdot (10^*1 \mid 0 \mid \epsilon)^* \cdot 10^* \mid 0^*$$
+
+Since $F = \{q_0\}$: $L(M) = 0^*1(10^*1 \mid 0)^* 10^* \mid 0^*$.
+
+**Interpretation:** the automaton is in $q_0$ whenever it has read an *even* number of $1$s (and any number of $0$s between them). The language is exactly all binary strings with an *even number of $1$s*.
+
+</details>
+
+##### **4.8. Regular Expression for 3-State FSA** (Homework 11, Task 1)
+
+Find a regular expression that describes the language accepted by the FSA with states $\{q_0, q_1, q_2\}$, where $q_0$ is both the start state and only accepting state, and transitions: $\delta(q_0, 1) = q_0$ (self-loop), $\delta(q_0, 0) = q_1$, $\delta(q_1, 0) = q_1$ (self-loop), $\delta(q_1, 1) = q_2$, $\delta(q_2, 0) = q_1$, $\delta(q_2, 1) = q_1$.
+
+```{dot}
+//| fig-cap: "3-state FSA for Homework Task 1"
+//| fig-width: 5.5
+//| fig-height: 2.0
+digraph hw_fsa {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=11, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=10, color="#355c7d"];
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  q0 [label="q₀", shape=doublecircle, fillcolor="#d7f0c2"];
+  q1 [label="q₁"];
+  q2 [label="q₂"];
+  start -> q0;
+  q0 -> q0 [label="1"];
+  q0 -> q1 [label="0"];
+  q1 -> q1 [label="0"];
+  q1 -> q2 [label="1"];
+  q2 -> q1 [label="0, 1"];
+}
+```
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step $k = -1$:**
+
+*   $R_{00}^{-1} = 1 \mid \epsilon$
+*   $R_{01}^{-1} = 0$
+*   $R_{02}^{-1} = \emptyset$
+*   $R_{10}^{-1} = \emptyset$
+*   $R_{11}^{-1} = 0 \mid \epsilon$
+*   $R_{12}^{-1} = 1$
+*   $R_{20}^{-1} = \emptyset$
+*   $R_{21}^{-1} = 0 \mid 1$ (both $0$ and $1$ go from $q_2$ to $q_1$)
+*   $R_{22}^{-1} = \epsilon$
+
+**Step $k = 0$ (allow $q_0$):**
+
+Since $R_{10}^{-1} = \emptyset$ and $R_{20}^{-1} = \emptyset$, any path using $q_0$ as intermediate from $q_1$ or $q_2$ back contributes $\emptyset$. So:
+
+*   $R_{00}^{0} = 1^*$
+*   $R_{01}^{0} = 1^*0$
+*   $R_{02}^{0} = \emptyset$
+*   $R_{10}^{0} = \emptyset$
+*   $R_{11}^{0} = R_{10}^{-1}(R_{00}^{-1})^* R_{01}^{-1} \mid R_{11}^{-1} = \emptyset \mid (0 \mid \epsilon) = 0 \mid \epsilon$
+*   $R_{12}^{0} = R_{10}^{-1}(R_{00}^{-1})^* R_{02}^{-1} \mid R_{12}^{-1} = \emptyset \mid 1 = 1$
+*   $R_{21}^{0} = R_{20}^{-1}(R_{00}^{-1})^* R_{01}^{-1} \mid R_{21}^{-1} = \emptyset \mid (0 \mid 1) = 0 \mid 1$
+*   $R_{22}^{0} = R_{20}^{-1}(R_{00}^{-1})^* R_{02}^{-1} \mid R_{22}^{-1} = \emptyset \mid \epsilon = \epsilon$
+
+**Step $k = 1$ (allow $q_0$ and $q_1$):**
+
+$R_{11}^{1} = R_{11}^{0}(R_{11}^{0})^* R_{11}^{0} \mid R_{11}^{0} = (0 \mid \epsilon)(0 \mid \epsilon)^*(0 \mid \epsilon) \mid (0 \mid \epsilon) = 0^*$
+
+$R_{12}^{1} = R_{11}^{0}(R_{11}^{0})^* R_{12}^{0} \mid R_{12}^{0} = (0 \mid \epsilon)(0 \mid \epsilon)^* \cdot 1 \mid 1 = 0^*1$
+
+$R_{21}^{1} = R_{21}^{0}(R_{11}^{0})^* R_{11}^{0} \mid R_{21}^{0} = (0 \mid 1)(0 \mid \epsilon)^*(0 \mid \epsilon) \mid (0 \mid 1) = (0 \mid 1)0^*$
+
+$R_{22}^{1} = R_{21}^{0}(R_{11}^{0})^* R_{12}^{0} \mid R_{22}^{0} = (0 \mid 1)(0 \mid \epsilon)^* \cdot 1 \mid \epsilon = (0 \mid 1)0^*1 \mid \epsilon$
+
+$R_{01}^{1} = R_{01}^{0}(R_{11}^{0})^* R_{11}^{0} \mid R_{01}^{0} = 1^*0 \cdot (0 \mid \epsilon)^* \cdot (0 \mid \epsilon) \mid 1^*0 = 1^*00^*$
+
+$R_{02}^{1} = R_{01}^{0}(R_{11}^{0})^* R_{12}^{0} \mid R_{02}^{0} = 1^*0 \cdot (0 \mid \epsilon)^* \cdot 1 \mid \emptyset = 1^*00^*1$
+
+**Step $k = 2$ (allow all states; we need $R_{00}^{2}$):**
+
+$$R_{00}^{2} = R_{02}^{1}(R_{22}^{1})^* R_{20}^{1} \mid R_{00}^{1}$$
+
+First compute $R_{20}^{1}$:
+$R_{20}^{1} = R_{21}^{0}(R_{11}^{0})^* R_{10}^{0} \mid R_{20}^{0} = (0 \mid 1)(0 \mid \epsilon)^* \cdot \emptyset \mid \emptyset = \emptyset$
+
+And $R_{00}^{1} = R_{01}^{0}(R_{11}^{0})^* R_{10}^{0} \mid R_{00}^{0} = 1^*0 \cdot (0 \mid \epsilon)^* \cdot \emptyset \mid 1^* = 1^*$
+
+Since $R_{20}^{1} = \emptyset$, the product $R_{02}^{1}(R_{22}^{1})^* R_{20}^{1} = \emptyset$. Therefore:
+
+$$R_{00}^{2} = \emptyset \mid 1^* = 1^*$$
+
+**Answer:** $L(M) = 1^*$.
+
+**Interpretation:** the only strings accepted are sequences of $1$s (including the empty string). Any $0$ immediately takes the automaton out of the accepting state $q_0$, and there is no way back to $q_0$ from $q_1$ or $q_2$. The accepting state $q_0$ can only be revisited via a path $q_0 \xrightarrow{0} q_1 \xrightarrow{1} q_2 \xrightarrow{0|1} q_1 \xrightarrow{\ldots}$, which never returns to $q_0$. So only pure strings of $1$s are accepted.
+
+</details>
+
+##### **4.9. Build ε-NFSA for $(11)^*(0 \mid 1)$** (Homework 11, Task 2)
+
+Using Thompson's Construction, build an ε-NFSA for $(11)^*(0 \mid 1)$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Step 1 — Build $N(1)$** (two-state, $1$-transition).
+
+**Step 2 — Build $N(11)$ by concatenation** of two copies of $N(1)$:
+
+$$q_a \xrightarrow{1} f_a/q_b \xrightarrow{1} f_b$$
+
+**Step 3 — Build $N((11)^*)$ by Kleene star:**
+
+Introduce $q_s$ and $f_s$:
+
+*   $q_s \xrightarrow{\epsilon} q_a \xrightarrow{1} f_a/q_b \xrightarrow{1} f_b \xrightarrow{\epsilon} q_a$ (loop);
+*   $f_b \xrightarrow{\epsilon} f_s$ (exit);
+*   $q_s \xrightarrow{\epsilon} f_s$ (bypass).
+
+**Step 4 — Build $N(0 \mid 1)$ by union:**
+
+$$q_u \xrightarrow{\epsilon} q_0' \xrightarrow{0} f_0' \xrightarrow{\epsilon} f_u, \quad q_u \xrightarrow{\epsilon} q_1' \xrightarrow{1} f_1' \xrightarrow{\epsilon} f_u$$
+
+**Step 5 — Concatenate $N((11)^*)$ and $N(0 \mid 1)$:**
+
+Merge $f_s$ with $q_u$. The final automaton has 10 states.
+
+```{dot}
+//| fig-cap: "ε-NFSA for (11)*(0|1): any even number of 1s followed by a single 0 or 1"
+//| fig-width: 9
+//| fig-height: 2.8
+digraph nfa_11star01 {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+
+  start [shape=point, width=0.15, fillcolor="#355c7d", color="#355c7d"];
+  qs  [label="qₛ"];
+  qa  [label="qₐ"];
+  mid [label="fₐ/q_b", fillcolor="#fff3cd"];
+  fb  [label="f_b", fillcolor="#fff3cd"];
+  qu  [label="fₛ/q_u", fillcolor="#fff3cd"];
+  q0p [label="q₀'"];
+  f0p [label="f₀'"];
+  q1p [label="q₁'"];
+  f1p [label="f₁'"];
+  fu  [label="f_u", shape=doublecircle, fillcolor="#d7f0c2"];
+
+  start -> qs;
+  qs  -> qa  [label="ε"];
+  qs  -> qu  [label="ε"];
+  qa  -> mid [label="1"];
+  mid -> fb  [label="1"];
+  fb  -> qa  [label="ε", style=dashed];
+  fb  -> qu  [label="ε"];
+  qu  -> q0p [label="ε"];
+  qu  -> q1p [label="ε"];
+  q0p -> f0p [label="0"];
+  q1p -> f1p [label="1"];
+  f0p -> fu  [label="ε"];
+  f1p -> fu  [label="ε"];
+}
+```
+
+The automaton accepts strings consisting of an even number of $1$s (including zero) followed by a single bit: $L = \{(11)^n b \mid n \geq 0,\ b \in \{0,1\}\} = \{0, 1, 110, 111, 11110, 11111, \ldots\}$.
+
+</details>
