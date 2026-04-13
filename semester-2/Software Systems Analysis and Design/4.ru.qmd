@@ -1,0 +1,3142 @@
+---
+title: "W4. Приведения типов C++, идентификация типа, удалённые и заданные по умолчанию функции, инициализация членов, делегирующие конструкторы, указатель this, константные методы"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2026-02-11
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Проблема приведений в стиле C (C-style casts)**
+
+До **C++11** для всех преобразований типов обычно использовали **C-style casts** (**приведения в стиле C**). Но такие приведения слишком «всеядны» и почти не фиксируют *намерение* программиста в терминах языка.
+
+###### **1.1.1 Традиционная запись приведений**
+
+**C++** унаследовал от **C** две формы записи:
+
+**Запись в стиле C:**
+```cpp
+int x = (int)12.34;
+```
+
+**Функциональная запись:**
+```cpp
+int x = int(12.34);
+```
+
+Обе формы избыточно универсальны: при *одной и той же* синтаксической конструкции могут выполняться принципиально разные операции:
+
+```cpp
+int x = (int)12.34;         // Преобразование значения: меняются биты (округление)
+
+int* px = &x;
+long a = (long)px;          // Реинтерпретация: биты не «пересчитываются»
+
+Derived* pd = new Derived();
+Base* pb = (Base*)pd;       // Навигация по иерархии: нужна проверка в runtime
+```
+
+###### **1.1.2 Семантическая проблема**
+
+Корневая проблема традиционных приведений — **неоднозначность намерения** (**ambiguity of intent**). Увидев `(Type)expression`, нельзя сразу понять, какое именно преобразование имеется в виду:
+
+*   **преобразование значения** (**value conversion**)? (например, `double` → `int` с потерей данных);
+*   **реинтерпретация** (**reinterpretation**)? (например, указатель → целое без изменения битового образа);
+*   **приведение вверх/вниз по иерархии** (**upcasting/downcasting**)? (например, `Derived*` → `Base*`);
+*   **добавление/снятие const** (**constness**)? (например, `const char*` → `char*`).
+
+Из‑за этой неоднозначности код труднее читать, сопровождать и отлаживать: сложнее искать «опасные» приведения по проекту, а компилятору труднее выдавать уместные предупреждения.
+
+###### **1.1.3 Решение в C++**
+
+В **C++** ввели **четыре специализированных оператора приведения** (**cast operators**), у каждого — своя роль и более прозрачная семантика:
+
+1.  **`dynamic_cast<T>(v)`** — безопасное приведение в **runtime** с проверками;
+2.  **`static_cast<T>(v)`** — приведение на этапе компиляции без проверок в **runtime**;
+3.  **`const_cast<T>(v)`** — добавить или убрать квалификаторы **const**/**volatile**;
+4.  **`reinterpret_cast<T>(v)`** — реинтерпретировать битовый образ без его «пересчёта».
+
+У каждого оператора своя зона ответственности: код становится более самодокументируемым, а компилятор может ловить ошибки точнее.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Четыре оператора приведения C++ разводят ранее смешанные в одной записи семантики"
+%%| fig-width: 6.4
+%%| fig-height: 3.4
+flowchart TB
+    Casts["Операторы приведения C++"]
+    Dyn["dynamic_cast<br/>иерархия, проверка в runtime"]
+    Stat["static_cast<br/>преобразование на этапе компиляции"]
+    Const["const_cast<br/>const/volatile"]
+    Reint["reinterpret_cast<br/>биты / адреса как другой тип"]
+    Casts --> Dyn
+    Casts --> Stat
+    Casts --> Const
+    Casts --> Reint
+```
+
+##### **1.2 Статический и динамический тип: напоминание**
+
+Прежде чем разбирать операторы приведения, полезно зафиксировать базовое различие:
+
+**Static type** (**статический тип**) — тип, который виден в исходном коде и определяется на **compile time**:
+
+```cpp
+Circle circle;
+Shape* figure = &circle;
+```
+
+Здесь **статический тип** `figure` — это `Shape*` (как объявлено).
+
+**Dynamic type** (**динамический тип**) — фактический тип объекта в **runtime**, то есть тип того, на что реально указывает указатель/ссылка:
+
+После присваивания выше **динамический тип** `figure` соответствует объекту `Circle` (фактический тип объекта в памяти).
+
+Это различие критично, чтобы понимать, когда уместен **`dynamic_cast`**, а когда — **`static_cast`**.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Статический тип и динамический тип"
+%%| fig-width: 6
+%%| fig-height: 3
+flowchart LR
+    Decl["Shape* figure"]
+    Obj["фактический объект: Circle"]
+    Decl -- "static type" --> Shape["Shape*"]
+    Decl -- "dynamic type (runtime)" --> Obj
+```
+
+##### **1.3 `dynamic_cast`**
+
+**`dynamic_cast<T>(v)`** выполняет проверяемые в **runtime** преобразования между указателями или ссылками в иерархии наследования.
+
+###### **1.3.1 Синтаксис и требования**
+
+```cpp
+dynamic_cast<T>(v)
+```
+
+**Требования:**
+
+*   `T` должен быть типом указателя или ссылки;
+*   `v` должен быть указателем или ссылкой на объект классового типа;
+*   у базового класса должен быть **хотя бы один виртуальный метод** — это включает **RTTI** (**Run-Time Type Information**).
+
+###### **1.3.2 Как работает `dynamic_cast`**
+
+**Для указателей:** при неудаче возвращает `nullptr` (объект не имеет целевого типа).
+
+```cpp
+Base* pb = new Derived();
+Derived* pd = dynamic_cast<Derived*>(pb);
+
+if (pd != nullptr) {
+    // Приведение удалось: pb указывает на Derived
+    pd->derivedMethod();
+} else {
+    // Приведение не удалось: pb не указывает на Derived
+}
+```
+
+**Для ссылок:** при неудаче выбрасывается исключение `std::bad_cast`.
+
+```cpp
+Base& rb = /* ссылка на базовый тип */;
+try {
+    Derived& rd = dynamic_cast<Derived&>(rb);
+    // Приведение удалось
+} catch (std::bad_cast& e) {
+    // Приведение не удалось
+}
+```
+
+###### **1.3.3 Когда использовать `dynamic_cast`**
+
+Имеет смысл, когда:
+
+*   нужно безопасно выполнить **downcast** от указателя/ссылки на базовый класс к производному;
+*   вы **не уверены** в фактическом **runtime**-типе объекта;
+*   нужна проверка типа в **runtime**, чтобы предотвратить ошибки.
+
+**Пример:**
+
+```cpp
+class Base {
+public:
+    virtual void f() { }  // Нужен хотя бы один virtual
+};
+
+class Derived : public Base {
+public:
+    void derivedMethod() { cout << "Derived!" << endl; }
+};
+
+Base* pb = new Derived();
+
+// C-style cast: ОПАСНО — нет проверки в runtime
+Derived* pd1 = (Derived*)pb;  // Если pb не на Derived — UB
+
+// dynamic_cast: безопаснее — есть проверка в runtime
+Derived* pd2 = dynamic_cast<Derived*>(pb);
+if (pd2 != nullptr) {
+    pd2->derivedMethod();  // Вызов безопасен
+}
+```
+
+**Ключевое преимущество:** `dynamic_cast` выполняет проверки в **runtime**. Если `pb` не указывает на объект `Derived`, для указателя вернётся `nullptr`, а не немедленный **undefined behavior**.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "dynamic_cast проверяет runtime-тип перед downcast"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+classDiagram
+    class Base
+    class Derived
+    Base <|-- Derived
+```
+
+###### **1.3.4 Производительность**
+
+У `dynamic_cast` есть накладные расходы в **runtime**: нужно узнать фактический тип объекта. В узких по времени местах, где тип **гарантирован**, иногда берут `static_cast` — но это осознанный компромисс..
+
+##### **1.4 `static_cast`**
+
+**`static_cast<T>(v)`** выполняет преобразования, которые компилятор проверяет на **compile time**, **без** проверок в **runtime** — быстрее, но менее безопасно, чем `dynamic_cast`.
+
+###### **1.4.1 Синтаксис и требования**
+
+```cpp
+static_cast<T>(v)
+```
+
+**Требования:**
+
+*   `T` может быть указателем, ссылкой или скалярным типом;
+*   `v` может быть указателем, ссылкой или значением;
+*   **не требуется** наличие виртуальных методов у базового класса.
+
+###### **1.4.2 Как работает `static_cast`**
+
+`static_cast` описывает преобразования, которые компилятор может согласовать на **compile time**, но **без** проверки корректности в **runtime**:
+
+```cpp
+Base* pb = new Derived();
+
+Derived* pd1 = (Derived*)pb;              // C-style: без проверок
+Derived* pd2 = static_cast<Derived*>(pb); // То же по смыслу, но явнее
+```
+
+**Отличие от `dynamic_cast`:**
+
+*   **нет проверок в runtime** — оператор не «поймает» неверный **dynamic type**;
+*   **быстрее** — нет обхода иерархии типов в **runtime**;
+*   **опаснее** — если `pb` не указывает на `Derived`, поведение **не определено** (**UB**).
+
+###### **1.4.3 Типовые сценарии**
+
+**1. Числовые преобразования:**
+
+```cpp
+double d = 3.14;
+int i = static_cast<int>(d);  // Явно: возможна потеря данных
+```
+
+**2. Приведение вверх по иерархии (обычно безопасно):**
+
+```cpp
+Derived* pd = new Derived();
+Base* pb = static_cast<Base*>(pd);  // Derived → Base
+```
+
+**3. Приведение вниз (опасно без гарантий):**
+
+```cpp
+Base* pb = /* ... */;
+Derived* pd = static_cast<Derived*>(pb);  // Только если вы УВЕРЕНЫ, что pb → Derived
+```
+
+**4. Преобразования с `void*`:**
+
+```cpp
+void* vp = /* ... */;
+int* ip = static_cast<int*>(vp);
+```
+
+###### **1.4.4 Когда использовать `static_cast`**
+
+Уместно, когда:
+
+*   нужны числовые преобразования и вы хотите **явно** зафиксировать возможную потерю данных;
+*   вы **уверены** в **dynamic type** (например, только что создали объект нужного типа);
+*   критична производительность и типовая безопасность обеспечивается логикой программы;
+*   нужно приводить к/от `void*`.
+
+**Практическое правило:** если нет **100%** уверенности в типе, для **downcast** предпочтительнее `dynamic_cast`.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "dynamic_cast и static_cast при downcast"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+flowchart LR
+    BasePtr["Base* pb"]
+    Dyn["dynamic_cast<Derived*>(pb)<br/>безопаснее, с проверкой"]
+    Stat["static_cast<Derived*>(pb)<br/>быстрее, без проверки"]
+    BasePtr --> Dyn
+    BasePtr --> Stat
+```
+
+##### **1.5 `const_cast`**
+
+**`const_cast<T>(v)`** добавляет или убирает квалификаторы **const** (или **volatile**). Это **единственный** оператор приведения, который может **снять constness**.
+
+###### **1.5.1 Базовый синтаксис**
+
+```cpp
+const_cast<T>(v)
+```
+
+*   используется, чтобы убрать или добавить квалификаторы `const` / `volatile`;
+*   «вычислений» в **runtime** не делает — это конструкция системы типов на этапе компиляции;
+*   битовый образ объекта не меняет — меняется лишь *тип* в смысле правил языка.
+
+###### **1.5.2 Типовой случай: старый API без `const`**
+
+Иногда нужно передать `const`-объект в функцию, которая принимает неконстантный указатель, хотя по смыслу данные не меняет:
+
+```cpp
+const char* str = "abcdef";
+
+void legacyFunction(char* s);  // Старый API: s не меняется, но const нет
+
+// Ошибка: нельзя передать const char* туда, где ожидается char*
+// legacyFunction(str);
+
+// OK: снять const через const_cast
+legacyFunction(const_cast<char*>(str));
+```
+
+**⚠️ Внимание:** это **небезопасно**, если `legacyFunction` всё-таки **пишет** в буфер:
+
+*   если объект изначально был по-настоящему `const` (например, строковый литерал), запись даёт **undefined behavior**;
+*   `const_cast` оправдан только когда вы **уверены**, что функция данные не модифицирует.
+
+###### **1.5.3 Безопасное и небезопасное использование**
+
+**Относительно безопасный сценарий:**
+
+```cpp
+const int* constPtr = /* ... */;
+void readOnly(int* p) {
+    cout << *p;  // Только чтение
+}
+
+// Безопасно, если readOnly действительно ничего не меняет
+readOnly(const_cast<int*>(constPtr));
+```
+
+**Небезопасный сценарий:**
+
+```cpp
+const int x = 42;
+int* px = const_cast<int*>(&x);
+*px = 100;  // UB: x изначально const
+```
+
+###### **1.5.4 Когда использовать `const_cast`**
+
+Имеет смысл, когда:
+
+*   стыкуетесь со **legacy** **C**-API, где `const` расставлен неверно;
+*   у вас есть `const`-объект, но нужно вызвать **non-const** метод, который по факту состояние не меняет;
+*   вы поэтапно доводите большой код до **const-correctness**.
+
+**Практика:** по возможности **избегайте** `const_cast`; если API ваш — лучше поправить сигнатуру функции.
+
+##### **1.6 `reinterpret_cast`**
+
+**`reinterpret_cast<T>(v)`** трактует битовый образ объекта как другой тип **без** «пересчёта» значения — самый опасный из стандартных приведений.
+
+###### **1.6.1 Синтаксис и смысл**
+
+```cpp
+reinterpret_cast<T>(v)
+```
+
+*   **меняет интерпретацию** двоичного представления;
+*   **не выполняет** отдельной операции над битами (в смысле преобразования значения);
+*   **не делает** проверок в **runtime**;
+*   позволяет рассматривать значение «как будто» это совсем другой тип.
+
+###### **1.6.2 Типовые сценарии**
+
+**1. Указатель как целое (и обратно):**
+
+```cpp
+int x = 777;
+int* p = &x;
+
+// Указатель → целое (хеширование, отладка низкого уровня)
+long internal = reinterpret_cast<long>(p);
+
+// Обратно в указатель
+int* back = reinterpret_cast<int*>(internal);
+```
+
+**2. Type punning: одна и та же память «глазами» разных типов:**
+
+```cpp
+unsigned int bits = 0x41200000;  // Битовый образ
+float* f = reinterpret_cast<float*>(&bits);
+// *f читает те же биты как float
+```
+
+**3. «Несовместимые» указатели:**
+
+```cpp
+unsigned* px = /* ... */;
+int* py = reinterpret_cast<int*>(px);  // Допустимо через reinterpret_cast
+```
+
+Без `reinterpret_cast` это ошибка:
+
+```cpp
+unsigned* px = /* ... */;
+int* py = px;  // ERROR: несовместимые типы
+```
+
+###### **1.6.3 Риски**
+
+`reinterpret_cast` **крайне опасен**:
+
+*   полностью обходит типовую безопасность;
+*   при некорректной интерпретации легко получить **undefined behavior**;
+*   поведение зависит от платформы (размер указателя, порядок байт, выравнивание).
+
+**Пример опасности:**
+
+```cpp
+unsigned x = 777;
+unsigned* px = &x;
+
+int y = 999;
+int* py = &y;
+
+py = reinterpret_cast<int*>(px);  // Синтаксически «можно»
+*py = -1;  // UB: писать «как int» в unsigned-память так нельзя
+```
+
+###### **1.6.4 Когда использовать `reinterpret_cast`**
+
+Только если реально нужен низкий уровень:
+
+*   системные API;
+*   собственные аллокаторы;
+*   регистры/память устройств (**memory-mapped I/O**);
+*   бинарная сериализация с доступом к «сырой» памяти.
+
+**Для типичного прикладного кода `reinterpret_cast` почти никогда не нужен.**
+
+##### **1.7 Идентификация типов: `typeid`**
+
+Оператор **`typeid`** позволяет узнавать тип в **runtime**; вместе с `dynamic_cast` это часть **RTTI** (**Run-Time Type Information**).
+
+###### **1.7.1 Базовый синтаксис**
+
+```cpp
+typeid(expression)   // Тип выражения
+typeid(type)         // Сам тип
+```
+
+`typeid` возвращает ссылку на объект **`std::type_info`** с информацией о типе.
+
+**Аналогия с `sizeof`:**
+
+Как `sizeof` работает и для типа, и для выражения:
+```cpp
+sizeof(int)      // Размер типа
+sizeof(x)        // Размер типа выражения x
+```
+
+так же устроен и `typeid`:
+```cpp
+typeid(int)      // Информация о типе int
+typeid(x)        // Информация о типе x
+```
+
+###### **1.7.2 Класс `type_info`**
+
+Фрагмент из стандарта ISO C++ (раздел 17.7.3):
+
+```cpp
+namespace std {
+    class type_info {
+    public:
+        virtual ~type_info();
+        bool operator==(const type_info& rhs) const noexcept;
+        bool before(const type_info& rhs) const noexcept;
+        size_t hash_code() const noexcept;
+        const char* name() const noexcept;
+
+        type_info(const type_info&) = delete;            // Cannot be copied
+        type_info& operator=(const type_info&) = delete; // Cannot be copied
+    };
+}
+```
+
+**Основные операции:**
+
+1.  **имя типа:** `name()` — строковое представление (**implementation-defined**);
+2.  **сравнение типов:** `operator==` — совпадают ли типы;
+3.  **хеш:** `hash_code()` — для хеш-таблиц.
+
+**Замечание:** смысл `before()` зависит от реализации, на практике используется редко.
+
+###### **1.7.3 Примеры с `typeid`**
+
+**Проверка динамического типа:**
+
+```cpp
+Base* pb = new Derived();
+
+const std::type_info& info = typeid(*pb);  // Dynamic type: Derived
+cout << "Type: " << info.name() << endl;
+```
+
+**Сравнение типов:**
+
+```cpp
+Base* pb = new Derived();
+
+if (typeid(*pb) == typeid(Derived)) {
+    cout << "pb points to a Derived object" << endl;
+}
+
+if (typeid(*pb) == typeid(Base)) {
+    cout << "pb points to a Base object" << endl;  // Не выполнится
+}
+```
+
+**Важное различие:**
+
+```cpp
+Base* pb = new Derived();
+
+typeid(pb)   // Тип: Base* (static type указателя)
+typeid(*pb)  // Тип: Derived (dynamic type объекта)
+```
+
+###### **1.7.4 Когда использовать `typeid`**
+
+Уместно, когда:
+
+*   нужно узнать фактический **runtime**-тип объекта;
+*   строите свою сериализацию/«отражение»;
+*   отлаживаете (печать информации о типе);
+*   делаете dispatch по типу без `dynamic_cast`.
+
+**Но:** частые проверки через `typeid` часто сигнализируют о слабом **OOP**-дизайне; предпочтительнее полиморфизм (**virtual functions**).
+
+###### **1.7.5 Сравнение: `typeid` и `dynamic_cast`**
+
+| Свойство | `typeid` | `dynamic_cast` |
+|---------|----------|----------------|
+| Задача | узнать тип | **привести** тип |
+| Результат | ссылка на `type_info` | указатель/ссылка или `nullptr` |
+| Типичный сценарий | проверка типа | безопасный **downcast** |
+| Производительность | обычно быстрее | медленнее (обход иерархии) |
+
+Часто можно выбрать любой из подходов:
+
+```cpp
+// Через typeid
+if (typeid(*pb) == typeid(Derived)) {
+    Derived* pd = static_cast<Derived*>(pb);
+    pd->derivedMethod();
+}
+
+// Через dynamic_cast (часто предпочтительнее)
+if (Derived* pd = dynamic_cast<Derived*>(pb)) {
+    pd->derivedMethod();
+}
+```
+
+Вариант с `dynamic_cast` обычно ближе к идиоматическому **C++**.
+
+##### **1.8 Удалённые и заданные по умолчанию функции (`= delete` / `= default`)**
+
+**C++11** дал явный контроль над особими функциями-членами через спецификаторы **`= default`** и **`= delete`**.
+
+###### **1.8.1 Проблема: правила неявной генерации**
+
+Компилятор может **неявно сгенерировать** ряд особых функций-членов:
+
+```cpp
+class T {
+    // Compiler may generate:
+    T();                        // Default constructor
+    T(const T&);                // Copy constructor
+    T(T&&);                     // Move constructor
+    virtual ~T();               // Destructor
+    T& operator=(const T&);     // Copy assignment
+    T&& operator=(T&&);         // Move assignment
+};
+```
+
+Но правила того, **когда** именно что генерируется, **крайне сложны**:
+
+*   если вы объявили **любой** конструктор, **default constructor** уже не генерируется автоматически;
+*   если объявлен **move constructor**, копирующие операции могут оказаться **удалёнными**;
+*   если объявлен деструктор, генерация копирующего присваивания может вести себя неочевидно;
+*   плюс множество других взаимных ограничений.
+
+**Итог:** правила трудно держать в голове, и от этого появляются тонкие ошибки.
+
+###### **1.8.2 Мотивация: объекты без копирования**
+
+Частый приём — тип, который **нельзя копировать**:
+
+**Старый стиль (до C++11):**
+
+```cpp
+class NonCopyable {
+public:
+    NonCopyable() { }
+private:
+    // Declare but don't define - causes linker error if called
+    NonCopyable(const NonCopyable&);
+    NonCopyable& operator=(const NonCopyable&);
+};
+```
+
+**Минусы:**
+
+*   **намерение неочевидно:** `private` могут означать и другое;
+*   ошибка часто всплывает на **линковке**, а не на компиляции;
+*   если вы объявили конструктор вручную, **default constructor** уже не «появится сам».
+
+###### **1.8.3 Решение: `= delete`**
+
+**Современный вариант:**
+
+```cpp
+class NonCopyable {
+public:
+    NonCopyable() = default;                              // Generate default constructor
+    NonCopyable(const NonCopyable&) = delete;             // Delete copy constructor
+    NonCopyable& operator=(const NonCopyable&) = delete;  // Delete copy assignment
+};
+```
+
+**Плюсы:**
+
+*   **намерение явное:** операции запрещены на уровне языка;
+*   **ошибка на compile time**, сообщения обычно понятнее;
+*   не нужен «пустой» конструктор ради генерации — достаточно **`= default`**;
+*   **`= delete`** применим не только к особым функциям-членам.
+
+###### **1.8.4 Использование `= default`**
+
+**Пример 1: вернуть генерацию конструктора по умолчанию**
+
+```cpp
+class A {
+public:
+    A(int x) { }  // Defining this suppresses default constructor
+};
+
+A a;  // ERROR: no default constructor
+```
+
+**Решение:**
+
+```cpp
+class A {
+public:
+    A(int x) { }
+    A() = default;  // Force generation of default constructor
+};
+
+A a;  // OK now
+```
+
+**Пример 2: явно зафиксировать «обычное» поведение**
+
+Даже если компилятор и так сгенерировал бы функцию, **`= default`** делает договорённость видимой:
+
+```cpp
+class C {
+public:
+    C() = default;                        // Explicit: this class is default-constructible
+    C(const C&) = default;                // Explicit: this class is copyable
+    C& operator=(const C&) = default;     // Explicit: this class is copy-assignable
+    ~C() = default;                       // Explicit: destructor is not virtual
+};
+```
+
+###### **1.8.5 `= delete` шире, чем «особые функции»**
+
+**Запрет выделения в куче:**
+
+```cpp
+class StackOnly {
+public:
+    void* operator new(size_t) = delete;  // Prevent heap allocation
+};
+
+StackOnly* ps = new StackOnly();  // ERROR: operator new is deleted
+StackOnly s;                       // OK: stack allocation
+```
+
+**Отсечь нежелательные преобразования аргументов:**
+
+```cpp
+void foo(double x) { /* ... */ }
+
+foo(3.14);  // OK: double literal
+foo(3);     // OK: int converts to double
+foo(true);  // OK: bool converts to double (unintended!)
+```
+
+Оставим только `double`:
+
+```cpp
+void foo(double x) { /* ... */ }
+void foo(int) = delete;      // Block int
+void foo(bool) = delete;     // Block bool
+
+foo(3.14);  // OK
+foo(3);     // ERROR: deleted function
+foo(true);  // ERROR: deleted function
+```
+
+**Ещё жёстче — фактически только `double`:**
+
+```cpp
+template<typename T>
+void foo(T) = delete;  // Delete ALL other types
+
+void foo(double x) { /* ... */ }  // Only this overload allowed
+
+foo(3.14);   // OK: exact match for double
+foo(3);      // ERROR: would instantiate deleted template
+foo(2.71F);  // ERROR: float would instantiate deleted template
+```
+
+###### **1.8.6 Практические рекомендации**
+
+1.  **Будьте явны:** `= default` / `= delete` фиксируют намерение лучше «молчаливых» правил.
+2.  **Не полагайтесь на неявную генерацию «на память»:** правила слишком громоздкие.
+3.  **`= delete` полезен для любых перегрузок**, не только для **special member functions**.
+4.  **Предпочитайте ошибки компиляции:** `= delete` обычно информативнее, чем `private` без определения.
+
+##### **1.9 Инициализация баз и полей**
+
+При создании объекта производного класса нужно корректно инициализировать **подобъект базы** и поля производного класса.
+
+###### **1.9.1 Порядок выполнения конструкторов**
+
+При создании объекта производного класса порядок такой:
+
+1.  конструктор **базового класса** (инициализирует **base subobject**);
+2.  **инициализаторы полей** (**member initializers**) — в порядке **объявления** полей в классе;
+3.  тело конструктора производного класса.
+
+```cpp
+class Base {
+    int m;
+public:
+    Base() { m = 0; }
+    Base(int i) { m = i; }
+};
+
+class Derived : public Base {
+    int md;
+public:
+    Derived() { md = 7; }
+};
+
+Derived d;  // Что произойдёт?
+```
+
+**Вопрос:** какой конструктор `Base` будет вызван?
+
+###### **1.9.2 В чём затык**
+
+У базового класса может быть несколько конструкторов. Как выбрать нужный?
+
+```cpp
+class Derived : public Base {
+public:
+    Derived() { md = 7; }  // Какой конструктор Base вызовется?
+    int md;
+};
+```
+
+**Поведение по умолчанию:** если в списке инициализации база не указана явно, вызывается **default constructor** базы. Но что делать, если **default constructor** отсутствует, или нужен другой конструктор базы?
+
+###### **1.9.3 Список инициализации конструктора (ctor-initializer)**
+
+**Constructor initializer list** (**список инициализации конструктора**), его же называют **member initializer list**, задаёт:
+
+*   какой конструктор базы вызвать;
+*   как инициализировать поля **до** входа в тело конструктора.
+
+```cpp
+class Derived : public Base {
+public:
+    Derived() : Base(1), md(7) { }
+    //          ^^^^^^^^  ^^^^^
+    //          |         инициализация поля
+    //          инициализация базы
+    int md;
+};
+```
+
+**Синтаксис:**
+
+```cpp
+DerivedConstructor(parameters) : BaseClass(args), member1(value1), member2(value2) {
+    // Constructor body
+}
+```
+
+###### **1.9.4 Инициализация базовых подобъектов**
+
+**Базовый пример:**
+
+```cpp
+class Base {
+public:
+    Base() { m = 0; }
+    Base(int i) { m = i; }
+    int m;
+};
+
+class Derived : public Base {
+public:
+    Derived() : Base(1) { md = 7; }  // Call Base(int) constructor
+    int md;
+};
+
+Derived d;  // Calls Base(1), then initializes md = 7
+```
+
+**Несколько аргументов у базы:**
+
+```cpp
+class Base {
+public:
+    Base(int x, int y) { /* ... */ }
+};
+
+class Derived : public Base {
+public:
+    Derived() : Base(10, 20) { /* ... */ }
+};
+```
+
+###### **1.9.5 Инициализация полей данных**
+
+Поля **стоит** (и часто **нужно**) инициализировать в списке:
+
+```cpp
+class C {
+    int m1;
+    int m2;
+    T m3;  // Some class type
+public:
+    C() : m1(5), m2(10), m3(15) { }  // Member initialization
+};
+```
+
+**Зачем список, а не тело?**
+
+1.  **эффективнее:** прямое **инициализирование**, а не «дефолт + присваивание»;
+2.  **обязательно** для `const`, ссылок и полей без **default constructor**;
+3.  **яснее:** отделяет инициализацию от прочей логики в теле.
+
+###### **1.9.6 Инициализация и присваивание**
+
+**Вариант 1: присваивание в теле (хуже для классовых полей)**
+
+```cpp
+class C {
+    int md;
+    T md2;  // Some class type
+public:
+    C() {
+        md = 7;      // Assignment (for primitive types, OK)
+        md2 = T(5);  // Default-construction, then assignment (inefficient)
+    }
+};
+```
+
+**Вариант 2: инициализация в списке (предпочтительно)**
+
+```cpp
+class C {
+    int md;
+    T md2;
+public:
+    C() : md(7), md2(5) {  // Direct initialization
+    }
+};
+```
+
+Для классового `md2` вариант 1 обычно означает:
+
+1.  **default-construct** `md2`;
+2.  затем **assign** `T(5)`.
+
+Вариант 2 обычно сводится к одному шагу:
+
+1.  **прямое конструирование** `md2` значением `5`.
+
+###### **1.9.7 Когда список инициализации обязателен**
+
+**Поля `const`:**
+
+```cpp
+class C {
+    const T md2;
+public:
+    C() { md2 = expression; }  // ERROR: cannot assign to const
+    C() : md2(expression) { }  // OK: initialization
+};
+```
+
+**Ссылки:**
+
+```cpp
+class C {
+    int& ref;
+public:
+    C(int& r) : ref(r) { }  // Must use initializer list
+};
+```
+
+**Поля без конструктора по умолчанию:**
+
+```cpp
+class NoDefault {
+public:
+    NoDefault(int x) { }  // No default constructor
+};
+
+class C {
+    NoDefault nd;
+public:
+    C() : nd(42) { }  // Must initialize in list
+};
+```
+
+##### **1.10 Делегирующие конструкторы (delegating constructors)**
+
+**Delegating constructors** (**C++11**) позволяют одному конструктору вызвать другой конструктор **того же** класса, уменьшая дублирование кода.
+
+###### **1.10.1 Проблема: дублирование кода**
+
+Несколько конструкторов часто повторяют одинаковую инициализацию:
+
+```cpp
+class C {
+    int x, y;
+public:
+    C() {
+        // Common initialization
+        x = 0;
+        y = 0;
+        // Specific logic
+    }
+
+    C(int val) {
+        // Common initialization (duplicated!)
+        x = 0;
+        y = 0;
+        // Specific logic
+        x = val;
+    }
+};
+```
+
+**Старый приём:** вынести общее в `private` метод:
+
+```cpp
+class C {
+    int x, y;
+private:
+    void init() {  // Common initialization
+        x = 0;
+        y = 0;
+    }
+public:
+    C() {
+        init();
+        // Specific actions
+    }
+
+    C(int val) {
+        init();
+        // Specific actions
+        x = val;
+    }
+};
+```
+
+###### **1.10.2 Современный приём: делегирование**
+
+Вместо отдельного `init()` один конструктор может **делегировать** другому:
+
+```cpp
+class C {
+    int x, y;
+public:
+    C() {  // Target constructor
+        x = 0;
+        y = 0;
+    }
+
+    C(int val) : C() {  // Delegating constructor
+        x = val;  // Specific actions
+    }
+};
+```
+
+**Синтаксис:** в списке инициализации вызывается другой конструктор: `ИмяКонструктора(args)`.
+
+###### **1.10.3 Порядок выполнения**
+
+При делегировании:
+
+1.  полностью отрабатывает **target constructor** (включая тело);
+2.  затем выполняется тело **delegating constructor**.
+
+```cpp
+class C {
+public:
+    C() {
+        cout << "Common initialization" << endl;
+    }
+
+    C(int x) : C() {
+        cout << "Specific initialization" << endl;
+    }
+};
+
+C c(42);
+// Output:
+// Common initialization
+// Specific initialization
+```
+
+###### **1.10.4 Терминология**
+
+```cpp
+class C {
+public:
+    C(int) { }        // Target constructor
+    C() : C(42) { }   // Delegating constructor
+};
+```
+
+*   **target constructor** — тот конструктор, **которому** делегируют;
+*   **delegating constructor** — тот, **кто** делегирует;
+*   **primary constructor** — распространённый приём: один конструктор держит «основную» инициализацию, остальные к нему делегируют.
+
+###### **1.10.5 Правила и ограничения**
+
+**Нельзя смешивать делегирование с инициализацией полей в одном списке так:**
+
+```cpp
+class C {
+    int x;
+public:
+    C(int val) : x(val) { }
+    C() : C(0), x(10) { }  // ERROR: cannot delegate and initialize members
+};
+```
+
+**Нельзя делать циклы делегирования:**
+
+```cpp
+class C {
+public:
+    C(int) { }
+    C(): C(42) { }         // Delegates to C(int)
+    C(char c): C(42.0) { } // ERROR: circular delegation
+    C(double d): C('a') { } // ERROR: circular delegation
+};
+```
+
+**Делегирование «монопольно»:** если вы делегируете, в том же списке нельзя параллельно:
+
+*   инициализировать базы;
+*   инициализировать поля;
+*   вызывать ещё один конструктор.
+
+###### **1.10.6 Плюсы**
+
+1.  **меньше дублирования:** общая логика в одном месте;
+2.  **проще сопровождать:** правки общей части локализованы;
+3.  **яснее намерение:** видно, что один конструктор «надстраивается» над другим.
+
+##### **1.11 Указатель `this`**
+
+Внутри функций-членов специальный указатель **`this`** указывает на объект, для которого функция вызвана.
+
+###### **1.11.1 Что такое `this`**
+
+**`this`** — неявный параметр, доступный во всех **non-static** функциях-членах:
+
+```cpp
+class C {
+    int member;
+public:
+    void f(int i) {
+        member = i;        // Implicitly: this->member = i
+        this->member = i;  // Explicitly using this
+    }
+};
+```
+
+По смыслу эквивалентно:
+```cpp
+member = i;
+this->member = i;
+```
+
+###### **1.11.2 Зачем он нужен**
+
+**1. Снятие неоднозначности имён**
+
+Когда параметр называется так же, как поле:
+
+```cpp
+class Point {
+    double x, y;
+public:
+    void setX(double x) {
+        this->x = x;  // this->x — поле, x — параметр
+    }
+};
+```
+
+**2. Вернуть «текущий объект»**
+
+Удобно для **method chaining**:
+
+```cpp
+class Builder {
+public:
+    Builder& setWidth(int w) {
+        width = w;
+        return *this;  // Return reference to current object
+    }
+
+    Builder& setHeight(int h) {
+        height = h;
+        return *this;
+    }
+private:
+    int width, height;
+};
+
+Builder b;
+b.setWidth(10).setHeight(20);  // Method chaining
+```
+
+**3. Передать объект во внешнюю функцию**
+
+```cpp
+void externalFunction(C* obj);
+
+class C {
+public:
+    void f() {
+        externalFunction(this);  // Pass pointer to current object
+    }
+};
+```
+
+**4. Проверка самоприсваивания**
+
+```cpp
+class C {
+public:
+    C& operator=(const C& other) {
+        if (this != &other) {  // Check if assigning to self
+            // Perform assignment
+        }
+        return *this;
+    }
+};
+```
+
+###### **1.11.3 Тип `this`**
+
+Для класса `C`:
+
+*   в **non-const** функции-члене: `this` имеет тип `C* const`;
+*   в **const** функции-члене: `this` имеет тип `const C* const`.
+
+**Почему `this` — константный указатель:**
+
+```cpp
+C* const this;  // Implicit declaration
+```
+
+Так язык запрещает «переназначить» текущий объект:
+
+```cpp
+class C {
+public:
+    void bad() {
+        this = &other;  // ERROR: cannot modify this
+    }
+};
+```
+
+###### **1.11.4 Как на самом деле устроены вызовы**
+
+Функции-члены получают `this` как **скрытый первый параметр**:
+
+```cpp
+class C {
+public:
+    int m;
+    void f(int i) { m = 7; }
+};
+```
+
+Компилятор моделирует это примерно так:
+
+```cpp
+void f(C* this, int i) {  // Hidden 'this' parameter
+    this->m = 7;
+}
+```
+
+Вызов:
+
+```cpp
+C c;
+c.f(1);    // Becomes: f(&c, 1)
+
+C* p = new C();
+p->f(1);   // Becomes: f(p, 1)
+```
+
+Адрес объекта подставляется автоматически.
+
+###### **1.11.5 Статические функции-члены**
+
+У **static member functions** нет `this`: они не привязаны к конкретному экземпляру.
+
+```cpp
+class C {
+    int member;
+    static int sMember;
+public:
+    static void f() {
+        member = 5;   // ERROR: no 'this' pointer
+        sMember = 7;  // OK: static member
+    }
+};
+```
+
+##### **1.12 Константные функции-члены (`const` после списка параметров)**
+
+**Constant member functions** обещают **не менять** состояние объекта: `this` трактуется как указатель на `const`.
+
+###### **1.12.1 Квалификатор `const` у метода**
+
+`const` ставится **после** списка параметров:
+
+```cpp
+class C {
+    int member;
+public:
+    void f1() {            // Non-const member function
+        member = 5;        // OK: can modify
+    }
+
+    void f2() const {      // Const member function
+        member = 5;        // ERROR: cannot modify
+        int x = member;    // OK: can read
+    }
+};
+```
+
+###### **1.12.2 Тип `this` в `const`-методах**
+
+**Обычный метод:**
+```cpp
+void f() {
+    // this has type: C* const
+    // Can modify object through this
+}
+```
+
+**`const`-метод:**
+```cpp
+void f() const {
+    // this has type: const C* const
+    // Cannot modify object through this
+}
+```
+
+Квалификатор `const` превращает `this` из «указателя на изменяемый объект» в «указатель на `const`».
+
+###### **1.12.3 Когда `const`-методы обязательны по смыслу использования**
+
+`const`-методы можно вызывать у `const` объектов; «неконстантные» — нет:
+
+```cpp
+class C {
+public:
+    void f1() { }
+    void f2() const { }
+};
+
+C c1;
+c1.f1();  // OK
+c1.f2();  // OK
+
+const C c2;
+c2.f1();  // ERROR: f1 can modify c2
+c2.f2();  // OK: f2 cannot modify c2
+```
+
+**Почему это важно:** при передаче по **`const` reference** (частый приём ради эффективности) доступны только `const`-методы:
+
+```cpp
+void process(const C& obj) {
+    obj.f1();  // ERROR: f1 is not const
+    obj.f2();  // OK: f2 is const
+}
+```
+
+###### **1.12.4 Практика: помечайте `const`, если метод не меняет состояние**
+
+```cpp
+class Point {
+    double x, y;
+public:
+    double getX() const { return x; }  // Doesn't modify, should be const
+    double getY() const { return y; }
+
+    void setX(double newX) { x = newX; }  // Modifies, cannot be const
+};
+```
+
+**Плюсы:**
+
+1.  **документирует** контракт «только чтение»;
+2.  **работает с `const` объектами**;
+3.  **помогает оптимизациям** компилятора;
+4.  **расширяет применимость** класса в `const`-контекстах.
+
+###### **1.12.5 Перегрузка по `const`**
+
+Можно иметь две версии одной функции — `const` и не-`const`:
+
+```cpp
+class C {
+    int* data;
+public:
+    // Non-const version
+    int* getData() {
+        return data;  // Returns modifiable pointer
+    }
+
+    // Const version
+    const int* getData() const {
+        return data;  // Returns const pointer
+    }
+};
+
+C c1;
+int* p1 = c1.getData();  // Calls non-const version
+
+const C c2;
+const int* p2 = c2.getData();  // Calls const version
+```
+
+Компилятор выбирает версию по **constness** объекта.
+
+##### **1.13 Объявление и определение функции**
+
+Различие **declaration** vs **definition** критично для разнесения **C++**-кода на заголовки и `.cpp`.
+
+###### **1.13.1 Объявления и определения**
+
+**Declaration** (**объявление**): вводит имя и тип для компилятора.
+
+**Definition** (**определение**): даёт полную реализацию (тело функции, полный класс и т.п.).
+
+**Для функций:**
+
+```cpp
+int f(int x);           // Declaration (function prototype)
+int f(int x) { ... }    // Definition (includes body)
+```
+
+**Для классов:**
+
+```cpp
+class C;                // Declaration (forward declaration)
+class C { ... };        // Definition (complete class)
+```
+
+###### **1.13.2 Заголовки и исходники**
+
+Типичный **C++**-проект разделяет **interface** (объявления) и реализации:
+
+**Заголовок (`Library.h`):**
+```cpp
+// Declarations only
+int f(int x);
+
+class C {
+    int member;
+public:
+    void method(int x);  // Declaration
+};
+```
+
+**Исходник (`Library.cpp`):**
+```cpp
+#include "Library.h"
+
+// Definitions
+int f(int x) {
+    return x * 2;
+}
+
+void C::method(int x) {  // Note: C::method syntax
+    member = x;
+}
+```
+
+**Пользовательский код (`main.cpp`):**
+```cpp
+#include "Library.h"
+
+int main() {
+    f(42);
+
+    C obj;
+    obj.method(10);
+}
+```
+
+###### **1.13.3 Определения функций-членов вне класса**
+
+Вне класса для принадлежности к типу используют **scope resolution operator** (**оператор `::`**):
+
+```cpp
+// In header
+class C {
+public:
+    void f(int x);  // Declaration
+};
+
+// In source file
+void C::f(int x) {  // C::f specifies this is a member of C
+    // Implementation
+}
+```
+
+**Смысл `::` для компилятора:** это не свободная функция `f`, а **`f` класса `C`**.
+
+###### **1.13.4 Зачем разделять объявление и определение?**
+
+**1. Независимая компиляция**
+
+*   заголовок задаёт **interface**;
+*   один заголовок подключают много `.cpp`;
+*   единицы трансляции компилируются отдельно;
+*   пересобирают в основном изменённые файлы.
+
+**2. Инкапсуляция**
+
+*   потребителю виден интерфейс (заголовок);
+*   детали реализации живут в `.cpp`;
+*   реализацию можно менять, не ломая внешний контракт.
+
+**3. Меньше зависимостей**
+
+*   заголовки компактнее и компилируются быстрее;
+*   тяжёлые реализации не «тащатся» в каждую единицу трансляции.
+
+***
+
+#### **2. Определения**
+
+*   **C-style cast** (**приведение в стиле C**): традиционная запись `(Type)expr` или `Type(expr)`, которая может означать любое преобразование без явной семантической метки.
+*   **Dynamic cast / `dynamic_cast`**: `dynamic_cast<T>(v)` — приведения в иерархии с проверкой в **runtime**; для указателей при ошибке даёт `nullptr`, для ссылок бросает исключение.
+*   **Static cast / `static_cast`**: `static_cast<T>(v)` — приведения, согласуемые на **compile time** без проверок в **runtime**; быстрее, но при неверном **dynamic type** возможен **UB**.
+*   **Const cast / `const_cast`**: `const_cast<T>(v)` — добавить/убрать `const`/`volatile`; единственный стандартный способ **снять constness** через приведение.
+*   **Reinterpret cast / `reinterpret_cast`**: `reinterpret_cast<T>(v)` — реинтерпретация битового образа как другого типа без «пересчёта» значения; максимально опасный инструмент.
+*   **Static type** (**статический тип**): тип в коде на **compile time** (например, `Shape*` у указателя, объявленного как `Shape*`).
+*   **Dynamic type** (**динамический тип**): фактический тип объекта в **runtime** (например, `Circle`, если `Shape*` указывает на `Circle`).
+*   **Type identification** (**идентификация типа**): определение типа объекта в **runtime**, часто через `typeid`.
+*   **`typeid`**: оператор, возвращающий `const std::type_info&` с информацией о типе выражения/типа.
+*   **`std::type_info`**: стандартный класс сведений о типе; сравнение, `name()`, `hash_code()`.
+*   **RTTI (Run-Time Type Information)**: служебная информация компилятора о типах; нужна для `dynamic_cast` и полиморфного `typeid`; требует полиморфного базового класса (обычно — **virtual**-функции).
+*   **`= default`**: явно попросить компилятор сгенерировать особую функцию-член с поведением по умолчанию.
+*   **`= delete`**: явно запретить использование функции (ошибка на **compile time** при попытке вызова).
+*   **Automatic generation** (**неявная генерация**): автоматическое создание компилятором особых функций-членов при определённых условиях.
+*   **Constructor initializer list** (**список инициализации конструктора**): хвост `: Base(args), member(value)` до тела конструктора.
+*   **Member initialization list**: часть списка, которая инициализирует поля класса.
+*   **Base class initialization**: выбор конструктора базы в списке инициализации производного конструктора.
+*   **Delegating constructor** (**делегирующий конструктор**): конструктор, который в списке инициализации вызывает другой конструктор того же класса.
+*   **Target constructor** (**целевой конструктор**): конструктор, которому делегируют.
+*   **`this` pointer**: неявный указатель на текущий объект в **non-static** методах; тип `C* const` или `const C* const` в `const`-методе.
+*   **Constant member function** (**const-метод**): метод с `const` после `()`, не меняющий состояние через `this`.
+*   **Const overloading**: две перегрузки метода — `const` и не-`const`; выбор по **constness** объекта.
+*   **Function declaration**: имя и сигнатура без реализации.
+*   **Function definition**: полная спецификация, включая тело.
+*   **`::` (scope resolution operator)**: привязка имени к классу при определении вне класса (`ClassName::functionName`).
+*   **Header file**: файл объявлений (часто `.h`/`.hpp`), подключаемый через `#include`.
+*   **Source file**: файл реализаций (часто `.cpp`).
+*   **Forward declaration**: `class C;` без полного определения — чтобы использовать указатели/ссылки до полного класса.
+
+***
+
+#### **3. Примеры**
+
+
+##### **3.1. Класс банковского счёта: полная реализация** (Лаба 4, Задание 1)
+
+Реализуйте учебную модель банковских счетов, продемонстрировав:
+
+*   базовый класс `Account` с базовыми операциями;
+*   производный класс `SavingsAccount` с начислением процентов;
+*   использование указателя `this`;
+*   **const**-методы;
+*   **`= delete`** для запрета копирования;
+*   **`= default`** для конструктора по умолчанию.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** цельная иерархия классов, где вместе собраны основные приёмы этой лекции: наследование, `this`, **const**-корректность, `= default` / `= delete`, корректная инициализация.
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+class Account {
+private:
+    int accountNumber;
+    double balance;
+    string ownerName;
+
+public:
+    // Defaulted default constructor
+    Account() = default;
+
+    // Parameterized constructor
+    Account(int accNum, double initialBalance, string owner)
+        : accountNumber(accNum), balance(initialBalance), ownerName(owner) {
+        cout << "Account created for " << ownerName << endl;
+    }
+
+    // Deleted copy constructor and assignment operator
+    Account(const Account&) = delete;
+    Account& operator=(const Account&) = delete;
+
+    // Deposit money (uses this pointer for demonstration)
+    void deposit(double amount) {
+        if (amount > 0) {
+            this->balance += amount;  // Explicit use of this
+            cout << "Deposited: $" << amount << endl;
+        } else {
+            cout << "Invalid deposit amount" << endl;
+        }
+    }
+
+    // Withdraw money (ensures balance doesn't go negative)
+    void withdraw(double amount) {
+        if (amount > 0 && this->balance >= amount) {
+            this->balance -= amount;
+            cout << "Withdrawn: $" << amount << endl;
+        } else {
+            cout << "Invalid withdrawal or insufficient funds" << endl;
+        }
+    }
+
+    // Constant member functions (don't modify state)
+    double getBalance() const {
+        return balance;
+    }
+
+    int getAccountNumber() const {
+        return accountNumber;
+    }
+
+    string getOwnerName() const {
+        return ownerName;
+    }
+
+    // Virtual destructor for proper inheritance
+    virtual ~Account() {
+        cout << "Account destroyed for " << ownerName << endl;
+    }
+};
+
+class SavingsAccount : public Account {
+private:
+    double interestRate;  // Annual interest rate (e.g., 2.5 for 2.5%)
+
+public:
+    // Constructor delegating to base class
+    SavingsAccount(int accNum, double initialBalance, string owner, double rate)
+        : Account(accNum, initialBalance, owner), interestRate(rate) {
+        cout << "SavingsAccount created with " << interestRate << "% interest" << endl;
+    }
+
+    // Calculate and deposit interest
+    void calculateInterest() {
+        double interest = this->getBalance() * (interestRate / 100.0);
+        cout << "Calculating interest: $" << interest << endl;
+        this->deposit(interest);  // Use inherited deposit method
+    }
+
+    // Constant member function
+    double getInterestRate() const {
+        return interestRate;
+    }
+
+    ~SavingsAccount() {
+        cout << "SavingsAccount destroyed" << endl;
+    }
+};
+
+int main() {
+    cout << "=== Creating Savings Account ===" << endl;
+    SavingsAccount savings(123456, 1000.0, "John Doe", 2.5);
+
+    cout << "\n=== Initial State ===" << endl;
+    cout << "Account Number: " << savings.getAccountNumber() << endl;
+    cout << "Owner's Name: " << savings.getOwnerName() << endl;
+    cout << "Current Balance: $" << savings.getBalance() << endl;
+    cout << "Interest Rate: " << savings.getInterestRate() << "%" << endl;
+
+    cout << "\n=== Performing Transactions ===" << endl;
+    savings.deposit(500.0);
+    savings.withdraw(200.0);
+
+    cout << "\n=== After Transactions ===" << endl;
+    cout << "Current Balance: $" << savings.getBalance() << endl;
+
+    cout << "\n=== Calculating Interest ===" << endl;
+    savings.calculateInterest();
+
+    cout << "\n=== Final State ===" << endl;
+    cout << "Final Balance: $" << savings.getBalance() << endl;
+
+    // Attempting to copy would cause compile error
+    // SavingsAccount copy = savings;  // ERROR: copy constructor deleted
+    // Account acc2 = savings;         // ERROR: copy constructor deleted
+
+    cout << "\n=== Exiting (destructors called) ===" << endl;
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== Creating Savings Account ===
+Account created for John Doe
+SavingsAccount created with 2.5% interest
+
+=== Initial State ===
+Account Number: 123456
+Owner's Name: John Doe
+Current Balance: $1000
+Interest Rate: 2.5%
+
+=== Performing Transactions ===
+Deposited: $500
+Withdrawn: $200
+
+=== After Transactions ===
+Current Balance: $1300
+
+=== Calculating Interest ===
+Calculating interest: $32.5
+Deposited: $32.5
+
+=== Final State ===
+Final Balance: $1332.5
+
+=== Exiting (destructors called) ===
+SavingsAccount destroyed
+Account destroyed for John Doe
+```
+
+**Разбор:**
+
+1.  **`= default`:** `Account() = default` явно оставляет конструктор по умолчанию.
+2.  **`= delete`:** копирующий конструктор и копирующее присваивание запрещены, чтобы нельзя было «дублировать» счёт.
+3.  **`this`:**
+    *   в `deposit()` / `withdraw()` используется явно для наглядности;
+    *   `this->balance` — доступ к полю через указатель.
+4.  **Const-методы:**
+    *   `getBalance()`, `getAccountNumber()`, `getOwnerName()` помечены `const`;
+    *   их можно вызывать у `const Account`;
+    *   контракт: состояние не меняют.
+5.  **Наследование:**
+    *   `SavingsAccount` наследует `Account`;
+    *   база инициализируется из списка конструктора;
+    *   добавлена логика процентов.
+6.  **Виртуальный деструктор:**
+    *   корректное уничтожение при удалении через указатель на базу;
+    *   порядок деструкторов: сначала производный, затем базовый.
+
+**Проектные решения:**
+
+*   счета нельзя копировать (**unique resource**);
+*   баланс меняется только через `deposit` / `withdraw` (**encapsulation**);
+*   **const**-геттеры безопасно читают состояние;
+*   проценты кладутся через уже существующий `deposit` (**code reuse**).
+
+**Ответ:** полная реализация с `= default` / `= delete`, `this`, **const**-корректностью, инициализацией и наследованием.
+
+</details>
+
+##### **3.2. Иерархия фигур и четыре вида приведения** (Лаба 4, Задание 2)
+
+Постройте иерархию фигур и покажите на примерах все четыре оператора приведения.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** для разных ситуаций в иерархии выбирается свой «правильный» **cast operator**.
+
+```cpp
+#include <iostream>
+#include <cmath>
+using namespace std;
+
+class Shape {
+public:
+    virtual double area() const = 0;      // Pure virtual
+    virtual double perimeter() const = 0; // Pure virtual
+    virtual ~Shape() { }                  // Virtual destructor
+};
+
+class Rectangle : public Shape {
+private:
+    double width;
+    double height;
+
+public:
+    Rectangle(double w, double h) : width(w), height(h) { }
+
+    double area() const override {
+        return width * height;
+    }
+
+    double perimeter() const override {
+        return 2 * (width + height);
+    }
+
+    // Rectangle-specific method
+    double diagonal() const {
+        return sqrt(width * width + height * height);
+    }
+
+    double getWidth() const { return width; }
+    double getHeight() const { return height; }
+};
+
+class Circle : public Shape {
+private:
+    double radius;
+
+public:
+    Circle(double r) : radius(r) { }
+
+    double area() const override {
+        return M_PI * radius * radius;
+    }
+
+    double perimeter() const override {
+        return 2 * M_PI * radius;
+    }
+
+    // Circle-specific method
+    double diameter() const {
+        return 2 * radius;
+    }
+
+    double getRadius() const { return radius; }
+};
+
+int main() {
+    Rectangle rectangle(5.0, 3.0);
+    Circle circle(4.0);
+
+    Shape* shape = &rectangle;
+
+    cout << "=== Demonstrate static casting [1] ===" << endl;
+    // Static cast: Compile-time downcast (no runtime check)
+    // Safe here because we KNOW shape points to Rectangle
+    const Rectangle* rectPtr = static_cast<const Rectangle*>(shape);
+    cout << "Rectangle width: " << rectPtr->getWidth() << endl;
+    cout << "Rectangle height: " << rectPtr->getHeight() << endl;
+    cout << "Rectangle diagonal: " << rectPtr->diagonal() << endl;
+
+    cout << "\n=== Demonstrate dynamic casting [2] ===" << endl;
+    // Dynamic cast: Runtime type checking
+    // Check if shape is actually a Circle
+    if (const Circle* circPtr = dynamic_cast<const Circle*>(shape)) {
+        cout << "Shape is a Circle with radius: " << circPtr->getRadius() << endl;
+    } else {
+        cout << "Shape is NOT a Circle" << endl;
+    }
+
+    // Now point to circle and check again
+    shape = &circle;
+    if (const Circle* circPtr = dynamic_cast<const Circle*>(shape)) {
+        cout << "Shape is a Circle with radius: " << circPtr->getRadius() << endl;
+        cout << "Circle diameter: " << circPtr->diameter() << endl;
+    } else {
+        cout << "Shape is NOT a Circle" << endl;
+    }
+
+    cout << "\n=== Demonstrate const casting [3] ===" << endl;
+    // Const cast: Remove const qualifier
+    // WARNING: Only safe if the original object wasn't const
+    const Rectangle* constRectPtr = &rectangle;
+
+    // Need to modify through a const pointer (normally not allowed)
+    // Remove const to call non-const method
+    Rectangle* mutableRectPtr = const_cast<Rectangle*>(constRectPtr);
+
+    // Now can call non-const methods (if they existed)
+    cout << "Successfully removed const (use with caution!)" << endl;
+    cout << "Area: " << mutableRectPtr->area() << endl;
+
+    cout << "\n=== Demonstrate reinterpret casting [4] ===" << endl;
+    // Reinterpret cast: Low-level bit reinterpretation
+    int intValue = 42;
+
+    // Treat the integer's bits as if they were a double
+    // WARNING: This is just for demonstration - meaningless operation!
+    double* doublePtr = reinterpret_cast<double*>(&intValue);
+
+    cout << "Integer value: " << intValue << endl;
+    cout << "Integer address: " << &intValue << endl;
+    cout << "Reinterpreted as double pointer: " << doublePtr << endl;
+    // Don't dereference doublePtr - it doesn't point to a valid double!
+
+    // More practical use: store pointer as integer
+    Shape* shapePtr = &rectangle;
+    long ptrAsInt = reinterpret_cast<long>(shapePtr);
+    cout << "Pointer stored as integer: " << ptrAsInt << endl;
+
+    // Convert back
+    Shape* restoredPtr = reinterpret_cast<Shape*>(ptrAsInt);
+    cout << "Restored pointer area: " << restoredPtr->area() << endl;
+
+    cout << "\n=== Summary ===" << endl;
+    cout << "1. static_cast: Fast compile-time cast (use when type is known)" << endl;
+    cout << "2. dynamic_cast: Safe runtime cast (use when type is uncertain)" << endl;
+    cout << "3. const_cast: Remove const (use rarely, with caution)" << endl;
+    cout << "4. reinterpret_cast: Bit reinterpretation (use for low-level operations)" << endl;
+
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== Demonstrate static casting [1] ===
+Rectangle width: 5
+Rectangle height: 3
+Rectangle diagonal: 5.83095
+
+=== Demonstrate dynamic casting [2] ===
+Shape is NOT a Circle
+Shape is a Circle with radius: 4
+Circle diameter: 8
+
+=== Demonstrate const casting [3] ===
+Successfully removed const (use with caution!)
+Area: 15
+
+=== Demonstrate reinterpret casting [4] ===
+Integer value: 42
+Integer address: 0x7ffeefbff5ac
+Reinterpreted as double pointer: 0x7ffeefbff5ac
+Pointer stored as integer: 140732920755372
+Restored pointer area: 15
+
+=== Summary ===
+1. static_cast: Fast compile-time cast (use when type is known)
+2. dynamic_cast: Safe runtime cast (use when type is uncertain)
+3. const_cast: Remove const (use rarely, with caution)
+4. reinterpret_cast: Bit reinterpretation (use for low-level operations)
+```
+
+**Разбор:**
+
+1.  **`static_cast` [1]:**
+    *   **downcast** с `Shape*` на `const Rectangle*`;
+    *   приведение на **compile time**, без проверки в **runtime**;
+    *   здесь безопасно, потому что известно: `shape` указывает на `Rectangle`;
+    *   быстрее `dynamic_cast`, но требует уверенности программиста.
+2.  **`dynamic_cast` [2]:**
+    *   проверка типа в **runtime**;
+    *   при ошибке для указателя — `nullptr`;
+    *   первая проверка не срабатывает (`shape` — не `Circle`);
+    *   вторая — срабатывает (`shape` указывает на `Circle`);
+    *   безопаснее, но дороже по времени.
+3.  **`const_cast` [3]:**
+    *   снимает `const` у типа указателя;
+    *   позволяет вызывать **non-const** методы через `const` указатель;
+    *   безопасно только если объект изначально не был «настоящим» `const`;
+    *   злоупотреблять не стоит — часто симптом дизайна.
+4.  **`reinterpret_cast` [4]:**
+    *   другая интерпретация битов без преобразования значения;
+    *   в примере — хранение указателя как целого и обратно;
+    *   максимально ломает типовую безопасность;
+    *   оставить для низкоуровневых задач.
+
+**Когда что брать:**
+
+*   **`static_cast`** — если тип **гарантирован** (и/или критична скорость);
+*   **`dynamic_cast`** — если нужна безопасность при неопределённом **runtime**-типе;
+*   **`const_cast`** — стыковка со **legacy** API (по возможности — без этого);
+*   **`reinterpret_cast`** — системное программирование (в прикладном коде почти никогда).
+
+**Ответ:** показаны все четыре приведения: `static_cast` для «известно корректных» случаев, `dynamic_cast` для безопасного **downcast**, `const_cast` для снятия `const`, `reinterpret_cast` для низкоуровневых манипуляций.
+
+</details>
+
+##### **3.3. Класс без копирования** (Лекция 4, Пример 1)
+
+Сделайте класс, который можно создавать, но **нельзя копировать**, корректно используя **`= default`** и **`= delete`**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **`= delete`** явно запрещает копирование, а **`= default`** — явно просит компилятор сгенерировать «обычную» версию функции.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class UniqueResource {
+private:
+    int* data;
+    int id;
+    static int nextId;
+
+public:
+    // Default constructor - explicitly defaulted
+    UniqueResource() = default;
+
+    // Parameterized constructor
+    UniqueResource(int value) : data(new int(value)), id(nextId++) {
+        cout << "Resource " << id << " created with value " << value << endl;
+    }
+
+    // Copy constructor - explicitly deleted
+    UniqueResource(const UniqueResource&) = delete;
+
+    // Copy assignment - explicitly deleted
+    UniqueResource& operator=(const UniqueResource&) = delete;
+
+    // Move constructor - can still move unique resources
+    UniqueResource(UniqueResource&& other) noexcept
+        : data(other.data), id(other.id) {
+        other.data = nullptr;
+        cout << "Resource " << id << " moved" << endl;
+    }
+
+    // Move assignment
+    UniqueResource& operator=(UniqueResource&& other) noexcept {
+        if (this != &other) {
+            delete data;
+            data = other.data;
+            id = other.id;
+            other.data = nullptr;
+            cout << "Resource " << id << " move-assigned" << endl;
+        }
+        return *this;
+    }
+
+    // Destructor
+    ~UniqueResource() {
+        if (data != nullptr) {
+            cout << "Resource " << id << " destroyed" << endl;
+            delete data;
+        } else {
+            cout << "Resource " << id << " (moved-from) destroyed" << endl;
+        }
+    }
+
+    void print() const {
+        if (data != nullptr) {
+            cout << "Resource " << id << ": " << *data << endl;
+        } else {
+            cout << "Resource " << id << ": (moved-from state)" << endl;
+        }
+    }
+};
+
+int UniqueResource::nextId = 1;
+
+int main() {
+    cout << "=== Creating resources ===" << endl;
+    UniqueResource r1(42);
+    UniqueResource r2(100);
+
+    cout << "\n=== Printing resources ===" << endl;
+    r1.print();
+    r2.print();
+
+    // Copy operations are deleted
+    // UniqueResource r3 = r1;  // ERROR: copy constructor deleted
+    // r2 = r1;                  // ERROR: copy assignment deleted
+
+    cout << "\n=== Moving resource ===" << endl;
+    UniqueResource r3 = std::move(r1);  // OK: move constructor
+
+    cout << "\n=== After move ===" << endl;
+    r1.print();  // r1 is in moved-from state
+    r3.print();  // r3 now owns the resource
+
+    cout << "\n=== Exiting (destructors called) ===" << endl;
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== Creating resources ===
+Resource 1 created with value 42
+Resource 2 created with value 100
+
+=== Printing resources ===
+Resource 1: 42
+Resource 2: 100
+
+=== Moving resource ===
+Resource 1 moved
+
+=== After move ===
+Resource 1: (moved-from state)
+Resource 1: 42
+
+=== Exiting (destructors called) ===
+Resource 2 destroyed
+Resource 1 destroyed
+Resource 1 (moved-from) destroyed
+```
+
+**Разбор:**
+
+1.  **Явное удаление копирования:**
+    *   копирующий конструктор: `UniqueResource(const UniqueResource&) = delete`;
+    *   копирующее присваивание: `operator=(const UniqueResource&) = delete`;
+    *   попытка копирования — **ошибка компиляции**.
+2.  **Move semantics:**
+    *   **move constructor** и **move assignment** остаются доступны;
+    *   можно переносить владение без копирования.
+3.  **Ясное намерение:**
+    *   по определению класса видно, что ресурс «уникален»;
+    *   читатель сразу понимает политику **non-copyable**.
+4.  **Контроль на этапе компиляции:**
+    *   ошибки ловятся при компиляции, а не в **runtime**;
+    *   сообщения обычно понятнее, чем у старого приёма с `private` без определения.
+
+**Типовые случаи для non-copyable классов:**
+
+*   дескрипторы файлов;
+*   сетевые соединения;
+*   объекты потоков;
+*   аналоги `std::unique_ptr`.
+
+**Ответ:** копирование запрещают через **`= delete`**, а перенос владения оставляют через **move**-операции.
+
+</details>
+
+##### **3.4. Списки инициализации конструкторов** (Лекция 4, Пример 2)
+
+Покажите корректное использование списка инициализации: для базы и для полей.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** список инициализации выполняется **до** тела конструктора; так эффективнее и так **обязаны** инициализироваться `const`, ссылки и некоторые поля классовых типов.
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+class Base {
+protected:
+    int m1, m2;
+public:
+    Base() : m1(0), m2(0) {
+        cout << "Base default constructor" << endl;
+    }
+
+    Base(int a, int b) : m1(a), m2(b) {
+        cout << "Base(int, int) constructor: m1=" << m1 << ", m2=" << m2 << endl;
+    }
+};
+
+class Derived : public Base {
+private:
+    int md;
+    const int constMember;
+    string name;
+
+public:
+    // Using initializer list to specify base constructor and initialize members
+    Derived(int a, int b, int d, string n)
+        : Base(a, b),              // Initialize base class
+          md(d),                   // Initialize member
+          constMember(999),        // Initialize const member (REQUIRED)
+          name(n)                  // Initialize string member
+    {
+        cout << "Derived constructor: md=" << md
+             << ", constMember=" << constMember
+             << ", name=" << name << endl;
+    }
+
+    void print() const {
+        cout << "Base: m1=" << m1 << ", m2=" << m2 << endl;
+        cout << "Derived: md=" << md << ", constMember=" << constMember
+             << ", name=" << name << endl;
+    }
+};
+
+// Example showing why initializer lists are required for certain members
+class RequiresInitializerList {
+private:
+    const int constValue;          // Must be initialized
+    int& refValue;                 // Must be initialized
+    string str;                    // Has default constructor but more efficient to initialize
+
+public:
+    // ALL of these MUST use initializer list
+    RequiresInitializerList(int val, int& ref, string s)
+        : constValue(val),         // const: must be initialized, cannot be assigned
+          refValue(ref),           // reference: must be initialized, cannot be rebound
+          str(s)                   // more efficient than default-construct + assign
+    {
+        // This would not work:
+        // constValue = val;       // ERROR: cannot assign to const
+        // refValue = ref;         // ERROR: cannot rebind reference
+        // str = s;                // Works but less efficient (default construct + assign)
+    }
+
+    void print() const {
+        cout << "constValue=" << constValue
+             << ", refValue=" << refValue
+             << ", str=" << str << endl;
+    }
+};
+
+int main() {
+    cout << "=== Creating Derived object ===" << endl;
+    Derived d(10, 20, 30, "MyObject");
+    d.print();
+
+    cout << "\n=== Creating RequiresInitializerList object ===" << endl;
+    int x = 42;
+    RequiresInitializerList r(100, x, "Hello");
+    r.print();
+
+    // Modify x to show reference works
+    x = 999;
+    cout << "\nAfter modifying x:" << endl;
+    r.print();
+
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== Creating Derived object ===
+Base(int, int) constructor: m1=10, m2=20
+Derived constructor: md=30, constMember=999, name=MyObject
+Base: m1=10, m2=20
+Derived: md=30, constMember=999, name=MyObject
+
+=== Creating RequiresInitializerList object ===
+constValue=100, refValue=42, str=Hello
+
+After modifying x:
+constValue=100, refValue=999, str=Hello
+```
+
+**Разбор:**
+
+1.  **Инициализация базы:**
+    *   `Base(a, b)` в списке выбирает конструктор базы;
+    *   база инициализируется до полей производного класса.
+2.  **Инициализация полей:**
+    *   фактический порядок — **порядок объявления** полей в классе, а не порядок в списке;
+    *   для классовых полей это обычно эффективнее, чем «дефолт + присваивание» в теле.
+3.  **Обязательные случаи:**
+    *   **`const`**-поля — только инициализация;
+    *   **ссылки** — только привязка при инициализации;
+    *   поля без **default constructor** — только через список (или **in-class** инициализаторы).
+4.  **Эффективность:**
+    *   список — прямое конструирование;
+    *   тело с присваиванием — лишние шаги для классовых типов.
+
+**Типичная ошибка — перепутать порядок с порядком в списке:**
+
+```cpp
+class Wrong {
+    int b;
+    int a;
+public:
+    Wrong() : a(5), b(a + 1) { }  // WRONG! b is initialized before a
+};
+```
+
+Поля всегда инициализируются в **порядке объявления**, а не в порядке записи в списке. Здесь сначала инициализируется `b`, затем `a`, поэтому `b(a + 1)` использует ещё не инициализированное `a` — **UB** / мусор.
+
+**Ответ:** список инициализации нужен, чтобы 1) вызвать нужный конструктор базы, 2) корректно инициализировать `const`/ссылки, 3) не платить лишними шагами для полей. Порядок инициализации полей — по объявлению.
+
+</details>
+
+##### **3.5. Делегирующие конструкторы** (Лекция 4, Пример 3)
+
+Покажите **delegating constructors**, чтобы убрать дублирование общей инициализации между перегрузками конструктора.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** один конструктор вызывает другой в списке инициализации, концентрируя общую логику.
+
+```cpp
+#include <iostream>
+#include <string>
+using namespace std;
+
+class Rectangle {
+private:
+    double width;
+    double height;
+    string color;
+    static int objectCount;
+    int id;
+
+    // Private helper for common initialization
+    void logCreation() {
+        cout << "Rectangle #" << id << " created: "
+             << width << "x" << height << " (" << color << ")" << endl;
+    }
+
+public:
+    // Target constructor - performs the main initialization
+    Rectangle(double w, double h, string c)
+        : width(w), height(h), color(c), id(++objectCount) {
+        logCreation();
+    }
+
+    // Delegating constructor - creates a square
+    Rectangle(double side)
+        : Rectangle(side, side, "white") {  // Delegates to target constructor
+        cout << "  (Created as square)" << endl;
+    }
+
+    // Delegating constructor - default color
+    Rectangle(double w, double h)
+        : Rectangle(w, h, "white") {  // Delegates to target constructor
+        cout << "  (Used default color)" << endl;
+    }
+
+    // Delegating constructor - default rectangle
+    Rectangle()
+        : Rectangle(1.0, 1.0, "white") {  // Delegates to target constructor
+        cout << "  (Default 1x1 rectangle)" << endl;
+    }
+
+    double area() const {
+        return width * height;
+    }
+
+    void print() const {
+        cout << "Rectangle #" << id << ": " << width << "x" << height
+             << ", color=" << color << ", area=" << area() << endl;
+    }
+};
+
+int Rectangle::objectCount = 0;
+
+int main() {
+    cout << "=== Creating rectangles with different constructors ===" << endl;
+
+    cout << "\n1. Full specification:" << endl;
+    Rectangle r1(5.0, 3.0, "red");
+
+    cout << "\n2. Width and height only (default color):" << endl;
+    Rectangle r2(4.0, 2.0);
+
+    cout << "\n3. Square (single dimension):" << endl;
+    Rectangle r3(3.0);
+
+    cout << "\n4. Default constructor:" << endl;
+    Rectangle r4;
+
+    cout << "\n=== Printing all rectangles ===" << endl;
+    r1.print();
+    r2.print();
+    r3.print();
+    r4.print();
+
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== Creating rectangles with different constructors ===
+
+1. Full specification:
+Rectangle #1 created: 5x3 (red)
+
+2. Width and height only (default color):
+Rectangle #2 created: 4x2 (white)
+  (Used default color)
+
+3. Square (single dimension):
+Rectangle #3 created: 3x3 (white)
+  (Created as square)
+
+4. Default constructor:
+Rectangle #4 created: 1x1 (white)
+  (Default 1x1 rectangle)
+
+=== Printing all rectangles ===
+Rectangle #1: 5x3, color=red, area=15
+Rectangle #2: 4x2, color=white, area=8
+Rectangle #3: 3x3, color=white, area=9
+Rectangle #4: 1x1, color=white, area=1
+```
+
+**Разбор:**
+
+1.  **Target constructor:** `Rectangle(double, double, string)` держит основную инициализацию.
+2.  **Delegating constructors:** остальные конструкторы делегируют ему:
+    *   `Rectangle(double)` — квадрат (одинаковые стороны);
+    *   `Rectangle(double, double)` — цвет по умолчанию `"white"`;
+    *   `Rectangle()` — дефолтные размеры и цвет.
+3.  **Порядок выполнения:**
+    *   сначала полностью отрабатывает **target** (включая тело);
+    *   затем тело **delegating** конструктора.
+4.  **Плюсы:**
+    *   общая логика в одном месте;
+    *   проще сопровождать;
+    *   видна «лесенка» конструкторов.
+
+**Альтернатива без делегирования (старый стиль):**
+
+```cpp
+class Rectangle {
+    // ...
+private:
+    void init(double w, double h, string c) {
+        width = w;
+        height = h;
+        color = c;
+        id = ++objectCount;
+        logCreation();
+    }
+
+public:
+    Rectangle(double w, double h, string c) { init(w, h, c); }
+    Rectangle(double side) { init(side, side, "white"); }
+    Rectangle(double w, double h) { init(w, h, "white"); }
+    Rectangle() { init(1.0, 1.0, "white"); }
+};
+```
+
+Делегирующие конструкторы обычно чище и ближе к современному **C++**.
+
+**Ответ:** в списке инициализации вызывается другой конструктор (`: Имя(args)`), что централизует инициализацию и убирает дублирование.
+
+</details>
+
+##### **3.6. Приведения в стиле C: в чём проблема** (Туториал 4, Пример 1)
+
+Разберите, почему **C-style casts** плохо читаются и зачем в **C++** появились именованные операторы приведения.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** одна и та же запись `(T)expr` может означать принципиально разные вещи — намерение теряется.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    virtual ~Base() { }
+};
+
+class Derived : public Base {
+public:
+    void derivedMethod() { cout << "Derived method" << endl; }
+};
+
+int main() {
+    cout << "=== Problem 1: Value Conversion ===" << endl;
+    // Standard conversion: double → int (data loss)
+    int x = (int)12.34;
+    cout << "Converted 12.34 to int: " << x << endl;
+    cout << "Intent: Value conversion with rounding" << endl;
+
+    cout << "\n=== Problem 2: Pointer Reinterpretation ===" << endl;
+    // Reinterpretation: pointer → long (no bit modification)
+    int* px = &x;
+    long a = (long)px;
+    cout << "Pointer value as long: " << a << endl;
+    cout << "Intent: View pointer bits as integer" << endl;
+
+    cout << "\n=== Problem 3: Unsafe Upcasting ===" << endl;
+    // Downcasting without runtime checks
+    Derived* pd = new Derived();
+    Base* pb = (Base*)pd;
+    cout << "Upcasted Derived* to Base*" << endl;
+    cout << "Intent: Type hierarchy navigation (needs safety check)" << endl;
+
+    cout << "\n=== The Problem ===" << endl;
+    cout << "All three use identical syntax: (Type)expression" << endl;
+    cout << "But they do COMPLETELY DIFFERENT things:" << endl;
+    cout << "  1. Value conversion (modifies bits)" << endl;
+    cout << "  2. Reinterpretation (keeps bits, changes view)" << endl;
+    cout << "  3. Type hierarchy navigation (needs runtime check)" << endl;
+    cout << "\nSolution: Use specific cast operators!" << endl;
+
+    delete pb;
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== Problem 1: Value Conversion ===
+Converted 12.34 to int: 12
+Intent: Value conversion with rounding
+
+=== Problem 2: Pointer Reinterpretation ===
+Pointer value as long: 140732920755324
+Intent: View pointer bits as integer
+
+=== Problem 3: Unsafe Upcasting ===
+Upcasted Derived* to Base*
+Intent: Type hierarchy navigation (needs safety check)
+
+=== The Problem ===
+All three use identical syntax: (Type)expression
+But they do COMPLETELY DIFFERENT things:
+  1. Value conversion (modifies bits)
+  2. Reinterpretation (keeps bits, changes view)
+  3. Type hierarchy navigation (needs runtime check)
+
+Solution: Use specific cast operators!
+```
+
+**Разбор:**
+
+1.  **Один синтаксис — разная семантика:**
+    *   `(int)12.34` — преобразование значения;
+    *   `(long)px` — реинтерпретация битов указателя;
+    *   `(Base*)pd` — шаг по иерархии типов.
+2.  **Почему это плохо:**
+    *   читатель не видит намерения;
+    *   компилятору сложнее помогать предупреждениями;
+    *   трудно искать «опасные» приведения в проекте;
+    *   выше цена сопровождения.
+3.  **Что даёт C++:**
+    *   `static_cast<int>(12.34)` — явное числовое приведение;
+    *   `reinterpret_cast<long>(px)` — явная реинтерпретация;
+    *   `dynamic_cast<Derived*>(pb)` — безопасная навигация по иерархии (при полиморфной базе).
+
+**Ответ:** **C-style cast** скрывает намерение; в **C++** четыре именованных приведения с более прозрачной семантикой: `static_cast`, `dynamic_cast`, `const_cast`, `reinterpret_cast`.
+
+</details>
+
+##### **3.7. `dynamic_cast` на практике** (Туториал 4, Пример 2)
+
+Покажите безопасный **downcast** через `dynamic_cast` и проверку типа в **runtime**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `dynamic_cast` проверяет фактический тип; для указателя при ошибке даёт `nullptr`, снижая риск **UB**.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    virtual void f() { cout << "Base::f" << endl; }
+    virtual ~Base() { }
+};
+
+class Derived : public Base {
+public:
+    void f() override { cout << "Derived::f" << endl; }
+    void derivedMethod() { cout << "Derived-specific method" << endl; }
+};
+
+int main() {
+    cout << "=== C-Style Cast: DANGEROUS ===" << endl;
+    Base* pb1 = new Base();  // Actually points to Base, not Derived
+
+    // C-style cast: NO RUNTIME CHECK
+    Derived* pd1 = (Derived*)pb1;
+    cout << "C-style cast succeeded (no checks performed)" << endl;
+    // pd1->derivedMethod();  // UNDEFINED BEHAVIOR! pb1 doesn't point to Derived
+    cout << "Calling derivedMethod() would cause undefined behavior!" << endl;
+
+    cout << "\n=== Dynamic Cast: SAFE ===" << endl;
+    Base* pb2 = new Base();  // Actually points to Base, not Derived
+
+    // Dynamic cast: PERFORMS RUNTIME CHECK
+    Derived* pd2 = dynamic_cast<Derived*>(pb2);
+
+    if (pd2 != nullptr) {
+        cout << "Cast succeeded" << endl;
+        pd2->derivedMethod();
+    } else {
+        cout << "Cast failed: pb2 doesn't point to Derived (returned nullptr)" << endl;
+        cout << "Safe! No undefined behavior." << endl;
+    }
+
+    cout << "\n=== Dynamic Cast: Success Case ===" << endl;
+    Base* pb3 = new Derived();  // Actually points to Derived
+
+    Derived* pd3 = dynamic_cast<Derived*>(pb3);
+
+    if (pd3 != nullptr) {
+        cout << "Cast succeeded: pb3 actually points to Derived" << endl;
+        pd3->derivedMethod();
+    } else {
+        cout << "Cast failed" << endl;
+    }
+
+    cout << "\n=== Comparison ===" << endl;
+    cout << "C-style cast: Fast but UNSAFE (no checks)" << endl;
+    cout << "dynamic_cast:  Slower but SAFE (runtime checks)" << endl;
+    cout << "  - Returns nullptr if cast fails (for pointers)" << endl;
+    cout << "  - Throws bad_cast if cast fails (for references)" << endl;
+    cout << "  - Requires at least one virtual function in base" << endl;
+
+    delete pb1;
+    delete pb2;
+    delete pb3;
+
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== C-Style Cast: DANGEROUS ===
+C-style cast succeeded (no checks performed)
+Calling derivedMethod() would cause undefined behavior!
+
+=== Dynamic Cast: SAFE ===
+Cast failed: pb2 doesn't point to Derived (returned nullptr)
+Safe! No undefined behavior.
+
+=== Dynamic Cast: Success Case ===
+Cast succeeded: pb3 actually points to Derived
+Derived-specific method
+
+=== Comparison ===
+C-style cast: Fast but UNSAFE (no checks)
+dynamic_cast:  Slower but SAFE (runtime checks)
+  - Returns nullptr if cast fails (for pointers)
+  - Throws bad_cast if cast fails (for references)
+  - Requires at least one virtual function in base
+```
+
+**Разбор:**
+
+1.  **Опасность C-style cast:**
+    *   «проходит» на этапе компиляции;
+    *   нет проверки в **runtime**;
+    *   легко получить невалидный указатель и **UB**.
+2.  **Безопасность `dynamic_cast`:**
+    *   сверяется с фактическим типом объекта;
+    *   для указателя возвращает `nullptr`, если тип не подходит;
+    *   помогает избежать **UB** при неверном **downcast**.
+3.  **Требования:**
+    *   полиморфная база (обычно — **virtual**-функции), чтобы работал **RTTI**;
+    *   дороже по времени, чем «слепой» `static_cast`.
+4.  **Когда уместен:**
+    *   если нет полной уверенности в **runtime**-типе;
+    *   если важнее безопасность, чем микроскопическая экономия;
+    *   в полиморфных иерархиях.
+
+**Ответ:** `dynamic_cast` даёт проверку корректности приведения в **runtime**; для указателя при ошибке возвращает `nullptr` вместо немедленного **UB**.
+
+</details>
+
+##### **3.8. `static_cast` для «известно безопасных» случаев** (Туториал 4, Пример 3)
+
+Покажите, когда оправдан `static_cast` для приведений на **compile time**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `static_cast` быстрее `dynamic_cast`, но требует **уверенности** программиста в типах.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    virtual void f() { cout << "Base::f" << endl; }
+    virtual ~Base() { }
+};
+
+class Derived : public Base {
+public:
+    void f() override { cout << "Derived::f" << endl; }
+    void derivedMethod() { cout << "Derived method" << endl; }
+};
+
+int main() {
+    cout << "=== Use Case 1: Numeric Conversions ===" << endl;
+    double d = 3.14159;
+    int i = static_cast<int>(d);  // Explicit about data loss
+    cout << "static_cast<int>(3.14159) = " << i << endl;
+    cout << "Explicit: programmer acknowledges data loss" << endl;
+
+    cout << "\n=== Use Case 2: Upcasting (Always Safe) ===" << endl;
+    Derived* pd = new Derived();
+    Base* pb = static_cast<Base*>(pd);  // Derived → Base (safe)
+    cout << "Upcasted Derived* to Base* (always safe)" << endl;
+    pb->f();  // Polymorphic call
+
+    cout << "\n=== Use Case 3: Downcasting (ONLY if certain) ===" << endl;
+    Base* pb2 = new Derived();  // We KNOW it points to Derived
+
+    // Safe because we're certain pb2 points to Derived
+    Derived* pd2 = static_cast<Derived*>(pb2);
+    cout << "Downcasted Base* to Derived* (we're certain of type)" << endl;
+    pd2->derivedMethod();
+
+    cout << "\n=== Comparison with dynamic_cast ===" << endl;
+    cout << "static_cast: No runtime overhead, no safety checks" << endl;
+    cout << "dynamic_cast: Runtime overhead, but provides safety" << endl;
+    cout << "\nWhen to use static_cast:" << endl;
+    cout << "  1. You're 100% certain of the actual type" << endl;
+    cout << "  2. Performance is critical" << endl;
+    cout << "  3. Numeric conversions (explicit data loss)" << endl;
+
+    cout << "\n=== DANGER: Wrong Use ===" << endl;
+    Base* pb3 = new Base();  // Points to Base, NOT Derived
+    Derived* pd3 = static_cast<Derived*>(pb3);  // WRONG! No check performed
+    cout << "Cast succeeded but UNSAFE - pd3 doesn't point to valid Derived" << endl;
+    // pd3->derivedMethod();  // UNDEFINED BEHAVIOR!
+    cout << "Would cause undefined behavior if we call derived methods" << endl;
+
+    delete pb;
+    delete pb2;
+    delete pb3;
+
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== Use Case 1: Numeric Conversions ===
+static_cast<int>(3.14159) = 3
+Explicit: programmer acknowledges data loss
+
+=== Use Case 2: Upcasting (Always Safe) ===
+Upcasted Derived* to Base* (always safe)
+Derived::f
+
+=== Use Case 3: Downcasting (ONLY if certain) ===
+Downcasted Base* to Derived* (we're certain of type)
+Derived method
+
+=== Comparison with dynamic_cast ===
+static_cast: No runtime overhead, no safety checks
+dynamic_cast: Runtime overhead, but provides safety
+
+When to use static_cast:
+  1. You're 100% certain of the actual type
+  2. Performance is critical
+  3. Numeric conversions (explicit data loss)
+
+=== DANGER: Wrong Use ===
+Cast succeeded but UNSAFE - pd3 doesn't point to valid Derived
+Would cause undefined behavior if we call derived methods
+```
+
+**Разбор:**
+
+1.  **Плюсы `static_cast`:**
+    *   нет накладных расходов **RTTI**-проверки;
+    *   быстрее `dynamic_cast` в типичных реализациях;
+    *   явно маркирует намерение «привести тип».
+2.  **Относительно безопасные применения:**
+    *   **upcast** по иерархии (в типичных случаях);
+    *   числовые приведения с явным допуском потери;
+    *   **downcast**, если **dynamic type** доказан логикой программы.
+3.  **Опасные применения:**
+    *   **downcast** без гарантий;
+    *   риск **UB** при вызовах методов производного типа;
+    *   нет «подушки безопасности» как у `dynamic_cast`.
+4.  **Практическое правило:**
+    *   для сомнительного **downcast** по умолчанию — `dynamic_cast`;
+    *   `static_cast` — когда профилирование/контракты оправдывают риск;
+    *   скорость без измерений редко стоит **UB**.
+
+**Ответ:** `static_cast` делает приведения, согласуемые на **compile time**, без проверок в **runtime**; хорош для **upcast**, явных числовых сужений и редких «жёстко гарантированных» **downcast**. Если уверенности нет — `dynamic_cast`.
+
+</details>
+
+##### **3.9. `const_cast` и const-корректность** (Туториал 4, Пример 4)
+
+Покажите, когда `const_cast` неизбежен, а когда он опасен.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `const_cast` снимает `const` у типа доступа; применять редко и только если гарантировано отсутствие записи в объект.
+
+```cpp
+#include <iostream>
+#include <cstring>
+using namespace std;
+
+// Legacy function that doesn't use const correctly
+void legacyPrint(char* str) {
+    // This function only reads, doesn't modify
+    cout << "String: " << str << endl;
+}
+
+// Another legacy function (pretend it's from old C library)
+void legacyProcess(char* str) {
+    // Actually modifies the string!
+    for (size_t i = 0; i < strlen(str); i++) {
+        str[i] = toupper(str[i]);
+    }
+}
+
+int main() {
+    cout << "=== Safe Use: Read-Only Legacy API ===" << endl;
+    const char* message = "Hello, World!";
+
+    // Error without const_cast:
+    // legacyPrint(message);  // ERROR: can't pass const char* to char*
+
+    // OK with const_cast (safe because legacyPrint doesn't modify)
+    legacyPrint(const_cast<char*>(message));
+    cout << "Safe: legacyPrint only reads the string" << endl;
+
+    cout << "\n=== UNSAFE Use: Modifying Legacy API ===" << endl;
+    const char* constMessage = "Dangerous";
+
+    cout << "Before: " << constMessage << endl;
+
+    // DANGEROUS! legacyProcess actually modifies the string
+    // legacyProcess(const_cast<char*>(constMessage));  // UNDEFINED BEHAVIOR!
+    cout << "Cannot safely use const_cast here - legacyProcess modifies data" << endl;
+    cout << "Would cause undefined behavior (string literal is in read-only memory)" << endl;
+
+    cout << "\n=== Safe Alternative: Copy First ===" << endl;
+    char buffer[100];
+    strcpy(buffer, "Hello");
+    cout << "Before: " << buffer << endl;
+
+    const char* constPtr = buffer;  // Now const
+    char* mutablePtr = const_cast<char*>(constPtr);  // Remove const
+    legacyProcess(mutablePtr);  // Safe: original wasn't const
+
+    cout << "After: " << buffer << endl;
+
+    cout << "\n=== Best Practice ===" << endl;
+    cout << "1. Avoid const_cast when possible" << endl;
+    cout << "2. Only use when interfacing with legacy APIs" << endl;
+    cout << "3. Ensure the underlying object wasn't originally const" << endl;
+    cout << "4. Document why const_cast is necessary" << endl;
+    cout << "5. Consider wrapping legacy API with const-correct interface" << endl;
+
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== Safe Use: Read-Only Legacy API ===
+String: Hello, World!
+Safe: legacyPrint only reads the string
+
+=== UNSAFE Use: Modifying Legacy API ===
+Before: Dangerous
+Cannot safely use const_cast here - legacyProcess modifies data
+Would cause undefined behavior (string literal is in read-only memory)
+
+=== Safe Alternative: Copy First ===
+Before: Hello
+After: HELLO
+
+=== Best Practice ===
+1. Avoid const_cast when possible
+2. Only use when interfacing with legacy APIs
+3. Ensure the underlying object wasn't originally const
+4. Document why const_cast is necessary
+5. Consider wrapping legacy API with const-correct interface
+```
+
+**Разбор:**
+
+1.  **Относительно безопасно:**
+    *   снять `const` ради вызова «только читающей» функции с неверной сигнатурой;
+    *   если объект создан как неконстантный, а `const` появился только на пути доступа.
+2.  **Опасно:**
+    *   снять `const` со строкового литерала и писать в память — **UB**;
+    *   снять `const` с объекта, который **изначально** `const`.
+3.  **Правило:**
+    *   безопаснее, если **реальный** объект не `const`, а `const` — лишь «надпись» на ссылке/указателе;
+    *   небезопасно, если объект **по смыслу** неизменяемый и может жить в read-only памяти.
+4.  **Почему это важно:**
+    *   компилятор может класть `const`-данные в защищённые сегменты;
+    *   запись может дать падение или тихую порчу;
+    *   оптимизации исходят из неизменяемости `const`-объектов.
+
+**Лучше, чем размазывать `const_cast` по коду:**
+
+```cpp
+// Instead of using const_cast, fix the API:
+void properPrint(const char* str) {  // Now const-correct
+    cout << "String: " << str << endl;
+}
+
+// Or create a wrapper:
+void safeLegacyPrint(const char* str) {
+    legacyPrint(const_cast<char*>(str));  // Encapsulate the cast
+}
+```
+
+**Ответ:** `const_cast` снимает `const` у типа доступа. Это терпимо только при стыковке со **legacy** API, если функция **не пишет**, и если объект **не был** изначально «настоящим» `const`. Предпочтительнее поправить API.
+
+</details>
+
+##### **3.10. `reinterpret_cast` для низкоуровневых операций** (Туториал 4, Пример 5)
+
+Покажите `reinterpret_cast` на примерах «битового взгляда» на память и хранения указателя как целого.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `reinterpret_cast` меняет **интерпретацию** битов, не выполняя обычного преобразования значения — инструмент для системного уровня и максимального риска.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "=== Use Case 1: Pointer ↔ Integer Conversion ===" << endl;
+    int x = 777;
+    int* p = &x;
+
+    cout << "Original pointer: " << p << endl;
+    cout << "Points to value: " << *p << endl;
+
+    // Store pointer as integer (e.g., for hashing, debugging)
+    long ptrAsInt = reinterpret_cast<long>(p);
+    cout << "Pointer as long: " << ptrAsInt << endl;
+
+    // Convert back to pointer
+    int* pBack = reinterpret_cast<int*>(ptrAsInt);
+    cout << "Converted back: " << pBack << endl;
+    cout << "Still points to: " << *pBack << endl;
+
+    cout << "\n=== Use Case 2: Type Punning (View Memory Differently) ===" << endl;
+    unsigned int bits = 0x3F800000;  // IEEE 754 representation of 1.0f
+    cout << "As unsigned int: " << bits << endl;
+
+    // View these bits as a float
+    float* fptr = reinterpret_cast<float*>(&bits);
+    cout << "Same bits as float: " << *fptr << endl;
+
+    cout << "\n=== Use Case 3: Incompatible Pointer Types ===" << endl;
+    unsigned int ux = 777;
+    unsigned int* pux = &ux;
+
+    // This would be an error without cast:
+    // int* pix = pux;  // ERROR: incompatible types
+
+    // reinterpret_cast allows it
+    int* pix = reinterpret_cast<int*>(pux);
+    cout << "unsigned* converted to int*" << endl;
+    cout << "Value: " << *pix << endl;
+
+    cout << "\n=== DANGER: Platform-Specific ===" << endl;
+    cout << "sizeof(void*) = " << sizeof(void*) << endl;
+    cout << "sizeof(long) = " << sizeof(long) << endl;
+
+    if (sizeof(void*) != sizeof(long)) {
+        cout << "WARNING: Pointer-to-long conversion may lose data!" << endl;
+        cout << "Use intptr_t or uintptr_t from <cstdint> instead" << endl;
+    } else {
+        cout << "OK: Pointer fits in long on this platform" << endl;
+    }
+
+    cout << "\n=== When to Use reinterpret_cast ===" << endl;
+    cout << "1. Low-level memory operations" << endl;
+    cout << "2. Hardware register access" << endl;
+    cout << "3. Binary serialization/deserialization" << endl;
+    cout << "4. Implementing custom memory allocators" << endl;
+    cout << "5. Interfacing with C APIs using void*" << endl;
+    cout << "\nFor application code: Almost NEVER!" << endl;
+
+    cout << "\n=== Better Alternatives ===" << endl;
+    cout << "• For pointer storage: use uintptr_t (from <cstdint>)" << endl;
+    cout << "• For type punning: use union or memcpy (safer)" << endl;
+    cout << "• For different pointer types: redesign to avoid need" << endl;
+
+    return 0;
+}
+```
+
+**Вывод программы:**
+```
+=== Use Case 1: Pointer ↔ Integer Conversion ===
+Original pointer: 0x7ffeefbff5ac
+Points to value: 777
+Pointer as long: 140732920755372
+Converted back: 0x7ffeefbff5ac
+Still points to: 777
+
+=== Use Case 2: Type Punning (View Memory Differently) ===
+As unsigned int: 1065353216
+Same bits as float: 1
+
+=== Use Case 3: Incompatible Pointer Types ===
+unsigned* converted to int*
+Value: 777
+
+=== DANGER: Platform-Specific ===
+sizeof(void*) = 8
+sizeof(long) = 8
+OK: Pointer fits in long on this platform
+
+=== When to Use reinterpret_cast ===
+1. Low-level memory operations
+2. Hardware register access
+3. Binary serialization/deserialization
+4. Implementing custom memory allocators
+5. Interfacing with C APIs using void*
+
+For application code: Almost NEVER!
+
+=== Better Alternatives ===
+• For pointer storage: use uintptr_t (from <cstdint>)
+• For type punning: use union or memcpy (safer)
+• For different pointer types: redesign to avoid need
+```
+
+**Разбор:**
+
+1.  **Что делает:**
+    *   трактует тот же битовый образ как другой тип;
+    *   это не «обычное» значение-преобразование, а смена *взгляда* компилятора;
+    *   почти полностью обходит статическую типобезопасность.
+2.  **Типовые применения:**
+    *   хранение указателя в целом и обратно;
+    *   **type punning** (осторожно: **strict aliasing**);
+    *   приведения между «несовместимыми» указателями.
+3.  **Риски:**
+    *   зависимость от платформы;
+    *   выравнивание и размеры;
+    *   легко получить **UB**;
+    *   ломаются инварианты типовой системы.
+4.  **Почему это опасно:**
+    *   возможны нарушения **strict aliasing**;
+    *   невыровненный доступ;
+    *   порядок байт;
+    *   неверные предположения о размерах.
+
+**Более безопасные альтернативы:**
+
+```cpp
+#include <cstdint>
+
+// Instead of reinterpret_cast<long>(ptr):
+uintptr_t ptrAsInt = reinterpret_cast<uintptr_t>(ptr);  // Guaranteed to fit
+
+// Instead of reinterpret_cast for type punning:
+union FloatInt {
+    float f;
+    uint32_t i;
+};
+FloatInt fi;
+fi.i = 0x3F800000;
+float value = fi.f;  // Safer than reinterpret_cast
+```
+
+**Ответ:** `reinterpret_cast` — для низкоуровневых задач (ОС, железо, бинарные форматы). В прикладном коде чаще уместнее `uintptr_t`, аккуратные `union`/`memcpy` и перепроектирование типов.
+
+</details>
+
+##### **3.11. `typeid` для идентификации типа** (Туториал 4, Пример 6)
+
+Покажите `typeid` для проверки типа в **runtime** и сравнения типов в полиморфной иерархии.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `typeid` даёт сведения о типе в **runtime**; полезно для отладки и редкого dispatch, но не замена нормальному полиморфизму.
+
+```cpp
+#include <iostream>
+#include <typeinfo>
+using namespace std;
+
+class Animal {
+public:
+    virtual ~Animal() { }  // Virtual destructor (required for RTTI)
+};
+
+class Dog : public Animal {
+public:
+    void bark() { cout << "Woof!" << endl; }
+};
+
+class Cat : public Animal {
+public:
+    void meow() { cout << "Meow!" << endl; }
+};
+
+void identifyAnimal(Animal* a) {
+    cout << "Type: " << typeid(*a).name() << endl;
+
+    // Compare with specific types
+    if (typeid(*a) == typeid(Dog)) {
+        cout << "This is a Dog" << endl;
+        Dog* d = static_cast<Dog*>(a);  // Safe because we checked
+        d->bark();
+    } else if (typeid(*a) == typeid(Cat)) {
+        cout << "This is a Cat" << endl;
+        Cat* c = static_cast<Cat*>(a);  // Safe because we checked
+        c->meow();
+    } else if (typeid(*a) == typeid(Animal)) {
+        cout << "This is a generic Animal" << endl;
+    }
+}
+
+int main() {
+    Dog dog;
+    Cat cat;
+    Animal animal;
+
+    Animal* ptr;
+
+    // Test with different objects
+    cout << "=== Testing with Dog ===" << endl;
+    ptr = &dog;
+    identifyAnimal(ptr);
+
+    cout << "\n=== Testing with Cat ===" << endl;
+    ptr = &cat;
+    identifyAnimal(ptr);
+
+    cout << "\n=== Testing with Animal ===" << endl;
+    ptr = &animal;
+    identifyAnimal(ptr);
+
+    // Demonstrating difference between static and dynamic type
+    cout << "\n=== Static vs Dynamic Type ===" << endl;
+    Animal* ptrToDog = new Dog();
+
+    cout << "Static type (pointer): " << typeid(ptrToDog).name() << endl;
+    cout << "Dynamic type (object): " << typeid(*ptrToDog).name() << endl;
+
+    // Can use this for conditional behavior
+    if (typeid(*ptrToDog) == typeid(Dog)) {
+        cout << "Confirmed: pointer points to a Dog" << endl;
+    }
+
+    delete ptrToDog;
+
+    return 0;
+}
+```
+
+**Возможный вывод программы:**
+```
+=== Testing with Dog ===
+Type: 3Dog
+This is a Dog
+Woof!
+
+=== Testing with Cat ===
+Type: 3Cat
+This is a Cat
+Meow!
+
+=== Testing with Animal ===
+Type: 6Animal
+This is a generic Animal
+
+=== Static vs Dynamic Type ===
+Static type (pointer): P6Animal
+Dynamic type (object): 3Dog
+Confirmed: pointer points to a Dog
+```
+
+**Примечание:** точный текст `type_info::name()` **implementation-defined** и на разных компиляторах выглядит по-разному (например, `Dog`, `class Dog`, mangled-имя).
+
+**Разбор:**
+
+1.  **Базовый приём:** `typeid(*ptr)` отражает **dynamic type** объекта.
+2.  **Сравнение:** `typeid(*ptr) == typeid(Dog)` проверяет «является ли объект именно `Dog`».
+3.  **Статика vs динамика:**
+    *   `typeid(ptr)` — тип **выражения** `ptr` (здесь `Animal*`);
+    *   `typeid(*ptr)` — тип **объекта в памяти** (например, `Dog`).
+4.  **Практика:** можно распознать тип и затем сузить указатель (часто вслед за проверкой используют `static_cast`, если логика эквивалентна проверке).
+
+**Альтернатива через `dynamic_cast` (часто предпочтительнее):**
+
+```cpp
+void identifyAnimal(Animal* a) {
+    if (Dog* d = dynamic_cast<Dog*>(a)) {
+        cout << "This is a Dog" << endl;
+        d->bark();
+    } else if (Cat* c = dynamic_cast<Cat*>(a)) {
+        cout << "This is a Cat" << endl;
+        c->meow();
+    }
+}
+```
+
+**Ответ:** `typeid` возвращает `const std::type_info&` для проверок типа в **runtime**; `typeid(*ptr)` — про объект, `typeid(ptr)` — про сам указатель/ссылку как значение. Сравнение — через `==` у `type_info`.
+
+</details>

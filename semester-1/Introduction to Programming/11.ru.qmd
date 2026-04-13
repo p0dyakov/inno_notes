@@ -1,0 +1,985 @@
+---
+title: "W12. Исключения, системы контроля версий"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2025-11-19
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Резюме**
+##### **1.1 Введение в исключения**
+В программировании нужно принять базовый факт: **любой достаточно длинный код содержит ошибки**. Хорошее программирование — это не попытка полностью избежать багов, а умение спроектировать код так, чтобы ошибки обрабатывались аккуратно. Для этого важны три способности:
+
+1. **Fault awareness (осведомлённость о сбоях)**: обнаруживать ошибки при их появлении, не «роняя» программу или систему целиком  
+2. **Fault recovery (восстановление после сбоя)**: выходить из ошибочного состояния и давать пользователю возможность продолжить работу и сохранить прогресс  
+3. **Fault tolerance (отказоустойчивость)**: стабильно продолжать выполнение несмотря на ошибки, выполняя те части работы, которые проблеме не противоречат  
+
+**Exception (исключение)** — это проблема, возникающая во время выполнения программы. Когда исключение возникает, нормальный поток управления нарушается. Причины могут быть разными:
+
+*   пользователь ввёл некорректные данные  
+*   требуемый файл не найден  
+*   в процессе обмена данными пропало сетевое соединение  
+*   у JVM закончилась память  
+
+Часть исключений связана с ошибками пользователя, часть — с ошибками программиста, часть — с отказами физических ресурсов.
+
+##### **1.2 Исторический контекст: классическая обработка ошибок**
+До появления современных механизмов исключений программисты опирались на **коды ошибок (error codes)**: функции возвращали особые значения (например `-1` или `0`) как признак неудачи либо передавали состояние ошибки через выходные параметры.
+
+У такого подхода серьёзные недостатки:
+
+*   **Error-prone (склонность к ошибкам)**: коды ошибок легко «забыть проверить», и программа продолжает работу в несогласованном состоянии  
+*   **Excess locality (избыточная локальность)**: ближайший вызывающий код может не иметь достаточно контекста, чтобы корректно обработать ошибку  
+*   **Code complexity (усложнение кода)**: нормальная логика перемешивается с проверками ошибок, текст программы становится трудночитаемым  
+*   **Poor error propagation (слабая передача ошибок вверх по стеку вызовов)**: ошибку приходилось вручную проталкивать по цепочке вызовов через возвращаемые значения, глобальные переменные или «почти goto»-конструкции  
+
+<!-- DIAGRAM HERE -->
+
+В итоге обработка ошибок оказывалась жёстко связана с бизнес-логикой, что снижало читаемость и сопровождаемость.
+
+##### **1.3 Что считается исключением**
+Исключение — это **любое событие, не входящее в нормальный поток управления** программы. Считать ли что-то исключением, зависит от конкретного приложения и уровня абстракции.
+
+Исключением может быть:
+
+*   **error (ошибка)** (например нехватка памяти, неверное значение аргумента)  
+*   **unusual result (нестандартный результат)** вычисления  
+*   **unexpected but not wrong request (неожиданный, но не «неправильный» запрос)** к ОС  
+*   **detection of external input (обнаружение внешнего события)** (запрос прерывания, попытка входа, просадка питания)  
+
+##### **1.4 Исключения в объектно-ориентированном программировании**
+Исключения не являются «врождённой» частью философии ОО, но в каждом современном ОО-языке есть обработка исключений. В ОО-языках **исключения — это объекты**: экземпляры классов, которые переносят информацию о нештатной ситуации между частями программы.
+
+У обработки исключений в ОО-языках три аспекта:
+
+1. **Событие**, нарушающее нормальный поток управления (инициируется средой выполнения или самой программой)  
+2. **Transfer of control (передача управления)** в другую точку программы (по правилам языка)  
+3. **Объект**, передаваемый вместе с передачей управления (экземпляр класса исключения)  
+
+##### **1.5 Иерархия исключений Java**
+В Java исключения образуют иерархию с корнем в классе `java.lang.Throwable`. Выделяют три крупные категории:
+
+###### **1.5.1 Checked exceptions (контролируемые исключения)**
+**Checked exceptions** проверяются компилятором на этапе компиляции; их также называют **compile-time exceptions**. Программист обязан их обработать — «проигнорировать» нельзя.
+
+Если метод может бросить checked exception, он должен либо:
+
+*   перехватить исключение в блоке `try-catch`  
+*   объявить исключение в своей секции `throws`  
+
+Checked-исключения наследуют `java.lang.Exception`, но не `RuntimeException` и не `Error`. Типичные примеры: `IOException`, `SQLException`, `ClassNotFoundException`.
+
+###### **1.5.2 Unchecked exceptions (runtime exceptions)**
+**Unchecked exceptions** возникают во время выполнения; их также называют **runtime exceptions**. Сюда относятся логические ошибки и некорректное использование API. Компилятор на этапе компиляции эти исключения не контролирует.
+
+Они наследуют `java.lang.RuntimeException`. Примеры:
+
+*   `NullPointerException`: обращение к членам `null`-объекта  
+*   `ArithmeticException`: деление на ноль  
+*   `ArrayIndexOutOfBoundsException`: выход за границы массива  
+*   `NumberFormatException`: разбор строки в число при некорректном формате  
+
+###### **1.5.3 Errors**
+**Errors** — проблемы вне прямого контроля пользователя или программиста. Их обычно не перехватывают в прикладном коде, потому что мало что можно сделать осмысленно. Например `StackOverflowError` или `OutOfMemoryError` указывают на серьёзные системные сбои.
+
+`Error` наследует `java.lang.Error`; для компилятора это тоже не checked-исключения.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.6 Механизм исключений**
+###### **1.6.1 Throwing exceptions (генерация исключений)**
+Исключение может возникнуть двумя путями:
+
+1. **Со стороны runtime**: при обнаружении ошибки (например деление на ноль)  
+2. **Явно в программе**: ключевое слово `throw` с объектом исключения  
+
+```java
+throw new ExceptionType("Error message");
+```
+
+После `throw` текущий метод немедленно прекращает выполнение.
+
+###### **1.6.2 Распространение исключения и stack unwinding**
+Когда исключение брошено, управление передаётся последовательно через **динамически охватывающие области видимости** (от текущей к внешним), пока не найдётся подходящий обработчик. Этот процесс называют **stack unwinding (раскруткой стека)**.
+
+Если в текущем методе обработчика нет, исключение поднимается к вызывающему методу и так далее по стеку вызовов. Если обработчика нигде нет, программа завершается.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.6.3 Перехват: блоки try-catch**
+Блок `try-catch` задаёт, где исключения перехватываются и как обрабатываются:
+
+```java
+try {
+    // Code that might throw exceptions
+} catch (ExceptionType1 e) {
+    // Handle ExceptionType1
+} catch (ExceptionType2 e) {
+    // Handle ExceptionType2
+}
+```
+
+Ключевые правила:
+
+*   блок `try` содержит код, где возможны исключения  
+*   каждый `catch` обрабатывает исключения указанного типа и его подклассов  
+*   объект исключения передаётся обработчику как параметр метода  
+*   несколько `catch` проверяются по порядку — выполняется первый подошедший  
+*   после обработчика выполнение продолжается уже после всей конструкции `try-catch`  
+
+**Важно**: `catch` нужно упорядочивать от более специфичного типа к более общему. `catch` для суперкласса перехватит и все подклассы; если поставить его первым, следующие `catch` для подклассов станут недостижимыми (ошибка компиляции в Java).
+
+###### **1.6.4 Блок finally**
+Блок `finally` содержит код, который выполняется **в любом случае** — было исключение или нет:
+
+```java
+try {
+    // Code that might throw exceptions
+} catch (ExceptionType e) {
+    // Handle exception
+} finally {
+    // Always executed
+}
+```
+
+`finally` выполняется:
+
+*   после `try`, если исключения не было  
+*   после любого сработавшего `catch`  
+*   даже в процессе stack unwinding, если подходящего `catch` не нашлось  
+
+В Java `finally` допустим и без `catch`. Типичное применение — гарантированная очистка (закрытие файлов, освобождение ресурсов).
+
+###### **1.6.5 Multi-catch (Java 7+)**
+Начиная с Java 7, один `catch` может обрабатывать несколько типов исключений:
+
+```java
+try {
+    // Code
+} catch (IOException | SQLException ex) {
+    // Handle both exception types
+}
+```
+
+Это снижает дублирование кода и помогает не ловить слишком широкие типы без необходимости.
+
+##### **1.7 Конструкция try-with-resources**
+**Try-with-resources** (Java 7) автоматически управляет ресурсами, которые нужно закрыть после использования. Ресурс — объект, реализующий `AutoCloseable`.
+
+```java
+try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+    return br.readLine();
+}
+```
+
+Ресурс, объявленный в заголовке `try`, закрывается при завершении блока — нормальном или аварийном. Явный `finally` для закрытия часто не нужен.
+
+**До Java 7** закрытие делали вручную в `finally`:
+
+```java
+BufferedReader br = new BufferedReader(new FileReader(path));
+try {
+    return br.readLine();
+} finally {
+    br.close();
+}
+```
+
+##### **1.8 Suppressed exceptions (подавленные исключения)**
+Когда возможны несколько исключений подряд (например в `try` и ещё одно при закрытии ресурса), одно исключение может **suppress (подавить)** другое в смысле «спрятать за собой». Пример:
+
+```java
+FileInputStream fileIn = null;
+try {
+    fileIn = new FileInputStream(filePath);
+} catch (FileNotFoundException e) {
+    throw new IOException(e);
+} finally {
+    fileIn.close();  // NullPointerException if file not found!
+}
+```
+
+Если файла нет, ловится `FileNotFoundException`, но затем в `finally` вызывается `close()` у `null`, и наружу «всплывает» `NullPointerException`, перекрывая исходную причину.
+
+Метод `Throwable.addSuppressed()` позволяет сохранить исходное исключение:
+
+```java
+Throwable firstException = null;
+FileInputStream fileIn = null;
+try {
+    fileIn = new FileInputStream(filePath);
+} catch (IOException e) {
+    firstException = e;
+} finally {
+    try {
+        fileIn.close();
+    } catch (NullPointerException npe) {
+        if (firstException != null) {
+            npe.addSuppressed(firstException);
+        }
+        throw npe;
+    }
+}
+```
+
+У try-with-resources подавленные исключения обрабатываются автоматически.
+
+##### **1.9 Спецификация исключений (throws)**
+В Java метод может объявить, какие checked-исключения он может бросить, через **throws clause**:
+
+```java
+void f(int x) throws IOException, SQLException {
+    // Method body
+}
+```
+
+Это означает: метод может бросить `IOException` или `SQLException`; вызывающий код обязан обработать их или снова объявить в `throws`.
+
+**Замечание**: требование относится только к checked-исключениям. Unchecked-исключения и `Error` объявлять не обязательно.
+
+##### **1.10 Файловые потоки в Java**
+###### **1.10.1 FileOutputStream**
+`FileOutputStream` записывает двоичные данные в файл. Основные методы:
+
+*   `void write(byte[] ary)`: записать весь массив байт  
+*   `void write(byte[] ary, int off, int len)`: записать `len` байт, начиная с `off`  
+*   `void write(int b)`: записать один байт  
+*   `void close()`: закрыть поток  
+
+###### **1.10.2 FileInputStream**
+`FileInputStream` читает двоичные данные из файла. Основные методы:
+
+*   `int available()`: оценка числа байт, доступных для чтения  
+*   `int read()`: прочитать один байт  
+*   `int read(byte[] b)`: до `b.length` байт в массив  
+*   `int read(byte[] b, int off, int len)`: до `len` байт, начиная с `off`  
+*   `long skip(long x)`: пропустить `x` байт  
+*   `void close()`: закрыть поток  
+
+##### **1.11 Системы контроля версий**
+**Version control systems (VCS)** — инструменты, которые фиксируют изменения файлов во времени и отслеживают правки исходного кода. Они критичны для команд, особенно распределённых, где каждый вносит свою функциональность.
+
+VCS помогает команде согласованно обмениваться изменениями и видеть, кто и что менял. Ключевые выгоды:
+
+*   полная история изменений  
+*   совместная работа с управлением конфликтами  
+*   откат к прошлым версиям  
+*   ветки под отдельные фичи  
+*   более организованный процесс разработки  
+
+##### **1.12 Типы систем контроля версий**
+###### **1.12.1 Local VCS (локальные)**
+Простейший вариант: локальная база хранит все версии файлов. Пример — **RCS (Revision Control System)**: набор патчей в особом формате позволяет восстановить файл на любой момент времени.
+
+**Ограничение**: одновременная совместная работа над файлами не поддерживается.
+
+###### **1.12.2 Centralized VCS (CVCS)**
+В **CVCS** есть **один глобальный репозиторий**; все делают commit в центр, а чужие изменения видны после update из этого репозитория.
+
+<!-- DIAGRAM HERE -->
+
+**Плюсы**:
+
+*   совместная разработка  
+*   видимость активности других  
+
+**Минусы**:
+
+*   **single point of failure (единая точка отказа)**: если центральный сервер недоступен, совместная работа и фиксация версий затруднены  
+*   **риск потери данных**: при порче центральной БД без бэкапов можно потерять всё  
+
+Примеры: SVN, CVS.
+
+###### **1.12.3 Distributed VCS (DVCS)**
+В **DVCS** **множество репозиториев**: у каждого пользователя свой репозиторий и рабочая копия. `commit` влияет только на локальный репозиторий; чтобы изменения стали видны централизованно, нужен **push**. Чтобы подтянуть чужие изменения, делают **pull** (и затем update рабочей копии в соответствии с моделью инструмента).
+
+<!-- DIAGRAM HERE -->
+
+**Плюсы**:
+
+*   полная копия репозитория на машине (резерв)  
+*   можно работать офлайн  
+*   нет единой обязательной точки отказа  
+*   гибкие сценарии ветвления и слияний  
+
+Наиболее популярные DVCS: **Git** и **Mercurial**.
+
+##### **1.13 Основы Git**
+###### **1.13.1 Git и GitHub**
+**Git** — распределённая система контроля версий; история кода ведётся локально на вашей машине.
+
+**GitHub** — облачный хостинг Git-репозиториев для обмена кодом и совместной работы. Git остаётся локальным инструментом; GitHub добавляет сервисы вокруг него.
+
+###### **1.13.2 Базовые команды Git**
+*   `git init`: создать репозиторий  
+*   `git clone <from> <to>`: клонировать удалённый репозиторий  
+*   `git pull`: обновить локальный репозиторий с remote  
+*   `git status`: статус и список изменённых файлов  
+*   `git add <files>`: добавить файлы в индекс (staging)  
+*   `git commit -m "MESSAGE"`: зафиксировать индекс с сообщением  
+*   `git push`: отправить локальные коммиты на remote  
+*   `git revert`: отменить коммит новым коммитом  
+*   `git checkout <BRANCH>`: переключить ветку  
+*   `git merge`: слить ветки  
+
+###### **1.13.3 Базовый рабочий процесс с Git**
+1. Установить **Git**  
+2. Настроить идентичность глобально:  
+   ```bash
+   git config --global user.name "Your Name"
+   git config --global user.email "youremail@example.com"
+   ```  
+3. Добавить **SSH-ключ** в настройках GitHub (Settings → SSH and GPG keys)  
+4. Создать локальный репозиторий и начать отслеживание изменений  
+5. Регулярно делать **add** и **commit**  
+6. **Push** на remote, чтобы делиться изменениями  
+
+***
+
+#### **2. Определения**
+*   **Exception (исключение)**: проблема во время выполнения, нарушающая нормальный поток и потенциально приводящая к аварийному завершению, если не обработана.  
+*   **Checked Exception**: исключение, проверяемое компилятором; его нужно обработать или объявить в `throws`.  
+*   **Unchecked Exception (Runtime Exception)**: исключение времени выполнения, обычно из-за ошибок в коде; компилятор его не требует обрабатывать явно.  
+*   **Error**: серьёзная проблема вне прямого контроля пользователя/программиста; чаще всего это системные сбои, из которых трудно восстановиться в прикладном смысле.  
+*   **try block**: блок, в котором могут возникнуть исключения.  
+*   **catch block**: обработчик конкретного типа исключения.  
+*   **finally block**: блок, выполняемый после `try`/`catch` в любом случае.  
+*   **throw**: ключевое слово явного броска исключения.  
+*   **throws**: ключевое слово в объявлении метода для перечисления checked-исключений.  
+*   **Stack Unwinding**: подъём исключения по стеку вызовов с поиском обработчика.  
+*   **Suppressed Exception**: исключение, возникшее параллельно с другим и прикреплённое к нему, а не заменяющее его полностью.  
+*   **Try-with-resources**: `try`, объявляющий ресурсы, которые закрываются автоматически.  
+*   **Version Control System (VCS)**: ПО для учёта изменений файлов во времени и совместной работы.  
+*   **Centralized VCS (CVCS)**: модель с одним центральным репозиторием для commit/update.  
+*   **Distributed VCS (DVCS)**: модель с полными копиями репозитория и обменом через push/pull.  
+*   **Git**: распределённая VCS, ориентированная на скорость, целостность данных и нелинейные workflow.  
+*   **GitHub**: облачный хостинг Git-репозиториев для совместной работы.  
+*   **Repository**: хранилище метаданных и истории набора файлов.  
+*   **Commit**: снимок изменений, новая точка истории.  
+*   **Push**: отправка локальных коммитов на remote.  
+*   **Pull**: получение изменений с remote и слияние с локальным репозиторием.  
+
+***
+
+#### **3. Примеры**
+##### **3.1. Создать аккаунт VCS и репозиторий** (Лаба 11, Задание 1)
+1. Создайте аккаунт VCS, если его нет (например на GitHub).  
+2. Создайте репозиторий для упражнений курса ITP (не для заданий на оценку).  
+3. Добавьте в репозиторий хотя бы упражнения прошлой недели.  
+4. Поддерживайте этот процесс до конца курса.  
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** контроль версий нужен, чтобы фиксировать работу, показывать прогресс и привыкать к профессиональной дисциплине.
+
+**Пошагово:**
+
+1.  **Регистрация на GitHub:**  
+    *   откройте [github.com](https://github.com)  
+    *   нажмите «Sign up» и пройдите регистрацию  
+2.  **Новый репозиторий:**  
+    *   иконка «+» в правом верхнем углу  
+    *   «New repository»  
+    *   имя (например `ITP-Exercises`)  
+    *   Public или Private  
+    *   при желании README при создании  
+    *   «Create repository»  
+3.  **Локальная настройка Git:**  
+    ```bash
+    git config --global user.name "Your Name"
+    git config --global user.email "youremail@example.com"
+    ```  
+4.  **Клонирование:**  
+    ```bash
+    git clone https://github.com/yourusername/ITP-Exercises.git
+    cd ITP-Exercises
+    ```  
+5.  **Добавить прошлые упражнения:**  
+    *   скопируйте файлы в папку репозитория  
+    *   индексация:  
+    ```bash
+    git add .
+    ```  
+    *   коммит:  
+    ```bash
+    git commit -m "Add previous week's exercises"
+    ```  
+    *   отправка:  
+    ```bash
+    git push
+    ```  
+6.  **Привычка:** после каждого нового упражнения повторяйте add/commit/push с осмысленными сообщениями коммитов.  
+
+</details>
+
+##### **3.2. Копирование файла с обработкой исключений** (Лаба 11, Задание 2)
+Напишите программу, которая читает текстовый файл и пишет данные в другой текстовый файл. Обработайте случаи:
+
+*   входной файл не существует  
+*   нет прав на запись в выходной файл  
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** файловые операции могут завершаться по-разному; важно обрабатывать `FileNotFoundException`, `IOException` и родственные ситуации.
+
+```java
+import java.io.*;
+
+public class FileCopier {
+    public static void main(String[] args) {
+        // Define input and output file paths
+        String inputFile = "input.txt";
+        String outputFile = "output.txt";
+        
+        // Try-with-resources automatically closes streams
+        try (FileInputStream in = new FileInputStream(inputFile);
+             FileOutputStream out = new FileOutputStream(outputFile)) {
+            
+            // Create buffer to hold file data
+            byte[] buffer = new byte[in.available()];
+            
+            // Read all data from input file into buffer
+            in.read(buffer, 0, buffer.length);
+            
+            // Write all data from buffer to output file
+            out.write(buffer, 0, buffer.length);
+            
+            System.out.println("File copied successfully!");
+            
+        } catch (FileNotFoundException e) {
+            // Input file doesn't exist OR no write permission for output
+            System.out.println("File error: " + e.getMessage());
+            System.out.println("Check that input file exists and you have write permissions.");
+        } catch (IOException e) {
+            // Other I/O errors during read/write
+            System.out.println("I/O error occurred: " + e.getMessage());
+        }
+    }
+}
+```
+
+**Пояснение:**
+
+1. **Try-with-resources** закрывает оба потока автоматически.  
+2. **FileNotFoundException** — нет входного файла или нет прав записи в выходной путь.  
+3. **IOException** — прочие ошибки ввода-вывода.  
+4. Подход с буфером читает файл целиком в память (разумно для небольших файлов).  
+
+**Коммит в репозиторий:**
+```bash
+git add FileCopier.java
+git commit -m "Add file copy program with exception handling"
+git push
+```
+
+</details>
+
+##### **3.3. Деление с несколькими обработчиками исключений** (Лаба 11, Задание 3)
+Напишите программу, которая читает из файла два целых параметра и делит первое на второе. Перехватите все релевантные исключения (разбор строки, нецелые значения, арифметика) и выведите понятные сообщения.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** одновременно возможны ошибки доступа к файлу, разбора числа и арифметики — для каждого типа нужен свой сценарий.
+
+```java
+import java.io.*;
+import java.util.Scanner;
+
+public class FileDivision {
+    public static void main(String[] args) {
+        String filename = "numbers.txt";
+        
+        try (Scanner scanner = new Scanner(new File(filename))) {
+            // Read two numbers from file
+            String firstLine = scanner.nextLine();
+            String secondLine = scanner.nextLine();
+            
+            // Parse strings to integers
+            int numerator = Integer.parseInt(firstLine.trim());
+            int denominator = Integer.parseInt(secondLine.trim());
+            
+            // Perform division
+            int result = numerator / denominator;
+            
+            System.out.println("Result: " + numerator + " / " + denominator + " = " + result);
+            
+        } catch (FileNotFoundException e) {
+            System.out.println("Error: File '" + filename + "' not found.");
+            System.out.println("Please ensure the file exists in the current directory.");
+            
+        } catch (NumberFormatException e) {
+            System.out.println("Error: Invalid number format in file.");
+            System.out.println("The file must contain exactly two integers, one per line.");
+            System.out.println("Details: " + e.getMessage());
+            
+        } catch (ArithmeticException e) {
+            System.out.println("Error: Cannot divide by zero.");
+            System.out.println("The second number in the file must be non-zero.");
+            
+        } catch (IOException e) {
+            System.out.println("Error: Problem reading from file.");
+            System.out.println("Details: " + e.getMessage());
+            
+        } catch (Exception e) {
+            System.out.println("Error: Unexpected problem occurred.");
+            System.out.println("Details: " + e.getMessage());
+        }
+    }
+}
+```
+
+**Тесты:**
+
+Создайте `numbers.txt` с разным содержимым:
+
+1. **Норма:**  
+   ```
+   10
+   2
+   ```  
+   Вывод: `Result: 10 / 2 = 5`  
+2. **Деление на ноль:**  
+   ```
+   10
+   0
+   ```  
+   Вывод: `Error: Cannot divide by zero.`  
+3. **Некорректное число:**  
+   ```
+   10
+   abc
+   ```  
+   Вывод: `Error: Invalid number format in file.`  
+4. **Нет файла:** удалите `numbers.txt`  
+   Вывод: `Error: File 'numbers.txt' not found.`  
+
+**Ответ:** программа различает типы ошибок и печатает отдельные сообщения для каждого случая.
+
+</details>
+
+##### **3.4. Деление с подавленными исключениями** (Лаба 11, Задание 4)
+Доработайте код предыдущего задания так, чтобы после печати сообщений об ошибках использовались suppressed exceptions.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** suppressed exceptions сохраняют информацию о нескольких сбоях, что полезно, когда при очистке ресурса возникает ещё одна ошибка.
+
+```java
+import java.io.*;
+import java.util.Scanner;
+
+public class FileDivisionWithSuppressed {
+    public static void main(String[] args) {
+        String filename = "numbers.txt";
+        Scanner scanner = null;
+        Throwable primaryException = null;
+        
+        try {
+            scanner = new Scanner(new File(filename));
+            
+            // Read two numbers from file
+            String firstLine = scanner.nextLine();
+            String secondLine = scanner.nextLine();
+            
+            // Parse strings to integers
+            int numerator = Integer.parseInt(firstLine.trim());
+            int denominator = Integer.parseInt(secondLine.trim());
+            
+            // Perform division
+            int result = numerator / denominator;
+            
+            System.out.println("Result: " + numerator + " / " + denominator + " = " + result);
+            
+        } catch (FileNotFoundException e) {
+            System.out.println("Error: File '" + filename + "' not found.");
+            primaryException = e;
+            
+        } catch (NumberFormatException e) {
+            System.out.println("Error: Invalid number format in file.");
+            primaryException = e;
+            
+        } catch (ArithmeticException e) {
+            System.out.println("Error: Cannot divide by zero.");
+            primaryException = e;
+            
+        } catch (Exception e) {
+            System.out.println("Error: Unexpected problem occurred.");
+            primaryException = e;
+            
+        } finally {
+            // Try to close scanner in finally block
+            if (scanner != null) {
+                try {
+                    scanner.close();
+                } catch (Exception closeException) {
+                    System.out.println("Error: Failed to close file.");
+                    
+                    // If we had a previous exception, add this as suppressed
+                    if (primaryException != null) {
+                        primaryException.addSuppressed(closeException);
+                    } else {
+                        // If no primary exception, this becomes the primary
+                        primaryException = closeException;
+                    }
+                }
+            }
+            
+            // Re-throw the primary exception if one occurred
+            if (primaryException != null) {
+                if (primaryException instanceof RuntimeException) {
+                    throw (RuntimeException) primaryException;
+                } else {
+                    throw new RuntimeException(primaryException);
+                }
+            }
+        }
+    }
+}
+```
+
+**Пояснение:**
+
+1. Сохраняем первое исключение в `primaryException`.  
+2. В `finally` при ошибке `close()` перехватываем второе исключение.  
+3. Если первичное уже есть, вызываем `addSuppressed()` для второго.  
+4. Так сохраняются и исходная проблема, и сбой при очистке.  
+
+**Предпочтительнее try-with-resources:**
+
+```java
+import java.io.*;
+import java.util.Scanner;
+
+public class FileDivisionBetter {
+    public static void main(String[] args) {
+        String filename = "numbers.txt";
+        
+        // Try-with-resources automatically handles suppressed exceptions
+        try (Scanner scanner = new Scanner(new File(filename))) {
+            String firstLine = scanner.nextLine();
+            String secondLine = scanner.nextLine();
+            
+            int numerator = Integer.parseInt(firstLine.trim());
+            int denominator = Integer.parseInt(secondLine.trim());
+            int result = numerator / denominator;
+            
+            System.out.println("Result: " + numerator + " / " + denominator + " = " + result);
+            
+        } catch (FileNotFoundException e) {
+            System.out.println("Error: File not found.");
+            throw new RuntimeException(e);
+        } catch (NumberFormatException e) {
+            System.out.println("Error: Invalid number format.");
+            throw new RuntimeException(e);
+        } catch (ArithmeticException e) {
+            System.out.println("Error: Division by zero.");
+            throw new RuntimeException(e);
+        }
+    }
+}
+```
+
+**Ответ:** try-with-resources — предпочтительный путь: JVM сама связывает исключения при закрытии ресурса с исключением из основного блока.
+
+</details>
+
+##### **3.5. Загрузка изображения с обработкой исключений** (Лаба 11, Задание 5)
+Ниже метод загружает изображение (на самом деле любой файл). Доработайте код так, чтобы обрабатывались все уместные исключения.
+
+```java
+public static void saveImage(String imageUrl) {
+    URL url = new URL(imageUrl);
+    String fileName = url.getFile();
+    String destName = "./figures" + fileName.substring(fileName.lastIndexOf("/"));
+    System.out.println(destName);
+    
+    InputStream is = url.openStream();
+    OutputStream os = new FileOutputStream(destName);
+    
+    byte[] b = new byte[2048];
+    int length;
+    
+    while ((length = is.read(b)) != -1) {
+        os.write(b, 0, length);
+    }
+    
+    is.close();
+    os.close();
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** сеть и файловая система дают много классов сбоев; используйте try-with-resources и отдельные `catch` для типичных исключений.
+
+```java
+import java.io.*;
+import java.net.*;
+import java.nio.file.*;
+
+public class ImageDownloader {
+    /**
+     * Downloads a file from a URL and saves it locally.
+     * @param imageUrl The URL of the file to download
+     * @throws IllegalArgumentException if imageUrl is null or empty
+     */
+    public static void saveImage(String imageUrl) {
+        // Validate input
+        if (imageUrl == null || imageUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Image URL cannot be null or empty");
+        }
+        
+        try {
+            // Parse URL
+            URL url = new URL(imageUrl);
+            
+            // Extract filename from URL
+            String fileName = url.getFile();
+            if (fileName == null || fileName.isEmpty() || !fileName.contains("/")) {
+                throw new IllegalArgumentException("Invalid URL: cannot extract filename");
+            }
+            
+            // Create destination path
+            String destName = "./figures" + fileName.substring(fileName.lastIndexOf("/"));
+            System.out.println("Downloading to: " + destName);
+            
+            // Ensure the figures directory exists
+            File directory = new File("./figures");
+            if (!directory.exists()) {
+                if (!directory.mkdirs()) {
+                    throw new IOException("Failed to create directory: " + directory.getPath());
+                }
+            }
+            
+            // Download and save file using try-with-resources
+            try (InputStream is = url.openStream();
+                 OutputStream os = new FileOutputStream(destName)) {
+                
+                byte[] buffer = new byte[2048];
+                int length;
+                int totalBytes = 0;
+                
+                // Read from URL and write to file
+                while ((length = is.read(buffer)) != -1) {
+                    os.write(buffer, 0, length);
+                    totalBytes += length;
+                }
+                
+                System.out.println("Download completed successfully!");
+                System.out.println("Total bytes downloaded: " + totalBytes);
+                
+            }
+            
+        } catch (MalformedURLException e) {
+            // Invalid URL format
+            System.err.println("Error: Invalid URL format");
+            System.err.println("Please check the URL: " + imageUrl);
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (FileNotFoundException e) {
+            // Cannot create output file (permission issues or invalid path)
+            System.err.println("Error: Cannot create output file");
+            System.err.println("Check that you have write permissions for the destination directory");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (UnknownHostException e) {
+            // Cannot resolve hostname (no internet or invalid domain)
+            System.err.println("Error: Cannot reach the server");
+            System.err.println("Check your internet connection and verify the URL");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (SocketTimeoutException e) {
+            // Connection timed out
+            System.err.println("Error: Connection timed out");
+            System.err.println("The server took too long to respond");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (IOException e) {
+            // Other I/O errors (network problems, disk full, etc.)
+            System.err.println("Error: I/O problem occurred during download");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (IllegalArgumentException e) {
+            // Invalid arguments
+            System.err.println("Error: Invalid argument");
+            System.err.println("Details: " + e.getMessage());
+            
+        } catch (Exception e) {
+            // Catch any other unexpected exceptions
+            System.err.println("Error: Unexpected problem occurred");
+            System.err.println("Details: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    // Example usage
+    public static void main(String[] args) {
+        // Test with a valid image URL
+        String imageUrl = "https://example.com/image.jpg";
+        saveImage(imageUrl);
+        
+        // Test with invalid URL
+        saveImage("not_a_valid_url");
+        
+        // Test with null
+        try {
+            saveImage(null);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught expected exception for null URL");
+        }
+    }
+}
+```
+
+**Что улучшено:**
+
+1. Try-with-resources для потоков.  
+2. Отдельные `catch` под разные классы ошибок.  
+3. Создание каталога назначения при необходимости.  
+4. Валидация URL до загрузки.  
+5. Информативные сообщения.  
+6. Отчёт о пути и числе байт.  
+
+**Сценарии проверки:**
+
+```java
+// Valid image download
+saveImage("https://example.com/photo.jpg");
+
+// Malformed URL
+saveImage("htp://invalid.url");
+
+// Network error (no internet)
+saveImage("https://nonexistent-domain-12345.com/image.jpg");
+
+// File permission error
+saveImage("https://example.com/image.jpg");  // with read-only destination directory
+```
+
+**Коммит:**
+```bash
+git add ImageDownloader.java
+git commit -m "Add image downloader with comprehensive exception handling"
+git push
+```
+
+**Дополнительно: README.md** в корне репозитория:
+
+```markdown
+# Упражнения курса ITP
+
+В этом репозитории — упражнения курса Introduction to Programming.
+
+## Структура
+
+- Лабораторные по неделям
+- Дополнительные задачи и решения
+- Примеры с лекций
+
+## Лаба 11: обработка исключений
+
+- FileCopier.java — копирование файла с обработкой исключений
+- FileDivision.java — деление и несколько типов исключений
+- ImageDownloader.java — загрузка по сети с подробной обработкой ошибок
+
+## Как пользоваться
+
+1. Клонируйте репозиторий
+2. Перейдите к нужному упражнению
+3. Скомпилируйте и запустите Java-файлы
+
+## Автор
+
+[Ваше имя]
+
+## Курс
+
+Introduction to Programming — Университет Иннополис
+```
+
+Коммит README:
+```bash
+git add README.md
+git commit -m "Add README with repository description"
+git push
+```
+
+**Ответ:** доработанный код покрывает сетевые и файловые сбои, неверный URL и использует try-with-resources.
+
+</details>
+
+
+##### **3.6. Законность try-finally без catch** (Туториал 11, Задание 1)
+Законен ли следующий код?
+
+```java
+try {
+} finally {
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** в Java блок `catch` не обязателен в конструкции try-catch-finally.
+
+**Ответ:** да, код законен. `catch` можно опустить и писать `try` сразу с `finally` — это удобно для гарантированной очистки без перехвата конкретных типов исключений.
+
+</details>
+
+##### **3.7. Перехват через класс Exception** (Туториал 11, Задание 2)
+Какие типы исключений перехватывает следующий обработчик? В чём проблема такого стиля?
+
+```java
+catch (Exception e) {
+    e.printStackTrace();
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ответ:**
+
+**Что перехватывается:** всё, что наследует `Exception`, включая checked и runtime-исключения. **`Error` и его подклассы не перехватываются.**
+
+**В чём проблема:**
+
+1. **Нет `try`:** такой `catch` сам по себе недопустим — нужен сопутствующий `try`.  
+2. **Слишком широко:** ловить `Exception` — плохая практика; лучше конкретные типы, чтобы различать сценарии и не «проглатывать» неожиданные ошибки.  
+
+</details>
+
+##### **3.8. Порядок блоков catch** (Туториал 11, Задание 3)
+Есть ли ошибка в следующих обработчиках? Скомпилируется ли код?
+
+```java
+try {
+} catch (Exception e) {
+} catch (ArithmeticException a) {
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `catch` упорядочивают от узкого типа к широкому.
+
+**Ответ:** код **не** скомпилируется. `ArithmeticException` — подкласс `Exception`; первый `catch (Exception e)` уже перехватит `ArithmeticException`, второй блок недостижим, что в Java запрещено.
+
+**Исправление:** сначала `ArithmeticException`, затем `Exception`:
+
+```java
+try {
+} catch (ArithmeticException a) {
+} catch (Exception e) {
+}
+```
+
+</details>

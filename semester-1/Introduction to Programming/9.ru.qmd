@@ -1,0 +1,2305 @@
+---
+title: "W10. Абстрактные классы, интерфейсы (interfaces), UML-диаграммы классов, пакеты (packages)"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2025-11-09
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+##### **1.1 Абстрактные классы и методы**
+**Abstract class** — класс с ключевым словом `abstract`, который **нельзя** создать напрямую через `new`. Это общий чертёж: общие свойства и поведение заданы, но «жить» в программе должен уже конкретный тип — как вместо абстрактной «еды» на стол попадают яблоки или шоколад, так вместо абстрактного `Vehicle` создаются машина, мотоцикл и т.д.
+
+###### **1.1.1 Зачем нужны abstract classes**
+1. **Logical grouping:** родственные классы собираются под общим зонтиком — например, `Lion`, `Cat`, `Dog` под абстрактным `Animal`.
+2. **Enforcing implementation:** можно объявить **abstract methods** — без тела; любой **concrete** (неабстрактный) **subclass** **обязан** их реализовать, сохраняя контракт и разрешая разную реализацию.
+
+###### **1.1.2 Объявление abstract class**
+Абстрактный класс помечается `abstract`:
+
+```java
+abstract class Vehicle {
+    // Regular fields (common to all vehicles)
+    Color color;
+    int numWheels;
+    
+    // Abstract method - no implementation
+    abstract void startEngine();
+    
+    // Concrete method - has implementation
+    void honk() {
+        System.out.println("Beep beep!");
+    }
+}
+```
+
+###### **1.1.3 Abstract methods**
+**Abstract method** — объявление метода без тела (без фигурных скобок с кодом); ключевое слово `abstract` и точка с запятой:
+
+```java
+abstract void startEngine();
+```
+
+Так задаётся контракт: у каждого транспорта должен быть способ **start engine**, но реализация зависит от конкретного типа.
+
+###### **1.1.4 Основные правила**
+-   **Abstract class** нельзя инстанцировать напрямую: недопустимо `new Vehicle()`.
+-   Если в классе есть **хотя бы один** abstract method, класс должен быть `abstract`.
+-   В одном abstract class сочетаются abstract и **concrete** (обычные) методы.
+-   Abstract methods в классе **не обязаны** быть (редкий случай).
+-   **Concrete subclass** реализует **все** унаследованные abstract methods или сам остаётся `abstract`.
+-   У abstract class могут быть конструкторы, `static` и `final` методы.
+-   Поля — с любыми модификаторами (`private`, `protected`, `public`, package-private).
+
+###### **1.1.5 Реализация**
+Неабстрактный класс, расширяющий abstract class, должен дать тела всем abstract methods:
+
+```java
+class Motorcycle extends Vehicle {
+    @Override
+    void startEngine() {
+        System.out.println("Kick start!");
+    }
+}
+```
+
+Теперь `Motorcycle` — concrete class, допустимо `Motorcycle bike = new Motorcycle();`.
+
+Если подкласс не реализовал все abstract methods, он остаётся abstract:
+
+```java
+abstract class FlyingVehicle extends Vehicle {
+    // startEngine() is still not implemented
+    // So FlyingVehicle must be abstract
+}
+```
+
+##### **1.2 Final classes и методы**
+Ключевое слово `final` ограничивает расширяемость: **запрещает** наследование или переопределение (в зависимости от контекста).
+
+###### **1.2.1 Final class**
+**Final class** нельзя расширять: после `final` ни один класс не может `extends` этот класс:
+
+```java
+final class Human extends Animal {
+    // ... implementation
+}
+
+// This would cause a compiler error:
+// class SuperHuman extends Human { }  // ERROR!
+```
+
+###### **1.2.2 Final methods**
+**Final method** нельзя **override** в подклассах — поведение зафиксировано для всей иерархии:
+
+```java
+class Animal {
+    final void breathe() {
+        System.out.println("Breathing oxygen");
+    }
+}
+
+class Dog extends Animal {
+    // This would cause a compiler error:
+    // void breathe() { }  // ERROR! Cannot override final method
+}
+```
+
+###### **1.2.3 Final fields**
+**Final field** (**constant** в смысле однократной инициализации) можно присвоить только один раз после инициализации:
+
+```java
+public class Circle {
+    private final double radius;  // Must be initialized
+    
+    public Circle(double r) {
+        radius = r;  // Initialization in constructor
+    }
+    
+    // radius cannot be changed after this point
+}
+```
+
+По конвенции `static final` поля класса пишут в `UPPER_SNAKE_CASE`:
+
+```java
+public static final double PI = 3.14159265359;
+```
+
+##### **1.3 Interfaces**
+**Interface** — ссылочный тип в Java, задающий **contract**: набор сигнатур методов, которые обязан предоставить **implementing class**. В отличие от abstract class, интерфейс ближе к *pure abstraction*: описано *что* сделать, а не *как*.
+
+###### **1.3.1 Зачем interfaces**
+1. **Multiple «inheritance» of type:** множественного наследования классов в Java нет, но класс может **implement** несколько интерфейсов — `Duck` и `Swimmable`, и `Flyable`.
+2. **Standardization:** контракты вроде `Comparable` сразу говорят, что объект можно сравнивать.
+3. **Decoupling:** код может зависеть от интерфейса, а не от concrete class — проще менять реализации и тестировать.
+
+###### **1.3.2 Объявление interface**
+Ключевое слово `interface`:
+
+```java
+interface Swimmable {
+    void swim();           // Abstract method (implicitly public abstract)
+    void stopSwimming();   // Abstract method
+}
+
+interface Flyable {
+    void fly();
+    void stopFlying();
+}
+```
+
+Начиная с Java 8, в interface допускаются:
+
+-   **Default methods:** реализация по умолчанию с ключевым словом `default`.
+-   **Static methods:** утилиты на уровне самого интерфейса.
+
+```java
+interface Living {
+    default void live() {
+        System.out.println(this.getClass().getSimpleName() + " lives");
+    }
+}
+```
+
+###### **1.3.3 implements**
+Класс подключает интерфейсы через `implements` (несколько — через запятую):
+
+```java
+class Duck implements Swimmable, Flyable, Living {
+    @Override
+    public void swim() {
+        System.out.println("Duck is swimming");
+    }
+    
+    @Override
+    public void stopSwimming() {
+        System.out.println("Duck stopped swimming");
+    }
+    
+    @Override
+    public void fly() {
+        System.out.println("Duck is flying");
+    }
+    
+    @Override
+    public void stopFlying() {
+        System.out.println("Duck stopped flying");
+    }
+    
+    // live() method is inherited from Living interface (default method)
+}
+```
+
+###### **1.3.4 Свойства interface**
+-   Методы по умолчанию **implicitly public abstract** (кроме `default` и `static`).
+-   Поля в interface — **implicitly public static final** (константы).
+-   Класс может **implement** несколько интерфейсов, но **extends** только **один** класс.
+-   Интерфейс может **extends** другой интерфейс (или несколько).
+-   Интерфейс **не** может `extends` класс.
+-   Интерфейс **нельзя** инстанцировать через `new`.
+
+##### **1.4 Abstract class vs. interface**
+Важно понимать, когда выбирать abstract class, а когда interface.
+
+###### **1.4.1 Ключевые отличия**
+
+| Аспект | Abstract class | Interface |
+|--------|---------------|-----------|
+| **Methods** | Abstract и обычные методы вместе | До Java 8 — только abstract; с Java 8+ ещё `default` и `static` |
+| **Fields** | Любые поля по модификаторам и «изменяемости» | Фактически только константы (`public static final`) |
+| **Multiple inheritance** | Один суперкласс | Несколько интерфейсов |
+| **Implementation** | Может частично реализовать контракт через код в классе | Не «реализует» abstract class; задаёт контракт |
+| **Keyword** | `abstract` | `interface` |
+| **Связь** | `extends` для класса | У класса — `implements`; у интерфейса — `extends` другого интерфейса |
+| **Access modifiers** | Любые для членов | Публичный контракт по умолчанию |
+| **Когда** | Общий код и поля у тесно связанных типов («is a») | Общее поведение у слабо связанных типов |
+
+###### **1.4.2 Как выбирать**
+**Abstract class**, если:
+
+-   нужно разделить общий код между родственными классами;
+-   много общих методов и полей;
+-   нужны `private` / `protected` члены;
+-   нужно изменяемое состояние (не только константы).
+
+**Interface**, если:
+
+-   интерфейс могут реализовать **несвязанные** классы;
+-   важен контракт поведения, а реализация вторична;
+-   нужно множественное наследование **типа**;
+-   нужен чистый контракт без обязательной базовой реализации.
+
+##### **1.5 Проверка типов и приведение**
+
+###### **1.5.1 Static и dynamic type**
+У каждой ссылки на объект два типа:
+
+-   **Static type** — тип в объявлении; на этапе компиляции не меняется.
+-   **Dynamic type** — фактический класс объекта в heap; может меняться при присваивании.
+
+```java
+Animal a = new Lion();  // Static type: Animal, Dynamic type: Lion
+a = new Frog();         // Static type: Animal, Dynamic type: Frog
+```
+
+###### **1.5.2 Upcasting**
+**Upcasting** — приведение ссылки от подкласса к суперклассу; безопасно и часто неявно, потому что объект подкласса «**is a**» суперкласс:
+
+```java
+Lion lion = new Lion();
+Animal animal = lion;  // Upcasting (implicit) - always safe
+```
+
+###### **1.5.3 Downcasting**
+**Downcasting** — от суперкласса к подклассу; нужно явное приведение и возможен сбой во время выполнения, если **dynamic type** не совместим:
+
+```java
+Animal animal = new Lion();
+Lion lion = (Lion) animal;  // Downcasting (explicit) - safe here
+
+Animal animal2 = new Frog();
+Lion lion2 = (Lion) animal2;  // Runtime error! ClassCastException
+```
+
+###### **1.5.4 Оператор instanceof**
+Для безопасного downcasting проверяют **dynamic type** через `instanceof`:
+
+```java
+instanceof_operator: obj instanceof ClassName
+```
+
+`true`, если `obj` — экземпляр `ClassName` или его **subclass**; иначе `false`.
+
+```java
+Animal a = new Lion();
+
+if (a instanceof Lion) {
+    Lion lion = (Lion) a;  // Safe to cast
+    // Use lion-specific methods
+} else if (a instanceof Frog) {
+    Frog frog = (Frog) a;  // Safe to cast
+    // Use frog-specific methods
+}
+```
+
+##### **1.6 UML: диаграммы классов**
+**UML (Unified Modeling Language)** — стандартизованный язык моделирования ПО. **Class diagram** — один из ключевых видов: классы, атрибуты, методы и связи между ними.
+
+###### **1.6.1 Класс на диаграмме**
+Класс — прямоугольник из трёх зон:
+
+1. **Верх:** имя класса (жирным).
+2. **Середина:** атрибуты (поля).
+3. **Низ:** методы.
+
+<!-- DIAGRAM HERE -->
+
+**Модификаторы видимости в UML:**
+
+-   `+` — `public`
+-   `-` — `private`
+-   `#` — `protected`
+-   `~` — package-private (по умолчанию)
+
+Пример:
+```
+Person
+-name: String
+-age: int
++Person(initialName: String)
++printPerson(): void
++getName(): String
+```
+
+###### **1.6.2 Abstract class на UML**
+Пометка `<<abstract>>` или курсив; abstract methods — курсивом:
+
+```
+<<abstract>> Shape
+-coords: Coords
++move(): void
++draw(): void
+```
+
+###### **1.6.3 Interface на UML**
+Стереотип `<<interface>>`:
+
+```
+<<interface>> Movable
++moveUp(): void
++moveDown(): void
++moveLeft(): void
++moveRight(): void
+```
+
+###### **1.6.4 Static и final**
+-   **Static** — подчёркивание.
+-   **Final** поля — `{readOnly}` или `UPPER_SNAKE_CASE`.
+-   **Final** методы — `{leaf}`.
+
+###### **1.6.5 Связи между классами**
+
+**1. Association**
+Общая связь «использует / взаимодействует».
+
+-   **Направление стрелки:** кто «знает» о ком.
+-   **Cardinality:** сколько объектов участвует (`1`, `0..1`, `*`, `1..*`).
+-   **Метка:** пояснение связи (по желанию).
+
+<!-- DIAGRAM HERE -->
+
+**2. Inheritance (generalization)**
+«**Is a**»; сплошная линия с полым треугольником к суперклассу.
+
+<!-- DIAGRAM HERE -->
+
+**3. Realization (implementation)**
+Класс **implements** interface; пунктир с полым треугольником к интерфейсу.
+
+<!-- DIAGRAM HERE -->
+
+**4. Composition**
+Сильное «**has a**»: часть не существует без целого; при уничтожении целого гибнут части. Закрашенный ромб со стороны целого.
+
+Пример: `Building` и `Room` — снос здания уничтожает комнаты как части модели.
+
+<!-- DIAGRAM HERE -->
+
+**5. Aggregation**
+Слабое «**has a**»: часть может существовать отдельно. Пустой ромб со стороны целого.
+
+Пример: `Car` и `Wheel` — колёса можно снять, они остаются объектами.
+
+<!-- DIAGRAM HERE -->
+
+**6. Dependency**
+«**Uses**»: зависимость, часто через параметр метода или локальную переменную. Пунктирная стрелка.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.7 Packages**
+**Package** — пространство имён для классов и интерфейсов: меньше конфликтов имён, проще управлять доступом.
+
+###### **1.7.1 Зачем packages**
+В больших проектах разные авторы могут выбрать одно имя класса; пакеты разводят имена по **namespace** и помогают структурировать библиотеку типов.
+
+###### **1.7.2 Объявление package**
+В начале файла — `package`:
+
+```java
+package myPackage;
+
+public class MyClass {
+    // ...
+}
+```
+
+**Fully-qualified name** класса: `myPackage.MyClass`.
+
+###### **1.7.3 Вложенные пакеты**
+Вложенность задаётся точками в имени пакета:
+
+```java
+package company.department.lab.math;
+
+public class Calculator {
+    // ...
+}
+```
+
+Полное имя: `company.department.lab.math.Calculator`.
+
+###### **1.7.4 Видимость и пакеты**
+-   `public` класс — из любого пакета.
+-   Класс без модификатора — только внутри своего пакета (**package-private**).
+
+```java
+package myPackage;
+
+public class PublicClass {    // Visible everywhere
+    // ...
+}
+
+class PackageClass {          // Visible only in myPackage
+    // ...
+}
+```
+
+###### **1.7.5 import**
+Чтобы сослаться на `public` класс из другого пакета:
+
+1. **Полное имя (fully-qualified name):**
+```java
+util.math.MathVector v = new util.math.MathVector();
+```
+
+2. **Импорт конкретного класса:**
+```java
+import util.math.MathVector;
+
+MathVector v = new MathVector();  // Can now use short name
+```
+
+3. **Import-on-demand (`*`):**
+```java
+import util.math.*;
+
+MathVector v = new MathVector();
+Calculator c = new Calculator();
+```
+
+Стандартную библиотеку часто подключают так:
+```java
+import java.util.*;
+import java.io.*;
+```
+
+###### **1.7.6 Именование**
+Для распространяемых библиотек принято обратное DNS-имя организации:
+
+```
+org.wonderful.very.util.math
+```
+
+Так снижается риск глобальных коллизий имён.
+
+###### **1.7.7 Пакеты и каталоги**
+Имя пакета отражается в пути: `company.department.project` → дерево каталогов:
+
+```
+base_directory/company/department/project/
+```
+
+На Windows путь может выглядеть как `base_directory\company\department\project\`.
+
+##### **1.8 Сводка по модификаторам**
+Четыре уровня видимости в Java:
+
+| Модификатор | Класс | Пакет | Подкласс | Везде |
+|----------|-------|---------|----------|-------|
+| `public` | ✓ | ✓ | ✓ | ✓ |
+| `protected` | ✓ | ✓ | ✓ | ✗ |
+| *по умолчанию* (package-private) | ✓ | ✓ | ✗ | ✗ |
+| `private` | ✓ | ✗ | ✗ | ✗ |
+
+**Кратко:**
+
+-   **`private`:** только свой класс.
+-   **По умолчанию:** весь текущий пакет.
+-   **`protected`:** пакет + наследники (в т.ч. в других пакетах).
+-   **`public`:** откуда угодно.
+
+***
+
+#### **2. Определения**
+*   **Abstract class**: класс с `abstract`, не создаётся через `new`; может содержать abstract methods.
+*   **Abstract method**: объявление без тела; реализуется в **concrete subclasses**.
+*   **Concrete class**: неабстрактный класс с полной реализацией унаследованных abstract methods; допускает `new`.
+*   **Final class**: класс с `final` — запрет на **subclassing**.
+*   **Final method**: метод с `final` — запрет на **overriding**.
+*   **Final field**: поле с однократной инициализацией (константа в этом смысле).
+*   **Interface**: контракт методов для **implementing classes**; ключевое слово `interface`.
+*   **Default method**: метод interface с реализацией по умолчанию (`default`, Java 8+).
+*   **Static type**: тип ссылки в объявлении; не меняется на этапе компиляции.
+*   **Dynamic type**: фактический класс объекта во время выполнения; может меняться при присваивании.
+*   **Upcasting**: подкласс → суперкласс; безопасно, часто неявно.
+*   **Downcasting**: суперкласс → подкласс; явное приведение; риск `ClassCastException`.
+*   **instanceof**: проверка, является ли объект экземпляром класса или **subclass** / **interface** во время выполнения.
+*   **UML**: стандартизованный язык моделирования ПО.
+*   **Class diagram**: диаграмма классов UML.
+*   **Association**: связь «использует / взаимодействует».
+*   **Inheritance (generalization)**: «is a», наследование.
+*   **Realization (implementation)**: класс реализует interface.
+*   **Composition**: сильное «has a», часть не живёт без целого.
+*   **Aggregation**: слабое «has a», часть независима.
+*   **Dependency**: «uses», зависимость (параметры, локальные переменные).
+*   **Cardinality**: числа на связях UML.
+*   **Package**: пространство имён для типов.
+*   **Fully-qualified name**: полное имя с путём пакета (например, `java.util.ArrayList`).
+*   **Import statement**: краткие имена классов из других пакетов.
+
+***
+
+#### **3. Примеры**
+##### **3.1. Иерархия существ: abstract class** (**Лаба** 9, **Задание** 1)
+Создайте abstract class `Creature` с abstract methods `bear()` и `die()`, полем `String name = null` и `boolean isAlive = false`. Добавьте неабстрактный метод `shoutName()`: если `name != null`, печатать имя, иначе — сообщение об ошибке.
+
+Классы `Human`, `Dog` и `Alien` наследуют `Creature` и по-разному переопределяют abstract methods:
+
+-   в `bear()` каждый класс задаёт имя и печатает строку вида `"The [class name] [name] was born"`;
+-   в `die()` — строку `"The [class name] [name] has died"`.
+
+У класса `Dog` добавьте метод `bark()`.
+
+Класс `AbstractClassDemonstration` должен демонстрировать работу.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** **Abstract class** задаёт общий каркас и общее поведение, а **subclasses** дополняют его конкретными реализациями **abstract methods**.
+
+```java
+// Creature.java
+abstract class Creature {
+    // Fields common to all creatures
+    String name = null;
+    boolean isAlive = false;
+    
+    // Abstract methods - must be implemented by subclasses
+    abstract void bear();
+    abstract void die();
+    
+    // Non-abstract method with implementation
+    void shoutName() {
+        if (name != null) {
+            System.out.println(name);
+        } else {
+            System.out.println("Error: Creature has no name!");
+        }
+    }
+}
+
+// Human.java
+class Human extends Creature {
+    @Override
+    void bear() {
+        System.out.print("Enter human name: ");
+        // For demonstration, we'll assign directly
+        this.name = "Alice";
+        this.isAlive = true;
+        System.out.println("The Human " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Human " + name + " has died");
+    }
+}
+
+// Dog.java
+class Dog extends Creature {
+    @Override
+    void bear() {
+        System.out.print("Enter dog name: ");
+        // For demonstration, we'll assign directly
+        this.name = "Buddy";
+        this.isAlive = true;
+        System.out.println("The Dog " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Dog " + name + " has died");
+    }
+    
+    // Dog-specific method
+    void bark() {
+        System.out.println(name + " says: Woof! Woof!");
+    }
+}
+
+// Alien.java
+class Alien extends Creature {
+    @Override
+    void bear() {
+        System.out.print("Enter alien name: ");
+        // For demonstration, we'll assign directly
+        this.name = "Zorg";
+        this.isAlive = true;
+        System.out.println("The Alien " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Alien " + name + " has died");
+    }
+}
+
+// AbstractClassDemonstration.java
+public class AbstractClassDemonstration {
+    public static void main(String[] args) {
+        // Create different creatures
+        Human human = new Human();
+        Dog dog = new Dog();
+        Alien alien = new Alien();
+        
+        // Demonstrate birth
+        human.bear();
+        dog.bear();
+        alien.bear();
+        
+        System.out.println("\n--- Shouting Names ---");
+        // Demonstrate shoutName()
+        human.shoutName();
+        dog.shoutName();
+        alien.shoutName();
+        
+        // Demonstrate dog-specific behavior
+        System.out.println("\n--- Dog Behavior ---");
+        dog.bark();
+        
+        System.out.println("\n--- Death ---");
+        // Demonstrate death
+        human.die();
+        dog.die();
+        alien.die();
+        
+        // Test shoutName with no name
+        System.out.println("\n--- Unnamed Creature ---");
+        Creature unnamed = new Human();  // Not born yet
+        unnamed.shoutName();  // Should print error
+    }
+}
+```
+
+**Обсуждение:** Почему `Creature dog = new Dog(); dog.bark();` не компилируется?
+
+**Ответ:** **Static type** переменной `dog` — `Creature`, компилятор знает только методы `Creature`. Несмотря на **dynamic type** `Dog`, вызовы проверяются по **static type**. Для `bark()` нужен **downcasting**: `((Dog) dog).bark();` или тип переменной `Dog`.
+
+</details>
+
+##### **3.2. Массив существ и полиморфизм** (**Лаба** 9, **Задание** 1, продолжение)
+Измените класс `AbstractClassDemonstration` из **Задания** 1: создайте массив (или коллекцию) существ разных типов (`Human`, `Dog`, `Alien`) и для каждого элемента вызовите `bear()` и `die()`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** **Polymorphism** позволяет хранить в массиве типа суперкласса объекты разных **subclasses** и вызывать переопределённые методы с **dynamic dispatch**.
+
+```java
+import java.util.ArrayList;
+
+public class AbstractClassDemonstration {
+    public static void main(String[] args) {
+        // Using ArrayList for flexibility (can also use array)
+        ArrayList<Creature> creatures = new ArrayList<>();
+        
+        // Add different types of creatures
+        creatures.add(new Human());
+        creatures.add(new Dog());
+        creatures.add(new Alien());
+        creatures.add(new Human());
+        creatures.add(new Dog());
+        
+        System.out.println("=== Birth of Creatures ===");
+        // Call bear() for each creature
+        for (Creature creature : creatures) {
+            creature.bear();  // Dynamic dispatch - correct method called
+        }
+        
+        System.out.println("\n=== Creatures Shouting Their Names ===");
+        for (Creature creature : creatures) {
+            creature.shoutName();
+        }
+        
+        System.out.println("\n=== Death of Creatures ===");
+        // Call die() for each creature
+        for (Creature creature : creatures) {
+            creature.die();  // Dynamic dispatch - correct method called
+        }
+        
+        // Alternative using traditional array
+        System.out.println("\n\n=== Using Array Instead ===");
+        Creature[] creatureArray = new Creature[3];
+        creatureArray[0] = new Human();
+        creatureArray[1] = new Dog();
+        creatureArray[2] = new Alien();
+        
+        for (int i = 0; i < creatureArray.length; i++) {
+            creatureArray[i].bear();
+        }
+        
+        for (int i = 0; i < creatureArray.length; i++) {
+            creatureArray[i].die();
+        }
+    }
+}
+```
+
+**Ответ:** **Polymorphism** здесь означает, что на этапе компиляции не нужно фиксировать конкретный тип каждого элемента: для каждого объекта вызываются `bear()` и `die()` той версии, которая соответствует его **dynamic type**.
+
+</details>
+
+##### **3.3. Final-классы и промежуточный Animal** (**Лаба** 9, **Задание** 2)
+Расширьте предыдущее решение:
+
+-   введите класс `Animal`, наследующий `Creature`;
+-   пусть `Human` и `Dog` наследуют `Animal`, а не напрямую `Creature`;
+-   запретите дальнейшее наследование от `Human` и `Dog` (сделайте их **final**).
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** `final` у класса запрещает дальнейшее наследование — поведение иерархии «заморожено» снизу вверх от этого класса.
+
+```java
+// Creature.java (unchanged)
+abstract class Creature {
+    String name = null;
+    boolean isAlive = false;
+    
+    abstract void bear();
+    abstract void die();
+    
+    void shoutName() {
+        if (name != null) {
+            System.out.println(name);
+        } else {
+            System.out.println("Error: Creature has no name!");
+        }
+    }
+}
+
+// Animal.java - intermediate abstract class
+abstract class Animal extends Creature {
+    // Can add animal-specific fields or methods here
+    int age = 0;
+    
+    void eat() {
+        System.out.println(name + " is eating");
+    }
+}
+
+// Human.java - now inherits from Animal and is final
+final class Human extends Animal {
+    @Override
+    void bear() {
+        this.name = "Alice";
+        this.isAlive = true;
+        System.out.println("The Human " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Human " + name + " has died");
+    }
+}
+
+// Dog.java - now inherits from Animal and is final
+final class Dog extends Animal {
+    @Override
+    void bear() {
+        this.name = "Buddy";
+        this.isAlive = true;
+        System.out.println("The Dog " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Dog " + name + " has died");
+    }
+    
+    void bark() {
+        System.out.println(name + " says: Woof! Woof!");
+    }
+}
+
+// Alien.java - still inherits from Creature directly
+class Alien extends Creature {
+    @Override
+    void bear() {
+        this.name = "Zorg";
+        this.isAlive = true;
+        System.out.println("The Alien " + name + " was born");
+    }
+    
+    @Override
+    void die() {
+        this.isAlive = false;
+        System.out.println("The Alien " + name + " has died");
+    }
+}
+
+// This would cause a compilation error:
+// class SuperHuman extends Human { }  // ERROR: Cannot subclass final class
+
+// This would also cause an error:
+// class SuperDog extends Dog { }  // ERROR: Cannot subclass final class
+
+// Demonstration
+public class FinalClassDemonstration {
+    public static void main(String[] args) {
+        Human human = new Human();
+        Dog dog = new Dog();
+        Alien alien = new Alien();
+        
+        human.bear();
+        dog.bear();
+        alien.bear();
+        
+        System.out.println("\n--- Using Animal Methods ---");
+        human.eat();  // Inherited from Animal
+        dog.eat();    // Inherited from Animal
+        // alien.eat(); // ERROR: Alien is not an Animal
+        
+        System.out.println("\n--- Death ---");
+        human.die();
+        dog.die();
+        alien.die();
+    }
+}
+```
+
+**Ответ:** `final` у `Human` и `Dog` не позволяет менять их поведение через наследование — это полезно для целостности дизайна, безопасности и предсказуемости оптимизаций.
+
+</details>
+
+##### **3.4. Интерфейсы Swimmable, Flyable и Living** (**Лаба** 9, **Задание** 3)
+Интерфейс `Swimmable` с методами `swim()` и `stopSwimming()`.
+
+Интерфейс `Flyable` с методами `fly()` и `stopFlying()`.
+
+Интерфейс `Living` с **default method** `live()`, печатающим `"[class name] lives"`.
+
+Класс `Submarine` — `implements Swimmable` с переопределением методов.
+
+Класс `Duck` — `implements Swimmable`, `Flyable`, `Living`; переопределите все не-default методы.
+
+Класс `Penguin` — `implements Swimmable`, `Living`; переопределите не-default методы.
+
+Класс `InterfaceDemonstration` демонстрирует сценарии.
+
+Подсказка: `stopSwimming` / `stopFlying` имеют смысл только если сущность уже «в процессе».
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** **Interfaces** дают множественное наследование поведения; **default methods** — общую реализацию, доступную всем **implementing classes**.
+
+```java
+// Swimmable.java
+interface Swimmable {
+    void swim();
+    void stopSwimming();
+}
+
+// Flyable.java
+interface Flyable {
+    void fly();
+    void stopFlying();
+}
+
+// Living.java
+interface Living {
+    default void live() {
+        System.out.println(this.getClass().getSimpleName() + " lives");
+    }
+}
+
+// Submarine.java
+class Submarine implements Swimmable {
+    private boolean isSwimming = false;
+    
+    @Override
+    public void swim() {
+        if (!isSwimming) {
+            isSwimming = true;
+            System.out.println("Submarine is submerging and swimming underwater");
+        } else {
+            System.out.println("Submarine is already swimming");
+        }
+    }
+    
+    @Override
+    public void stopSwimming() {
+        if (isSwimming) {
+            isSwimming = false;
+            System.out.println("Submarine has surfaced and stopped swimming");
+        } else {
+            System.out.println("Submarine is not swimming");
+        }
+    }
+}
+
+// Duck.java
+class Duck implements Swimmable, Flyable, Living {
+    private boolean isSwimming = false;
+    private boolean isFlying = false;
+    
+    @Override
+    public void swim() {
+        if (isFlying) {
+            System.out.println("Duck cannot swim while flying!");
+            return;
+        }
+        if (!isSwimming) {
+            isSwimming = true;
+            System.out.println("Duck is swimming on the water");
+        } else {
+            System.out.println("Duck is already swimming");
+        }
+    }
+    
+    @Override
+    public void stopSwimming() {
+        if (isSwimming) {
+            isSwimming = false;
+            System.out.println("Duck stopped swimming");
+        } else {
+            System.out.println("Duck is not swimming");
+        }
+    }
+    
+    @Override
+    public void fly() {
+        if (isSwimming) {
+            System.out.println("Duck cannot fly while swimming!");
+            return;
+        }
+        if (!isFlying) {
+            isFlying = true;
+            System.out.println("Duck is flying in the sky");
+        } else {
+            System.out.println("Duck is already flying");
+        }
+    }
+    
+    @Override
+    public void stopFlying() {
+        if (isFlying) {
+            isFlying = false;
+            System.out.println("Duck stopped flying and landed");
+        } else {
+            System.out.println("Duck is not flying");
+        }
+    }
+    
+    // live() method is inherited from Living interface (default method)
+}
+
+// Penguin.java
+class Penguin implements Swimmable, Living {
+    private boolean isSwimming = false;
+    
+    @Override
+    public void swim() {
+        if (!isSwimming) {
+            isSwimming = true;
+            System.out.println("Penguin is swimming gracefully underwater");
+        } else {
+            System.out.println("Penguin is already swimming");
+        }
+    }
+    
+    @Override
+    public void stopSwimming() {
+        if (isSwimming) {
+            isSwimming = false;
+            System.out.println("Penguin stopped swimming and waddled to shore");
+        } else {
+            System.out.println("Penguin is not swimming");
+        }
+    }
+    
+    // live() method is inherited from Living interface (default method)
+}
+
+// InterfaceDemonstration.java
+public class InterfaceDemonstration {
+    public static void main(String[] args) {
+        System.out.println("=== Submarine Demonstration ===");
+        Submarine sub = new Submarine();
+        sub.swim();
+        sub.stopSwimming();
+        sub.stopSwimming();  // Try to stop when not swimming
+        
+        System.out.println("\n=== Duck Demonstration ===");
+        Duck duck = new Duck();
+        duck.live();          // Using default method from Living
+        duck.swim();
+        duck.fly();           // Cannot fly while swimming
+        duck.stopSwimming();
+        duck.fly();
+        duck.swim();          // Cannot swim while flying
+        duck.stopFlying();
+        duck.swim();          // Now can swim
+        duck.stopSwimming();
+        
+        System.out.println("\n=== Penguin Demonstration ===");
+        Penguin penguin = new Penguin();
+        penguin.live();       // Using default method from Living
+        penguin.swim();
+        penguin.swim();       // Already swimming
+        penguin.stopSwimming();
+    }
+}
+```
+
+**Ответ:** Набор **interfaces** задаёт несколько ролей поведения: у `Duck` совмещены плавание и полёт, у `Penguin` — только плавание; `Submarine` показывает, что «неживой» объект тоже может реализовать поведенческий контракт `Swimmable`.
+
+</details>
+
+##### **3.5. Массив объектов Living** (**Лаба** 9, **Задание** 3, продолжение)
+Измените `InterfaceDemonstration`: создайте массив «живых» объектов разных типов (`Duck`, `Penguin`) и для каждого вызовите `live()`.
+
+**Обсуждение:**
+
+-   что произойдёт при попытке вызвать `swim()` для элементов такого массива;
+-   можно ли положить в массив экземпляр `Submarine`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** Массив типа interface даёт полиморфизм по общему контракту, даже если **dynamic types** различаются.
+
+```java
+public class InterfaceDemonstration {
+    public static void main(String[] args) {
+        // Create array of Living objects
+        Living[] livingThings = new Living[2];
+        livingThings[0] = new Duck();
+        livingThings[1] = new Penguin();
+        
+        System.out.println("=== All Living Things ===");
+        for (Living thing : livingThings) {
+            thing.live();  // All Living things have this method
+        }
+        
+        // Discussion Question 1: What if we call swim()?
+        System.out.println("\n=== Attempting to Swim ===");
+        for (Living thing : livingThings) {
+            // This won't compile directly:
+            // thing.swim();  // ERROR: Living doesn't have swim()
+            
+            // We need to check and cast:
+            if (thing instanceof Swimmable) {
+                ((Swimmable) thing).swim();
+            } else {
+                System.out.println(thing.getClass().getSimpleName() + 
+                                   " cannot swim");
+            }
+        }
+        
+        // Discussion Question 2: Can Submarine be added?
+        System.out.println("\n=== Can Submarine be in Living array? ===");
+        
+        // This won't compile:
+        // livingThings[0] = new Submarine();  // ERROR!
+        // Submarine doesn't implement Living interface
+        
+        System.out.println("No, Submarine cannot be added to Living[] " +
+                          "because Submarine doesn't implement Living interface");
+        
+        // But we can create a Swimmable array:
+        System.out.println("\n=== Swimmable Array ===");
+        Swimmable[] swimmers = new Swimmable[3];
+        swimmers[0] = new Duck();
+        swimmers[1] = new Penguin();
+        swimmers[2] = new Submarine();  // This works!
+        
+        for (Swimmable swimmer : swimmers) {
+            swimmer.swim();
+        }
+        
+        for (Swimmable swimmer : swimmers) {
+            swimmer.stopSwimming();
+        }
+    }
+}
+```
+
+**Ответы на вопросы для обсуждения:**
+
+1. **Что при вызове `swim()`?** У ссылки **static type** `Living`, метода `swim()` в контракте нет — вызвать напрямую нельзя. Нужно `instanceof Swimmable` и затем **downcasting** к `Swimmable`.
+2. **Можно ли положить `Submarine`?** Нет: массив `Living[]` принимает только объекты с **dynamic type**, реализующим `Living`. У `Submarine` нет `Living` — ошибка компиляции. Зато `Submarine` можно хранить, например, в `Swimmable[]`.
+
+</details>
+
+##### **3.6. Проверки типов с `instanceof`** (**Лекция** 9, проверки типов)
+Покажите безопасный **downcasting** с `instanceof` на иерархии `Animal` (`Lion`, `Frog`) и отдельном классе `Car` (неродственном типу).
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** `instanceof` — это **RTTI**: проверка **dynamic type** перед **downcasting**, чтобы избежать `ClassCastException`.
+
+```java
+// Base class
+class Animal {
+    public int f1 = 100;
+    
+    public void makeSound() {
+        System.out.println("Some animal sound");
+    }
+}
+
+// Derived classes
+class Lion extends Animal {
+    public int f2 = 200;
+    
+    @Override
+    public void makeSound() {
+        System.out.println("Roar!");
+    }
+    
+    public void hunt() {
+        System.out.println("Lion is hunting");
+    }
+}
+
+class Frog extends Animal {
+    public int f3 = 300;
+    
+    @Override
+    public void makeSound() {
+        System.out.println("Ribbit!");
+    }
+    
+    public void jump() {
+        System.out.println("Frog is jumping");
+    }
+}
+
+// Unrelated class
+class Car {
+    public void drive() {
+        System.out.println("Car is driving");
+    }
+}
+
+// Demonstration
+public class TypeCheckDemo {
+    public static void main(String[] args) {
+        // Creating objects with different dynamic types
+        Animal a1 = new Lion();
+        Animal a2 = new Frog();
+        
+        System.out.println("=== Type Checking ===");
+        
+        // Check what a1 is
+        boolean r1 = a1 instanceof Animal;  // true
+        boolean r2 = a1 instanceof Lion;    // true
+        boolean r3 = a1 instanceof Frog;    // false
+        
+        System.out.println("a1 instanceof Animal: " + r1);
+        System.out.println("a1 instanceof Lion: " + r2);
+        System.out.println("a1 instanceof Frog: " + r3);
+        
+        System.out.println("\n=== Safe Downcasting ===");
+        
+        // Safe downcasting using instanceof
+        if (a1 instanceof Lion) {
+            Lion lion = (Lion) a1;  // Safe to cast
+            System.out.println("a1 is a Lion, accessing f2: " + lion.f2);
+            lion.hunt();
+        } else if (a1 instanceof Frog) {
+            Frog frog = (Frog) a1;
+            System.out.println("a1 is a Frog, accessing f3: " + frog.f3);
+            frog.jump();
+        }
+        
+        if (a2 instanceof Lion) {
+            Lion lion = (Lion) a2;
+            lion.hunt();
+        } else if (a2 instanceof Frog) {
+            Frog frog = (Frog) a2;  // Safe to cast
+            System.out.println("a2 is a Frog, accessing f3: " + frog.f3);
+            frog.jump();
+        }
+        
+        System.out.println("\n=== Unsafe Downcasting ===");
+        
+        // This would compile but throw ClassCastException at runtime:
+        try {
+            Lion lion = (Lion) a2;  // a2 is actually a Frog!
+            lion.hunt();
+        } catch (ClassCastException e) {
+            System.out.println("Error: Cannot cast Frog to Lion - " + 
+                             e.getMessage());
+        }
+        
+        System.out.println("\n=== Checking Unrelated Types ===");
+        
+        // Checking against unrelated type
+        // Note: This might not compile in newer Java versions due to 
+        // compile-time type checking improvements
+        // boolean r4 = a1 instanceof Car;  // Compilation error in newer Java
+        System.out.println("Cannot check if Animal is Car - " +
+                          "they are unrelated types");
+        
+        System.out.println("\n=== Polymorphism ===");
+        
+        // Array of animals with polymorphic method calls
+        Animal[] animals = {new Lion(), new Frog(), new Lion()};
+        
+        for (Animal animal : animals) {
+            animal.makeSound();  // Polymorphic call
+            
+            // Access specific features based on actual type
+            if (animal instanceof Lion) {
+                ((Lion) animal).hunt();
+            } else if (animal instanceof Frog) {
+                ((Frog) animal).jump();
+            }
+        }
+    }
+}
+```
+
+**Ответ:** `instanceof` даёт безопасный **downcasting**: `true`, если **dynamic type** — сам указанный класс или его **subclass**, что снижает риск `ClassCastException` (**RTTI**).
+
+</details>
+
+##### **3.7. Иерархия фигур на abstract class** (**Лекция** 9, абстрактные классы)
+Перепишите иерархию `Shape` на **abstract class**: в базе объявите `Move()`, `Rotate()`, `Draw()`, `Increase()` как abstract methods; `Circle` и `Rectangle` сделайте **concrete subclasses**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** **Abstract class** удобен для «чисто абстрактных» понятий без `new` у базы и для принудительного контракта у всех **concrete subclasses**.
+
+```java
+// Abstract base class
+abstract class Shape {
+    // Data common to all shapes
+    protected int x, y;  // coordinates
+    
+    // Constructor
+    public Shape(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+    
+    // Abstract methods - behavior common to all shapes but implemented differently
+    abstract void Move(int dx, int dy);
+    abstract void Rotate(double angle);
+    abstract void Draw();
+    abstract void Increase(double factor);
+}
+
+// Concrete implementation for Circle
+class Circle extends Shape {
+    private double radius;
+    
+    public Circle(int x, int y, double radius) {
+        super(x, y);
+        this.radius = radius;
+    }
+    
+    @Override
+    void Move(int dx, int dy) {
+        this.x += dx;
+        this.y += dy;
+        System.out.println("Circle moved to (" + x + ", " + y + ")");
+    }
+    
+    @Override
+    void Rotate(double angle) {
+        // Circle rotation doesn't change appearance
+        System.out.println("Circle rotated by " + angle + " degrees " +
+                          "(no visible change)");
+    }
+    
+    @Override
+    void Draw() {
+        System.out.println("Drawing Circle at (" + x + ", " + y + 
+                          ") with radius " + radius);
+    }
+    
+    @Override
+    void Increase(double factor) {
+        radius *= factor;
+        System.out.println("Circle radius increased to " + radius);
+    }
+}
+
+// Concrete implementation for Rectangle
+class Rectangle extends Shape {
+    private double width, height;
+    private double rotationAngle = 0;
+    
+    public Rectangle(int x, int y, double width, double height) {
+        super(x, y);
+        this.width = width;
+        this.height = height;
+    }
+    
+    @Override
+    void Move(int dx, int dy) {
+        this.x += dx;
+        this.y += dy;
+        System.out.println("Rectangle moved to (" + x + ", " + y + ")");
+    }
+    
+    @Override
+    void Rotate(double angle) {
+        rotationAngle += angle;
+        rotationAngle %= 360;  // Keep angle in [0, 360)
+        System.out.println("Rectangle rotated by " + angle + " degrees " +
+                          "(total rotation: " + rotationAngle + "°)");
+    }
+    
+    @Override
+    void Draw() {
+        System.out.println("Drawing Rectangle at (" + x + ", " + y + 
+                          ") with width " + width + ", height " + height +
+                          ", rotation " + rotationAngle + "°");
+    }
+    
+    @Override
+    void Increase(double factor) {
+        width *= factor;
+        height *= factor;
+        System.out.println("Rectangle size increased to " + width + 
+                          "x" + height);
+    }
+}
+
+// Demonstration
+public class ShapeDemo {
+    public static void main(String[] args) {
+        // Cannot instantiate abstract class:
+        // Shape shape = new Shape(0, 0);  // ERROR!
+        
+        // Create array of shapes
+        Shape[] figures = new Shape[3];
+        figures[0] = new Circle(10, 20, 5.0);
+        figures[1] = new Rectangle(30, 40, 10.0, 20.0);
+        figures[2] = new Circle(50, 60, 7.5);
+        
+        System.out.println("=== Drawing All Shapes ===");
+        for (Shape figure : figures) {
+            figure.Draw();  // Polymorphic call
+        }
+        
+        System.out.println("\n=== Increasing All Shapes ===");
+        for (Shape figure : figures) {
+            figure.Increase(1.5);  // Polymorphic call
+        }
+        
+        System.out.println("\n=== Drawing After Increase ===");
+        for (Shape figure : figures) {
+            figure.Draw();
+        }
+        
+        System.out.println("\n=== Moving and Rotating ===");
+        figures[0].Move(5, 5);
+        figures[0].Rotate(45);
+        
+        figures[1].Move(-10, 10);
+        figures[1].Rotate(90);
+        
+        System.out.println("\n=== Final State ===");
+        for (Shape figure : figures) {
+            figure.Draw();
+        }
+        
+        System.out.println("\n=== Adding New Shape (Triangle) ===");
+        // The beauty: we can add Triangle without modifying existing code!
+        System.out.println("If we add a Triangle class, all the loops above");
+        System.out.println("will work without any modification!");
+    }
+}
+```
+
+**Ответ:** **Abstract class** здесь уместен, потому что:
+
+1. обобщённый `Shape` не должен создаваться через `new` — только конкретные фигуры;
+2. общие данные (координаты) и операции (`Move`, `Rotate`, `Draw`, `Increase`) одинаково актуальны для всех;
+3. реализации различаются по типу фигуры;
+4. можно добавлять новые фигуры, не ломая общие циклы (**Open/Closed Principle**).
+
+</details>
+
+##### **3.8. Иерархия Vehicle: абстрактный промежуточный уровень** (**Лекция** 9, абстрактные классы)
+Abstract class `Vehicle` с abstract method `startEngine()`; concrete class `Motorbike` и **abstract class** `FlyingVehicle`, показывающие, что производный класс тоже может оставаться абстрактным.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** Если производный класс не закрыл все **abstract methods** предков, он сам обязан быть `abstract`.
+
+```java
+// Abstract base class
+abstract class Vehicle {
+    // Common features for all vehicles
+    protected String color;
+    protected int numWheels;
+    
+    public Vehicle(String color, int numWheels) {
+        this.color = color;
+        this.numWheels = numWheels;
+    }
+    
+    // Abstract method - must be implemented by concrete subclasses
+    abstract void startEngine();
+    
+    // Concrete method - available to all vehicles
+    void honk() {
+        System.out.println("Honk honk!");
+    }
+    
+    void displayInfo() {
+        System.out.println("Color: " + color + ", Wheels: " + numWheels);
+    }
+}
+
+// Concrete class - implements all abstract methods
+class Motorbike extends Vehicle {
+    public Motorbike(String color) {
+        super(color, 2);
+    }
+    
+    @Override
+    void startEngine() {
+        System.out.println("Motorbike: Kick start! Vroom vroom!");
+    }
+}
+
+// Abstract class - doesn't implement abstract methods
+abstract class FlyingVehicle extends Vehicle {
+    protected int maxAltitude;
+    
+    public FlyingVehicle(String color, int numWheels, int maxAltitude) {
+        super(color, numWheels);
+        this.maxAltitude = maxAltitude;
+    }
+    
+    // Doesn't implement startEngine() - remains abstract
+    
+    // Adds new abstract method
+    abstract void takeOff();
+    
+    // Concrete method specific to flying vehicles
+    void displayAltitude() {
+        System.out.println("Max altitude: " + maxAltitude + " meters");
+    }
+}
+
+// Concrete flying vehicle - must implement ALL abstract methods
+class Airplane extends FlyingVehicle {
+    public Airplane(String color) {
+        super(color, 3, 12000);
+    }
+    
+    @Override
+    void startEngine() {
+        System.out.println("Airplane: Starting jet engines... Engines running!");
+    }
+    
+    @Override
+    void takeOff() {
+        System.out.println("Airplane: Accelerating down runway... Taking off!");
+    }
+}
+
+class Helicopter extends FlyingVehicle {
+    public Helicopter(String color) {
+        super(color, 0, 6000);
+    }
+    
+    @Override
+    void startEngine() {
+        System.out.println("Helicopter: Starting rotors... Whop whop whop!");
+    }
+    
+    @Override
+    void takeOff() {
+        System.out.println("Helicopter: Lifting off vertically!");
+    }
+}
+
+// Demonstration
+public class VehicleDemo {
+    public static void main(String[] args) {
+        // Cannot instantiate abstract classes:
+        // Vehicle v = new Vehicle("red", 4);          // ERROR!
+        // FlyingVehicle fv = new FlyingVehicle(...);  // ERROR!
+        
+        // Can instantiate concrete classes:
+        Motorbike bike = new Motorbike("Black");
+        Airplane plane = new Airplane("White");
+        Helicopter heli = new Helicopter("Green");
+        
+        System.out.println("=== Motorbike ===");
+        bike.displayInfo();
+        bike.startEngine();
+        bike.honk();
+        
+        System.out.println("\n=== Airplane ===");
+        plane.displayInfo();
+        plane.displayAltitude();
+        plane.startEngine();
+        plane.takeOff();
+        plane.honk();
+        
+        System.out.println("\n=== Helicopter ===");
+        heli.displayInfo();
+        heli.displayAltitude();
+        heli.startEngine();
+        heli.takeOff();
+        
+        System.out.println("\n=== Polymorphism with Vehicles ===");
+        Vehicle[] vehicles = {bike, plane, heli};
+        
+        for (Vehicle vehicle : vehicles) {
+            vehicle.startEngine();  // Polymorphic call
+        }
+        
+        System.out.println("\n=== Polymorphism with Flying Vehicles ===");
+        FlyingVehicle[] flyers = {plane, heli};
+        
+        for (FlyingVehicle flyer : flyers) {
+            flyer.takeOff();  // Polymorphic call
+        }
+    }
+}
+```
+
+**Ответ:** Пример показывает: (1) **concrete class** `Motorbike` закрывает все abstract methods; (2) **abstract class** `FlyingVehicle` может расширять другой abstract class без реализации унаследованных abstract methods; (3) **concrete** `Airplane`/`Helicopter` обязаны закрыть всю «цепочку» abstract methods; (4) `new` для любого `abstract class` запрещён на любой глубине.
+
+</details>
+
+##### **3.9. Пакеты и import** (**Лекция** 9, пакеты)
+Покажите объявление **nested packages**, импорт классов и использование **fully-qualified name**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** **Packages** задают **namespace**, снижают коллизии имён и связаны с моделью доступа; структура каталогов должна совпадать с именем пакета.
+
+**Структура файлов:**
+```
+project/
+├── company/
+│   └── department/
+│       └── lab/
+│           └── math/
+│               ├── MathVector.java
+│               └── Calculator.java
+├── myPackage/
+│   ├── PublicClass.java
+│   └── PackageClass.java
+└── Main.java
+```
+
+**Файл MathVector.java:**
+```java
+package company.department.lab.math;
+
+public class MathVector {
+    private double x, y;
+    
+    public MathVector(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+    
+    public void display() {
+        System.out.println("Vector: (" + x + ", " + y + ")");
+    }
+    
+    public double magnitude() {
+        return Math.sqrt(x * x + y * y);
+    }
+}
+```
+
+**Файл Calculator.java:**
+```java
+package company.department.lab.math;
+
+public class Calculator {
+    public static double add(double a, double b) {
+        return a + b;
+    }
+    
+    public static double multiply(double a, double b) {
+        return a * b;
+    }
+}
+```
+
+**Файл PublicClass.java:**
+```java
+package myPackage;
+
+public class PublicClass {
+    public void publicMethod() {
+        System.out.println("This is a public class - accessible everywhere");
+    }
+}
+```
+
+**Файл PackageClass.java:**
+```java
+package myPackage;
+
+// No public modifier - package-private (default access)
+class PackageClass {
+    void packageMethod() {
+        System.out.println("This is package-private - " +
+                          "only accessible in myPackage");
+    }
+}
+```
+
+**Файл Main.java:**
+```java
+// Three ways to use classes from other packages:
+
+// 1. Import specific class
+import company.department.lab.math.MathVector;
+
+// 2. Import all classes from a package (import-on-demand)
+import myPackage.*;
+
+// 3. Use fully-qualified name (no import needed)
+// company.department.lab.math.Calculator
+
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("=== Method 1: Imported Specific Class ===");
+        // Can use short name because we imported it
+        MathVector v1 = new MathVector(3.0, 4.0);
+        v1.display();
+        System.out.println("Magnitude: " + v1.magnitude());
+        
+        System.out.println("\n=== Method 2: Import-on-Demand ===");
+        // Can use short name because we imported myPackage.*
+        PublicClass pc = new PublicClass();
+        pc.publicMethod();
+        
+        // This won't work - PackageClass is not public:
+        // PackageClass pkc = new PackageClass();  // ERROR!
+        
+        System.out.println("\n=== Method 3: Fully-Qualified Name ===");
+        // No import needed - use full name
+        double sum = company.department.lab.math.Calculator.add(10, 20);
+        double product = company.department.lab.math.Calculator.multiply(5, 6);
+        System.out.println("Sum: " + sum);
+        System.out.println("Product: " + product);
+        
+        System.out.println("\n=== Standard Java Library ===");
+        // java.lang is automatically imported
+        String str = "Hello";  // String is from java.lang
+        System.out.println(str);
+        
+        // Need to import other packages
+        java.util.ArrayList<Integer> list = new java.util.ArrayList<>();
+        list.add(1);
+        list.add(2);
+        System.out.println("List: " + list);
+        
+        // Better to import:
+        // import java.util.ArrayList;
+        // or import java.util.*;
+    }
+}
+```
+
+**Файл PackageDemo.java (в пакете myPackage):**
+```java
+package myPackage;
+
+public class PackageDemo {
+    public static void main(String[] args) {
+        // Inside the same package, we can access package-private classes
+        PackageClass pkc = new PackageClass();
+        pkc.packageMethod();  // This works!
+        
+        PublicClass pc = new PublicClass();
+        pc.publicMethod();
+    }
+}
+```
+
+**Сборка и запуск:**
+```bash
+# Compile (from project root)
+javac company/department/lab/math/*.java
+javac myPackage/*.java
+javac Main.java
+
+# Run
+java Main
+```
+
+**Вывод:**
+```
+=== Method 1: Imported Specific Class ===
+Vector: (3.0, 4.0)
+Magnitude: 5.0
+
+=== Method 2: Import-on-Demand ===
+This is a public class - accessible everywhere
+
+=== Method 3: Fully-Qualified Name ===
+Sum: 30.0
+Product: 30.0
+
+=== Standard Java Library ===
+Hello
+List: [1, 2]
+```
+
+**Ответ:** **Packages** дают:
+
+1. **Организацию:** логические группы связанных классов.
+2. **Пространства имён:** меньше конфликтов имён (одно имя класса в разных пакетах).
+3. **Контроль доступа:** package-private классы не видны снаружи пакета.
+4. **Именование:** обратный DNS (`com.example.project`) снижает глобальные коллизии.
+
+</details>
+
+##### **3.10. UML: Book и Person** (**Туториал** 9, ассоциация)
+Постройте **class diagram** и соответствующий Java-код для **association** между `Book` и `Person` (авторы).
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** **Association** — связь «использует / имеет»; направление стрелки показывает, кто о ком «знает».
+
+**Диаграмма UML:**
+
+```
+Book                                Person
+-name: String                      -name: String
+-publisher: String                 -age: int
+-authors: Person[]                 +Person(initialName: String)
++addAuthor(author: Person): void   +printPerson(): void
++getAuthors(): Person[]            +getName(): String
+```
+
+**Стрелка:** Book → Person (`Book` знает о `Person`, обратная ссылка в этом примере не задана).
+
+**Реализация на Java:**
+
+```java
+// Person.java
+class Person {
+    private String name;
+    private int age;
+    
+    public Person(String initialName) {
+        this.name = initialName;
+        this.age = 0;
+    }
+    
+    public Person(String initialName, int initialAge) {
+        this.name = initialName;
+        this.age = initialAge;
+    }
+    
+    public void printPerson() {
+        System.out.println(name + ", age: " + age + " years");
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+
+// Book.java
+class Book {
+    private String name;
+    private String publisher;
+    private Person[] authors;
+    private int authorCount = 0;
+    
+    public Book(String name, String publisher, int maxAuthors) {
+        this.name = name;
+        this.publisher = publisher;
+        this.authors = new Person[maxAuthors];
+    }
+    
+    public void addAuthor(Person author) {
+        if (authorCount < authors.length) {
+            authors[authorCount] = author;
+            authorCount++;
+        } else {
+            System.out.println("Cannot add more authors - array is full");
+        }
+    }
+    
+    public Person[] getAuthors() {
+        // Return only the filled portion of the array
+        Person[] result = new Person[authorCount];
+        for (int i = 0; i < authorCount; i++) {
+            result[i] = authors[i];
+        }
+        return result;
+    }
+    
+    public void displayBook() {
+        System.out.println("Book: " + name);
+        System.out.println("Publisher: " + publisher);
+        System.out.println("Authors:");
+        for (int i = 0; i < authorCount; i++) {
+            System.out.print("  - ");
+            authors[i].printPerson();
+        }
+    }
+}
+
+// Demo
+public class AssociationDemo {
+    public static void main(String[] args) {
+        // Create persons (potential authors)
+        Person author1 = new Person("Alice Johnson", 45);
+        Person author2 = new Person("Bob Smith", 38);
+        Person author3 = new Person("Carol White", 52);
+        
+        // Create a book
+        Book book = new Book("Java Programming Essentials", 
+                            "Tech Books Publishing", 3);
+        
+        // Add authors to the book
+        book.addAuthor(author1);
+        book.addAuthor(author2);
+        book.addAuthor(author3);
+        
+        // Display book information
+        book.displayBook();
+        
+        System.out.println("\n=== Getting Authors ===");
+        Person[] bookAuthors = book.getAuthors();
+        for (Person author : bookAuthors) {
+            author.printPerson();
+        }
+    }
+}
+```
+
+**Двунаправленная ассоциация (many-to-many):**
+
+Если и `Book`, и `Person` должны знать друг о друге:
+
+```java
+class Person {
+    private String name;
+    private int age;
+    private Book[] books;  // Books this person authored
+    private int bookCount = 0;
+    
+    public Person(String initialName, int maxBooks) {
+        this.name = initialName;
+        this.age = 0;
+        this.books = new Book[maxBooks];
+    }
+    
+    public void addBook(Book book) {
+        if (bookCount < books.length) {
+            books[bookCount] = book;
+            bookCount++;
+        }
+    }
+    
+    public void printPerson() {
+        System.out.println(name + ", age: " + age + " years");
+    }
+    
+    public String getName() {
+        return name;
+    }
+    
+    public Book[] getBooks() {
+        Book[] result = new Book[bookCount];
+        for (int i = 0; i < bookCount; i++) {
+            result[i] = books[i];
+        }
+        return result;
+    }
+}
+
+class Book {
+    private String name;
+    private String publisher;
+    private Person[] authors;
+    private int authorCount = 0;
+    
+    public Book(String name, String publisher, int maxAuthors) {
+        this.name = name;
+        this.publisher = publisher;
+        this.authors = new Person[maxAuthors];
+    }
+    
+    public void addAuthor(Person author) {
+        if (authorCount < authors.length) {
+            authors[authorCount] = author;
+            authorCount++;
+            author.addBook(this);  // Bidirectional link
+        }
+    }
+    
+    public String getName() {
+        return name;
+    }
+    
+    public Person[] getAuthors() {
+        Person[] result = new Person[authorCount];
+        for (int i = 0; i < authorCount; i++) {
+            result[i] = authors[i];
+        }
+        return result;
+    }
+}
+```
+
+**UML для двунаправленной связи:**
+```
+Book <--------*------*--------> Person
+```
+(Без стрелки — взаимное знание; `*` с двух сторон — **many-to-many**.)
+
+**Ответ:** **Association** описывает совместную работу классов: направление — кто от кого зависит, **cardinality** — сколько экземпляров участвует в связи.
+
+</details>
+
+##### **3.11. UML: композиция Building и Room** (**Туториал** 9, композиция)
+Покажите **composition**, где `Room` — часть `Building` и не существует как самостоятельная сущность вне здания.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** **Composition** — сильная принадлежность: при уничтожении целого (Building) уничтожаются и части (Rooms) в модели владения.
+
+**Диаграмма UML:**
+```
+Building ◆-------- Room
+-rooms: Room[]
+~address: String
+```
+(Закрашенный ромб со стороны `Building` — **composition**.)
+
+**Реализация на Java:**
+
+```java
+class Building {
+    private String address;
+    private Room[] rooms;
+    
+    // Inner class - Room cannot exist outside Building
+    class Room {
+        private int roomNumber;
+        private double area;
+        
+        public Room(int roomNumber, double area) {
+            this.roomNumber = roomNumber;
+            this.area = area;
+        }
+        
+        // Room can access Building's members
+        String getBuildingAddress() {
+            return Building.this.address;
+        }
+        
+        void displayRoom() {
+            System.out.println("  Room " + roomNumber + 
+                             ": " + area + " sq meters " +
+                             "in building at " + getBuildingAddress());
+        }
+    }
+    
+    public Building(String address, int numRooms) {
+        this.address = address;
+        this.rooms = new Room[numRooms];
+        
+        // Create rooms - they are part of the building
+        for (int i = 0; i < numRooms; i++) {
+            rooms[i] = new Room(i + 1, 15.0 + i * 5);
+        }
+    }
+    
+    public void displayBuilding() {
+        System.out.println("Building at: " + address);
+        System.out.println("Rooms:");
+        for (Room room : rooms) {
+            room.displayRoom();
+        }
+    }
+    
+    // When building is demolished, rooms cease to exist
+    public void demolish() {
+        System.out.println("Demolishing building at " + address);
+        rooms = null;  // Rooms are destroyed with the building
+        System.out.println("Building and all its rooms are destroyed");
+    }
+}
+
+public class CompositionDemo {
+    public static void main(String[] args) {
+        System.out.println("=== Creating Building ===");
+        Building building = new Building("123 Main Street", 4);
+        building.displayBuilding();
+        
+        System.out.println("\n=== Demolishing Building ===");
+        building.demolish();
+        
+        // After demolition, we cannot access rooms
+        // They were composed within the building
+        
+        System.out.println("\n=== Key Point ===");
+        System.out.println("Rooms cannot exist without their building");
+        System.out.println("When the building is destroyed, rooms are destroyed too");
+        System.out.println("This is COMPOSITION");
+    }
+}
+```
+
+**Вариант без inner class (всё ещё composition):**
+
+```java
+class Room {
+    private int roomNumber;
+    private double area;
+    private Building building;  // Back-reference to owner
+    
+    // Package-private constructor - only Building can create rooms
+    Room(int roomNumber, double area, Building building) {
+        this.roomNumber = roomNumber;
+        this.area = area;
+        this.building = building;
+    }
+    
+    String getBuildingAddress() {
+        return building.getAddress();
+    }
+    
+    void displayRoom() {
+        System.out.println("  Room " + roomNumber + 
+                         ": " + area + " sq meters");
+    }
+}
+
+class Building {
+    private String address;
+    private Room[] rooms;
+    
+    public Building(String address, int numRooms) {
+        this.address = address;
+        this.rooms = new Room[numRooms];
+        
+        // Building creates and owns its rooms
+        for (int i = 0; i < numRooms; i++) {
+            rooms[i] = new Room(i + 1, 15.0 + i * 5, this);
+        }
+    }
+    
+    String getAddress() {
+        return address;
+    }
+    
+    public void displayBuilding() {
+        System.out.println("Building at: " + address);
+        System.out.println("Rooms:");
+        for (Room room : rooms) {
+            room.displayRoom();
+        }
+    }
+}
+```
+
+**Ответ:** **Composition** — «**part-of**» с сильным владением: (1) часть создаётся целым; (2) не живёт отдельно от модели целого; (3) при уничтожении целого исчезают части; (4) часто делают через **inner class** или строгую инкапсуляцию.
+
+</details>
+
+##### **3.12. UML: агрегация Car и Wheel** (**Туториал** 9, агрегация)
+Покажите **aggregation**, где `Wheel` может существовать независимо от `Car`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** **Aggregation** — слабое «**has a**»: часть может существовать независимо от целого.
+
+**Диаграмма UML:**
+```
+Car ◇-------- Wheel
+-wheels: Wheel[]
+```
+(Пустой ромб со стороны `Car` — **aggregation**.)
+
+**Реализация на Java:**
+
+```java
+// Wheel.java - Can exist independently
+class Wheel {
+    private double diameter;
+    private String brand;
+    private String condition;
+    
+    public Wheel(double diameter, String brand) {
+        this.diameter = diameter;
+        this.brand = brand;
+        this.condition = "new";
+    }
+    
+    public void displayWheel() {
+        System.out.println("  " + brand + " wheel, " + 
+                         diameter + " inches, condition: " + condition);
+    }
+    
+    public void wear() {
+        condition = "worn";
+    }
+    
+    public String getBrand() {
+        return brand;
+    }
+}
+
+// Car.java - Has wheels but doesn't own them
+class Car {
+    private String model;
+    private Wheel[] wheels;
+    
+    public Car(String model) {
+        this.model = model;
+        this.wheels = new Wheel[4];
+    }
+    
+    // Mount existing wheels
+    public void mountWheel(Wheel wheel, int position) {
+        if (position >= 0 && position < 4) {
+            wheels[position] = wheel;
+            System.out.println("Mounted wheel at position " + position);
+        }
+    }
+    
+    // Remove a wheel - it still exists after removal
+    public Wheel removeWheel(int position) {
+        if (position >= 0 && position < 4) {
+            Wheel removed = wheels[position];
+            wheels[position] = null;
+            System.out.println("Removed wheel from position " + position);
+            return removed;
+        }
+        return null;
+    }
+    
+    public void displayCar() {
+        System.out.println("Car: " + model);
+        System.out.println("Wheels:");
+        for (int i = 0; i < 4; i++) {
+            System.out.print("  Position " + i + ": ");
+            if (wheels[i] != null) {
+                wheels[i].displayWheel();
+            } else {
+                System.out.println("No wheel");
+            }
+        }
+    }
+}
+
+public class AggregationDemo {
+    public static void main(String[] args) {
+        System.out.println("=== Creating Wheels (Independent) ===");
+        Wheel wheel1 = new Wheel(17, "Michelin");
+        Wheel wheel2 = new Wheel(17, "Bridgestone");
+        Wheel wheel3 = new Wheel(17, "Michelin");
+        Wheel wheel4 = new Wheel(17, "Bridgestone");
+        
+        wheel1.displayWheel();
+        wheel2.displayWheel();
+        
+        System.out.println("\n=== Creating Car ===");
+        Car car1 = new Car("Toyota Camry");
+        
+        System.out.println("\n=== Mounting Wheels ===");
+        car1.mountWheel(wheel1, 0);
+        car1.mountWheel(wheel2, 1);
+        car1.mountWheel(wheel3, 2);
+        car1.mountWheel(wheel4, 3);
+        
+        System.out.println();
+        car1.displayCar();
+        
+        System.out.println("\n=== Removing a Wheel ===");
+        Wheel removedWheel = car1.removeWheel(0);
+        car1.displayCar();
+        
+        System.out.println("\n=== Removed Wheel Still Exists ===");
+        System.out.println("The removed wheel:");
+        removedWheel.displayWheel();
+        System.out.println("It can be mounted on another car!");
+        
+        System.out.println("\n=== Creating Second Car ===");
+        Car car2 = new Car("Honda Civic");
+        car2.mountWheel(removedWheel, 0);
+        System.out.println();
+        car2.displayCar();
+        
+        System.out.println("\n=== Spare Wheels ===");
+        Wheel spareWheel1 = new Wheel(17, "Goodyear");
+        Wheel spareWheel2 = new Wheel(17, "Pirelli");
+        System.out.println("These wheels exist but aren't mounted on any car:");
+        spareWheel1.displayWheel();
+        spareWheel2.displayWheel();
+        
+        System.out.println("\n=== Key Point ===");
+        System.out.println("Wheels can exist without a car");
+        System.out.println("Wheels can be removed and installed on different cars");
+        System.out.println("If a car is destroyed, its wheels still exist");
+        System.out.println("This is AGGREGATION");
+    }
+}
+```
+
+**Вывод:**
+```
+=== Creating Wheels (Independent) ===
+  Michelin wheel, 17.0 inches, condition: new
+  Bridgestone wheel, 17.0 inches, condition: new
+
+=== Creating Car ===
+
+=== Mounting Wheels ===
+Mounted wheel at position 0
+Mounted wheel at position 1
+Mounted wheel at position 2
+Mounted wheel at position 3
+
+Car: Toyota Camry
+Wheels:
+  Position 0:   Michelin wheel, 17.0 inches, condition: new
+  Position 1:   Bridgestone wheel, 17.0 inches, condition: new
+  Position 2:   Michelin wheel, 17.0 inches, condition: new
+  Position 3:   Bridgestone wheel, 17.0 inches, condition: new
+
+=== Removing a Wheel ===
+Removed wheel from position 0
+Car: Toyota Camry
+Wheels:
+  Position 0: No wheel
+  Position 1:   Bridgestone wheel, 17.0 inches, condition: new
+  Position 2:   Michelin wheel, 17.0 inches, condition: new
+  Position 3:   Bridgestone wheel, 17.0 inches, condition: new
+
+=== Removed Wheel Still Exists ===
+The removed wheel:
+  Michelin wheel, 17.0 inches, condition: new
+It can be mounted on another car!
+
+=== Creating Second Car ===
+Mounted wheel at position 0
+
+Car: Honda Civic
+Wheels:
+  Position 0:   Michelin wheel, 17.0 inches, condition: new
+  Position 1: No wheel
+  Position 2: No wheel
+  Position 3: No wheel
+
+=== Spare Wheels ===
+These wheels exist but aren't mounted on any car:
+  Goodyear wheel, 17.0 inches, condition: new
+  Pirelli wheel, 17.0 inches, condition: new
+
+=== Key Point ===
+Wheels can exist without a car
+Wheels can be removed and installed on different cars
+If a car is destroyed, its wheels still exist
+This is AGGREGATION
+```
+
+**Ответ:** **Aggregation** отличается от **composition**: часть (`Wheel`) существует сама по себе; может быть создана до «целого»; может переезжать между `Car`; при уничтожении `Car` колёса остаются; жизненный цикл части не совпадает с целым.
+
+</details>
+

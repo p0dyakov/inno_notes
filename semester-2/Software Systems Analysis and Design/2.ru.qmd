@@ -1,0 +1,1101 @@
+---
+title: "W2. Классы C++ без ООП, конструкторы и деструкторы, объявления и инициализация, преобразования типов, операторные и преобразующие функции"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2026-01-29
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+##### **1.1 Введение в классы C++**
+
+**Class** (**класс**) в **C++** — это пользовательский **compound type** (**составной тип**), который позволяет сгруппировать данные (переменные) и функции, работающие с этими данными. Классы — основа **object-oriented programming** (**объектно ориентированного программирования**, **OOP**), но ими можно пользоваться осмысленно и без полного набора принципов **OOP**.
+
+Три главных взгляда на классы **C++**:
+
+1. **Как на составной тип:** класс объединяет несколько переменных разных типов.
+2. **Как на пользовательский тип:** класс может вести себя похоже на встроенные типы вроде `int` или `double`.
+3. **Как на базу для OOP:** классы поддерживают **encapsulation** (**инкапсуляцию**), **inheritance** (**наследование**) и **polymorphism** (**полиморфизм**) — это разберём в следующих лекциях.
+
+###### **1.1.1 Базовая структура класса**
+
+Определение класса задаёт и структуру (**data members** — поля данных), и операции (**member functions** — функции-члены) для объектов этого типа:
+
+```cpp
+class Point {
+    double x;
+    double y;
+};
+```
+
+Этот простой класс задаёт тип `Point` с двумя полями данных — координатами `x` и `y`.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Класс объединяет поля данных и функции-члены в одном пользовательском типе"
+%%| fig-width: 6
+%%| fig-height: 3
+classDiagram
+    class Point {
+      - double x
+      - double y
+      + Move(dx, dy)
+    }
+```
+
+##### **1.2 Управление доступом: `public` и `private`**
+
+В **C++** есть **access specifiers** (**спецификаторы доступа**), чтобы управлять тем, какие части класса видны снаружи:
+
+*   **`private`:** к **private**-членам можно обратиться только изнутри самого класса. Для членов **class** это уровень доступа по умолчанию.
+*   **`public`:** **public**-члены доступны любому коду, который имеет доступ к объекту класса.
+
+Такое разделение поддерживает **encapsulation** (**инкапсуляцию**): детали реализации скрыты, наружу выставляется управляемый интерфейс.
+
+```cpp
+class Point {
+private:
+    double x, y;  // Implementation (hidden)
+public:
+    void Move(double dx, double dy) {  // Interface (visible)
+        x += dx;
+        y += dy;
+    }
+};
+```
+
+**Обычный приём** — держать поля данных **private** и давать контролируемый доступ через **public** **member functions**. Это даёт:
+
+*   проверку данных до сохранения;
+*   возможность сменить внутреннее представление, не ломая пользователей;
+*   доступ «только для чтения» (**getters** без **setters**).
+
+###### **1.2.1 Обращение к членам класса**
+
+Для объекта, объявленного по значению, используйте **dot notation** (**точечную запись**):
+
+```cpp
+Point p1;
+p1.Move(0.5, 0.5);  // Call member function
+```
+
+Для указателя на объект — **arrow notation** (**стрелочную запись**):
+
+```cpp
+Point* p = new Point();
+p->Move(0.5, 0.5);  // Call member function via pointer
+```
+
+##### **1.3 Область видимости и время жизни**
+
+Прежде чем углубляться в классы, важно различать два базовых понятия: **scope** (**область видимости**) и **lifetime** (**время жизни**).
+
+**Scope** задаёт *где* в коде имя переменной видимо и может использоваться:
+
+```cpp
+void function1() {
+    int x = 5;      // x's scope: inside function1 only
+    // Can use x here
+}  // End of x's scope
+
+void function2() {
+    // Cannot use x here - it's out of scope
+    int y = 10;     // y's scope: inside function2 only
+}
+```
+
+**Lifetime** задаёт *когда* объект существует в памяти (от создания до уничтожения):
+
+```cpp
+void example() {
+    int x = 5;      // x's lifetime begins here
+    {
+        int y = 10; // y's lifetime begins here
+        // Both x and y exist
+    }               // y's lifetime ends - y is destroyed
+    // Only x exists here
+}                   // x's lifetime ends - x is destroyed
+```
+
+**Суть:** **scope** — понятие **compile time** (где имена видны), а **lifetime** — **runtime** (когда объект реально существует в памяти).
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Область видимости (scope) и время жизни (lifetime) различаются: имя может быть видно в одном регионе кода, а объект существовать лишь на определённом интервале времени"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+flowchart TB
+    Scope["Область видимости (scope)<br/>где видно имя"]
+    Lifetime["Время жизни (lifetime)<br/>когда объект в памяти"]
+    Scope --> Lifetime
+```
+
+##### **1.4 Указатель `this`**
+
+Внутри **member functions** есть скрытый указатель **`this`**: он указывает на объект, для которого вызвана функция-член.
+
+```cpp
+class Point {
+    double x, y;
+public:
+    void setX(double x) {
+        this->x = x;  // this->x is the member, x is the parameter
+    }
+    
+    Point& getReference() {
+        return *this;  // Returns reference to the current object
+    }
+};
+
+Point p;
+p.setX(5.0);  // Inside setX, 'this' points to p
+```
+
+**Зачем нужен `this`:**
+
+1.  **Разрешать коллизии имён**, когда параметры совпадают с именами полей.
+2.  **Возвращать сам объект** — для **method chaining** (`obj.method1().method2()`).
+3.  **Передавать объект в другие функции:** `someFunction(this)` или `someFunction(*this)`.
+4.  **Проверять self-assignment:** `if (this != &other) { ... }`
+
+**Тип `this`:** для класса `C` в обычной функции-члене тип `this` — `C*`; в **`const`** **member functions** — `const C*`.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Внутри функции-члена this указывает на текущий объект"
+%%| fig-width: 6
+%%| fig-height: 2.8
+flowchart LR
+    This["this : Point*"]
+    Obj["текущий объект p"]
+    Member["p.x / p.y"]
+    This --> Obj --> Member
+```
+
+##### **1.5 Объявления сущностей в C/C++**
+
+Программа на **C++** — это последовательность **declarations** (**объявлений**), каждое из которых вводит **entity** (**сущность**). К числу сущностей относятся:
+
+*   **Value** (**значение**): литерал (например, `42`, `3.14`).
+*   **Object** (**объект**): именованная или безымянная область памяти со значением.
+*   **Reference** (**ссылка**): синоним (**alias**) для другого объекта.
+*   **Function** (**функция**): последовательность операторов, выполняющая действия.
+*   **Type** (**тип**): встроенный или пользовательский тип (**class** и др.).
+
+###### **1.5.1 Ссылки: псевдонимы объектов**
+
+**Reference** — это **alias** (альтернативное имя) для уже существующего объекта. После инициализации ссылка всегда относится к одному и тому же объекту и ведёт себя как он:
+
+```cpp
+int x = 10;
+int& ref = x;    // ref is an alias for x
+
+ref = 20;        // Changes x to 20
+cout << x;       // Prints 20
+
+int* ptr = &x;   // Pointer: stores the address of x
+*ptr = 30;       // Changes x to 30 (dereference ptr to access x)
+```
+
+**Главные отличия ссылок от указателей:**
+
+| Свойство | Ссылка (reference) | Указатель (pointer) |
+|---------|-----------|---------|
+| Синтаксис | `int& ref = x;` | `int* ptr = &x;` |
+| Обязательна инициализация | Да, сразу | Нет, может быть `nullptr` |
+| Можно перепривязать | Нет | Да |
+| Может быть «пустой» | Нет | Да (`nullptr`) |
+| Разыменование | Неявно | Явно (`*ptr`) |
+| Адрес | `&ref` — адрес объекта | `ptr` — сам адрес |
+
+**Зачем ссылки в конструкторах:**
+
+```cpp
+C(C& other) { }      // Copy constructor with reference
+```
+
+При передаче по значению:
+
+```cpp
+C(C other) { }       // WRONG! Infinite recursion
+```
+
+потребовалось бы копировать `other` для передачи — вызывается **copy constructor**, которому снова нужна копия, снова **copy constructor**… получается бесконечная рекурсия.
+
+###### **1.5.2 Синтаксис объявления переменной**
+
+Общая форма объявления переменной:
+
+```
+S T name initializer;
+```
+
+где:
+
+*   **S:** **storage class specifier** (по желанию: `static`, `extern` и т.д.).
+*   **T:** **type specifier** (обязательно: `int`, `double`, `Point`…).
+*   **name:** идентификатор переменной (обязательно).
+*   **initializer:** начальное значение (по желанию).
+*   **`;`** разделитель (обязательно).
+
+**Static semantics** (**статическая семантика**, **compile time**): объявление заносит имя в текущий **scope**, и оно доступно дальше по тексту.
+
+**Dynamic semantics** (**динамическая семантика**, **runtime**): выделяется память, вычисляется выражение инициализатора (при необходимости с преобразованием типа), значение сохраняется.
+
+##### **1.6 Формы инициализации в C++**
+
+В **C++** есть несколько способов инициализировать переменные — это путает, но даёт гибкость.
+
+###### **1.6.1 Классическая инициализация**
+
+```cpp
+int y = 0;      // Assignment-style initialization
+int x(0);       // Functional-style initialization
+```
+
+###### **1.6.2 Единообразная инициализация (C++11)**
+
+В **C++11** появилась **braced initialization** (**инициализация фигурными скобками**), её же называют **uniform initialization**:
+
+```cpp
+int z{0};       // Braced initialization
+int t = {0};    // Braced initialization with =
+```
+
+Синтаксис задуман так, чтобы единообразно работать для разных типов и контекстов. Главные плюсы:
+
+1. **Блокирует narrowing conversions** (**сужающие преобразования**) — потерю данных ловим на **compile time**:
+   ```cpp
+   double x = 3.14, y = 2.71, z = 1.41;
+   int sum2(x+y+z);    // OK, but data loss (implicit narrowing)
+   int sum3 = x+y+z;   // OK, but data loss (implicit narrowing)
+   int sum1{x+y+z};    // Error: narrowing conversion not allowed
+   ```
+2. **Отделяет объявление объекта от объявления функции** — проблема **Most Vexing Parse**:
+   ```cpp
+   class C { ... };
+   C c1();    // Function declaration (not an object!)
+   C c2{};    // Object declaration with default initialization
+   ```
+
+**О сложности:** идея «uniform initialization» на деле соседствует с множеством тонко различающихся форм инициализации в **C++**. На практике **braced initialization** часто предпочтительнее из‑за безопасности.
+
+##### **1.7 Память: stack и heap**
+
+Прежде чем говорить о создании объектов, нужно различать два основных региона памяти в программе на **C++**:
+
+###### **1.7.1 Память стека**
+
+**Stack** (**стек**) — область памяти, которая растёт и сжимается по мере вызова и завершения функций:
+
+```cpp
+void function() {
+    int x = 5;        // Allocated on stack
+    double y = 3.14;  // Allocated on stack
+    Point p;          // Allocated on stack
+}  // All automatically deallocated here
+```
+
+**Свойства стека:**
+
+*   **Быстро:** выделение/освобождение очень дешёвые.
+*   **Автоматически:** не нужно вручную освобождать память объекта.
+*   **Ограниченный размер:** обычно порядка мегабайт (зависит от системы).
+*   **LIFO:** объекты уничтожаются в порядке, обратном созданию.
+*   **Время жизни по области видимости:** объект живёт до конца **scope**.
+
+**Наглядная схема:**
+```
+Вызовы функций    Память стека
+--------------    ------------
+main()            |          |  <- вершина стека
+  вызов foo()     | x из foo |
+    вызов bar()   | y из foo |
+                  | z из bar |  <- текущий кадр стека
+                  |__________|
+```
+
+###### **1.7.2 Память кучи**
+
+**Heap** (**куча**, также **free store**) — область с ручным управлением:
+
+```cpp
+void function() {
+    int* ptr = new int(5);     // Allocated on heap
+    Point* p = new Point();     // Allocated on heap
+    // Objects still exist here
+    delete ptr;                 // Manual deallocation
+    delete p;                   // Manual deallocation
+}  // Pointers destroyed, but if you forget 'delete', memory leaks!
+```
+
+**Свойства кучи:**
+
+*   **Медленнее:** аллокация/деаллокация сложнее.
+*   **Ручное управление:** всё, что выделено `new`, нужно освободить `delete`.
+*   **Больший объём:** ограничен в основном **RAM**.
+*   **Гибкое время жизни:** объект живёт, пока вы его явно не уничтожите.
+*   **Риск фрагментации** со временем.
+
+**Пример утечки памяти:**
+```cpp
+void badFunction() {
+    int* ptr = new int(5);  // Allocates on heap
+    return;                  // Forgets to delete - MEMORY LEAK!
+}  // ptr variable destroyed, but the integer on heap remains forever
+```
+
+###### **1.7.3 Статическое и динамическое создание объектов**
+
+В **C++** два принципиально разных способа создать объект.
+
+**Статическое (автоматическое) объявление:**
+
+```cpp
+void foo() {
+    Test staticTest;  // Created on stack
+}
+```
+
+**Свойства:**
+
+*   объект создаётся **объявлением**;
+*   память на **stack**;
+*   доступ **по имени**;
+*   существует **до конца области видимости** (**lifetime** определяется статически);
+*   **constructor** вызывается в точке объявления;
+*   **destructor** — автоматически при выходе из **scope**;
+*   **когда уместно:** время жизни совпадает с **scope**, объект не слишком крупный.
+
+**Динамическое объявление:**
+
+```cpp
+void foo() {
+    Test* dynamicTest = new Test();  // Created on heap
+    delete dynamicTest;               // Don't forget!
+}
+```
+
+**Свойства:**
+
+*   объект создаётся явным **`new`**;
+*   память на **heap**;
+*   объект **безымянный**, доступ по указателю;
+*   живёт до явного **`delete`** (**lifetime** задаётся динамически);
+*   **constructor** вызывает `new`;
+*   нужно вручную вызвать `delete` — **destructor** и освобождение памяти;
+*   **когда уместно:** объект должен пережить **scope**, размер неизвестен на **compile time**, или объект очень большой.
+
+**Memory leakage** (**утечка памяти**) — динамическая память никогда не освобождена (`delete` не вызван). Относится только к **heap**.
+
+**Сравнение полного цикла:**
+
+```cpp
+void example() {
+    // STACK OBJECT
+    Test stack;              // 1. Memory allocated
+                             // 2. Constructor called
+    // Use stack...
+}                            // 3. Destructor called
+                             // 4. Memory automatically freed
+
+void example2() {
+    // HEAP OBJECT
+    Test* heap = new Test(); // 1. Memory allocated
+                             // 2. Constructor called
+    // Use heap...
+    delete heap;             // 3. Destructor called
+                             // 4. Memory manually freed
+}
+```
+
+##### **1.8 Конструкторы**
+
+**Constructors** (**конструкторы**) — особые **member functions**, которые инициализируют объект при создании. Имя совпадает с именем класса, тип возврата не задаётся.
+
+###### **1.8.1 Виды конструкторов**
+
+В **C++** обычно выделяют четыре группы:
+
+1. **Default constructor** (**конструктор по умолчанию**): без аргументов.
+   ```cpp
+   class C {
+   public:
+       int a;
+       C() : a{0} {}  // Default constructor
+   };
+   ```
+2. **Conversion constructor** (**конструктор преобразования**): один аргумент другого типа.
+   ```cpp
+   C(int i) : a(i) {}  // Converts int to C
+   ```
+3. **Copy constructor** (**конструктор копирования**): ссылка на другой объект того же класса.
+   ```cpp
+   C(C& other) { 
+       this->a = other.a; 
+   }
+   ```
+4. **Прочие конструкторы:** несколько аргументов или специальные сочетания параметров.
+   ```cpp
+   C(int i, int j) { 
+       a = i + j; 
+   }
+   ```
+
+###### **1.8.2 Список инициализации членов**
+
+Предпочтительный способ инициализировать поля — **member initialization list** (**список инициализации членов** после двоеточия):
+
+```cpp
+Point() : x(0.0), y(0.0) { }  // Preferred: initialization list
+Point() { x = 0.0; y = 0.0; } // Works but less efficient: assignment in body
+```
+
+**Почему список предпочтительнее:**
+
+*   **Эффективнее:** члены сразу инициализируются, а не конструируются по умолчанию и потом присваиваются.
+*   **Обязателен для:** **`const`**-членов, ссылок-членов, полей без **default constructor**.
+*   **Яснее намерение:** отделяет инициализацию от остальной логики **constructor**.
+
+###### **1.8.3 Вызов конструкторов**
+
+Разный синтаксис объявления вызывает разные **constructors**:
+
+```cpp
+class C { 
+    C() { }           // Default
+    C(int i) { }      // Conversion
+    C(C& c) { }       // Copy
+    C(int i, int j) { } // Other
+};
+
+C c1;              // Default constructor
+C c2(1);           // Conversion constructor
+C c3 = 1;          // Conversion constructor (+ copy, often optimized away)
+C c4 = C(1);       // Conversion constructor (+ copy, often optimized away)
+C c5(c2);          // Copy constructor
+C c6 = c2;         // Copy constructor
+C c7{1, 2};        // Constructor with 2 parameters
+C c8();            // FUNCTION DECLARATION (not object!)
+```
+
+**Важно:** `C c8();` — не объект, а объявление функции, возвращающей `C`. Это **Most Vexing Parse**. Для **default construction** используйте `C c8{};`.
+
+###### **1.8.4 Copy elision и оптимизации компилятора**
+
+Концептуально `C c3 = 1;` могло бы означать:
+
+1. **conversion constructor** создаёт временный `C`;
+2. **copy constructor** инициализирует `c3` из временного.
+
+На практике компиляторы **обязаны** убирать лишние копии во многих случаях (с **C++17** часть случаев стала обязательной). Объект может создаваться напрямую без вызова **copy constructor**.
+
+**Но:** даже если **copy constructor** не вызывается, он должен быть **доступен** (не **`private`**). Иначе — ошибка компиляции, хотя «по факту» копирования могло и не быть.
+
+##### **1.9 Деструкторы**
+
+**Destructor** (**деструктор**) — особая **member function**, которая выполняет очистку при уничтожении объекта. Имя — имя класса с тильдой (`~`), параметров нет.
+
+```cpp
+class Test {
+public:
+    int x;
+    Test() : x(0) {
+        cout << "Constructor called" << endl;
+    }
+    ~Test() {
+        cout << "Destructor called" << endl;
+    }
+};
+```
+
+**Задачи деструктора:**
+
+*   освободить ресурсы, которые объект захватил (файлы, сеть, блокировки);
+*   освободить память, выделенную динамически;
+*   выполнить прочую очистку.
+
+**Когда вызывается автоматически:**
+
+*   для объектов на стеке — в конце **scope**;
+*   для объектов на куче — при выполнении `delete`.
+
+**Явный вызов деструктора** (нужен редко):
+```cpp
+c.Test::~Test();  // Explicit call - object still exists after!
+delete pc;         // Correct way for heap objects - calls destructor and frees memory
+```
+
+⚠️ **Предупреждение:** явный вызов деструктора почти никогда не уместен. Для стекового объекта деструктор вызовется снова автоматически — риск **double-deletion** и подобных ошибок.
+
+##### **1.10 Перегрузка функций и разрешение перегрузки (overload resolution)**
+
+Прежде чем подробно разбирать преобразования типов, полезно понять **function overloading** (**перегрузку функций**) — несколько функций с одним именем и разными параметрами.
+
+**Пример перегрузки:**
+
+```cpp
+void print(int x) {
+    cout << "Integer: " << x << endl;
+}
+
+void print(double x) {
+    cout << "Double: " << x << endl;
+}
+
+void print(const char* s) {
+    cout << "String: " << s << endl;
+}
+
+print(42);      // Calls print(int)
+print(3.14);    // Calls print(double)
+print("hello"); // Calls print(const char*)
+```
+
+**Overload resolution** — это этап компиляции, на котором выбирается, какая именно перегрузка будет вызвана:
+
+1. **Candidate functions** — все функции с подходящим именем.
+2. **Viable functions** — те, для которых реально собрать вызов с данными аргументами (возможно, с преобразованиями).
+3. **Best match** — точное совпадение лучше преобразований; «лучшее» преобразование лучше «худшего».
+
+**Пример overload resolution:**
+
+```cpp
+void foo(int x) { }       // #1
+void foo(double x) { }    // #2
+
+foo(5);      // Calls #1: exact match for int
+foo(5.0);    // Calls #2: exact match for double
+foo(5.5f);   // Calls #2: float→double is better than float→int
+```
+
+**Зачем это важно:**
+
+*   чтобы осмысленно ставить `= delete` на ненужные перегрузки;
+*   чтобы понимать, какой **constructor** выберется;
+*   чтобы избегать неоднозначных вызовов;
+*   чтобы писать эффективный код без лишних копий.
+
+##### **1.11 Преобразования типов**
+
+**C++** поддерживает **standard conversions** (**стандартные преобразования**, встроенные в язык) и **user-defined conversions** (**пользовательские преобразования** для классов).
+
+###### **1.11.1 Стандартные преобразования**
+
+Примеры:
+
+*   массив → указатель;
+*   целое → **boolean**;
+*   **double** → длинное целое;
+*   указатель на производный класс → указатель на базовый.
+
+Они могут происходить неявно, когда это нужно для вызова:
+```cpp
+void foo(double x) { ... }
+foo(3.14);   // OK: double literal
+foo(3);      // OK: int converted to double
+foo(true);   // OK: boolean converted to double (true → 1.0)
+```
+
+###### **1.11.2 Ограничение преобразований через `delete`**
+
+Чтобы запретить нежелательные преобразования, объявите лишние перегрузки **deleted**:
+
+```cpp
+void foo(double x) { ... }
+void foo(int) = delete;
+void foo(bool) = delete;
+
+foo(3.14);   // OK
+foo(3);      // Error: deleted function
+foo(true);   // Error: deleted function
+```
+
+Для более жёсткого запрета — **deleted** шаблон:
+
+```cpp
+template<typename T>
+void foo(T) = delete;
+
+void foo(double x) { ... }  // Only this overload allowed
+
+foo(3.14);   // OK: calls the double version
+foo(3);      // Error: would instantiate deleted template
+foo(true);   // Error: would instantiate deleted template
+```
+
+##### **1.12 Константные выражения: `const` и `constexpr`**
+
+###### **1.12.1 Квалификатор `const`**
+
+**`const`** задаёт, что значение переменной после инициализации менять нельзя:
+
+```cpp
+const int x = expression;  // Value fixed after initialization
+```
+
+При этом **`const` сам по себе не гарантирует** вычисление на **compile time** — в выражении могут быть **runtime**-вычисления.
+
+###### **1.12.2 Спецификатор `constexpr` (C++11)**
+
+**`constexpr`** **гарантирует**, что значение можно вычислить на этапе компиляции:
+
+```cpp
+constexpr int y = 42;  // Must be evaluable at compile-time
+```
+
+**Ключевые моменты:**
+
+*   для объектов **`constexpr` подразумевает `const`**;
+*   такое значение можно использовать там, где нужны **compile-time constants** (размеры массивов, аргументы шаблонов);
+*   вычисление выполняется один раз при компиляции.
+
+Неформально: **constant expression** — выражение, значение которого вычислимо на **compile time**.
+
+###### **1.12.3 Функции `constexpr`**
+
+Функции тоже можно объявлять **`constexpr`**, чтобы их можно было вызывать в **constant expressions**:
+
+```cpp
+constexpr int Sqr(int arg) { return arg * arg; }
+
+constexpr int s1 = Sqr(5);  // OK: computes 25 at compile time
+```
+
+**Требования к `constexpr`-функциям (в духе C++11 и далее):**
+
+*   не **virtual**;
+*   в **C++11** тело часто сводится к одному `return` (в **C++14** правила ослаблены);
+*   аргументы и тип возврата — **literal types** (скаляры, агрегаты и т.д. по правилам стандарта);
+*   для **constructors** — ограничения на инициализацию (в ранних стандартах — в основном **initialization lists**).
+
+**Пример с аргументом шаблона:**
+```cpp
+template<int N>
+class list { }
+
+constexpr int sqr1(int arg) { return arg * arg; }
+int sqr2(int arg) { return arg * arg; }
+
+const int X = 2;
+list<sqr1(X)> mylist1;  // OK: sqr1 is constexpr
+list<sqr2(X)> mylist2;  // Error: sqr2 is not constexpr
+```
+
+###### **1.12.4 `const` и `constexpr` вместе**
+
+Для простых объектов **`constexpr const`** избыточно: **`constexpr` уже подразумевает `const`** у объекта:
+
+```cpp
+constexpr const int N = 5;  // Same as below
+constexpr int N = 5;         // const is implicit
+```
+
+Но квалификаторы могут относиться к **разным частям** декларации:
+
+```cpp
+static constexpr int N = 3;
+constexpr const int* NP = &N;  
+// constexpr applies to pointer (NP is a constant pointer)
+// const applies to pointee (*NP is constant data)
+```
+
+##### **1.13 Упрощение записи сложных типов**
+
+Сложные **type specifications** трудно читать и писать:
+
+```cpp
+int (*(a4[10]))(int);
+// "a4 is an array of 10 pointers to functions taking int and returning int"
+```
+
+###### **1.13.1 `typedef` (стиль C)**
+
+**`typedef`** создаёт **type alias** (**псевдоним типа**):
+
+```cpp
+typedef int (*PtrFun)(int);
+PtrFun a4[10];  // Much clearer!
+```
+
+###### **1.13.2 Объявление `using` (современный C++)**
+
+Синтаксис **`using`** обычно читается проще и единообразнее:
+
+```cpp
+using PtrFun = int (*)(int);
+PtrFun a4[10];
+```
+
+В современном **C++** **`using`** предпочтительнее, потому что:
+
+*   порядок записи нагляднее (имя алиаса слева);
+*   удобнее с шаблонами;
+*   согласуется с другими конструкциями **`using`**.
+
+##### **1.14 Функции-операторы**
+
+**Operator functions** (**функции-операторы**) задают, как стандартные операторы (`+`, `-`, `*`, `[]` и др.) работают с пользовательскими типами — тогда класс ведёт себя ближе к встроенным типам.
+
+###### **1.14.1 Базовый синтаксис**
+
+```cpp
+class Point {
+    double x, y;
+public:
+    void operator+=(double v) {
+        x += v;
+        y += v;
+    }
+};
+
+Point p(1.5, 3.5);
+p += 0.5;  // Equivalent to: p.operator+=(0.5)
+```
+
+Функция-оператор вызывается, когда соответствующий оператор применяют к объекту класса.
+
+###### **1.14.2 Типичные операторы**
+
+```cpp
+class C {
+    int member;
+public:
+    C operator+(const C& c1) {      // Binary +
+        return C(member + c1.member);
+    }
+    
+    int operator[](int p) {          // Subscript
+        return member - p;
+    }
+    
+    int operator()(int p) {          // Function call
+        return member + p;
+    }
+    
+    C& operator=(const C& other) {   // Assignment
+        member = other.member;
+        return *this;
+    }
+};
+
+C c1, c2;
+C sum = c1 + c2;     // Calls operator+
+int value = sum[1];  // Calls operator[]
+int result = sum(3); // Calls operator()
+c1 = c2;             // Calls operator=
+```
+
+###### **1.14.3 Правила перегрузки операторов**
+
+*   **Arity** (**арность**, число операндов) не меняется: `+` остаётся бинарным, `!` — унарным.
+*   **Precedence** (**приоритет**) не меняется: `*` всегда «крепче», чем `+`.
+*   **Новые операторы придумать нельзя** — только перегрузить существующие.
+*   **Большинство операторов перегружаемо**, в том числе `+`, `-`, `*`, `/`, `[]`, `()`, `new`, `delete`.
+*   **Не перегружаются:** `.`, `::`, `.*`, `?:`, `sizeof`.
+
+##### **1.15 Функции преобразования типа**
+
+**Conversion functions** (**операторы преобразования**) задают, как объект класса превратить в другой тип. Они помогают пользовательским типам вести себя как встроенные там, где нужны **type conversions**.
+
+###### **1.15.1 Базовый синтаксис**
+
+```cpp
+class C {
+    int member;
+public:
+    operator bool() {  // Conversion to bool
+        return member != 0;
+    }
+};
+
+C c1(1);
+if (c1) {  // Equivalent to: if (c1.operator bool())
+    // Do something
+}
+```
+
+**Синтаксис:**
+
+*   имя — `operator TargetType()`;
+*   тип возврата не пишут (он подразумевается — должен быть `TargetType`);
+*   параметров нет;
+*   пустые скобки обязательны.
+
+###### **1.15.2 Conversion constructors и conversion functions**
+
+Они задают преобразования в **противоположных направлениях**:
+
+```cpp
+class C {
+    int value;
+public:
+    // Conversion constructor: int → C
+    C(int i) : value(i) { }
+    
+    // Conversion function: C → bool
+    operator bool() { return value != 0; }
+};
+
+C c = 5;      // Uses conversion constructor (int → C)
+if (c) { }    // Uses conversion function (C → bool)
+```
+
+###### **1.15.3 Неоднозначность преобразований**
+
+Неоднозначность возникает, если есть несколько путей преобразования:
+
+```cpp
+class B;
+class A {
+public:
+    A(B& b) { }  // Conversion constructor: B → A
+};
+class B {
+public:
+    operator A() { }  // Conversion function: B → A
+};
+
+B b;
+A a = b;  // Error: Ambiguous! Use A(b) or b.operator A()?
+```
+
+**Как снижать риск:** аккуратно проектируйте преобразования; конструкторы часто делают **`explicit`**, чтобы отключить лишние **implicit conversions**.
+
+##### **1.16 Заставить класс вести себя как фундаментальный тип**
+
+Одна из целей **C++** — чтобы **user-defined types** вели себя как встроенные. Средствами выше этого можно добиться:
+
+**1. Инициализация:** похожий синтаксис.
+```cpp
+int i(1);     // Built-in type
+C c(1);       // User-defined type (conversion constructor)
+C c1(c);      // Copy initialization
+```
+
+**2. Присваивание:** задаём семантику **`operator=`**.
+```cpp
+i = 7;        // Built-in assignment
+c = 7;        // User-defined assignment (via conversion + assignment operator)
+c1 = c2;      // User-defined copy assignment
+```
+
+**3. Выражения:** участие в арифметике и др.
+```cpp
+i = k + m;    // Built-in operator
+c = c1 + c2;  // User-defined operator+
+```
+
+**4. Преобразования типов:** в условиях и выражениях.
+```cpp
+if (i) { }    // Standard conversion int → bool
+if (c) { }    // User-defined conversion C → bool
+```
+
+Подобрав **constructors**, **operator functions** и **conversion functions**, класс естественно встраивается в **type system** **C++** и согласуется по стилю с **fundamental types**.
+
+##### **1.17 Стиль кода**
+
+Единый стиль повышает читаемость и сопровождаемость. В этом курсе:
+
+*   для **C++** используйте **Qt coding style**;
+*   в **CLion**: Settings → Editor → Code Style → C/C++ → Set from… → **Qt**;
+*   **форматируйте код регулярно:** выучите горячую клавишу для своей ОС;
+*   перед сдачей заданий прогоняйте автоформат.
+
+Единообразие упрощает ревью и совместную работу.
+
+***
+
+#### **2. Определения**
+
+*   **Class** (**класс**): пользовательский **compound type**, объединяющий **data members** и **member functions**.
+*   **Object** (**объект**): экземпляр класса; область памяти с конкретным типом и значением.
+*   **Member variable / data member** (**поле / член-данные**): переменная внутри класса, часть состояния объекта.
+*   **Member function / method** (**функция-член / метод**): функция внутри класса, работающая с данными объекта.
+*   **Constructor** (**конструктор**): особая **member function**, инициализирующая объект при создании; имя совпадает с классом, тип возврата не задаётся.
+*   **Default constructor** (**конструктор по умолчанию**): конструктор без параметров, задаёт **default initialization**.
+*   **Conversion constructor** (**конструктор преобразования**): один параметр другого типа; даёт **implicit** или **explicit** переход к типу класса.
+*   **Copy constructor** (**конструктор копирования**): принимает ссылку на другой объект того же класса и строит копию.
+*   **Destructor** (**деструктор**): особая **member function** с именем `~ClassName`; очистка при уничтожении объекта.
+*   **Access specifier** (**спецификатор доступа**): ключевые слова `public`, `private`, `protected` — видимость **class members**.
+*   **Private members** (**закрытые члены**): доступны только изнутри класса.
+*   **Public members** (**открытые члены**): доступны коду, имеющему доступ к объекту класса.
+*   **Encapsulation** (**инкапсуляция**): скрытие деталей реализации (**private**-данные) и контролируемый интерфейс (**public**-функции).
+*   **Static declaration** (**статическое / автоматическое объявление**): объект на **stack**, **lifetime** до конца **scope**.
+*   **Dynamic declaration** (**динамическое объявление**): объект на **heap** через `new`, **lifetime** вручную, нужен `delete`.
+*   **Stack memory** (**память стека**): для автоматических объектов; быстро, ограниченный размер, автоуправление.
+*   **Heap memory** (**память кучи**): для динамики; больше объём, медленнее, ручное управление.
+*   **Memory leakage** (**утечка памяти**): динамическая память не освобождена — потребление растёт со временем.
+*   **Scope** (**область видимости**): фрагмент кода, где имя видимо (**compile-time**-концепция).
+*   **Lifetime** (**время жизни**): интервал **runtime**, когда объект существует в памяти.
+*   **Entity** (**сущность**): базовый элемент программы на **C++** (значение, объект, ссылка, функция, тип, шаблон и т.д.).
+*   **Declaration** (**объявление**): вводит сущность и делает имя доступным в **scope**.
+*   **Initialization** (**инициализация**): задание начального значения при создании объекта.
+*   **Assignment** (**присваивание**): новое значение уже существующему объекту вместо старого.
+*   **Reference** (**ссылка**): **alias** существующего объекта; инициализируется сразу, перепривязать нельзя.
+*   **Pointer** (**указатель**): хранит адрес объекта; может быть `nullptr`, переназначается, нужно явное разыменование.
+*   **Uniform initialization** (**единообразная инициализация**): фигурный синтаксис `{}` (**C++11**), согласованный между типами.
+*   **Narrowing conversion** (**сужающее преобразование**): может потерять данные (например **double** → **int**); **braced initialization** часто запрещает.
+*   **Most Vexing Parse**: в **C++** конструкция `T obj();` читается как объявление функции, а не объекта.
+*   **Member initialization list** (**список инициализации членов**): после списка параметров конструктора (`:`), до тела.
+*   **Copy elision** (**опускание копирования**): оптимизация компилятора, убирающая лишние копии; во многих случаях норма стандарта.
+*   **`this` pointer**: неявный указатель в **member functions** на объект, для которого вызвана функция.
+*   **Function overloading** (**перегрузка функций**): одно имя, разные списки параметров.
+*   **Overload resolution** (**разрешение перегрузки**): выбор подходящей перегрузки по типам аргументов.
+*   **Type conversion** (**преобразование типа**): переход значения между типами, явно или неявно.
+*   **Standard conversion** (**стандартное преобразование**): встроенные правила языка (**int** → **double**, массив → указатель и т.д.).
+*   **User-defined conversion** (**пользовательское преобразование**): через **conversion constructors** или **conversion functions**.
+*   **`const` qualifier**: значение после инициализации не меняется.
+*   **`constexpr` specifier**: значение или функция вычислимы на **compile time** (в пределах правил стандарта).
+*   **Constant expression** (**константное выражение**): значение можно получить на этапе компиляции.
+*   **Literal type** (**литеральный тип**): допустим в контекстах **`constexpr`** (скаляры, простые агрегаты — по стандарту).
+*   **`typedef`**: стиль **C** для **type alias**.
+*   **`using` declaration**: современный синтаксис **type alias** (предпочтительнее **`typedef`**).
+*   **Operator function** (**функция-оператор**): задаёт поведение стандартного оператора для объектов класса.
+*   **Operator overloading** (**перегрузка операторов**): своя семантика операторов для **user-defined types**.
+*   **Conversion function** (**функция преобразования**): `operator TargetType()` — перевод объекта класса в другой тип.
+*   **`delete` specifier** (**удалённая функция**): запрет вызова (например лишних перегрузок или копирования).
+*   **Template** (**шаблон**): заготовка обобщённой функции или класса для множества типов.
+
+***
+
+#### **3. Примеры**
+##### **3.1. Класс `Box` с базовыми конструкторами** (Лаба 2, Задание 1)
+
+Напишите программу с классом `Box`.
+
+*   Поля — длина, ширина и высота; тип **`unsigned int`**.
+*   Три конструктора: **default**, **copy**, **conversion**.
+*   Оператор присваивания **`operator=`**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** реализовать ключевые **constructors** и **`operator=`**, чтобы класс вёл себя ближе к **fundamental type**.
+
+```cpp
+#include <iostream>
+
+class Box
+{
+private:
+    unsigned int length;
+    unsigned int width;
+    unsigned int height;
+
+public:
+    // Default constructor - initializes with zeros
+    Box() : length(0), width(0), height(0) {
+        std::cout << "Default constructor called" << std::endl;
+    }
+
+    // Conversion constructor - creates a cube from one dimension
+    Box(unsigned int side) : length(side), width(side), height(side) {
+        std::cout << "Conversion constructor called" << std::endl;
+    }
+
+    // Copy constructor - creates a copy of another box
+    Box(const Box& other) 
+        : length(other.length), width(other.width), height(other.height) {
+        std::cout << "Copy constructor called" << std::endl;
+    }
+
+    // Assignment operator - assigns values from one box to another
+    Box& operator=(const Box& other) {
+        if (this != &other) {  // Check for self-assignment
+            length = other.length;
+            width = other.width;
+            height = other.height;
+        }
+        std::cout << "Assignment operator called" << std::endl;
+        return *this;
+    }
+
+    // Getters for testing
+    unsigned int getLength() const { return length; }
+    unsigned int getWidth() const { return width; }
+    unsigned int getHeight() const { return height; }
+};
+
+int main() {
+    Box b1;              // Default constructor
+    Box b2(5);           // Conversion constructor (5x5x5 cube)
+    Box b3(b2);          // Copy constructor
+    Box b4;
+    b4 = b2;             // Assignment operator
+    
+    return 0;
+}
+```
+
+**Заметки по реализации:**
+
+1.  **Default constructor:** **member initialization list** обнуляет все измерения.
+2.  **Conversion constructor:** один **`unsigned int`** задаёт куб.
+3.  **Copy constructor:** **`const` reference** — без бесконечной рекурсии и лишних копий.
+4.  **`operator=`:** 
+    *   возвращает ссылку для цепочки (`b1 = b2 = b3`);
+    *   проверка **self-assignment**;
+    *   возврат `*this`.
+
+**Ответ:** полная реализация `Box` с **default**, **conversion**, **copy** **constructors** и **`operator=`**.
+
+</details>
+
+##### **3.2. Массив указателей на функции через `using`** (Туториал 2, Задание 1)
+
+Современным объявлением **`using`** (вместо устаревшего **`typedef`**) задайте тип **«массив из 10 указателей на функции»**, которые принимают **`int`** и возвращают **`int`**.
+
+Эквивалент на **`typedef`**:
+```cpp
+typedef int (*PtrFun)(int);
+PtrFun a4[10];
+```
+Перепишите так, чтобы **одно** объявление **`using`** задавало весь тип массива сразу (например `using MyType = ...;`).
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** начиная с **C++11**, **alias** на **`using`** умеют напрямую описывать указатели на функции и массивы — сложные декларации читаются проще, чем через **`typedef`**.
+
+Указатель на функцию `int(int)` пишется как `int(*)(int)`. Массив из 10 таких указателей — `int(*[10])(int)`. **`using`** аккуратно «заворачивает» это:
+
+```cpp
+using FuncPtrArray = int(*[10])(int);
+```
+
+Пример использования:
+
+```cpp
+#include <iostream>
+
+int double_it(int x) { return x * 2; }
+int triple_it(int x) { return x * 3; }
+
+int main() {
+    using FuncPtrArray = int(*[10])(int);
+
+    FuncPtrArray funcs;          // array of 10 function pointers
+    funcs[0] = double_it;
+    funcs[1] = triple_it;
+
+    std::cout << funcs[0](5) << "\n";  // 10
+    std::cout << funcs[1](5) << "\n";  // 15
+    return 0;
+}
+```
+
+**Сравнение с `typedef`:**
+
+| Стиль | Объявление |
+| --- | --- |
+| **`typedef`** (legacy) | `typedef int (*PtrFun)(int); PtrFun a4[10];` |
+| **`using`** (modern) | `using FuncPtrArray = int(*[10])(int);` |
+
+В современном **C++** форма **`using`** удобнее: имя алиаса слева, тип справа — естественное направление чтения.
+
+**Ответ:** `using FuncPtrArray = int(*[10])(int);`
+
+</details>

@@ -1,0 +1,465 @@
+---
+title: "W2. Указатели, строки и массивы в C"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2025-09-18
+lang: ru
+format: html
+engine: knitr
+---
+
+{{< video 2.mp4 >}}
+
+[Quiz](https://notebooklm.google.com/notebook/d94773cc-fb37-47cc-9006-4d367fff55f4?artifactId=c6bb672c-ab95-4ba4-9b03-174e17c1826c) | [Flashcards](https://notebooklm.google.com/notebook/d94773cc-fb37-47cc-9006-4d367fff55f4?artifactId=92d009ac-aabd-457e-9716-11b83aa32ac6)
+
+#### **1. Краткое содержание**
+##### **1.1 Память, значения и адреса**
+Данные программы хранятся в **memory** (**памяти**). Удобно представлять память как одну длинную цепочку ячеек — почти как ряд почтовых ящиков. У каждой ячейки два ключевых атрибута:
+
+1.  **Address** (**адрес**): уникальный числовой идентификатор «номера ящика»; часто в шестнадцатеричном виде (например `0x7ffc...`).
+2.  **Value** (**значение**): то, что реально лежит в ячейке, — как письмо внутри ящика.
+
+Каждая объявленная переменная занимает одну или несколько ячеек. Критично *различать адрес переменной и хранимое в ней значение*. Например, целая `var1` со значением `100` может лежать по адресу `0xbff5a400`.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.2 Стек программы и локальные переменные**
+При выполнении для вызовов функций используется область памяти **stack** (**стек**). Стек работает как *last-in, first-out (LIFO)*. При каждом вызове функции на вершину кладётся **stack frame** (**кадр стека**) / **activation record**.
+
+В кадре — всё нужное для вызова:
+
+*   **Local variables** (**локальные переменные**).
+*   Параметры функции.
+*   **Return address** (**адрес возврата**).
+
+По завершении функции кадр снимается, локальные переменные уничтожаются — автоматически. Поэтому время жизни локальной переменной ограничено выполнением функции, где она объявлена.
+
+##### **1.3 Куча и динамическое выделение памяти**
+Отдельно от стека — **heap** (**куча**). На куче выполняется **dynamic memory allocation** (**динамическое выделение памяти**): блоки памяти запрашиваются во время выполнения, когда размер заранее неизвестен.
+
+В отличие от переменных на стеке, время жизни памяти на куче *не привязано к области видимости функции*. Ответственность за управление — на программисте.
+
+*   Выделение: `malloc()` (от *memory allocate*) принимает размер в байтах и возвращает **generic pointer** (**обобщённый указатель**) `void*` на начало выделенного блока.
+*   Освобождение: явный вызов `free()` с тем же указателем.
+
+Без `free()` возникает **memory leak** (**утечка памяти**): память остаётся занятой, что может исчерпать ресурсы и привести к падению.
+
+##### **1.4 Указатели**
+**Pointer** (**указатель**) — переменная, хранящая *memory address* (**адрес памяти**) как своё значение. Вместо «прямого» хранения `int` или `char` хранится расположение *других* данных — это основа косвенной адресации, кучи и эффективной передачи больших структур в функции.
+
+Объявление: тип, на который «смотрим», затем `*`. Пример: `int* p;` — `p` должен хранить адрес `int`.
+
+Два базовых оператора:
+
+*   **Address-of operator** (`&`): унарный оператор перед именем переменной даёт её адрес (`&var1`).
+*   **Dereference operator** (`*`): унарный оператор перед указателем даёт значение *по адресу*, записанному в указателе.
+
+Пример: `p = &x;` и чтение `x` через указатель: `*p`.
+
+`void*` — generic pointer: может хранить адрес любого типа, но **dereference** напрямую нельзя; обычно нужен **cast** к конкретному типу указателя, например `(int*)`.
+
+##### **1.5 Массивы**
+**Array** (**массив**) — *фиксированного размера* последовательный набор элементов одного типа в смежной памяти. Доступ по **index** (**индексу**), начиная с `0`.
+
+Пример: `double balance[10];` — 10 элементов `double`; первый `balance[0]`, последний `balance[9]`.
+
+Важно: имя массива в большинстве выражений *превращается* (**decays**) в указатель на первый элемент: `balance` эквивалентно `&balance[0]`.
+
+Поэтому работает **pointer arithmetic**: если `p` указывает на первый элемент, `*(p + i)` эквивалентно `array[i]`; шаг `p+1` масштабируется на `sizeof` элемента (для `int*` — на `sizeof(int)` байт).
+
+##### **1.6 Строки в C**
+**String** в C — не отдельный встроенный тип; это *одномерный массив `char`, завершённый **null terminator***.
+
+**Null terminator** — `\0` (код 0). Библиотечные функции для строк опираются на него, чтобы знать, где остановиться.
+
+Два типичных способа инициализации:
+
+1.  Явный массив символов: `char greeting[] = {'H', 'e', 'l', 'l', 'o', '\0'};` — `\0` нужно добавить вручную.
+2.  **String literal**: `char greeting[] = "Hello";` — компилятор сам добавит завершающий `\0`; поэтому под `"Hello"` нужен массив из 6 символов `char`, а не 5.
+
+Без корректного `\0`, когда массив трактуют как строку, возникает **undefined behavior** (**неопределённое поведение**): функции могут читать дальше конца данных в соседнюю память.
+
+##### **1.7 Указатели на функции**
+Как указатель хранит адрес данных, так **function pointer** (**указатель на функцию**) хранит адрес функции и позволяет вызывать её косвенно — callbacks, таблицы функций (например для state machines), передача функций как аргументов.
+
+Синтаксис объявления должен совпадать с **signature** (возврат и параметры). Пример: `int (*my_func_ptr)(int, int);`.
+
+***
+
+#### **2. Определения**
+*   **Pointer**: переменная с адресом другой переменной или области памяти.
+*   **Array**: фиксированный по размеру непрерывный набор элементов одного типа с доступом по целому индексу.
+*   **C-Style String**: последовательность символов в `char[]`, завершённая `\0`.
+*   **Null Terminator (`\0`)**: маркер конца C-строки.
+*   **Address-of Operator (`&`)**: унарный оператор, возвращающий адрес операнда.
+*   **Dereference Operator (`*`)**: унарный оператор доступа к значению по адресу из указателя.
+*   **Stack**: область памяти для локальных переменных и информации о вызовах; LIFO; управление автоматическое.
+*   **Heap**: область для динамических данных; время жизни вручную через `malloc()` / `free()`.
+*   **Dynamic Memory Allocation**: выделение памяти из кучи во время выполнения.
+*   **Memory Leak**: ошибка управления памятью — память на куче выделена, но не освобождена через `free()` и остаётся недоступной до конца работы программы.
+*   **Dangling Pointer**: указатель на память, уже освобождённую или иначе недействительную.
+*   **Pointer Arithmetic**: арифметика указателей с масштабом `sizeof` целевого типа.
+
+***
+
+#### **3. Примеры**
+##### **3.1. Развернуть строку** (**Лаба** 2, **Задание** 1)
+Напишите программу: запросить у пользователя строку и напечатать её в обратном порядке.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    // Declare a character array to store the user's string.
+    // We'll set a maximum length, for example, 100 characters.
+    char inputString[100];
+    char reversedString[100];
+
+    // Prompt the user to enter a string.
+    printf("Enter a string: ");
+
+    // Read the string from the user.
+    // fgets is used instead of scanf to handle strings with spaces.
+    fgets(inputString, sizeof(inputString), stdin);
+
+    // Remove the newline character that fgets() often appends.
+    inputString[strcspn(inputString, "\n")] = 0;
+
+    // Find the length of the input string.
+    int length = strlen(inputString);
+    int endIndex = length - 1;
+    int i;
+
+    // Loop through the input string from beginning to end,
+    // and build the reversed string from end to beginning.
+    for (i = 0; i < length; i++) {
+        reversedString[i] = inputString[endIndex];
+        endIndex--;
+    }
+    // Add the null terminator to the end of the reversed string.
+    reversedString[i] = '\0';
+
+    // Print the reversed string.
+    printf("Reversed string: %s\n", reversedString);
+
+    return 0;
+}
+```
+</details>
+
+##### **3.2. Равнобедренный треугольник** (**Лаба** 2, **Задание** 2)
+Напишите функцию, печатающую равнобедренный треугольник высоты $n$ и ширины основания $2n-1$. Программа должна принимать $n$ как аргумент **командной строки**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+#include <stdlib.h> // Required for atoi()
+
+// Function to print the triangle
+void printTriangle(int height) {
+    // Loop for each row (from 1 to height)
+    for (int i = 1; i <= height; i++) {
+        // Calculate the number of spaces and asterisks for the current row
+        int spaces = height - i;
+        int stars = 2 * i - 1;
+
+        // Print the leading spaces
+        for (int j = 0; j < spaces; j++) {
+            printf(" ");
+        }
+
+        // Print the asterisks
+        for (int j = 0; j < stars; j++) {
+            printf("*");
+        }
+
+        // Move to the next line after printing each row
+        printf("\n");
+    }
+}
+
+// The main function accepts command line arguments
+// argc: argument count (number of strings passed)
+// argv: argument vector (array of strings)
+int main(int argc, char *argv[]) {
+    // Check if the user provided exactly one command line argument (plus the program name).
+    if (argc != 2) {
+        printf("Usage: %s <height>\n", argv[0]);
+        // Return 1 to indicate an error
+        return 1;
+    }
+
+    // Convert the command line argument (which is a string) to an integer.
+    // argv[0] is the program name, argv[1] is the first argument.
+    int n = atoi(argv[1]);
+
+    // Check if the number is positive.
+    if (n <= 0) {
+        printf("Height must be a positive integer.\n");
+        return 1;
+    }
+
+    // Call the function to print the triangle
+    printTriangle(n);
+
+    // Return 0 to indicate successful execution
+    return 0;
+}
+
+/*
+--- How to Compile and Run ---
+1. Save the code as a .c file (e.g., triangle.c).
+2. Open a terminal or command prompt.
+3. Compile the code: gcc triangle.c -o triangle
+4. Run the program with a command line argument: ./triangle 6
+*/
+```
+</details>
+
+##### **3.3. Разные фигуры** (**Лаба** 2, **Задание** 3)
+Добавьте несколько функций к предыдущему решению, чтобы пользователь мог печатать разные фигуры по выбору.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+// --- Figure Drawing Functions ---
+
+// 1. Right-angled triangle, increasing
+void printTriangleRightAngle(int height) {
+    printf("Right-Angled Triangle:\n");
+    for (int i = 1; i <= height; i++) {
+        for (int j = 1; j <= i; j++) {
+            printf("*");
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+// 2. Right-angled triangle, decreasing
+void printTriangleRightAngleInverted(int height) {
+    printf("Inverted Right-Angled Triangle:\n");
+    for (int i = height; i >= 1; i--) {
+        for (int j = 1; j <= i; j++) {
+            printf("*");
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+// 3. Square
+void printSquare(int size) {
+    printf("Square:\n");
+    for (int i = 1; i <= size; i++) {
+        for (int j = 1; j <= size; j++) {
+            printf("*");
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+// 4. Isosceles triangle (from previous exercise)
+void printTriangleIsosceles(int height) {
+    printf("Isosceles Triangle:\n");
+    for (int i = 1; i <= height; i++) {
+        for (int j = 0; j < height - i; j++) {
+            printf(" ");
+        }
+        for (int j = 0; j < 2 * i - 1; j++) {
+            printf("*");
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+
+// --- Main Program Logic ---
+
+int main(int argc, char *argv[]) {
+    // Check for correct command line argument usage
+    if (argc != 2) {
+        printf("Usage: %s <size>\n", argv[0]);
+        return 1;
+    }
+
+    // Convert size argument from string to integer
+    int size = atoi(argv[1]);
+
+    if (size <= 0) {
+        printf("Size must be a positive integer.\n");
+        return 1;
+    }
+
+    // Variable to store user's choice
+    int choice;
+
+    // Loop until the user chooses to exit
+    while (1) {
+        // Display menu
+        printf("Choose a figure to print:\n");
+        printf("1. Right-Angled Triangle\n");
+        printf("2. Inverted Right-Angled Triangle\n");
+        printf("3. Square\n");
+        printf("4. Isosceles Triangle\n");
+        printf("0. Exit\n");
+        printf("Your choice: ");
+
+        // Get user input
+        scanf("%d", &choice);
+
+        // Process user choice
+        switch (choice) {
+            case 1:
+                printTriangleRightAngle(size);
+                break;
+            case 2:
+                printTriangleRightAngleInverted(size);
+                break;
+            case 3:
+                printSquare(size);
+                break;
+            case 4:
+                printTriangleIsosceles(size);
+                break;
+            case 0:
+                printf("Exiting program.\n");
+                return 0; // Exit the program
+            default:
+                printf("Invalid choice. Please try again.\n\n");
+        }
+    }
+
+    return 0;
+}
+```
+</details>
+
+##### **3.4. Обмен двух целых** (**Лаба** 2, **Задание** 4)
+Напишите программу: ввести два целых и поменять их местами отдельной функцией.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+
+// This function swaps the values of two integers.
+// It takes 'pointers' to the variables as arguments.
+// A pointer is a variable that stores the memory address of another variable.
+// By using pointers, the function can modify the original variables in main().
+void swapIntegers(int *ptrA, int *ptrB) {
+    // Create a temporary variable to hold one of the values.
+    int temp;
+
+    // 1. Store the value at the address pointed to by ptrA in temp.
+    // The '*' operator here is the 'dereference' operator. It gets the value
+    // stored at the memory address.
+    temp = *ptrA;
+
+    // 2. Copy the value at the address pointed to by ptrB into the address of ptrA.
+    *ptrA = *ptrB;
+
+    // 3. Copy the value from temp into the address of ptrB.
+    *ptrB = temp;
+}
+
+int main() {
+    // Declare two integer variables.
+    int num1, num2;
+
+    // Prompt the user for the first integer.
+    printf("Enter the first integer: ");
+    // Read the user's input and store it in num1.
+    scanf("%d", &num1);
+
+    // Prompt the user for the second integer.
+    printf("Enter the second integer: ");
+    // Read the user's input and store it in num2.
+    scanf("%d", &num2);
+
+    // Print the values before swapping.
+    printf("\nBefore swap: num1 = %d, num2 = %d\n", num1, num2);
+
+    // Call the swap function.
+    // We pass the memory addresses of num1 and num2 using the '&' (address-of) operator.
+    swapIntegers(&num1, &num2);
+
+    // Print the values after swapping.
+    printf("After swap:  num1 = %d, num2 = %d\n", num1, num2);
+
+    return 0;
+}
+```
+</details>
+
+##### **3.5. Запись ввода пользователя в файл** (**Лаба** 2, **Задание** 5)
+Напишите программу: запросить у пользователя строку текста и записать её в текстовый файл (пробелы в вводе должны сохраняться). *Подсказка: `fopen`, `fgets`, `fputs`.*
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    // Declare a character array to hold the user's text input.
+    // Let's allow for up to 255 characters plus the null terminator.
+    char userInput[256];
+
+    // Declare a file pointer. This will be used to reference the file.
+    FILE *filePtr;
+
+    // Prompt the user to enter a line of text.
+    printf("Please enter a line of text to save to a file:\n");
+
+    // Read a line of text from the standard input (the keyboard).
+    // - userInput: the buffer to store the text.
+    // - sizeof(userInput): the maximum number of characters to read.
+    // - stdin: the standard input stream.
+    // fgets is used because it can handle spaces in the input.
+    fgets(userInput, sizeof(userInput), stdin);
+
+    // --- File Handling ---
+
+    // 1. Open the file.
+    // - "output.txt": the name of the file to create/open.
+    // - "w": the mode to open the file in. "w" stands for "write".
+    //   If the file exists, its contents are overwritten. If it doesn't exist, it's created.
+    filePtr = fopen("output.txt", "w");
+
+    // 2. Check if the file was opened successfully.
+    // If fopen() fails (e.g., due to permissions issues), it returns NULL.
+    if (filePtr == NULL) {
+        printf("Error: Could not open the file for writing.\n");
+        return 1; // Exit with an error code.
+    }
+
+    // 3. Write the user's input string to the file.
+    // - userInput: the string to write.
+    // - filePtr: the pointer to the file where the string will be written.
+    fputs(userInput, filePtr);
+
+    // 4. Close the file.
+    // This is a crucial step to ensure all data is written to the disk
+    // and to release the file handle back to the operating system.
+    fclose(filePtr);
+
+    // Inform the user that the operation was successful.
+    printf("\nYour input has been written to 'output.txt'.\n");
+
+    return 0; // Exit successfully.
+}
+```
+</details>

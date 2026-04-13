@@ -1,0 +1,1505 @@
+---
+title: "W11. Паттерны проектирования: Facade, Decorator, Proxy"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "2026-03-31"
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Паттерны проектирования в контексте**
+
+На этой неделе продолжаем **структурные паттерны** каталога **GoF**. **Structural patterns** описывают, как классы и объекты **компонуются** в более крупные и полезные структуры. Три паттерна недели — **Facade**, **Decorator** и **Proxy** — все структурные, но решают разные задачи:
+
+*   **Facade** прячет сложную подсистему за простым единым интерфейсом.
+*   **Decorator** добавляет поведение конкретному объекту в runtime, не меняя его класс.
+*   **Proxy** управляет доступом к другому объекту, выступая его заместителем.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Три паттерна недели среди структурных паттернов (structural) каталога GoF"
+%%| fig-width: 6.2
+%%| fig-height: 2.8
+flowchart TB
+    Patterns["Design Patterns"]
+    S["Structural"]
+    F["Facade"]
+    D["Decorator"]
+    P["Proxy"]
+    Patterns --> S
+    S --> F
+    S --> D
+    S --> P
+```
+
+##### **1.2 Фасад (Facade)**
+
+###### **1.2.1 Мотивация: упростить сложную подсистему**
+
+В реальных системах часто есть глубоко связанные подсистемы. **Компилятор**, например, включает чтение исходника, сканер, парсер, иерархию узлов AST, семантический анализ, генератор кода и подсистему диагностики. У каждого компонента свой интерфейс, а клиенту, который хочет «просто скомпилировать», пришлось бы знать *все* эти интерфейсы, порядок инициализации и жизненный цикл. Это даёт две проблемы:
+
+1.  **Сложность клиента**: нужно понимать много интерфейсов, а не один нужный.
+2.  **Жёсткая связность**: любое изменение внутри подсистемы тянет правки по всем клиентам.
+
+Паттерн **Facade** вводит один класс с упрощённым интерфейсом, который внутри делегирует вызовы нужным частям подсистемы. Клиент видит только фасад — детали скрыты.
+
+Когда **Facade** уместен:
+
+*   нужен ограниченный, но понятный вход к сложной подсистеме;
+*   хотите слоить подсистему так, чтобы верхний уровень не зависел от низкоуровневых деталей.
+
+###### **1.2.2 Структура**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Facade: клиент взаимодействует только с Facade"
+%%| fig-width: 7
+%%| fig-height: 4
+classDiagram
+    class Client
+    class Facade {
+        -linksToSubsystemObjects
+        +subsystemOperation()
+    }
+    class SubsystemClass1 {
+        +operationA()
+    }
+    class SubsystemClass2 {
+        +operationB()
+    }
+    class SubsystemClass3 {
+        +operationC()
+    }
+    Client --> Facade
+    Facade --> SubsystemClass1
+    Facade --> SubsystemClass2
+    Facade --> SubsystemClass3
+```
+
+Участники:
+
+*   **Facade**: объявляет упрощённый интерфейс; знает, какие классы подсистемы обрабатывают какие запросы; делегирует вызовы. Может инициализировать и управлять жизненным циклом объектов подсистемы.
+*   **Subsystem classes**: реализуют функциональность подсистемы; выполняют работу по поручению Facade; **не** знают о Facade и не держат на него ссылок.
+*   **Client**: общается с подсистемой только через Facade; отвязан от внутренностей.
+
+###### **1.2.3 Как применить Facade**
+
+1.  **Проверьте**, можно ли дать клиенту более простой интерфейс — если он избавляет от зависимости от множества классов подсистемы, это верный путь.
+2.  **Объявите и реализуйте** этот интерфейс в новом классе Facade: перенаправление вызовов, при необходимости инициализация и жизненный цикл.
+3.  **Переведите клиентов** на общение с подсистемой только через Facade — при обновлении подсистемы чаще всего меняется только фасад.
+4.  Если Facade **разрастается**, разбейте его на более узкие фасады.
+
+###### **1.2.4 Плюсы и минусы**
+
+*   **Плюсы**
+    *   изоляция от сложности подсистемы;
+    *   снижение связности клиентов с внутренностями;
+    *   слоистая архитектура: верхний уровень зависит от Facade, а не от десятков низкоуровневых классов.
+*   **Минусы**
+    *   фасад может выродиться в **god object** — класс, связанный со всем приложением; избыточная ответственность усложняет сопровождение.
+
+###### **1.2.5 Пример: компилятор**
+
+В лекции компилятор — канонический пример **Facade**. Подсистема из семи крупных частей (Reader, иерархия Token, Scanner, Parser, иерархия AST, Generator, иерархия Message) с разными интерфейсами. Клиенту, которому нужно лишь «скомпилировать исходник в байткод», знать всё это не требуется.
+
+Решение — **многоуровневые фасады**:
+
+*   `LexicalAnalyzer` — Facade над `Reader` и `Scanner`; наружу только `getToken()`; `Reader` и `Scanner` — private implementation details.
+*   `Compiler` — фасад более высокого уровня над `LexicalAnalyzer`, `Parser` и `CodeGenerator`; наружу только `compile()`. Клиент пишет `new Compiler(input, output).compile()` и не касается семи компонентов напрямую.
+
+```cpp
+class LexicalAnalyzer {
+public:
+    LexicalAnalyzer(istream& input) : reader(input) {
+        scanner = new Scanner(reader);
+    }
+    Token* getToken() {
+        return scanner->getToken();  // Own interface: hides Reader
+    }
+private:
+    Reader reader;
+    Scanner* scanner;
+};
+
+class Compiler {
+public:
+    Compiler(istream& input, BytecodeStream& output)
+        : lexer(input), generator(output), parser(lexer.scanner) {}
+    void compile() {
+        Program* program = parser.parseProgram();
+        generator.visit(program);
+    }
+private:
+    LexicalAnalyzer lexer;
+    Parser          parser;
+    CodeGenerator   generator;
+};
+```
+
+Обратите внимание: каждый Facade держит компоненты подсистемы как **private members** и открывает лишь узкий публичный интерфейс.
+
+##### **1.3 Декоратор (Decorator)**
+
+###### **1.3.1 Мотивация: добавлять поведение динамически**
+
+Текстовый редактор: окна с опциональными возможностями — полоса прокрутки, рамка, меню, статус‑бар или любая комбинация. Как это моделировать?
+
+Прямой путь — **inheritance** — ведёт к комбинаторному взрыву. Подкласс вроде `ScrolledBorderedTextWithMenu` — жёсткая статическая конфигурация: нельзя собрать в runtime, нельзя потом убрать рамку, каждая новая комбинация — новый класс. При $n$ опциях может понадобиться до $2^n$ подклассов.
+
+Второй путь — **Strategy** (поле на каждую фичу) — работает, но раздувает класс‑хост: у каждого экземпляра поля «на все случаи», даже если фичи выключены.
+
+**Decorator** решает задачу иначе: объект *оборачивают* одним или несколькими декораторами в runtime; каждый декоратор добавляет одно поведение. Композиция произвольна: `ScrollDecorator(BorderDecorator(new TextView()))` — прокрутка и рамка; порядок можно обратить: `BorderDecorator(ScrollDecorator(new TextView()))` — другой визуальный результат.
+
+Когда **Decorator** уместен:
+
+*   нужно навешивать дополнительное поведение в runtime, не ломая код, который уже использует объект;
+*   расширение через наследование неудобно или невозможно (`final`, слишком много комбинаций).
+
+###### **1.3.2 Почему наследование здесь плохо**
+
+Попытка добавить опции только подклассами:
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Наследование: комбинаторный взрыв подклассов"
+%%| fig-width: 7
+%%| fig-height: 3.5
+classDiagram
+    class TextView
+    class ScrolledText
+    class BorderedText
+    class TextWithMenu
+    class ScrolledBorderedText
+    TextView <|-- ScrolledText
+    TextView <|-- BorderedText
+    TextView <|-- TextWithMenu
+    TextView <|-- ScrolledBorderedText
+```
+
+При четырёх опциональных возможностях (прокрутка, рамка, меню, статус‑бар) для покрытия всех сочетаний может понадобиться до 15 нетривиальных подклассов. Оформление окна нельзя сменить динамически в **runtime** — подкласс фиксируется в момент создания объекта.
+
+###### **1.3.3 Идея Decorator**
+
+Суть **Decorator** в том, что декоратор одновременно *является подтипом* и *контейнером* для оборачиваемого **component**:
+
+```cpp
+class TextView {
+    virtual void Draw() { ... }
+    virtual void Resize(int) { ... }
+};
+
+class BorderDecorator : TextView {   // IS-A TextView (same interface)
+    override void Draw() {
+        component.Draw();            // Delegates to wrapped object
+        DrawBorder(borderWidth);     // Adds border behavior
+    }
+    override void Resize(int s) { component.Resize(s); }
+
+    protected TextView component;    // HAS-A TextView (wraps it)
+    private void DrawBorder(int w) { ... }
+    private int borderWidth;
+
+    public BorderDecorator(TextView c, int w)
+    { component = c; borderWidth = w; }
+};
+```
+
+Так как `BorderDecorator` наследует `TextView`, с точки зрения клиента это корректный `TextView` — сохраняется полный **polymorphism**. Клиент не знает, имеет ли он дело с «голым» `TextView` или с обёрткой:
+
+```cpp
+class AnotherClass {
+    var ws = new TextView();
+    var wb = new BorderDecorator(new TextView(), 2);
+
+    TextView w = condition ? ws : wb;
+    w.Draw();    // Works for both — client is unaware of decoration
+    w.Resize(4);
+}
+```
+
+Декораторы можно наслаивать произвольно:
+
+```cpp
+// ScrollDecorator wrapping a BorderDecorator wrapping a TextView
+var wb = new ScrollDecorator(new BorderDecorator(new TextView(), 2));
+
+// Or reversed — different visual result
+var wb2 = new BorderDecorator(new ScrollDecorator(new TextView()), 2);
+```
+
+Появляется возможность динамически добавлять и убирать поведение. Пример добавления декоратора:
+
+```cpp
+var w  = new TextView();           // simple window
+var w1 = new ScrollDecorator(w);   // same window + scroll bar, at runtime
+```
+
+###### **1.3.4 Структура**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Структура паттерна Decorator: декораторы оборачивают компонент через тот же интерфейс"
+%%| fig-width: 7.5
+%%| fig-height: 4.5
+classDiagram
+    class Component {
+        <<interface>>
+        +execute()
+    }
+    class ConcreteComponent {
+        +execute()
+    }
+    class BaseDecorator {
+        -wrappee: Component
+        +BaseDecorator(c: Component)
+        +execute()
+    }
+    class ConcreteDecorator1 {
+        +execute()
+        +extra()
+    }
+    class ConcreteDecorator2 {
+        +execute()
+    }
+    class Client
+    Component <|.. ConcreteComponent
+    Component <|.. BaseDecorator
+    BaseDecorator o-- Component : wraps
+    BaseDecorator <|-- ConcreteDecorator1
+    BaseDecorator <|-- ConcreteDecorator2
+    Client --> Component
+```
+
+Основные участники:
+
+*   **Component** (интерфейс или абстрактный класс): общий интерфейс и для обёрток, и для оборачиваемых объектов.
+*   **Concrete Component**: базовый объект с основным поведением, которое расширяют декораторы.
+*   **Base Decorator**: хранит ссылку (`wrappee`) на оборачиваемый **Component** и делегирует ему работу; от него наследуют конкретные декораторы.
+*   **Concrete Decorators**: добавляют поведение до и/или после вызова базового декоратора; обычно каждый отвечает за одно дополнение.
+*   **Client**: по необходимости оборачивает объекты в декораторы; так как все декораторы подчинены `Component`, допустимы любые сочетания.
+
+###### **1.3.5 Как применять Decorator**
+
+1.  Убедитесь, что предметную область можно описать базовым компонентом и опциональными слоями поверх него.
+2.  Найдите методы, общие для базового компонента и всех слоёв; объявите **интерфейс Component** с этими методами.
+3.  Реализуйте **Concrete Component** с базовым поведением.
+4.  Создайте **Base Decorator** с тем же интерфейсом, полем `wrappee` типа `Component` и делегированием всех вызовов в `wrappee`.
+5.  Убедитесь, что и компонент, и декораторы реализуют интерфейс **Component**.
+6.  Реализуйте **Concrete Decorators** как наследников **Base Decorator**; каждый вызывает `super.execute()` (переход к обёрнутому объекту) и добавляет своё до или после.
+7.  **Клиент** собирает цепочку декораторов и управляет порядком обёртки.
+
+###### **1.3.6 Плюсы и минусы**
+
+*   **Плюсы**
+    *   расширение поведения без нового подкласса на каждую комбинацию;
+    *   добавление и снятие обязанностей в **runtime**;
+    *   несколько поведений — несколько обёрток подряд;
+    *   *Single Responsibility Principle*: «толстый» класс с вариантами поведения дробится на мелкие классы.
+*   **Минусы**
+    *   трудно убрать *конкретную* обёртку из середины стека без пересборки цепочки;
+    *   трудно сделать декоратор, чьё поведение не зависит от порядка в стеке;
+    *   код инициализации с длинной цепочкой `new DecoratorX(new DecoratorY(...))` громоздко читать.
+
+##### **1.4 Заместитель (Proxy)**
+
+###### **1.4.1 Мотивация: контроль доступа к объекту**
+
+**Proxy** — суррогат или «заглушка» для другого объекта: реализует тот же интерфейс, что и *реальный субъект*, поэтому клиент обращается с прокси так же, как с оригиналом. Отличие в том, что прокси перехватывает обращения и может выполнять дополнительную работу до и/или после передачи вызова реальному объекту.
+
+Типичный повод: **очень тяжёлый объект** (большое изображение, соединение с БД, удалённый сервис), дорогой в создании. Его не хочется создавать заранее; после создания может понадобиться кэш, контроль доступа, журналирование и т.д.
+
+###### **1.4.2 Варианты Proxy**
+
+*   **Virtual Proxy (lazy initialization)**: откладывает создание тяжёлого объекта до первого обращения.
+*   **Remote Proxy**: реальный объект на удалённом сервере; прокси скрывает сеть.
+*   **Protection Proxy (access control)**: проверка прав перед пересылкой запроса.
+*   **Caching Proxy**: кэш дорогих операций и повторная выдача результатов.
+*   **Logging Proxy**: журнал всех обращений к объекту.
+*   **Smart Reference**: подсчёт ссылок и освобождение (аналог **smart pointers** в **C++**), иногда проверка блокировок.
+
+###### **1.4.3 Структура**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Структура паттерна Proxy: Proxy и Service разделяют один интерфейс"
+%%| fig-width: 7
+%%| fig-height: 4
+classDiagram
+    class ServiceInterface {
+        <<interface>>
+        +operation()
+    }
+    class Service {
+        +operation()
+    }
+    class Proxy {
+        -realService: Service
+        +Proxy(s: Service)
+        +checkAccess(): bool
+        +operation()
+    }
+    class Client
+    ServiceInterface <|.. Service
+    ServiceInterface <|.. Proxy
+    Proxy o-- Service : realService
+    Client --> ServiceInterface
+```
+
+Участники:
+
+*   **ServiceInterface**: интерфейс сервиса; **Proxy** должен его реализовать, чтобы быть взаимозаменимым с **Service**.
+*   **Service**: реальный объект с бизнес‑логикой; о **Proxy** не знает.
+*   **Proxy**: хранит ссылку на **Service** (`realService`); после своей работы делегирует вызов; часто сам создаёт и управляет жизненным циклом **Service**.
+*   **Client**: работает через `ServiceInterface` и с прокси, и с сервисом; обычно не различает, что именно использует.
+
+###### **1.4.4 Реализация в C++ через перегрузку операторов**
+
+В **C++** **Proxy** можно выразить **operator overloading**: операторы `->` (доступ к члену через указатель) и `*` (разыменование). Перегрузив их, класс `Proxy` ведёт себя синтаксически *как указатель* на реальный объект.
+
+```cpp
+class Object {
+public:
+    int m;
+    // ... other public members
+};
+
+class Proxy {
+public:
+    Proxy(Object* o) : object(o) { }
+    Object* operator->() { return object; }   // Enables p->m syntax
+    Object& operator*()  { return *object; }  // Enables (*p).m syntax
+private:
+    Object* object;
+};
+```
+
+Использование:
+
+```cpp
+Proxy p(new Object());
+p->m = 77;       // equivalent to (p.operator->()).m = 77
+int x = (*p).m;  // equivalent to (p.operator*()).m
+```
+
+Этот прокси — тонкая обёртка. Полезнее **Virtual Proxy** с **lazy initialization**:
+
+```cpp
+class ProxyForHeavy {
+public:
+    ProxyForHeavy() : object(nullptr) { }
+    VeryHeavyObject* operator->() { LoadObject(); return object; }
+    VeryHeavyObject& operator*()  { LoadObject(); return *object; }
+private:
+    void LoadObject() {
+        if (object == nullptr)
+            object = new VeryHeavyObject();   // Create only on first access
+    }
+    VeryHeavyObject* object;
+};
+```
+
+Зачем это нужно:
+1.  **Отложенное создание**: `VeryHeavyObject` не выделяется, пока не понадобится доступ к членам — даже при многих экземплярах `ProxyForHeavy`.
+2.  **Безопасность к `nullptr`**: прокси гарантирует инициализацию `object` до доступа.
+
+Правила **C++** для перегрузки: можно переопределить `+`, `-`, `*`, `/`, `[]`, `()`, `new`, `delete`, `->`, `*`; нельзя `.`; нельзя придумать новые операторы и менять арность или приоритет.
+
+###### **1.4.5 Как применять Proxy**
+
+1.  Введите **интерфейс сервиса** (если его ещё нет), чтобы **Proxy** и **Service** были взаимозаменяемы; если клиентов **Service** менять нельзя, иногда прокси делают подклассом **Service**.
+2.  Создайте класс **Proxy** с полем на **Service**; чаще прокси сам создаёт и управляет жизненным циклом, реже **Service** передают в конструктор.
+3.  Реализуйте методы прокси: пред/пост‑обработка (права, лог, кэш) и делегирование **Service**.
+4.  Рассмотрите фабричный метод, решающий, отдать клиенту **Proxy** или реальный **Service**.
+5.  При необходимости используйте **lazy initialization** для **Service**.
+
+###### **1.4.6 Proxy и смежные паттерны**
+
+*   **Adapter**: даёт *другой* интерфейс к объекту; **Proxy** сохраняет *тот же* интерфейс, что у субъекта.
+*   **Decorator**: похож на обёртку, но цель иная — добавить обязанности; **Proxy** *контролирует доступ* и жизненный цикл. На практике: расширяем поведение — **Decorator**; посредничество и доступ — **Proxy**.
+
+###### **1.4.7 Плюсы и минусы**
+
+*   **Плюсы**
+    *   контроль над сервисом без знания клиента;
+    *   управление жизненным циклом, когда клиенту это не важно;
+    *   прокси полезен, если сервис ещё не готов или временно недоступен;
+    *   *Open/Closed Principle*: новые прокси без правок сервиса и клиентов.
+*   **Минусы**
+    *   усложнение из‑за новых классов;
+    *   возможная задержка ответа (удалённый или ленивый прокси).
+
+---
+
+#### **2. Определения**
+
+*   **Design pattern** (**паттерн проектирования**): архитектурная схема — определённая организация классов, объектов и методов — дающая стандартизированное переиспользуемое решение типичной задачи ООП-проектирования.
+*   **Structural pattern** (**структурный паттерн**): категория паттернов GoF о том, как объединять классы и объекты в крупные структуры. **Facade**, **Decorator** и **Proxy** относятся к этой категории.
+*   **Facade**: структурный паттерн, дающий упрощённый единый интерфейс к сложной подсистеме и скрывающий её сложность от клиентов.
+*   **God object**: антипаттерн, когда один класс «знает слишком много» или «делает слишком много». Плохо спроектированный **Facade** может выродиться в **god object**.
+*   **Decorator**: структурный паттерн, добавляющий объекту новое поведение через обёртки (**decorators**), реализующие тот же интерфейс, что и оборачиваемый объект.
+*   **Wrappee**: объект внутри декоратора; тот, чьё поведение расширяют.
+*   **Base decorator**: абстрактный промежуточный класс, реализующий интерфейс компонента и хранящий ссылку на **wrappee**; от него наследуют конкретные декораторы.
+*   **Concrete decorator**: конкретный класс-декоратор, добавляющий одно поведение до или после делегирования **wrappee**.
+*   **Proxy**: структурный паттерн — заместитель или **placeholder** для другого объекта с контролем доступа и, при необходимости, пред/пост-обработкой каждого запроса.
+*   **Virtual proxy**: прокси, откладывающий создание «тяжёлого» объекта до первого обращения (**lazy initialization**).
+*   **Remote proxy**: прокси объекта на удалённом сервере с прозрачной сетевой коммуникацией.
+*   **Protection proxy**: прокси, проверяющий права клиента перед пересылкой запросов реальному объекту.
+*   **Caching proxy**: прокси, кэширующий результаты дорогих операций и отдающий кэш при повторных запросах.
+*   **Smart reference**: прокси со счётчиком ссылок на реальный объект и автоматическим освобождением при нуле (аналог **`shared_ptr`** в **C++**).
+*   **Operator overloading**: возможность **C++** переопределять операторы (включая `->` и `*`), чтобы **Proxy** вёл себя синтаксически как указатель.
+*   **Lazy initialization**: отложенное создание дорогого ресурса до первого реального обращения.
+*   **Open/Closed Principle**: принцип **SOLID** — сущности открыты для расширения и закрыты для модификации.
+*   **Single Responsibility Principle**: принцип **SOLID** — у класса должна быть одна причина для изменения.
+
+---
+
+#### **3. Примеры**
+
+##### **3.1. Конспект лекции — теоретические вопросы** (Лаба 10, **Задание** 1)
+
+Ответьте на шесть вопросов ниже, чтобы проверить понимание трёх паттернов этой недели.
+
+**(a)** В чём назначение паттерна **Facade**? Какую проблему он решает?
+
+**(b)** Опишите реальный сценарий, где **Facade** был бы полезен.
+
+**(c)** В чём назначение паттерна **Decorator**?
+
+**(d)** Опишите реальный сценарий, где **Decorator** был бы полезен.
+
+**(e)** В чём назначение паттерна **Proxy**?
+
+**(f)** Опишите реальный сценарий, где **Proxy** был бы полезен.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**(a) Назначение Facade:**
+Паттерн **Facade** решает проблему *сложности подсистемы*. Когда система из многих взаимодействующих классов с разными интерфейсами, клиенту для «высокоуровневой» задачи пришлось бы координировать все эти классы — растёт связность, клиент хрупок к внутренним изменениям. **Facade** вводит один класс с простым интерфейсом, который внутри выполняет всю координацию; клиент зависит от **Facade**, а не от деталей подсистемы.
+
+**(b) Пример для Facade:**
+**Домашний кинотеатр**: проектор, DVD-плеер, объёмный звук, свет, привод экрана — у каждого свой интерфейс и порядок включения. Класс `HomeTheaterFacade` даёт один метод `watchMovie()`, который включает всё в нужном порядке; пользователь (клиент) вызывает один метод и не работает с устройствами по отдельности.
+
+**(c) Назначение Decorator:**
+Паттерн **Decorator** решает задачу *динамического расширения поведения*. Если объекты одного типа должны нести разные комбинации опциональных возможностей, иерархия подклассов даёт комбинаторный взрыв и не даёт менять поведение в **runtime**. **Decorator** оборачивает объект в одну или несколько обёрток, каждая добавляет одно поведение, без смены класса объекта и без поломки уже существующего кода.
+
+**(d) Пример для Decorator:**
+**Библиотека текстового ввода-вывода** с базовым `FileStream`. Клиентам часто нужны сжатие, шифрование, буферизация. Вместо класса вроде `CompressedEncryptedBufferedFileStream` вводят три декоратора — `CompressionDecorator`, `EncryptionDecorator`, `BufferingDecorator` — их можно наслаивать в любом порядке вокруг любого потока, не меняя сам `FileStream`.
+
+**(e) Назначение Proxy:**
+Паттерн **Proxy** решает задачу *контролируемого доступа* к объекту. Нужна пред/пост-обработка при обращении (права, лог, отложенная инициализация) без смены интерфейса объекта и кода клиента. **Proxy** реализует тот же интерфейс, что и реальный объект, перехватывает вызовы и после своей работы делегирует реальному объекту.
+
+**(f) Пример для Proxy:**
+**Просмотрщик документов** подгружает большие изображения с диска. Вместо загрузки всех при старте для каждого пути создаётся `ProxyImage`; при первом вызове `display()` загружается реальное изображение, дальше — без повторной загрузки. Код клиента с `display()` одинаков для прокси и для реального объекта — оптимизация прозрачна.
+
+</details>
+
+##### **3.2. Умный дом: реализовать фасад (Facade)** (Лаба 10, **Задание** 2)
+
+Реализуйте **Facade**, упрощающий управление устройствами умного дома.
+
+**Требования:**
+
+*   Реализуйте классы трёх устройств:
+    *   `Light` with methods `on()` and `off()`
+    *   `Thermostat` with method `setTemperature(int temp)`
+    *   `SecurityCamera` with methods `activate()` and `deactivate()`
+*   Design a `SmartHomeFacade` class that provides two scenario methods:
+    *   `leavingHome()`: turns off lights, sets thermostat to eco mode (15°C), activates security cameras.
+    *   `arrivingHome()`: turns on lights, sets thermostat to comfortable temperature (22°C).
+*   Продемонстрируйте оба сценария в `main`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **Facade** прячет три независимых класса подсистемы за двумя сценарными методами верхнего уровня. Клиент вызывает только `facade.leavingHome()` или `facade.arrivingHome()` и не обращается к `Light`, `Thermostat` и `SecurityCamera` напрямую.
+
+```java
+// Light.java — Subsystem class 1
+public class Light {
+    public void on()  { System.out.println("Light: on.");  }
+    public void off() { System.out.println("Light: off."); }
+}
+
+// Thermostat.java — Subsystem class 2
+public class Thermostat {
+    public void setTemperature(int temp) {
+        System.out.println("Thermostat: set to " + temp + "°C.");
+    }
+}
+
+// SecurityCamera.java — Subsystem class 3
+public class SecurityCamera {
+    public void activate()   { System.out.println("SecurityCamera: activated.");   }
+    public void deactivate() { System.out.println("SecurityCamera: deactivated."); }
+}
+
+// SmartHomeFacade.java — Facade
+public class SmartHomeFacade {
+    private Light          light;
+    private Thermostat     thermostat;
+    private SecurityCamera camera;
+
+    public SmartHomeFacade() {
+        // The Facade owns the lifecycle of subsystem objects
+        this.light      = new Light();
+        this.thermostat = new Thermostat();
+        this.camera     = new SecurityCamera();
+    }
+
+    public void leavingHome() {
+        System.out.println("--- Leaving home ---");
+        light.off();
+        thermostat.setTemperature(15);   // eco mode
+        camera.activate();
+    }
+
+    public void arrivingHome() {
+        System.out.println("--- Arriving home ---");
+        light.on();
+        thermostat.setTemperature(22);   // comfortable temperature
+        camera.deactivate();
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        SmartHomeFacade home = new SmartHomeFacade();
+        home.leavingHome();
+        System.out.println();
+        home.arrivingHome();
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+--- Leaving home ---
+Light: off.
+Thermostat: set to 15°C.
+SecurityCamera: activated.
+
+--- Arriving home ---
+Light: on.
+Thermostat: set to 22°C.
+SecurityCamera: deactivated.
+```
+
+**Ответ:** класс `Main` *ничего* не знает о `Light`, `Thermostat` и `SecurityCamera`. Если появится четвёртое устройство (`Blinds`), меняется только `SmartHomeFacade` — `Main` не трогаем. Это главная выгода **Facade**.
+
+</details>
+
+##### **3.3. Стилизация текста с паттерном Decorator** (Лаба 10, **Задание** 3)
+
+Примените **Decorator**, чтобы получить гибкую систему стилей текста (жирный, курсив, подчёркивание), добавляемых к тексту динамически.
+
+**Требования:**
+
+*   Задайте интерфейс `Text` с методом `write()`, выводящим текст с учётом стилей.
+*   Реализуйте класс `PlainText` без оформления.
+*   Создайте абстрактный класс `TextDecorator`, реализующий `Text`, — базу для декораторов стиля.
+*   Реализуйте декораторы `Bold`, `Italic`, `Underline`. Используйте escape-последовательности **ANSI**:
+    *   Bold: wrap the text in `"\033[1m"` and `"\033[0m"`
+    *   Italic: wrap in `"\033[3m"` and `"\033[0m"`
+    *   Underline: wrap in `"\033[4m"` and `"\033[0m"`
+*   Продемонстрируйте наслоение нескольких стилей на один и тот же текстовый объект.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** каждый декоратор хранит ссылку на `Text` (который может быть другим декоратором), вызывает `wrappee.write()` для внутреннего текста и оборачивает результат своими тегами. Наслоение даёт стили снаружи внутрь (внешний декоратор — последним в цепочке вызовов при отрисовке).
+
+```java
+// Text.java — Component interface
+public interface Text {
+    String write();
+}
+
+// PlainText.java — Concrete Component
+public class PlainText implements Text {
+    private final String content;
+
+    public PlainText(String content) {
+        this.content = content;
+    }
+
+    @Override
+    public String write() {
+        return content;
+    }
+}
+
+// TextDecorator.java — Base Decorator
+public abstract class TextDecorator implements Text {
+    protected Text wrappee;
+
+    public TextDecorator(Text text) {
+        this.wrappee = text;
+    }
+
+    @Override
+    public String write() {
+        return wrappee.write();   // Default: delegate unchanged
+    }
+}
+
+// Bold.java — Concrete Decorator
+public class Bold extends TextDecorator {
+    public Bold(Text text) { super(text); }
+
+    @Override
+    public String write() {
+        return "\033[1m" + wrappee.write() + "\033[0m";
+    }
+}
+
+// Italic.java — Concrete Decorator
+public class Italic extends TextDecorator {
+    public Italic(Text text) { super(text); }
+
+    @Override
+    public String write() {
+        return "\033[3m" + wrappee.write() + "\033[0m";
+    }
+}
+
+// Underline.java — Concrete Decorator
+public class Underline extends TextDecorator {
+    public Underline(Text text) { super(text); }
+
+    @Override
+    public String write() {
+        return "\033[4m" + wrappee.write() + "\033[0m";
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        Text plain = new PlainText("Hello, World!");
+        System.out.println(plain.write());
+
+        Text bold = new Bold(new PlainText("Hello, World!"));
+        System.out.println(bold.write());
+
+        // Stack three decorators: Bold + Italic + Underline
+        Text styled = new Bold(new Italic(new Underline(new PlainText("Hello, World!"))));
+        System.out.println(styled.write());
+    }
+}
+```
+
+**Как работает наслоение:** при вызове `styled.write()` у внешнего декоратора `Bold`:
+1.  `Bold.write()` вызывает `Italic.write()` (его **wrappee**).
+2.  `Italic.write()` вызывает `Underline.write()`.
+3.  `Underline.write()` вызывает `PlainText.write()` и получает `"Hello, World!"`.
+4.  `Underline` оборачивает: `"\033[4m" + "Hello, World!" + "\033[0m"`.
+5.  `Italic` оборачивает результат: `"\033[3m" + подчёркнутый_текст + "\033[0m"`.
+6.  `Bold` оборачивает снова: `"\033[1m" + курсив_подчёркнутый + "\033[0m"`.
+
+Итоговая строка несёт три слоя **ANSI**-стилей; в терминале с поддержкой **ANSI** текст одновременно жирный, курсив и подчёркнутый. Порядок обёрток задаёт, какой стиль «снаружи».
+
+</details>
+
+##### **3.4. Доступ к документам по ролям через Proxy** (Лаба 10, **Задание** 4)
+
+Реализуйте **Proxy**, который по ролям пользователя ограничивает доступ к конфиденциальным документам.
+
+**Требования:**
+
+*   Интерфейс `Document` с методом `display()`.
+*   Класс `RealDocument` — конфиденциальный документ.
+*   Класс `SecureDocumentProxy`, также `Document`: логика безопасности — доступ только роли `"ADMIN"`, остальным отказ.
+*   Продемонстрируйте прокси для разных ролей.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `SecureDocumentProxy` стоит между клиентом и `RealDocument`, перед вызовом `display()` выполняет проверку `checkAccess(role)`. `RealDocument` создаётся **лениво** — только при первом обращении авторизованного пользователя; для остальных реальный документ не загружается.
+
+```java
+// Document.java — Service interface
+public interface Document {
+    void display(String userRole);
+}
+
+// RealDocument.java — Real Service
+public class RealDocument implements Document {
+    private final String content;
+
+    public RealDocument(String filename) {
+        // Simulate loading the document from secure storage
+        System.out.println("RealDocument: Loading sensitive document '" + filename + "'.");
+        this.content = "CONFIDENTIAL CONTENT of " + filename;
+    }
+
+    @Override
+    public void display(String userRole) {
+        System.out.println("RealDocument: " + content);
+    }
+}
+
+// SecureDocumentProxy.java — Proxy with protection logic
+public class SecureDocumentProxy implements Document {
+    private final String filename;
+    private RealDocument realDocument;   // created lazily
+
+    public SecureDocumentProxy(String filename) {
+        this.filename = filename;
+    }
+
+    private boolean checkAccess(String userRole) {
+        return "ADMIN".equalsIgnoreCase(userRole);
+    }
+
+    @Override
+    public void display(String userRole) {
+        if (!checkAccess(userRole)) {
+            System.out.println("SecureDocumentProxy: Access DENIED for role '" + userRole + "'.");
+            return;
+        }
+        // Lazy initialization: load the real document only for authorized users
+        if (realDocument == null) {
+            realDocument = new RealDocument(filename);
+        }
+        realDocument.display(userRole);
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new SecureDocumentProxy("financial_report_Q1.pdf");
+
+        System.out.println("=== User role: GUEST ===");
+        doc.display("GUEST");
+
+        System.out.println("\n=== User role: ADMIN ===");
+        doc.display("ADMIN");
+
+        System.out.println("\n=== User role: ADMIN (second request) ===");
+        doc.display("ADMIN");   // Real document already loaded; no re-load
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+=== User role: GUEST ===
+SecureDocumentProxy: Access DENIED for role 'GUEST'.
+
+=== User role: ADMIN ===
+RealDocument: Loading sensitive document 'financial_report_Q1.pdf'.
+RealDocument: CONFIDENTIAL CONTENT of financial_report_Q1.pdf
+
+=== User role: ADMIN (second request) ===
+RealDocument: CONFIDENTIAL CONTENT of financial_report_Q1.pdf
+```
+
+**Ответ:** документ загружается ровно один раз (при первом доступе администратора) и не загружается для не-**ADMIN**. Клиент (`Main`) везде вызывает `doc.display(role)` единообразно и не знает логики прокси. Здесь совмещены варианты **Protection proxy** и **Virtual proxy** (**lazy initialization**).
+
+</details>
+
+##### **3.5. Компиляция исходного кода через многоуровневые фасады** (Лекция 10, **Пример** 1)
+
+Ниже **C++**-код моделирует компилятор с многоуровневыми классами-**Facade**. Определите, какие классы играют роль **Facade**, что инкапсулирует каждый **Facade**, и проследите вызов `compiler.compile()`.
+
+```cpp
+class LexicalAnalyzer {
+public:
+    LexicalAnalyzer(istream& input) : reader(input) {
+        scanner = new Scanner(reader);
+    }
+    virtual ~LexicalAnalyzer() { delete scanner; }
+    Token* getToken() { return scanner->getToken(); }
+private:
+    Reader   reader;
+    Scanner* scanner;
+};
+
+class Compiler {
+public:
+    Compiler(istream& input, BytecodeStream& output)
+        : lexer(input), generator(output), parser(lexer.scanner)
+    {}
+    virtual ~Compiler() {}
+    void compile() {
+        Program* program = parser.parseProgram();
+        generator.visit(program);
+    }
+private:
+    LexicalAnalyzer lexer;
+    Parser          parser;
+    CodeGenerator   generator;
+};
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** здесь два уровня **Facade**. Каждый скрывает интерфейсы своих частей и показывает верхнему уровню только нужное.
+
+**Facade 1 — `LexicalAnalyzer`:**
+
+*   Инкапсулирует: `Reader` (читает символы из потока) и `Scanner` (строит лексемы).
+*   Внешний интерфейс: `getToken()`.
+*   `Reader` и `Scanner` закрыты — пользователь `LexicalAnalyzer` о них не знает.
+
+**Facade 2 — `Compiler`:**
+
+*   Инкапсулирует: `LexicalAnalyzer`, `Parser`, `CodeGenerator`.
+*   Внешний интерфейс: `compile()`.
+*   Внутри `compile()` вызывается `parser.parseProgram()` (строится **AST**), затем `generator.visit(program)` — генерация байткода. Вызывающий код не обращается к этим трём компонентам напрямую.
+
+**Трассировка `compiler.compile()`:**
+1.  Клиент создаёт `Compiler(input, output)`. Конструктор инициализирует `lexer` (внутри — `Reader` и `Scanner`), затем `generator`, затем `parser` (ему передаётся `lexer.scanner`).
+2.  Клиент вызывает `compiler.compile()`.
+3.  В `compile()`: `parser.parseProgram()` читает токены через `lexer` и строит **AST** `Program*`.
+4.  `generator.visit(program)` обходит **AST** и пишет байткод в выходной поток.
+5.  Задействована вся подсистема компилятора (7+ классов), но снаружи виден один вызов метода.
+
+**Ответ:** `LexicalAnalyzer` — низкоуровневый **Facade** над `Reader` и `Scanner`; `Compiler` — высокоуровневый **Facade** над полным конвейером. Такая двухуровневая схема типична: каждый слой говорит только со слоем сразу под ним.
+
+</details>
+
+##### **3.6. Порядок наслоения декораторов** (Лекция 10, **Пример** 2)
+
+Ниже заданы базовый класс `TextView` и два декоратора в **C++**. Разберите разницу между двумя выражениями создания:
+
+```cpp
+var wb1 = new ScrollDecorator(new BorderDecorator(new TextView(), 2));
+var wb2 = new BorderDecorator(new ScrollDecorator(new TextView()), 2);
+```
+
+Опишите визуальный результат в каждом случае при вызове `Draw()`. Затем объясните, как работает динамическое оформление (добавление полосы прокрутки к уже существующему окну в **runtime**).
+
+```cpp
+class TextView {
+    virtual void Draw() { ... }
+    virtual void Resize(int) { ... }
+};
+
+class BorderDecorator : TextView {
+    override void Draw() {
+        component.Draw();          // 1. Draw contents
+        DrawBorder(borderWidth);   // 2. Draw border on top
+    }
+    override void Resize(int s) { component.Resize(s); }
+    protected TextView component;
+    private void DrawBorder(int w) { ... }
+    private int borderWidth;
+    public BorderDecorator(TextView c, int w) { component = c; borderWidth = w; }
+};
+
+class ScrollDecorator : BorderDecorator {
+    override void Draw() {
+        component.Draw();     // 1. Draw contents
+        DrawScrollBar();      // 2. Draw scroll bar on top
+    }
+    override void Resize(int s) { component.Resize(s); }
+    private void DrawScrollBar() { ... }
+    public ScrollDecorator(TextView c) { component = c; }
+};
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** каждый декоратор сначала вызывает `component.Draw()` (делегирование внутрь), затем дорисовывает своё; добавление внешнего в стеке декоратора рисуется *последним* (поверх остального). Порядок обёртки задаёт визуальные слои.
+
+**`wb1 = ScrollDecorator(BorderDecorator(TextView(), 2))`**
+
+Структура (снаружи внутрь): `ScrollDecorator` → `BorderDecorator` → `TextView`
+
+При вызове `wb1.Draw()`:
+1.  `ScrollDecorator.Draw()` → `component.Draw()` → это `BorderDecorator.Draw()`.
+2.  `BorderDecorator.Draw()` → `TextView.Draw()`.
+3.  `TextView` рисует содержимое.
+4.  `BorderDecorator` рисует рамку *вокруг текста*.
+5.  `ScrollDecorator` рисует полосу прокрутки *поверх рамки с текстом*.
+
+Визуально: текст → рамка → сверху полоса прокрутки.
+
+**`wb2 = BorderDecorator(ScrollDecorator(TextView()), 2)`**
+
+Структура: `BorderDecorator` → `ScrollDecorator` → `TextView`
+
+При вызове `wb2.Draw()`:
+1.  `BorderDecorator.Draw()` → `ScrollDecorator.Draw()`.
+2.  `ScrollDecorator.Draw()` → `TextView.Draw()`.
+3.  Содержимое `TextView`.
+4.  `ScrollDecorator` — полоса прокрутки поверх текста.
+5.  `BorderDecorator` — рамка *вокруг уже «прокрученного» вида*, рамка охватывает и полосу прокрутки.
+
+Визуально: текст → полоса прокрутки → сверху рамка. В `wb1` полоса была поверх рамки; в `wb2` рамка снаружи.
+
+**Динамическое оформление:**
+
+```cpp
+var w  = new TextView();           // A simple window exists
+...
+var w1 = new ScrollDecorator(w);   // At runtime: now w1 is a scrollable view of the same text
+```
+
+Новый подкласс не нужен, существующий код не меняется — оформление добавляется *после* создания объекта, который уже может использоваться.
+
+**Ответ:** порядок наслоения задаёт слои. Поменяв `wb1` и `wb2`, вы помещаете рамку «внутри» или «снаружи» области полосы прокрутки. Динамика возможна, потому что декоратор принимает любой `TextView` при создании — в том числе уже существующий.
+
+</details>
+
+##### **3.7. Виртуальный прокси и ленивая инициализация в C++** (Лекция 10, **Пример** 3)
+
+Ниже класс `ProxyForHeavy` — **virtual proxy** для тяжёлого объекта в **C++** с перегрузкой операторов.
+
+```cpp
+class VeryHeavyObject {
+public:
+    int m;
+    // ... large private data, expensive constructor
+};
+
+class ProxyForHeavy {
+public:
+    ProxyForHeavy() : object(nullptr) { }
+    VeryHeavyObject* operator->() { LoadObject(); return object; }
+    VeryHeavyObject& operator*()  { LoadObject(); return *object; }
+private:
+    void LoadObject() {
+        if (object == nullptr)
+            object = new VeryHeavyObject();
+    }
+    VeryHeavyObject* object;
+};
+```
+
+Объясните: (a) зачем нужен прокси; (b) как синтаксически работает `p->m = 77`; (c) что будет без прокси при `VeryHeavyObject* ptr = nullptr` и случайном вызове `ptr->m`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** прокси перегружает `->` и `*`, чтобы доступ к реальному объекту выглядел как у указателя, но объект гарантированно создаётся до доступа.
+
+**(a) Зачем прокси:**
+
+Без него клиент с **lazy initialization** для `VeryHeavyObject` должен перед каждым доступом проверять `nullptr`:
+
+```cpp
+VeryHeavyObject* obj = nullptr;
+// ... later ...
+if (obj == nullptr) obj = new VeryHeavyObject();
+obj->m = 77;   // Must remember to check every time
+```
+
+Проверку на `nullptr` иначе пришлось бы дублировать в каждом месте использования указателя; прокси инкапсулирует её один раз. Клиент пишет:
+
+```cpp
+ProxyForHeavy p;
+p->m = 77;     // LoadObject() is called automatically; no null-check needed
+```
+
+Объект создаётся при первом доступе и дальше переиспользуется; `p->m` безопасен — через прокси к члену нельзя «дотянуться» до **null**-указателя.
+
+**(b) Как работает `p->m = 77`:**
+
+**C++** обрабатывает `p->m` как `(p.operator->()).m`:
+1.  Вызывается `ProxyForHeavy::operator->()`.
+2.  Внутри `LoadObject()`: при `object == nullptr` выделяется новый `VeryHeavyObject`.
+3.  `operator->()` возвращает сырой `VeryHeavyObject*`.
+4.  К нему применяется `.m`, то есть `object->m`.
+5.  Присваивание `= 77` записывает 77 в `object->m`.
+
+Итого: при необходимости создать объект, затем установить `m` в 77.
+
+**(c) Без прокси:**
+
+```cpp
+VeryHeavyObject* ptr = nullptr;
+ptr->m;   // Undefined behavior: dereference of null pointer → crash (segfault)
+```
+
+У «голого» указателя нет защиты; не-**null** нужно обеспечивать вручную на каждом месте доступа. Прокси снимает эту обязанность с клиента.
+
+**Ответ:** `ProxyForHeavy` сочетает **lazy initialization** и защиту от **null** до доступа к членам; перегрузка операторов делает это прозрачным — `p->m` выглядит как обычный указатель, но внутри выполняется контролируемая инициализация.
+
+</details>
+
+##### **3.8. Умный указатель со счётчиком ссылок** (Лекция 10, **Задание** 1)
+
+Опираясь на пример `ProxyForHeavy` с лекции, реализуйте в **C++** класс **умного указателя**, который:
+
+1.  Ведёт число экземпляров `SmartPtr`, указывающих на один и тот же объект (**ARC**, automatic reference counting).
+2.  Автоматически освобождает реальный объект, когда счётчик обнуляется (нет ссылающихся `SmartPtr`).
+3.  Дополнительно обдумайте, как сделать **Proxy** в языке *без* перегрузки `->` и `*` (например, **Java**).
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** нужен общий счётчик. Несколько `SmartPtr` на один объект не могут хранить счётчик внутри каждой копии `SmartPtr` (у каждой был бы свой). Обычно выделяют на куче общий `int*`, которым делятся все копии; при нуле освобождают и счётчик, и объект.
+
+**Реализация умного указателя (C++):**
+
+```cpp
+#include <iostream>
+
+class VeryHeavyObject {
+public:
+    int m;
+    VeryHeavyObject() { std::cout << "VeryHeavyObject: created\n"; }
+    ~VeryHeavyObject() { std::cout << "VeryHeavyObject: destroyed\n"; }
+};
+
+class SmartPtr {
+public:
+    // Constructor: creates the object and initializes count to 1
+    SmartPtr() {
+        object  = new VeryHeavyObject();
+        count   = new int(1);
+    }
+
+    // Copy constructor: share the same object and counter; increment count
+    SmartPtr(const SmartPtr& other) {
+        object = other.object;
+        count  = other.count;
+        ++(*count);
+        std::cout << "SmartPtr: copy — ref count now " << *count << "\n";
+    }
+
+    // Destructor: decrement count; destroy object when count reaches 0
+    ~SmartPtr() {
+        --(*count);
+        std::cout << "SmartPtr: destructor — ref count now " << *count << "\n";
+        if (*count == 0) {
+            delete object;
+            delete count;
+        }
+    }
+
+    // Overload -> : give access to the real object
+    VeryHeavyObject* operator->() { return object; }
+
+    // Overload * : give reference to the real object
+    VeryHeavyObject& operator*() { return *object; }
+
+    int refCount() const { return *count; }
+
+private:
+    VeryHeavyObject* object;
+    int*             count;
+};
+
+int main() {
+    SmartPtr p1;             // count = 1
+    p1->m = 42;
+    std::cout << "p1->m = " << p1->m << "\n";
+
+    {
+        SmartPtr p2 = p1;    // count = 2 (copy constructor)
+        std::cout << "Inside block: ref count = " << p2.refCount() << "\n";
+        p2->m = 99;
+    }                        // p2 destroyed → count = 1; object lives
+
+    std::cout << "After block: ref count = " << p1.refCount() << "\n";
+    std::cout << "p1->m = " << p1->m << "\n";   // 99, same object
+
+    // p1 destroyed at end of main → count = 0 → object is freed
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+VeryHeavyObject: created
+p1->m = 42
+SmartPtr: copy — ref count now 2
+Inside block: ref count = 2
+SmartPtr: destructor — ref count now 1
+After block: ref count = 1
+p1->m = 99
+SmartPtr: destructor — ref count now 0
+VeryHeavyObject: destroyed
+```
+
+**Прокси в Java (без перегрузки операторов):**
+
+В **Java** нет перегрузки `->` и `*`, поэтому прокси не может быть синтаксически «как указатель». Вместо этого и `SmartProxy`, и реальный `Service` реализуют один **interface**; клиент вызывает обычный метод прокси, а тот делегирует реальному объекту.
+
+```java
+// Service interface
+public interface HeavyService {
+    void doWork();
+}
+
+// Real object
+public class RealHeavyService implements HeavyService {
+    public RealHeavyService() {
+        System.out.println("RealHeavyService: expensive initialization");
+    }
+    @Override
+    public void doWork() {
+        System.out.println("RealHeavyService: doing work");
+    }
+}
+
+// Proxy: lazy initialization — creates the real object on first use
+public class LazyProxy implements HeavyService {
+    private RealHeavyService real = null;
+
+    @Override
+    public void doWork() {
+        if (real == null) {
+            real = new RealHeavyService();   // created only on first call
+        }
+        real.doWork();
+    }
+}
+
+// Client
+public class Main {
+    public static void main(String[] args) {
+        HeavyService proxy = new LazyProxy();   // No object created yet
+        proxy.doWork();                          // First call: creates the object
+        proxy.doWork();                          // Second call: reuses it
+    }
+}
+```
+
+**Ответ:** в **C++** перегрузка операторов даёт синтаксис как у «голого» указателя. В **Java** прокси явный: и сервис, и прокси реализуют один интерфейс, клиент пишется против интерфейса. Смысл (**controlled access**, отложенная инициализация) тот же, отличается только «прозрачность» синтаксиса.
+
+</details>
+
+##### **3.9. Фасад конвертации видео** (Туториал 10, **Пример** 1)
+
+В приведённом ниже коде на **Java** показан **Facade** для подсистемы конвертации видео. Разберите код и ответьте: (a) какой класс — **Facade** и какие классы подсистемы он скрывает; (b) как метод `convertVideo` оркестрирует подсистему; (c) что клиенту (`Demo`) достаточно знать о подсистеме.
+
+```java
+// VideoConversionFacade.java
+public class VideoConversionFacade {
+    public File convertVideo(String fileName, String format) {
+        System.out.println("VideoConversionFacade: conversion started.");
+        VideoFile file = new VideoFile(fileName);
+        Codec sourceCodec = CodecFactory.extract(file);
+        Codec destinationCodec;
+        if (format.equals("mp4")) {
+            destinationCodec = new MPEG4CompressionCodec();
+        } else if (format.equals("ogg")) {
+            destinationCodec = new OggCompressionCodec();
+        } else {
+            System.err.println("Error: Unsupported format");
+            destinationCodec = null;
+        }
+        if (sourceCodec != null && destinationCodec != null) {
+            VideoFile buffer             = BitrateReader.read(file, sourceCodec);
+            VideoFile intermediateResult = BitrateReader.convert(buffer, destinationCodec);
+            File result = (new AudioMixer()).fix(intermediateResult);
+            System.out.println("VideoConversionFacade: conversion completed.");
+            return result;
+        }
+        return null;
+    }
+}
+
+// Demo.java — Client
+public class Demo {
+    public static void main(String[] args) {
+        VideoConversionFacade converter = new VideoConversionFacade();
+        File mp4Video = converter.convertVideo("youtube_video.ogg", "mp4");
+        if (mp4Video != null) {
+            System.out.println(mp4Video);
+        }
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `VideoConversionFacade` скрывает многошаговый конвейер: определение кодека, чтение/перекодирование битрейта, сведение аудио. Клиенту достаточно имени файла и целевого формата — остальное внутри.
+
+**(a) Класс-Facade и подсистема:**
+
+`VideoConversionFacade` — это **Facade**. Он скрывает пять классов подсистемы:
+
+*   `VideoFile` — входной видеофайл, метаданные (в т.ч. исходный кодек).
+*   `CodecFactory` — определяет кодек исходного файла.
+*   `MPEG4CompressionCodec` / `OggCompressionCodec` — целевые кодеки.
+*   `BitrateReader` — читает поток в кодеке и перекодирует буфер.
+*   `AudioMixer` — обрабатывает аудиодорожку и возвращает итоговый `java.io.File`.
+
+**(b) Как `convertVideo` оркестрирует подсистему:**
+
+Четыре этапа:
+
+1.  **Анализ источника:** `VideoFile` по имени и `CodecFactory.extract(file)` для исходного кодека.
+2.  **Выбор кодека:** `destinationCodec` по строке `format`.
+3.  **Видеоконверсия:**
+    a.  `BitrateReader.read(file, sourceCodec)` — сырые данные в промежуточный `VideoFile buffer`.
+    b.  `BitrateReader.convert(buffer, destinationCodec)` — перекодирование в `intermediateResult`.
+4.  **Финализация аудио:** `new AudioMixer().fix(intermediateResult)` — итоговый `java.io.File`.
+
+**(c) Что должен знать клиент:**
+
+`Demo` знает *только*:
+1.  что есть `VideoConversionFacade` и сигнатура `convertVideo(String fileName, String format)`;
+2.  что метод возвращает `java.io.File`.
+
+О `VideoFile`, `CodecFactory`, `BitrateReader`, `AudioMixer` и классах кодеков клиент не знает; смена подсистемы (новый кодек, другой `BitrateReader`) не требует правок `Demo`.
+
+**Ответ:** канонический **Facade**: один вызов клиента запускает внутри многошаговый конвейер из нескольких объектов; граница «что знает клиент» — интерфейс **Facade**.
+
+</details>
+
+##### **3.10. Декоратор одежды на Java** (Туториал 10, **Пример** 2)
+
+В приведённом ниже коде на **Java** **Decorator** моделирует «одевание» человека. Проследите по шагам вывод `fullyDressed.dress()` и `fullyDressed.getDescription()`.
+
+```java
+// Human.java — Component interface
+public interface Human {
+    String dress();
+    String getDescription();
+}
+
+// SimpleHuman.java — Concrete Component
+public class SimpleHuman implements Human {
+    private final String name;
+    public SimpleHuman(String name) { this.name = name; }
+    @Override public String dress()          { return name + " gets dressed: "; }
+    @Override public String getDescription() { return name + " - naked human";  }
+}
+
+// ClothingDecorator.java — Base Decorator
+public abstract class ClothingDecorator implements Human {
+    protected Human human;
+    public ClothingDecorator(Human human) { this.human = human; }
+    @Override public String dress()          { return human.dress(); }
+    @Override public String getDescription() { return human.getDescription(); }
+}
+
+// ShirtDecorator.java — Concrete Decorator
+public class ShirtDecorator extends ClothingDecorator {
+    public ShirtDecorator(Human human) { super(human); }
+    @Override public String dress()          { return super.dress() + "shirt, "; }
+    @Override public String getDescription() { return super.getDescription() + " + shirt"; }
+}
+
+// BootsDecorator.java — Concrete Decorator (others similar)
+public class BootsDecorator extends ClothingDecorator {
+    public BootsDecorator(Human human) { super(human); }
+    @Override public String dress()          { return super.dress() + "boots, "; }
+    @Override public String getDescription() { return super.getDescription() + " + boots"; }
+}
+
+// DecoratorPatternDemo.java — Client (excerpt)
+Human ivan = new SimpleHuman("Ivan");
+
+Human fullyDressed = new ShirtDecorator(
+        new PantsDecorator(
+                new SocksDecorator(
+                        new BootsDecorator(ivan))));
+
+System.out.println(fullyDressed.getDescription());
+System.out.println(fullyDressed.dress());
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** в каждом `dress()` вызывается `super.dress()` (через `ClothingDecorator` это уходит к `human.dress()`), цепочка доходит до `SimpleHuman.dress()`, затем при возврате каждый декоратор дописывает свой предмет одежды.
+
+**Стек декораторов (снаружи → внутрь):**
+
+```
+ShirtDecorator
+  └─ PantsDecorator
+       └─ SocksDecorator
+            └─ BootsDecorator
+                 └─ SimpleHuman("Ivan")
+```
+
+**Трассировка `fullyDressed.getDescription()`:**
+
+Каждый `getDescription()` уходит внутрь, строка собирается на обратном пути:
+
+1.  `ShirtDecorator.getDescription()` → calls `super.getDescription()` → `PantsDecorator.getDescription()`
+2.  `PantsDecorator.getDescription()` → calls `super.getDescription()` → `SocksDecorator.getDescription()`
+3.  `SocksDecorator.getDescription()` → calls `super.getDescription()` → `BootsDecorator.getDescription()`
+4.  `BootsDecorator.getDescription()` → calls `super.getDescription()` → `SimpleHuman.getDescription()`
+5.  `SimpleHuman.getDescription()` returns `"Ivan - naked human"`
+6.  `BootsDecorator` appends: `"Ivan - naked human + boots"`
+7.  `SocksDecorator` appends: `"Ivan - naked human + boots + socks"`
+8.  `PantsDecorator` appends: `"Ivan - naked human + boots + socks + pants"`
+9.  `ShirtDecorator` appends: `"Ivan - naked human + boots + socks + pants + shirt"`
+
+**Результат `getDescription()`:** `"Ivan - naked human + boots + socks + pants + shirt"`
+
+**Трассировка `fullyDressed.dress()`:**
+
+Та же цепочка, но каждый декоратор дописывает предмет одежды:
+
+1–5. Спуск до `SimpleHuman.dress()` → `"Ivan gets dressed: "`.
+6.  `BootsDecorator` appends: `"Ivan gets dressed: boots, "`
+7.  `SocksDecorator` appends: `"Ivan gets dressed: boots, socks, "`
+8.  `PantsDecorator` appends: `"Ivan gets dressed: boots, socks, pants, "`
+9.  `ShirtDecorator` appends: `"Ivan gets dressed: boots, socks, pants, shirt, "`
+
+**Результат `dress()`:** `"Ivan gets dressed: boots, socks, pants, shirt, "`
+
+**Ответ:** порядок в строке — от внутреннего декоратора к внешнему (сапоги → … → рубашка), потому что внутренний возвращает управление первым. Поменяв порядок обёрток в `new ShirtDecorator(new PantsDecorator(...))`, меняете порядок фрагментов в выводе.
+
+</details>
+
+##### **3.11. Ленивый прокси изображения** (Туториал 10, **Задание** 1)
+
+Даны интерфейс и заготовка задачи:
+
+```java
+// Image.java — interface (given)
+public interface Image {
+    void display();
+}
+
+// problem/LoadImage.java — stub (given, must be completed into a solution)
+public class LoadImage implements Image {
+    @Override
+    public void display() {
+        // TODO: implement
+    }
+}
+```
+
+Сценарий: изображение грузится долго, но важно для приложения; пользователь не должен ждать его до доступа к остальным функциям. Примените **Proxy**:
+
+1.  Класс `RealImage` с дорогой «загрузкой» с диска (имитация `Thread.sleep(3000)`).
+2.  Класс `ProxyImage` с **lazy**-загрузкой при первом `display()` и повторным использованием.
+3.  В `Main` покажите, что загрузка выполняется один раз при нескольких вызовах `display()`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** у `ProxyImage` ссылка на `RealImage` изначально **null**; при первом `display()` создаётся `RealImage` и срабатывает дорогая «загрузка»; дальше прокси вызывает `display()` у уже созданного `RealImage`.
+
+```java
+// Image.java — interface (provided)
+public interface Image {
+    void display();
+}
+
+// RealImage.java — Real Service (expensive to create)
+public class RealImage implements Image {
+    private final String imageName;
+    private final String path;
+    private boolean isLoaded = false;
+
+    public RealImage(String imageName, String path) {
+        this.imageName = imageName;
+        this.path      = path;
+        loadFromDisk(imageName, path);    // Expensive: called in constructor
+    }
+
+    @Override
+    public void display() {
+        if (!isLoaded) {
+            throw new IllegalStateException("Image not loaded yet.");
+        }
+        System.out.println("Displaying image: " + imageName);
+    }
+
+    public void loadFromDisk(String imageName, String path) {
+        System.out.println("Loading '" + imageName + "' from disk path: " + path);
+        try {
+            Thread.sleep(3000);   // Simulate 3-second disk load
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        isLoaded = true;
+        System.out.println("Image '" + imageName + "' successfully loaded.");
+    }
+}
+
+// ProxyImage.java — Virtual Proxy
+public class ProxyImage implements Image {
+    private final String imageName;
+    private final String path;
+    private RealImage realImage = null;   // Null until first access
+
+    public ProxyImage(String imageName, String path) {
+        this.imageName = imageName;
+        this.path      = path;
+        // No loading here — ProxyImage construction is instant
+    }
+
+    @Override
+    public void display() {
+        if (realImage == null) {
+            // First access: create and load the real image
+            realImage = new RealImage(imageName, path);
+        }
+        realImage.display();
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("Creating ProxyImage (no loading yet)...");
+        ProxyImage image1 = new ProxyImage("cat", "some_path/cat.jpg");
+
+        System.out.println("\nFirst display() call:");
+        image1.display();    // Triggers loading (takes ~3 seconds)
+
+        System.out.println("\nSecond display() call:");
+        image1.display();    // Instant — real image already loaded
+
+        System.out.println("\nThird display() call:");
+        image1.display();    // Still instant
+
+        System.out.println("\n--- New proxy for a different image ---");
+        ProxyImage image2 = new ProxyImage("dog", "another_path/dog.jpg");
+        System.out.println("Displaying dog (first time):");
+        image2.display();
+        System.out.println("Displaying dog (second time):");
+        image2.display();
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+Creating ProxyImage (no loading yet)...
+
+First display() call:
+Loading 'cat' from disk path: some_path/cat.jpg
+... (3-second pause) ...
+Image 'cat' successfully loaded.
+Displaying image: cat
+
+Second display() call:
+Displaying image: cat
+
+Third display() call:
+Displaying image: cat
+
+--- New proxy for a different image ---
+Displaying dog (first time):
+Loading 'dog' from disk path: another_path/dog.jpg
+... (3-second pause) ...
+Image 'dog' successfully loaded.
+Displaying image: dog
+Displaying dog (second time):
+Displaying image: dog
+```
+
+**Наблюдения:**
+1.  Создание `ProxyImage` мгновенно — пауза ~3 с только при *первом* `display()`.
+2.  После первого вызова `RealImage` кэшируется в `realImage`; дальше сразу `realImage.display()`.
+3.  У каждого `ProxyImage` свой `RealImage`.
+
+**Ответ:** прокси откладывает дорогое создание до фактической надобности и кэширует объект; для клиента `image1.display()` выглядит одинаково — различие «загрузка / уже в памяти» скрыто внутри **Proxy**.
+
+</details>

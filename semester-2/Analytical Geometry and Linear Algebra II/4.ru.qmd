@@ -1,0 +1,1464 @@
+---
+title: "W4–W5. Четыре фундаментальных подпространства, ортогональные дополнения, метод наименьших квадратов"
+author: "Salman Ahmadi-Asl"
+date: 2026-02-13
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Четыре фундаментальных подпространства матрицы**
+
+У каждой матрицы есть четыре важных векторных подпространства (**four fundamental subspaces**), которые раскрывают её полную алгебраическую структуру. Понимание этих подпространств нужно для решения систем уравнений, для интерпретации линейных преобразований «матрица → образ» и для приложений в анализе данных и инженерии.
+
+Для матрицы $A$ размера $m \times n$ с $\text{rank}(A) = r$ выделяют **четыре фундаментальных подпространства**:
+
+**1. Столбцовое пространство (column space)** $\mathcal{C}(A)$ (или $\text{Col}(A)$)
+
+Это множество всех линейных комбинаций столбцов $A$:
+$$\mathcal{C}(A) = \{A\mathbf{x} \mid \mathbf{x} \in \mathbb{R}^n\}$$
+
+*   Подпространство в $\mathbb{R}^m$ («пространство выходов», **output space**)
+*   Размерность равна $r$ (рангу)
+*   Система $A\mathbf{x} = \mathbf{b}$ имеет решение тогда и только тогда, когда $\mathbf{b} \in \mathcal{C}(A)$
+*   **Базис:** столбцы **pivot** в исходной матрице $A$ (их номера видны по ступенчатому виду по строкам, **row echelon form**)
+
+**2. Ядро / нуль-пространство (null space)** $\mathcal{N}(A)$ (или $\text{Nul}(A)$)
+
+Множество всех векторов, которые $A$ отображает в ноль:
+$$\mathcal{N}(A) = \{\mathbf{x} \in \mathbb{R}^n \mid A\mathbf{x} = \mathbf{0}\}$$
+
+*   Подпространство в $\mathbb{R}^n$ («пространство входов», **input space**)
+*   Размерность $n - r$ (число свободных переменных, **free variables**)
+*   Содержит все решения однородной системы $A\mathbf{x} = \mathbf{0}$
+*   **Базис:** **специальные решения (special solutions)** — по одному на каждую свободную переменную: эту переменную ставят равной $1$, остальные свободные — $0$
+
+**3. Строчное пространство (row space)** $\mathcal{C}(A^T)$ (или $\text{Row}(A)$)
+
+Линейная оболочка строк $A$, то же самое, что $\mathcal{C}(A^T)$:
+$$\mathcal{C}(A^T) = \{A^T\mathbf{y} \mid \mathbf{y} \in \mathbb{R}^m\}$$
+
+*   Подпространство в $\mathbb{R}^n$
+*   Размерность $r$ (как у столбцового пространства)
+*   **Базис:** ненулевые строки **REF** (ступенчатого вида по строкам) матрицы $A$
+*   В $\text{Row}(A)$ лежат все линейные комбинации строк $A$
+
+**4. Левое ядро (left null space)** $\mathcal{N}(A^T)$ (или $\text{Nul}(A^T)$)
+
+Это $\mathcal{N}(A^T)$:
+$$\mathcal{N}(A^T) = \{\mathbf{y} \in \mathbb{R}^m \mid A^T\mathbf{y} = \mathbf{0}\}$$
+
+*   Подпространство в $\mathbb{R}^m$
+*   Размерность $m - r$
+*   Название **left null space**: $A^T\mathbf{y} = \mathbf{0}$ эквивалентно $\mathbf{y}^TA = \mathbf{0}^T$ — $\mathbf{y}$ умножает $A$ **слева**
+*   **Базис:** решают $A^T\mathbf{y} = \mathbf{0}$ приведением $A^T$ к ступенчатому виду
+
+###### **1.1.1 Сводная таблица**
+
+| Подпространство | Обозначение | Содержится в | Размерность | Как найти базис |
+|:----------------|:------------|:-------------|:------------|:----------------|
+| **Столбцовое** | $\mathcal{C}(A)$ | $\mathbb{R}^m$ | $r$ | Столбцы **pivot** в $A$ |
+| **Ядро** | $\mathcal{N}(A)$ | $\mathbb{R}^n$ | $n - r$ | Специальные решения $A\mathbf{x} = \mathbf{0}$ |
+| **Строчное** | $\mathcal{C}(A^T)$ | $\mathbb{R}^n$ | $r$ | Ненулевые строки $\text{REF}(A)$ |
+| **Левое ядро** | $\mathcal{N}(A^T)$ | $\mathbb{R}^m$ | $m - r$ | Специальные решения $A^T\mathbf{y} = \mathbf{0}$ |
+
+###### **1.1.2 Теорема о ранге и дефекте (Rank–Nullity Theorem)**
+
+Размерности этих подпространств связаны. Два основных соотношения:
+
+$$\text{dim}(\mathcal{C}(A^T)) + \text{dim}(\mathcal{N}(A)) = n$$
+$$\text{dim}(\mathcal{C}(A)) + \text{dim}(\mathcal{N}(A^T)) = m$$
+
+В «сжатом» виде:
+$$r + (n - r) = n \quad \text{и} \quad r + (m - r) = m$$
+
+Это следствие **теоремы о ранге и дефекте**: для любой матрицы ранг плюс размерность ядра (по столбцам) равны числу столбцов.
+
+###### **1.1.3 Как вычислить четыре подпространства: по шагам**
+
+**Пример.** Пусть $A = \begin{bmatrix} 1 & 2 & 0 & 1 \\ 2 & 4 & 1 & 4 \\ 1 & 2 & 1 & 3 \end{bmatrix}$ (матрица $3 \times 4$).
+
+**Шаг 1: привести к REF**
+
+$$A \xrightarrow{\text{элемент. преобр. строк}} R = \begin{bmatrix} 1 & 2 & 0 & 1 \\ 0 & 0 & 1 & 2 \\ 0 & 0 & 0 & 0 \end{bmatrix}$$
+
+Ведущие элементы (**pivots**) в столбцах 1 и 3, значит $r = 2$.
+
+**Шаг 2: $\mathcal{C}(A)$**
+
+Базис дают столбцы **pivot** в *исходной* матрице $A$:
+$$\mathcal{C}(A) = \text{span}\left\{\begin{bmatrix} 1 \\ 2 \\ 1 \end{bmatrix}, \begin{bmatrix} 0 \\ 1 \\ 1 \end{bmatrix}\right\}$$
+
+$\text{dim}(\mathcal{C}(A)) = 2$.
+
+**Шаг 3: $\mathcal{C}(A^T)$**
+
+Ненулевые строки $R$ образуют базис строчного пространства:
+$$\mathcal{C}(A^T) = \text{span}\left\{\begin{bmatrix} 1 \\ 2 \\ 0 \\ 1 \end{bmatrix}, \begin{bmatrix} 0 \\ 0 \\ 1 \\ 2 \end{bmatrix}\right\}$$
+
+$\text{dim}(\mathcal{C}(A^T)) = 2$.
+
+**Шаг 4: $\mathcal{N}(A)$**
+
+Решаем $A\mathbf{x} = \mathbf{0}$ по $R\mathbf{x} = \mathbf{0}$:
+$$\begin{cases} x_1 + 2x_2 + x_4 = 0 \\ x_3 + 2x_4 = 0 \end{cases}$$
+
+Свободные: $x_2$ и $x_4$. При $x_2 = 1, x_4 = 0$ получаем $\mathbf{n}_1 = \begin{bmatrix} -2 \\ 1 \\ 0 \\ 0 \end{bmatrix}$; при $x_2 = 0, x_4 = 1$ — $\mathbf{n}_2 = \begin{bmatrix} -1 \\ 0 \\ -2 \\ 1 \end{bmatrix}$.
+
+$$\mathcal{N}(A) = \text{span}\left\{\begin{bmatrix} -2 \\ 1 \\ 0 \\ 0 \end{bmatrix}, \begin{bmatrix} -1 \\ 0 \\ -2 \\ 1 \end{bmatrix}\right\}$$
+
+$\text{dim}(\mathcal{N}(A)) = 2 = 4 - 2 = n - r$ ✓
+
+**Шаг 5: $\mathcal{N}(A^T)$**
+
+Решаем $A^T\mathbf{y} = \mathbf{0}$. Составляем $A^T$ и приводим к ступенчатому виду:
+$$A^T = \begin{bmatrix} 1 & 2 & 1 \\ 2 & 4 & 2 \\ 0 & 1 & 1 \\ 1 & 4 & 3 \end{bmatrix} \xrightarrow{\text{эл. преобр. строк}} \begin{bmatrix} 1 & 2 & 1 \\ 0 & 1 & 1 \\ 0 & 0 & 0 \\ 0 & 0 & 0 \end{bmatrix}$$
+
+Свободная переменная $y_3 = t$. Система:
+$$\begin{cases} y_1 + 2y_2 + y_3 = 0 \\ y_2 + y_3 = 0 \end{cases}$$
+
+При $y_3 = 1$: $y_2 = -1$, $y_1 = 1$. Итак:
+$$\mathcal{N}(A^T) = \text{span}\left\{\begin{bmatrix} 1 \\ -1 \\ 1 \end{bmatrix}\right\}$$
+
+$\text{dim}(\mathcal{N}(A^T)) = 1 = 3 - 2 = m - r$ ✓
+
+##### **1.2 Ортогональные дополнения (orthogonal complements)**
+
+Два подпространства $V$ и $W$ в $\mathbb{R}^n$ называются **ортогональными (orthogonal)**, если каждый вектор из $V$ ортогонален каждому вектору из $W$. Пишут $V \perp W$.
+
+###### **1.2.1 Определение ортогонального дополнения**
+
+Для подпространства $V \subseteq \mathbb{R}^n$ **ортогональное дополнение (orthogonal complement)** $V^\perp$ (читают «V перп») — множество всех векторов в $\mathbb{R}^n$, ортогональных каждому вектору из $V$:
+$$V^\perp = \{\mathbf{x} \in \mathbb{R}^n \mid \mathbf{x} \cdot \mathbf{v} = 0 \text{ для всех } \mathbf{v} \in V\}$$
+
+**Важно:** $V^\perp$ всегда подпространство. Чтобы проверить $\mathbf{x} \in V^\perp$, достаточно проверить ортогональность **базису** $V$, а не всем векторам из $V$.
+
+###### **1.2.2 Фундаментальная теорема линейной алгебры (Fundamental Theorem of Linear Algebra)**
+
+Четыре фундаментальных подпространства образуют **ортогональные пары**:
+
+$$\boxed{\mathcal{C}(A^T) \perp \mathcal{N}(A) \quad \text{в }\mathbb{R}^n}$$
+$$\boxed{\mathcal{C}(A) \perp \mathcal{N}(A^T) \quad \text{в }\mathbb{R}^m}$$
+
+Эквивалентно:
+$$\mathcal{C}(A^T)^\perp = \mathcal{N}(A) \quad \text{и} \quad \mathcal{N}(A)^\perp = \mathcal{C}(A^T)$$
+$$\mathcal{C}(A)^\perp = \mathcal{N}(A^T) \quad \text{и} \quad \mathcal{N}(A^T)^\perp = \mathcal{C}(A)$$
+
+**Почему так?** Если $\mathbf{x} \in \mathcal{N}(A)$, то $A\mathbf{x} = \mathbf{0}$. Пусть $\mathbf{r}$ — любая строка $A$. Тогда:
+$$\mathbf{r} \cdot \mathbf{x} = 0$$
+
+То есть $\mathbf{x}$ ортогонален каждой строке $A$, т.е. $\mathbf{x} \in \mathcal{C}(A^T)^\perp$. Обратно, если $\mathbf{x}$ ортогонален всем строкам, то $A\mathbf{x} = \mathbf{0}$.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.3 Ортогональное разложение**
+
+Связь «пространство — ортогональное дополнение» даёт разложение: каждый вектор из $\mathbb{R}^n$ **единственным** образом записывается как сумма компоненты в подпространстве и компоненты в дополнении.
+
+**Теорема (ортогональное разложение, orthogonal decomposition).** Если $V$ — подпространство в $\mathbb{R}^n$, то каждый $\mathbf{x} \in \mathbb{R}^n$ единственным образом представим в виде
+$$\mathbf{x} = \mathbf{v} + \mathbf{w}$$
+где $\mathbf{v} \in V$ и $\mathbf{w} \in V^\perp$.
+
+Пишут:
+$$\mathbb{R}^n = V \oplus V^\perp$$
+
+Символ $\oplus$ — **прямая сумма (direct sum)**: пересечение подпространств только $\{\mathbf{0}\}$.
+
+Для матриц получаются два базовых разложения:
+$$\mathbb{R}^n = \mathcal{C}(A^T) \oplus \mathcal{N}(A)$$
+$$\mathbb{R}^m = \mathcal{C}(A) \oplus \mathcal{N}(A^T)$$
+
+##### **1.3 Свойства ортогональных дополнений**
+
+###### **1.3.1 Свойство 1: пересечение — ноль**
+
+Для любого подпространства $V$:
+$$V \cap V^\perp = \{\mathbf{0}\}$$
+
+**Доказательство.** Пусть $\mathbf{x} \in V \cap V^\perp$. Тогда $\mathbf{x} \in V$ и $\mathbf{x} \in V^\perp$. Так как $\mathbf{x} \in V^\perp$, он ортогонален всем векторам из $V$, в том числе себе:
+$$\mathbf{x} \cdot \mathbf{x} = \|\mathbf{x}\|^2 = 0$$
+
+Значит $\mathbf{x} = \mathbf{0}$. $\square$
+
+###### **1.3.2 Свойство 2: сумма размерностей равна $n$**
+
+Для любого $V \subseteq \mathbb{R}^n$:
+$$\text{dim}(V) + \text{dim}(V^\perp) = n$$
+
+**Набросок доказательства.** Возьмём ортонормированный базис $\{\mathbf{v}_1, \ldots, \mathbf{v}_k\}$ в $V$ и дополним его до ортонормированного базиса $\{\mathbf{v}_1, \ldots, \mathbf{v}_k, \mathbf{w}_1, \ldots, \mathbf{w}_{n-k}\}$ в $\mathbb{R}^n$ (процесс Грама — Шмидта, **Gram–Schmidt**). Векторы $\{\mathbf{w}_1, \ldots, \mathbf{w}_{n-k}\}$ ортогональны всем $\mathbf{v}_i$, значит образуют базис $V^\perp$. Отсюда $\text{dim}(V^\perp) = n - k$. $\square$
+
+###### **1.3.3 Свойство 3: двойное дополнение возвращает $V$**
+
+Для любого $V$:
+$$(V^\perp)^\perp = V$$
+
+**Доказательство.** Две включённости.
+
+**($V \subseteq (V^\perp)^\perp$):** Пусть $\mathbf{v} \in V$. Для любого $\mathbf{w} \in V^\perp$ по определению $V^\perp$ имеем $\mathbf{v} \cdot \mathbf{w} = 0$. Значит $\mathbf{v}$ ортогонален всему $V^\perp$, т.е. $\mathbf{v} \in (V^\perp)^\perp$.
+
+**($V \supseteq (V^\perp)^\perp$):** По свойству 2: $\text{dim}(V) + \text{dim}(V^\perp) = n$ и $\text{dim}(V^\perp) + \text{dim}((V^\perp)^\perp) = n$, откуда $\text{dim}(V) = \text{dim}((V^\perp)^\perp)$. Так как $V \subseteq (V^\perp)^\perp$ и размерности совпадают, множества равны. $\square$
+
+###### **1.3.4 Свойство 4: единственность разложения**
+
+Если $\mathbf{x} = \mathbf{v}_1 + \mathbf{w}_1 = \mathbf{v}_2 + \mathbf{w}_2$, где $\mathbf{v}_1, \mathbf{v}_2 \in V$ и $\mathbf{w}_1, \mathbf{w}_2 \in V^\perp$, то $\mathbf{v}_1 = \mathbf{v}_2$ и $\mathbf{w}_1 = \mathbf{w}_2$.
+
+**Доказательство.** Переставим слагаемые:
+$$\mathbf{v}_1 - \mathbf{v}_2 = \mathbf{w}_2 - \mathbf{w}_1$$
+
+Слева вектор из $V$, справа — из $V^\perp$. Общий вектор только $\mathbf{0}$ (свойство 1), поэтому:
+$$\mathbf{v}_1 - \mathbf{v}_2 = \mathbf{0} \implies \mathbf{v}_1 = \mathbf{v}_2$$
+$$\mathbf{w}_2 - \mathbf{w}_1 = \mathbf{0} \implies \mathbf{w}_1 = \mathbf{w}_2$$
+$\square$
+
+##### **1.4 Примеры ортогональных дополнений**
+
+###### **1.4.1 Геометрия в $\mathbb{R}^3$**
+
+*   Если $V$ — плоскость $xy$ (множество $\{(x, y, 0) \mid x, y \in \mathbb{R}\}$), то $V^\perp$ — ось $z$ ($\{(0, 0, z) \mid z \in \mathbb{R}\}$).
+*   Если $V$ — прямая через начало с направлением $\mathbf{v}$, то $V^\perp$ — плоскость, перпендикулярная $\mathbf{v}$.
+*   Если $V = \mathbb{R}^3$, то $V^\perp = \{\mathbf{0}\}$.
+*   Если $V = \{\mathbf{0}\}$, то $V^\perp = \mathbb{R}^3$.
+
+###### **1.4.2 Пример в $\mathbb{R}^4$**
+
+Пусть $V = \text{span}\left\{\begin{pmatrix} 1 \\ 0 \\ 1 \\ 0 \end{pmatrix}, \begin{pmatrix} 0 \\ 1 \\ 0 \\ 1 \end{pmatrix}\right\}$.
+
+Ищем $V^\perp$: все $\mathbf{x} = \begin{pmatrix} x_1 \\ x_2 \\ x_3 \\ x_4 \end{pmatrix}$ такие, что
+$$\begin{pmatrix} 1 \\ 0 \\ 1 \\ 0 \end{pmatrix} \cdot \mathbf{x} = 0 \quad \text{и} \quad \begin{pmatrix} 0 \\ 1 \\ 0 \\ 1 \end{pmatrix} \cdot \mathbf{x} = 0$$
+
+Получаем:
+$$x_1 + x_3 = 0 \quad \text{и} \quad x_2 + x_4 = 0$$
+
+Подставляя $x_3 = -x_1$, $x_4 = -x_2$:
+$$\mathbf{x} = \begin{pmatrix} x_1 \\ x_2 \\ -x_1 \\ -x_2 \end{pmatrix} = x_1\begin{pmatrix} 1 \\ 0 \\ -1 \\ 0 \end{pmatrix} + x_2\begin{pmatrix} 0 \\ 1 \\ 0 \\ -1 \end{pmatrix}$$
+
+Итак:
+$$V^\perp = \text{span}\left\{\begin{pmatrix} 1 \\ 0 \\ -1 \\ 0 \end{pmatrix}, \begin{pmatrix} 0 \\ 1 \\ 0 \\ -1 \end{pmatrix}\right\}$$
+
+Заметим: $\text{dim}(V) + \text{dim}(V^\perp) = 2 + 2 = 4$ ✓
+
+##### **1.5 Доказательство фундаментальной теоремы**
+
+###### **1.5.1 Доказательство: $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$**
+
+**Теорема.** Для любой матрицы $A$ размера $m \times n$ выполняется $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$.
+
+**Доказательство.** Две включённости.
+
+**($\mathcal{N}(A) \subseteq \mathcal{C}(A^T)^\perp$):**
+
+Пусть $\mathbf{x} \in \mathcal{N}(A)$, т.е. $A\mathbf{x} = \mathbf{0}$. Нужно $\mathbf{x} \in \mathcal{C}(A^T)^\perp$, т.е. $\mathbf{x}$ ортогонален всему $\mathcal{C}(A^T)$.
+
+Если $\mathbf{y} \in \mathcal{C}(A^T)$, то $\mathbf{y} = A^T\mathbf{w}$ для некоторого $\mathbf{w} \in \mathbb{R}^m$. Вычисляем:
+$$\mathbf{x} \cdot \mathbf{y} = \mathbf{x}^T\mathbf{y} = \mathbf{x}^T(A^T\mathbf{w}) = (A\mathbf{x})^T\mathbf{w} = \mathbf{0}^T\mathbf{w} = 0$$
+
+Значит $\mathbf{x} \perp \mathbf{y}$ для всех $\mathbf{y} \in \mathcal{C}(A^T)$, т.е. $\mathbf{x} \in \mathcal{C}(A^T)^\perp$.
+
+**($\mathcal{C}(A^T)^\perp \subseteq \mathcal{N}(A)$):**
+
+Пусть $\mathbf{x} \in \mathcal{C}(A^T)^\perp$, т.е. $\mathbf{x} \cdot \mathbf{y} = 0$ для всех $\mathbf{y} \in \mathcal{C}(A^T)$. Нужно $A\mathbf{x} = \mathbf{0}$.
+
+В частности, $\mathbf{x}$ ортогонален каждой строке $A$ (строки $A$ — столбцы $A^T$). Пусть $\mathbf{a}_i$ — $i$-я строка $A$. Тогда:
+$$\mathbf{a}_i \cdot \mathbf{x} = 0 \quad \text{для всех } i = 1, 2, \ldots, m$$
+
+Это и есть $A\mathbf{x} = \mathbf{0}$ ($i$-я компонента $A\mathbf{x}$ равна $\mathbf{a}_i \cdot \mathbf{x}$). Значит $\mathbf{x} \in \mathcal{N}(A)$.
+
+**Вывод:** $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$. $\square$
+
+###### **1.5.2 Доказательство: $\mathcal{N}(A)^\perp = \mathcal{C}(A^T)$**
+
+Следует из предыдущего пункта и свойства 3:
+$$\mathcal{N}(A)^\perp = (\mathcal{C}(A^T)^\perp)^\perp = \mathcal{C}(A^T)$$
+$\square$
+
+Аналогично, применяя те же рассуждения к $A^T$:
+$$\mathcal{C}(A)^\perp = \mathcal{N}(A^T) \quad \text{и} \quad \mathcal{N}(A^T)^\perp = \mathcal{C}(A)$$
+
+##### **1.6 Почему $\text{rank}(A) = \text{rank}(A^T)$**
+
+Из фундаментальной теоремы следует равенство **строчного** и **столбцового** ранга.
+
+**Теорема.** $\text{rank}(A) = \text{rank}(A^T)$.
+
+**Доказательство.** По теореме о ранге и дефекте для $A$:
+$$\text{rank}(A) + \text{dim}(\mathcal{N}(A)) = n$$
+
+Из соотношения с ортогональным дополнением:
+$$\text{dim}(\mathcal{C}(A^T)) + \text{dim}(\mathcal{C}(A^T)^\perp) = n$$
+
+Но $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$, поэтому
+$$\text{dim}(\mathcal{C}(A^T)) + \text{dim}(\mathcal{N}(A)) = n$$
+
+Сравнивая с первой формулой:
+$$\text{rank}(A) = \text{dim}(\mathcal{C}(A)) = \text{dim}(\mathcal{C}(A^T)) = \text{rank}(A^T)$$
+$\square$
+
+Число линейно независимых строк совпадает с числом линейно независимых столбцов.
+
+##### **1.7 Задачи наименьших квадратов (least squares)**
+
+Если система $A\mathbf{x} = \mathbf{b}$ **несогласована (inconsistent)** и точного решения нет, ищут «лучшее приближение». Это и есть **задача наименьших квадратов (least squares problem)**.
+
+###### **1.7.1 Постановка**
+
+**Задача.** Даны $A \in \mathbb{R}^{m \times n}$ (часто $m > n$: уравнений больше, чем неизвестных) и $\mathbf{b} \in \mathbb{R}^m$. Найти $\mathbf{x} \in \mathbb{R}^n$, минимизирующий
+$$\|A\mathbf{x} - \mathbf{b}\|^2$$
+
+**Почему «наименьших квадратов»?** Минимизируется сумма квадратов невязок по уравнениям:
+$$\|A\mathbf{x} - \mathbf{b}\|^2 = (A\mathbf{x} - \mathbf{b})^T(A\mathbf{x} - \mathbf{b}) = \sum_{i=1}^m (a_i^T\mathbf{x} - b_i)^2$$
+
+где $a_i^T$ — $i$-я строка $A$.
+
+###### **1.7.2 Геометрический смысл**
+
+Вектор $A\mathbf{x}$ всегда лежит в $\mathcal{C}(A)$. Нужна **ближайшая** к $\mathbf{b}$ точка в $\mathcal{C}(A)$ — это **ортогональная проекция (orthogonal projection)** $\mathbf{b}$ на $\mathcal{C}(A)$; обозначим $\mathbf{p} = \text{proj}_{\mathcal{C}(A)}(\mathbf{b})$.
+
+<!-- DIAGRAM HERE -->
+
+Вектор ошибки $\mathbf{e} = \mathbf{b} - \mathbf{p}$ ортогонален $\mathcal{C}(A)$, т.е. $\mathbf{e} \in \mathcal{C}(A)^\perp = \mathcal{N}(A^T)$.
+
+###### **1.7.3 Зачем нужны наименьшие квадраты?**
+
+Переопределённые системы ($m > n$) часто несогласованы: ограничений больше, чем степеней свободы. Типичные приложения:
+
+*   **Аппроксимация данных (data fitting):** прямая или кривая по экспериментальным точкам
+*   **Регрессия (regression analysis):** линейная модель, наилучшая по данным
+*   **Обработка сигналов (signal processing):** оценка сигнала по зашумлённым измерениям
+*   **Компьютерная графика (computer graphics):** упрощённые модели форм
+*   **Машинное обучение (machine learning):** много обучающих примеров
+
+Вместо отказа от решения подбирают $\mathbf{x}$, при котором $A\mathbf{x}$ максимально близок к $\mathbf{b}$.
+
+###### **1.7.4 Нормальные уравнения (normal equations), вперёд**
+
+Нормальное **псевдорешение наименьших квадратов** $\hat{\mathbf{x}}$ удовлетворяет
+$$A^TA\hat{\mathbf{x}} = A^T\mathbf{b}$$
+
+Это **нормальные уравнения (normal equations)**. Их смысл: ошибка $\mathbf{b} - A\hat{\mathbf{x}}$ ортогональна $\mathcal{C}(A)$.
+
+**Вывод.** Пусть $\mathbf{e} = \mathbf{b} - A\hat{\mathbf{x}}$. Для минимума $\mathbf{e}$ должен быть перпендикулярен $\mathcal{C}(A)$, т.е. $\mathbf{e} \in \mathcal{N}(A^T)$:
+$$A^T\mathbf{e} = \mathbf{0}$$
+$$A^T(\mathbf{b} - A\hat{\mathbf{x}}) = \mathbf{0}$$
+$$A^T\mathbf{b} - A^TA\hat{\mathbf{x}} = \mathbf{0}$$
+$$A^TA\hat{\mathbf{x}} = A^T\mathbf{b}$$
+
+Если столбцы $A$ линейно независимы (**full column rank**), то $A^TA$ обратима и
+$$\hat{\mathbf{x}} = (A^TA)^{-1}A^T\mathbf{b}$$
+
+Матрица $A^+ = (A^TA)^{-1}A^T$ называется **псевдообратной (pseudoinverse)** (обобщённо — **псевдообратная Мура — Пенроуза, Moore–Penrose inverse**).
+
+***
+
+#### **2. Определения**
+
+*   **Столбцовое пространство (column space)** ($\mathcal{C}(A)$ или $\text{Col}(A)$): все линейные комбинации столбцов $A$; подпространство в $\mathbb{R}^m$ размерности $r = \text{rank}(A)$.
+*   **Ядро / нуль-пространство (null space)** ($\mathcal{N}(A)$ или $\text{Nul}(A)$): все решения $A\mathbf{x} = \mathbf{0}$; подпространство в $\mathbb{R}^n$ размерности $n - r$.
+*   **Строчное пространство (row space)** ($\mathcal{C}(A^T)$ или $\text{Row}(A)$): линейная оболочка строк $A$, то же, что $\mathcal{C}(A^T)$; подпространство в $\mathbb{R}^n$ размерности $r$.
+*   **Левое ядро (left null space)** ($\mathcal{N}(A^T)$ или $\text{Nul}(A^T)$): ядро $A^T$; подпространство в $\mathbb{R}^m$ размерности $m - r$.
+*   **Ранг (rank):** размерность столбцового (эквивалентно — строчного) пространства матрицы.
+*   **Ортогональное дополнение (orthogonal complement)** ($V^\perp$): для $V \subseteq \mathbb{R}^n$ — все векторы из $\mathbb{R}^n$, ортогональные каждому вектору из $V$.
+*   **Ортогональные подпространства (orthogonal subspaces):** $V$ и $W$ ортогональны, если каждый вектор из $V$ ортогонален каждому вектору из $W$.
+*   **Прямая сумма (direct sum)** ($V \oplus W$): все векторы вида $\mathbf{v} + \mathbf{w}$, $\mathbf{v} \in V$, $\mathbf{w} \in W$, при $V \cap W = \{\mathbf{0}\}$.
+*   **Задача наименьших квадратов (least squares problem):** найти $\mathbf{x}$, минимизирующий $\|A\mathbf{x} - \mathbf{b}\|^2$.
+*   **Нормальные уравнения (normal equations):** система $A^TA\mathbf{x} = A^T\mathbf{b}$, решение которой даёт оценку наименьших квадратов.
+*   **Псевдообратная (pseudoinverse):** при полном столбцовом ранге $A$ матрица $A^+ = (A^TA)^{-1}A^T$ — левый обратный множитель, дающий решение наименьших квадратов.
+*   **Столбцы pivot:** столбцы исходной $A$, в которых в ступенчатом виде стоят ведущие элементы; они образуют базис $\mathcal{C}(A)$.
+*   **Свободные переменные (free variables):** отвечают столбцам без **pivot**; параметризуют $\mathcal{N}(A)$.
+*   **Ведущий главный минор (leading principal minor):** определитель верхнего левого блока $k \times k$ (используется в разложении $LDL^T$).
+
+***
+
+#### **3. Формулы**
+
+*   **Размерности четырёх подпространств:** для $A$ размера $m \times n$ с $\text{rank}(A) = r$:
+    - $\text{dim}(\mathcal{C}(A)) = r$
+    - $\text{dim}(\mathcal{N}(A)) = n - r$
+    - $\text{dim}(\mathcal{C}(A^T)) = r$
+    - $\text{dim}(\mathcal{N}(A^T)) = m - r$
+*   **Теорема о ранге и дефекте (Rank–Nullity Theorem):** $\text{rank}(A) + \text{dim}(\mathcal{N}(A)) = n$ и $\text{rank}(A) + \text{dim}(\mathcal{N}(A^T)) = m$
+*   **Ортогональные пары:**
+    - $\mathcal{C}(A^T)^\perp = \mathcal{N}(A)$ и $\mathcal{N}(A)^\perp = \mathcal{C}(A^T)$
+    - $\mathcal{C}(A)^\perp = \mathcal{N}(A^T)$ и $\mathcal{N}(A^T)^\perp = \mathcal{C}(A)$
+*   **Размерность дополнения:** $\text{dim}(V) + \text{dim}(V^\perp) = n$ для любого $V \subseteq \mathbb{R}^n$
+*   **Прямые суммы:**
+    - $\mathbb{R}^n = \mathcal{C}(A^T) \oplus \mathcal{N}(A)$
+    - $\mathbb{R}^m = \mathcal{C}(A) \oplus \mathcal{N}(A^T)$
+*   **Нормальные уравнения:** $A^TA\hat{\mathbf{x}} = A^T\mathbf{b}$
+*   **Решение наименьших квадратов** (при полном столбцовом ранге $A$): $\hat{\mathbf{x}} = (A^TA)^{-1}A^T\mathbf{b}$
+*   **Проекция на $\mathcal{C}(A)$:** $\mathbf{p} = A(A^TA)^{-1}A^T\mathbf{b}$
+*   **Матрица проекции:** $P = A(A^TA)^{-1}A^T$ проецирует на $\mathcal{C}(A)$
+*   **Разложение $LDL^T$** для симметричной $A$: $A = LDL^T$, где $L$ — унитреугольная нижняя, $D$ — диагональная
+
+***
+
+#### **4. Примеры**
+
+##### **4.1. Четыре фундаментальных подпространства матрицы** (Лаба 4, Задание 1)
+
+Дана матрица
+
+$$A = \begin{pmatrix} 1 & 2 & 0 & 1 \\ 2 & 4 & 0 & 2 \\ 0 & 1 & 1 & 1 \end{pmatrix}$$
+
+(a) Найти ступенчатый вид (**echelon form**) $A$ и ранг $r$.
+
+(b) Найти базисы $\text{Col}(A)$ и $\text{Row}(A)$.
+
+(c) Найти базисы $\text{Nul}(A)$ и $\text{Nul}(A^T)$.
+
+(d) Указать размерности четырёх фундаментальных подпространств $\text{Col}(A)$, $\text{Row}(A)$, $\text{Nul}(A)$ и $\text{Nul}(A^T)$ и проверить соотношения
+$$\dim \text{Col}(A) = \dim \text{Row}(A) = r, \quad \dim \text{Nul}(A) = n - r, \quad \dim \text{Nul}(A^T) = m - r,$$
+где $m$ — число строк $A$, $n$ — число столбцов.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** приведение строк одновременно даёт ранг и базисы всех четырёх подпространств.
+
+**(a) Ступенчатый вид и ранг:**
+
+Приводим $A$:
+
+$$\begin{pmatrix} 1 & 2 & 0 & 1 \\ 2 & 4 & 0 & 2 \\ 0 & 1 & 1 & 1 \end{pmatrix} \xrightarrow{R_2 - 2R_1} \begin{pmatrix} 1 & 2 & 0 & 1 \\ 0 & 0 & 0 & 0 \\ 0 & 1 & 1 & 1 \end{pmatrix} \xrightarrow{R_2 \leftrightarrow R_3} \begin{pmatrix} 1 & 2 & 0 & 1 \\ 0 & 1 & 1 & 1 \\ 0 & 0 & 0 & 0 \end{pmatrix}$$
+
+Ступенчатый вид $U = \begin{pmatrix} 1 & 2 & 0 & 1 \\ 0 & 1 & 1 & 1 \\ 0 & 0 & 0 & 0 \end{pmatrix}$, **pivot** в столбцах 1 и 2, значит $r = 2$.
+
+**(b) Базисы $\text{Col}(A)$ и $\text{Row}(A)$:**
+
+*   **$\text{Col}(A)$:** столбцы **pivot** в *исходной* $A$ (1-й и 2-й):
+$$\text{Col}(A) = \text{span}\left\{\begin{pmatrix} 1 \\ 2 \\ 0 \end{pmatrix}, \begin{pmatrix} 2 \\ 4 \\ 1 \end{pmatrix}\right\}$$
+*   **$\text{Row}(A)$:** ненулевые строки ступенчатого вида:
+$$\text{Row}(A) = \text{span}\left\{\begin{pmatrix} 1 \\ 2 \\ 0 \\ 1 \end{pmatrix}, \begin{pmatrix} 0 \\ 1 \\ 1 \\ 1 \end{pmatrix}\right\}$$
+
+**(c) Базисы $\text{Nul}(A)$ и $\text{Nul}(A^T)$:**
+
+*   **$\text{Nul}(A)$:** решаем $A\mathbf{x} = \mathbf{0}$ по ступенчатому виду. Свободные $x_3$ и $x_4$.
+
+    Из 2-й строки: $x_2 + x_3 + x_4 = 0 \Rightarrow x_2 = -x_3 - x_4$.
+
+    Из 1-й: $x_1 + 2x_2 + x_4 = 0 \Rightarrow x_1 = -2x_2 - x_4 = 2x_3 + x_4$.
+
+    При $(x_3, x_4) = (1, 0)$: $\mathbf{n}_1 = \begin{pmatrix} 2 \\ -1 \\ 1 \\ 0 \end{pmatrix}$; при $(0, 1)$: $\mathbf{n}_2 = \begin{pmatrix} 1 \\ -1 \\ 0 \\ 1 \end{pmatrix}$.
+
+$$\text{Nul}(A) = \text{span}\left\{\begin{pmatrix} 2 \\ -1 \\ 1 \\ 0 \end{pmatrix}, \begin{pmatrix} 1 \\ -1 \\ 0 \\ 1 \end{pmatrix}\right\}$$
+
+*   **$\text{Nul}(A^T)$:** $A^T\mathbf{y} = \mathbf{0}$, приводим $A^T$:
+
+$$A^T = \begin{pmatrix} 1 & 2 & 0 \\ 2 & 4 & 1 \\ 0 & 0 & 1 \\ 1 & 2 & 1 \end{pmatrix} \xrightarrow{\text{эл. преобр.}} \begin{pmatrix} 1 & 2 & 0 \\ 0 & 0 & 1 \\ 0 & 0 & 0 \\ 0 & 0 & 0 \end{pmatrix}$$
+
+Свободная $y_2 = t$. Из 2-й строки: $y_3 = 0$; из 1-й: $y_1 = -2t$.
+
+$$\text{Nul}(A^T) = \text{span}\left\{\begin{pmatrix} -2 \\ 1 \\ 0 \end{pmatrix}\right\}$$
+
+**(d) Проверка размерностей:**
+
+*   $\dim \text{Col}(A) = 2 = r$ ✓
+*   $\dim \text{Row}(A) = 2 = r$ ✓
+*   $\dim \text{Nul}(A) = 2 = n - r = 4 - 2$ ✓
+*   $\dim \text{Nul}(A^T) = 1 = m - r = 3 - 2$ ✓
+
+**Ответ:** $r = 2$; базисы выше; все формулы для размерностей выполняются.
+
+</details>
+
+##### **4.2. Ортогональное дополнение к плоскости** (Лаба 4, Задание 2)
+
+Найти ортогональное дополнение к плоскости, натянутой на векторы $(1, 1, 2)$ и $(1, 2, 3)$: взять их за строки матрицы $A$ и решить $Ax = 0$. Имейте в виду: дополнение — целая прямая.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** $(\text{Row}(A))^\perp = \text{Nul}(A)$ (фундаментальная теорема). Плоскость — это $\text{Row}(A)$, ищем $\text{Nul}(A)$.
+
+1.  **Матрица:**
+$$A = \begin{pmatrix} 1 & 1 & 2 \\ 1 & 2 & 3 \end{pmatrix}$$
+
+2.  **Расширенная матрица $[A \mid \mathbf{0}]$:**
+$$\begin{pmatrix} 1 & 1 & 2 \\ 1 & 2 & 3 \end{pmatrix} \xrightarrow{R_2 - R_1} \begin{pmatrix} 1 & 1 & 2 \\ 0 & 1 & 1 \end{pmatrix} \xrightarrow{R_1 - R_2} \begin{pmatrix} 1 & 0 & 1 \\ 0 & 1 & 1 \end{pmatrix}$$
+
+3.  **Ядро:** свободная $x_3 = t$.
+    *   $x_2 + x_3 = 0 \Rightarrow x_2 = -t$
+    *   $x_1 + x_3 = 0 \Rightarrow x_1 = -t$
+
+$$\mathbf{x} = t\begin{pmatrix} -1 \\ -1 \\ 1 \end{pmatrix}$$
+
+**Ответ:** ортогональное дополнение — прямая $\text{span}\left\{\begin{pmatrix} -1 \\ -1 \\ 1 \end{pmatrix}\right\}$ (то же, что $\text{span}\left\{\begin{pmatrix} 1 \\ 1 \\ -1 \end{pmatrix}\right\}$).
+
+</details>
+
+##### **4.3. Дополнение к строчному пространству и разложение** (Лаба 4, Задание 3)
+
+Найти базис ортогонального дополнения к $\text{Row}(A)$ для
+$$A = \begin{pmatrix} 1 & 0 & 2 \\ 1 & 1 & 4 \end{pmatrix}$$
+Разложить $x = (3, 3, 3)$ на компоненту $x_r$ в $\text{Row}(A)$ и $x_n$ в $\text{Nul}(A)$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** $(\text{Row}(A))^\perp = \text{Nul}(A)$. Разложение $\mathbf{x}$ — линейная комбинация векторов из $\text{Row}(A)$ и $\text{Nul}(A)$.
+
+1.  **Базис $\text{Nul}(A) = \text{Row}(A)^\perp$:**
+
+$$\begin{pmatrix} 1 & 0 & 2 \\ 1 & 1 & 4 \end{pmatrix} \xrightarrow{R_2 - R_1} \begin{pmatrix} 1 & 0 & 2 \\ 0 & 1 & 2 \end{pmatrix}$$
+
+$x_3 = t$: $x_1 = -2t$, $x_2 = -2t$. Базис: $\mathbf{n} = \begin{pmatrix} -2 \\ -2 \\ 1 \end{pmatrix}$.
+
+2.  **Базис $\text{Row}(A)$:** $\mathbf{r}_1 = (1, 0, 2)^T$, $\mathbf{r}_2 = (0, 1, 2)^T$ (строки **RREF**).
+3.  **Разложение $\mathbf{x} = (3,3,3)^T$:** $\mathbf{x} = \alpha\mathbf{r}_1 + \beta\mathbf{r}_2 + \gamma\mathbf{n}$:
+
+$$\begin{pmatrix} 1 & 0 & -2 \\ 0 & 1 & -2 \\ 2 & 2 & 1 \end{pmatrix}\begin{pmatrix}\alpha\\\beta\\\gamma\end{pmatrix} = \begin{pmatrix}3\\3\\3\end{pmatrix}$$
+
+Из 1-й и 2-й строк: $\alpha = 3 + 2\gamma$, $\beta = 3 + 2\gamma$. Подстановка в 3-ю:
+$2(3+2\gamma) + 2(3+2\gamma) + \gamma = 3 \Rightarrow 12 + 9\gamma = 3 \Rightarrow \gamma = -1$.
+Тогда $\alpha = 1$, $\beta = 1$.
+
+4.  **Компонента в $\text{Row}(A)$:**
+$$\mathbf{x}_r = \alpha\mathbf{r}_1 + \beta\mathbf{r}_2 = 1\cdot(1,0,2)^T + 1\cdot(0,1,2)^T = (1,1,4)^T$$
+
+5.  **Компонента в $\text{Nul}(A)$:**
+$$\mathbf{x}_n = \gamma\mathbf{n} = -1\cdot(-2,-2,1)^T = (2,2,-1)^T$$
+
+6.  **Проверка:** $\mathbf{x}_r + \mathbf{x}_n = (3,3,3)^T$ ✓, $A\mathbf{x}_n = \mathbf{0}$ ✓.
+
+**Ответ:** базис $(\text{Row}(A))^\perp$: $\left\{\begin{pmatrix}-2\\-2\\1\end{pmatrix}\right\}$; $x_r = (1,1,4)^T$, $x_n = (2,2,-1)^T$.
+
+</details>
+
+##### **4.4. Почему эти утверждения об ортогональности неверны** (Лаба 4, Задание 4)
+
+Почему неверны утверждения:
+
+(a) Если $V$ ортогонально $W$, то $V^\perp$ ортогонально $W^\perp$.
+
+(b) Если $V$ ортогонально $W$, а $W$ ортогонально $Z$, то $V$ ортогонально $Z$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** ортогональность подпространств **не транзитивна**; переход к дополнению не сохраняет ортогональность. В $\mathbb{R}^3$ достаточно контрпримеров.
+
+**(a) Контрпример:**
+
+$V = \text{span}\{(1,0,0)\}$, $W = \text{span}\{(0,1,0)\}$ в $\mathbb{R}^3$.
+
+$V \perp W$, так как $(1,0,0)\cdot(0,1,0) = 0$.
+
+$V^\perp = \text{span}\{(0,1,0),(0,0,1)\}$, $W^\perp = \text{span}\{(1,0,0),(0,0,1)\}$.
+
+В обоих дополнениях есть $(0,0,1)$, и $(0,0,1)\cdot(0,0,1) = 1 \neq 0$.
+
+Значит $V^\perp$ **не** ортогонально $W^\perp$. Утверждение (a) ложно.
+
+**(b) Контрпример:**
+
+$V = \text{span}\{(1,0,0)\}$, $W = \text{span}\{(0,1,0)\}$, $Z = \text{span}\{(1,0,1)\}$ в $\mathbb{R}^3$.
+
+*   $V \perp W$ ✓
+*   $W \perp Z$ ✓
+*   Но $(1,0,0)\cdot(1,0,1) = 1 \neq 0$, т.е. $V$ **не** ортогонально $Z$.
+
+Утверждение (b) ложно: ортогональность не транзитивна.
+
+**Ответ:** оба утверждения опровергнуты примерами выше.
+
+</details>
+
+##### **4.5. Векторы, ортогональные фундаментальным подпространствам** (Лаба 4, Задание 5)
+
+Найти вектор $x$, ортогональный $\text{Row}(A)$, вектор $y$, ортогональный $\text{Col}(A)$, и вектор $z$, ортогональный $\text{Nul}(A)$.
+
+$$A = \begin{pmatrix} 1 & 2 & 1 \\ 2 & 4 & 3 \\ 3 & 6 & 4 \end{pmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** ортогональность к $\text{Row}(A)$ $\Rightarrow$ вектор из $\text{Nul}(A)$; к $\text{Col}(A)$ — из $\text{Nul}(A^T)$; к $\text{Nul}(A)$ — из $\text{Row}(A)$ (фундаментальная теорема).
+
+1.  **Приведение $A$:**
+$$\begin{pmatrix}1&2&1\\2&4&3\\3&6&4\end{pmatrix} \xrightarrow{R_2-2R_1,\,R_3-3R_1} \begin{pmatrix}1&2&1\\0&0&1\\0&0&1\end{pmatrix} \xrightarrow{R_3-R_2} \begin{pmatrix}1&2&1\\0&0&1\\0&0&0\end{pmatrix} \xrightarrow{R_1-R_2} \begin{pmatrix}1&2&0\\0&0&1\\0&0&0\end{pmatrix}$$
+
+**Pivot** в столбцах 1 и 3, $r = 2$. Свободная $x_2$.
+
+2.  **$\text{Nul}(A)$ (ортогонально $\text{Row}(A)$):** при $x_2 = 1$: $x_1 = -2$, $x_3 = 0$.
+$$\mathbf{x} = \begin{pmatrix}-2\\1\\0\end{pmatrix}$$
+
+3.  **$\text{Nul}(A^T)$ (ортогонально $\text{Col}(A)$):** $A^T\mathbf{y} = \mathbf{0}$.
+$$A^T = \begin{pmatrix}1&2&3\\2&4&6\\1&3&4\end{pmatrix} \xrightarrow{R_2-2R_1,\,R_3-R_1} \begin{pmatrix}1&2&3\\0&0&0\\0&1&1\end{pmatrix} \xrightarrow{R_2\leftrightarrow R_3} \begin{pmatrix}1&2&3\\0&1&1\\0&0&0\end{pmatrix}$$
+
+$y_3 = t$: $y_2 = -t$, $y_1 = -t$.
+$$\mathbf{y} = t\begin{pmatrix}-1\\-1\\1\end{pmatrix}, \quad \text{напр.} \quad \mathbf{y} = \begin{pmatrix}-1\\-1\\1\end{pmatrix}$$
+
+4.  **$\text{Row}(A)$ (ортогонально $\text{Nul}(A)$):** любая ненулевая строка ступенчатого вида, напр.
+$$\mathbf{z} = \begin{pmatrix}1\\2\\0\end{pmatrix} \quad \text{(первая ненулевая строка RREF)}$$
+
+**Ответ:** $x = \begin{pmatrix}-2\\1\\0\end{pmatrix}$ (к $\text{Row}(A)$), $y = \begin{pmatrix}-1\\-1\\1\end{pmatrix}$ (к $\text{Col}(A)$), $z = \begin{pmatrix}1\\2\\0\end{pmatrix}$ (к $\text{Nul}(A)$).
+
+</details>
+
+##### **4.6. Блочные матрицы: ступенчатый вид и специальные решения** (Лаба 4, Задание 6)
+
+Для каждой блочной матрицы найти $U$ (ступенчатый вид) и **специальные решения (special solutions)**:
+
+$$A = \begin{bmatrix} 0 & 0 & 0 \\ 0 & 0 & 3 \\ 2 & 4 & 6 \end{bmatrix} \qquad B = \begin{bmatrix} A & A \end{bmatrix} \qquad C = \begin{bmatrix} A & A \\ A & 0 \end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** к блочным матрицам применимы те же элементарные преобразования строк (**Gaussian elimination**); от блочной структуры зависят **pivot** и вид специальных решений.
+
+**Матрица $A$ ($3 \times 3$):**
+
+$$A = \begin{bmatrix}0&0&0\\0&0&3\\2&4&6\end{bmatrix} \xrightarrow{R_1\leftrightarrow R_3} \begin{bmatrix}2&4&6\\0&0&3\\0&0&0\end{bmatrix}$$
+
+$U_A = \begin{bmatrix}2&4&6\\0&0&3\\0&0&0\end{bmatrix}$. **Pivot** в столбцах 1 и 3; свободная $x_2$.
+
+*   Из 2-й строки: $3x_3 = 0 \Rightarrow x_3 = 0$.
+*   Из 1-й: $2x_1 + 4x_2 = 0 \Rightarrow x_1 = -2x_2$.
+*   При $x_2 = 1$: $\mathbf{s}_A = \begin{pmatrix}-2\\1\\0\end{pmatrix}$.
+
+**Матрица $B = [A \mid A]$ ($3 \times 6$):**
+
+Приведение $B$ совпадает с приведением $A$ в каждом из двух блоков:
+
+$$U_B = \begin{bmatrix}2&4&6&2&4&6\\0&0&3&0&0&3\\0&0&0&0&0&0\end{bmatrix}$$
+
+Свободные $x_2, x_4, x_5, x_6$ (столбцы 2, 4, 5, 6). По **RREF** для $B$: **pivot** в столбцах 1 и 3, свободные 2, 4, 5, 6; последовательная подстановка $(1,0,0,0)$, $(0,1,0,0)$, … даёт четыре специальных решения.
+
+**Матрица $C$ ($6 \times 6$):**
+
+$$C = \begin{bmatrix}A&A\\A&0\end{bmatrix}$$
+
+Вычитание верхнего блока из нижнего ($R_{\text{bottom}} - R_{\text{top}}$):
+
+$$\begin{bmatrix}A&A\\0&-A\end{bmatrix} \sim \begin{bmatrix}U_A&U_A\\0&-U_A\end{bmatrix}$$
+
+Ранг $C$: в типичной ситуации $\operatorname{rank}(C) = 2\operatorname{rank}(A) = 4$, $\dim\text{Nul}(C) = 6 - 4 = 2$.
+
+**Ответ:** $U_A = \begin{bmatrix}2&4&6\\0&0&3\\0&0&0\end{bmatrix}$, для $A$ специальное решение $\mathbf{s} = (-2,1,0)^T$. Для $B$ (ранг 2) — четыре специальных решения. Для $C$ (ранг 4) — два.
+
+</details>
+
+##### **4.7. Построить систему по полному решению** (Лаба 4, Задание 7)
+
+**I.** Найти систему $2 \times 3$ вида $Ax = b$ с полным решением
+$$x = \begin{bmatrix}1\\2\\0\end{bmatrix} + w\begin{bmatrix}1\\3\\1\end{bmatrix}$$
+
+**II.** Найти систему $3 \times 3$, у которой решения существуют ровно при условии $b_1 + b_2 = b_3$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** полное решение = частное + ядро; «обратная» постановка матрицы и правой части.
+
+**Часть I:**
+
+1.  Частное решение $\mathbf{x}_p = (1,2,0)^T$, направление ядра $\mathbf{x}_h = (1,3,1)^T$.
+2.  Строим $A$ с $\text{Nul}(A) = \text{span}\{(1,3,1)^T\}$, например **RREF** со свободной $x_3$:
+$$A = \begin{bmatrix}1&0&-1\\0&1&-3\end{bmatrix}$$
+Проверка: $A\mathbf{x}_h = (0,0)^T$ ✓
+
+3.  $\mathbf{b} = A\mathbf{x}_p$:
+$$\mathbf{b} = \begin{bmatrix}1&0&-1\\0&1&-3\end{bmatrix}\begin{bmatrix}1\\2\\0\end{bmatrix} = \begin{bmatrix}1\\2\end{bmatrix}$$
+
+**Часть II:** третья строка — сумма первых двух (согласованность $\Leftrightarrow$ $b_1 + b_2 = b_3$):
+$$A = \begin{bmatrix}1&0&-1\\0&1&-3\\1&1&-4\end{bmatrix}, \quad \mathbf{b} = \begin{bmatrix}b_1\\b_2\\b_1+b_2\end{bmatrix}$$
+
+**Ответ:**
+
+*   I: $\begin{bmatrix}1&0&-1\\0&1&-3\end{bmatrix}x = \begin{bmatrix}1\\2\end{bmatrix}$
+*   II: $\begin{bmatrix}1&0&-1\\0&1&-3\\1&1&-4\end{bmatrix}x = \begin{bmatrix}b_1\\b_2\\b_1+b_2\end{bmatrix}$
+
+</details>
+
+##### **4.8. Полные решения линейных систем** (Лаба 4, Задание 8)
+
+Найти полные решения:
+
+(a)
+$$\begin{aligned}x + 3y + 3z &= 1 \\ 2x + 6y + 9z &= 5 \\ -x - 3y + 3z &= 5\end{aligned}$$
+
+(b)
+$$\begin{bmatrix}1&3&1&2\\2&6&4&8\\0&0&2&4\end{bmatrix}\begin{bmatrix}x\\y\\z\\t\end{bmatrix} = \begin{bmatrix}1\\3\\1\end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** полное решение = частное + общее однородное; по расширенной матрице выделяют **pivot** и свободные переменные.
+
+**(a):**
+
+1.  Расширенная матрица:
+$$\left[\begin{array}{ccc|c}1&3&3&1\\2&6&9&5\\-1&-3&3&5\end{array}\right] \xrightarrow{R_2-2R_1,\,R_3+R_1} \left[\begin{array}{ccc|c}1&3&3&1\\0&0&3&3\\0&0&6&6\end{array}\right] \xrightarrow{R_3-2R_2} \left[\begin{array}{ccc|c}1&3&3&1\\0&0&3&3\\0&0&0&0\end{array}\right]$$
+
+2.  Обратная подстановка: из 2-й строки $z = 1$; из 1-й $x + 3y = -2$.
+    *   Свободная $y = \alpha$: $x = -2 - 3\alpha$.
+3.  Полное решение:
+$$\begin{pmatrix}x\\y\\z\end{pmatrix} = \begin{pmatrix}-2\\0\\1\end{pmatrix} + \alpha\begin{pmatrix}-3\\1\\0\end{pmatrix}$$
+
+**(b):**
+
+1.  Приведение:
+$$\left[\begin{array}{cccc|c}1&3&1&2&1\\2&6&4&8&3\\0&0&2&4&1\end{array}\right] \xrightarrow{R_2-2R_1} \left[\begin{array}{cccc|c}1&3&1&2&1\\0&0&2&4&1\\0&0&2&4&1\end{array}\right] \xrightarrow{R_3-R_2} \left[\begin{array}{cccc|c}1&3&1&2&1\\0&0&2&4&1\\0&0&0&0&0\end{array}\right]$$
+
+$$\xrightarrow{R_1 - \frac{1}{2}R_2} \left[\begin{array}{cccc|c}1&3&0&0&\frac{1}{2}\\0&0&1&2&\frac{1}{2}\\0&0&0&0&0\end{array}\right]$$
+
+2.  Свободные $y = \alpha$, $t = \beta$; базисные $x = \tfrac{1}{2} - 3\alpha$, $z = \tfrac{1}{2} - 2\beta$.
+3.  Полное решение:
+$$\begin{pmatrix}x\\y\\z\\t\end{pmatrix} = \begin{pmatrix}1/2\\0\\1/2\\0\end{pmatrix} + \alpha\begin{pmatrix}-3\\1\\0\\0\end{pmatrix} + \beta\begin{pmatrix}0\\0\\-2\\1\end{pmatrix}$$
+
+**Ответ:**
+
+*   (a): $\begin{pmatrix}-2\\0\\1\end{pmatrix} + \alpha\begin{pmatrix}-3\\1\\0\end{pmatrix}$
+*   (b): $\begin{pmatrix}1/2\\0\\1/2\\0\end{pmatrix} + \alpha\begin{pmatrix}-3\\1\\0\\0\end{pmatrix} + \beta\begin{pmatrix}0\\0\\-2\\1\end{pmatrix}$
+
+</details>
+
+##### **4.9. Нормаль к плоскости и ортогональное дополнение** (Домашнее задание 4, Задание 1)
+
+Пусть $P = \{(x, y, z) \in \mathbb{R}^3 : 2x - 4y - 5z = 0\}$.
+
+(a) Найти ненулевой вектор $n \in \mathbb{R}^3$, нормальный к $P$, и проверить, что $P = n^\perp$.
+
+(b) Найти базис $P$.
+
+(c) Найти базис $P^\perp$ и связать его с $\text{span}\{n\}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** плоскость через начало, заданная $ax + by + cz = 0$, имеет вектор нормали $(a,b,c)$; каждая точка плоскости ортогональна этой нормали.
+
+**(a) Нормаль:**
+
+$P = \{(x,y,z): 2x - 4y - 5z = 0\}$. По коэффициентам:
+$$n = \begin{pmatrix}2\\-4\\-5\end{pmatrix}$$
+
+**Проверка $P = n^\perp$:** $(x,y,z) \in n^\perp$ $\Leftrightarrow$ $n \cdot (x,y,z) = 2x - 4y - 5z = 0$ — это определение $P$. ✓
+
+**(b) Базис $P$:**
+
+Две линейно независимые точки на $P$: свободные $y, z$.
+
+*   $y = 1, z = 0$: $x = 2$, вектор $(2, 1, 0)^T$.
+*   $z = 2, y = 0$: $x = 5$, вектор $(5, 0, 2)^T$.
+
+Базис $P$: $\left\{\begin{pmatrix}2\\1\\0\end{pmatrix}, \begin{pmatrix}5\\0\\2\end{pmatrix}\right\}$.
+
+**(c) Базис $P^\perp$:**
+
+$\dim P = 2$ в $\mathbb{R}^3$, значит $\dim P^\perp = 1$. Вектор $n = (2,-4,-5)^T$ ортогонален $P$, поэтому
+$$P^\perp = \text{span}\{n\} = \text{span}\left\{\begin{pmatrix}2\\-4\\-5\end{pmatrix}\right\}$$
+
+**Ответ:** $n = (2,-4,-5)^T$; базис $P$: $\{(2,1,0)^T, (5,0,2)^T\}$; $P^\perp = \text{span}\{n\}$.
+
+</details>
+
+##### **4.10. Четыре подпространства параметрической матрицы** (Домашнее задание 4, Задание 2)
+
+Для $a, b, c \in \mathbb{R}$ рассмотреть
+$$A = \begin{bmatrix}0&1&a&0&a&0\\0&0&1&b&0&b\\0&0&0&1&c&c\\0&0&0&0&0&0\end{bmatrix}$$
+
+(a) Найти базисы $\text{Col}(A)$, $\text{Row}(A)$, $\text{Nul}(A)$ и $\text{Nul}(A^T)$ через $a$, $b$, $c$.
+
+(b) Явно записать две ортогональные пары из четырёх подпространств.
+
+(c) Меняются ли размерности четырёх подпространств при $a = b = c = 0$?
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** $A$ уже в **REF**; **pivot** и свободные столбцы считываются сразу.
+
+**(a):**
+
+$A$ имеет размер $4 \times 6$ и уже ступенчата. **Pivot** в столбцах 2, 3 и 4, $r = 3$.
+
+*   **$\text{Col}(A)$:** столбцы **pivot** исходной матрицы — 2, 3, 4:
+$$\text{Col}(A) = \text{span}\left\{\begin{pmatrix}1\\0\\0\\0\end{pmatrix}, \begin{pmatrix}a\\1\\0\\0\end{pmatrix}, \begin{pmatrix}0\\b\\1\\0\end{pmatrix}\right\}$$
+
+*   **$\text{Row}(A)$:** ненулевые строки (сами строки $A$):
+$$\text{Row}(A) = \text{span}\left\{(0,1,a,0,a,0),\ (0,0,1,b,0,b),\ (0,0,0,1,c,c)\right\}$$
+
+*   **$\text{Nul}(A)$:** свободные $x_1, x_5, x_6$; три специальных решения.
+*   **$\text{Nul}(A^T)$:** $\dim \text{Nul}(A^T) = 4 - 3 = 1$. Последняя строка $A$ нулевая, поэтому $e_4 = (0,0,0,1)^T$ даёт $A^T e_4 = 0$:
+$$\text{Nul}(A^T) = \text{span}\left\{\begin{pmatrix}0\\0\\0\\1\end{pmatrix}\right\}$$
+
+**(b) Ортогональность:**
+
+$$\text{Row}(A) \perp \text{Nul}(A) \quad \text{в }\mathbb{R}^6$$
+$$\text{Col}(A) \perp \text{Nul}(A^T) \quad \text{в }\mathbb{R}^4$$
+
+**(c) Случай $a = b = c = 0$:**
+
+Структура **pivot** та же, $r = 3$, размерности $3,3,3,1$ не меняются.
+
+**Ответ:** $r = 3$ при любых $a,b,c$; при $a=b=c=0$ размерности те же.
+
+</details>
+
+##### **4.11. Четыре подпространства $A$, $A+I$ и $A+A^2$** (Домашнее задание 4, Задание 3)
+
+Пусть
+$$A = \begin{bmatrix}0&1&0\\0&0&1\\0&0&0\end{bmatrix}$$
+Описать четыре фундаментальных подпространства для $A$, $A+I$ и $A+A^2$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** выписать матрицы, найти ранги и ядра приведением строк.
+
+**Матрица $A$:**
+
+$$A = \begin{bmatrix}0&1&0\\0&0&1\\0&0&0\end{bmatrix}$$
+
+Уже **REF**. **Pivot** в столбцах 2 и 3, $r = 2$.
+
+*   $\text{Col}(A) = \text{span}\{(1,0,0)^T, (0,1,0)^T\}$ (2-й и 3-й столбцы $A$). $\dim\text{Col}(A) = 2$.
+*   $\text{Row}(A) = \text{span}\{(0,1,0), (0,0,1)\}$, $\dim = 2$.
+*   $\text{Nul}(A)$: свободная $x_1$, базисное решение $(1,0,0)^T$, $\dim = 1$.
+*   $\text{Nul}(A^T)$: $\dim = 1$. $A^T = \begin{bmatrix}0&0&0\\1&0&0\\0&1&0\end{bmatrix}$: $y_2=0$, $y_1=0$, $y_3$ свободна. $\text{Nul}(A^T) = \text{span}\{(0,0,1)^T\}$.
+
+**Матрица $A + I$:**
+
+$$A + I = \begin{bmatrix}1&1&0\\0&1&1\\0&0&1\end{bmatrix}$$
+
+Верхнетреугольная с единицами на диагонали — обратима, $r = 3$.
+
+*   $\text{Col}(A+I) = \mathbb{R}^3$, $\text{Row}(A+I) = \mathbb{R}^3$, $\text{Nul}(A+I) = \{0\}$, $\text{Nul}((A+I)^T) = \{0\}$.
+
+**Матрица $A + A^2$:**
+
+$$A^2 = \begin{bmatrix}0&0&1\\0&0&0\\0&0&0\end{bmatrix}, \qquad
+A + A^2 = \begin{bmatrix}0&1&1\\0&0&1\\0&0&0\end{bmatrix}$$
+
+**Pivot** в столбцах 2 и 3, $r = 2$.
+
+*   $\text{Col}(A+A^2) = \text{span}\{(1,0,0)^T, (1,1,0)^T\}$, $\dim = 2$.
+*   $\text{Row}(A+A^2) = \text{span}\{(0,1,1),(0,0,1)\}$, $\dim = 2$.
+*   $\text{Nul}(A+A^2)$: $(1,0,0)^T$, $\dim = 1$.
+*   $\text{Nul}((A+A^2)^T)$: $(A+A^2)^T = \begin{bmatrix}0&0&0\\1&0&0\\1&1&0\end{bmatrix}$, $y_3$ свободна, $y_1=y_2=0$, $\text{span}\{(0,0,1)^T\}$.
+
+**Ответ:** у $A$ и $A+A^2$ ранг 2, $\text{Nul} = \text{span}\{(1,0,0)^T\}$, левое ядро $\text{span}\{(0,0,1)^T\}$; $A+I$ обратима ($r=3$), ядра тривиальны.
+
+</details>
+
+##### **4.12. Принадлежит ли $w$ столбцовому или нуль-пространству? (первая матрица)** (Домашнее задание 4, Задание 4)
+
+Пусть
+$$w = \begin{bmatrix}1\\1\\-1\\-3\end{bmatrix}, \quad A = \begin{bmatrix}7&6&-4&1\\-5&-1&0&-2\\9&-11&7&-3\\19&-9&7&1\end{bmatrix}$$
+Выяснить: $w \in \text{Col}(A)$? $w \in \text{Nul}(A)$? оба? ни одно?
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** $\text{Nul}(A)$ — по $Aw$; $\text{Col}(A)$ — по согласованности $Ax=w$.
+
+**Проверка $\text{Nul}(A)$:** вычисляем $Aw$:
+
+$$Aw = \begin{bmatrix}14\\0\\0\\0\end{bmatrix}$$
+
+Так как $Aw \neq \mathbf{0}$, $w \notin \text{Nul}(A)$.
+
+**Проверка $\text{Col}(A)$:** привести $[A \mid w]$. Если система согласована, $w \in \text{Col}(A)$.
+
+$$\left[\begin{array}{cccc|c}7&6&-4&1&1\\-5&-1&0&-2&1\\9&-11&7&-3&-1\\19&-9&7&1&-3\end{array}\right]$$
+
+После исключения Гаусса система согласована (**pivot** в расширенном столбце не появляется). Значит $w \in \text{Col}(A)$.
+
+**Ответ:** $w \in \text{Col}(A)$, но $w \notin \text{Nul}(A)$.
+
+</details>
+
+##### **4.13. Принадлежит ли $w$ столбцовому или нуль-пространству? (вторая матрица)** (Домашнее задание 4, Задание 5)
+
+Пусть
+$$w = \begin{bmatrix}1\\2\\0\\1\end{bmatrix}, \quad A = \begin{bmatrix}-8&5&-2&0\\-5&2&1&-2\\10&-8&6&-3\\3&-2&1&0\end{bmatrix}$$
+То же, что в 4.12.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**$\text{Nul}(A)$:** $Aw = \begin{bmatrix}2\\-3\\-9\\-1\end{bmatrix} \neq \mathbf{0}$, значит $w \notin \text{Nul}(A)$.
+
+**$\text{Col}(A)$:** по $[A \mid w]$ получается строка вида $[0\;0\;0\;0\mid c]$, $c \neq 0$ — несогласованность, $w \notin \text{Col}(A)$.
+
+**Ответ:** $w$ не в $\text{Col}(A)$ и не в $\text{Nul}(A)$.
+
+</details>
+
+##### **4.14. В каком $\mathbb{R}^k$ лежат подпространства?** (Домашнее задание 4, Задание 6)
+
+Пусть $A$ — матрица $m \times n$. Какие из подпространств
+$$\text{Row}(A),\ \text{Col}(A),\ \text{Nul}(A),\ \text{Row}(A^T),\ \text{Col}(A^T),\ \text{Nul}(A^T)$$
+лежат в $\mathbb{R}^n$, какие в $\mathbb{R}^m$? Сколько **различных** подпространств в этом списке (в общем случае)?
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** смотреть длину векторов — «вход» $\mathbb{R}^n$ или «выход» $\mathbb{R}^m$.
+
+*   **В $\mathbb{R}^n$:** $\text{Row}(A)$, $\text{Nul}(A)$, $\text{Col}(A^T)$.
+*   **В $\mathbb{R}^m$:** $\text{Col}(A)$, $\text{Nul}(A^T)$, $\text{Row}(A^T)$.
+
+Так как $\text{Row}(A) = \text{Col}(A^T)$ и $\text{Col}(A) = \text{Row}(A^T)$, из шести названий остаются **четыре различных** подпространства.
+
+**Ответ:** в $\mathbb{R}^n$ — $\text{Row}(A)$, $\text{Nul}(A)$, $\text{Col}(A^T)$; в $\mathbb{R}^m$ — остальные три; различных — четыре (четыре фундаментальных).
+
+</details>
+
+##### **4.15. Две формулы ранга и дефекта** (Домашнее задание 4, Задание 7)
+
+Пусть $A$ — матрица $m \times n$. Обосновать тождества:
+$$\dim\text{Row}(A) + \dim\text{Nul}(A) = n, \qquad \dim\text{Col}(A) + \dim\text{Nul}(A^T) = m$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** обе формулы — теорема о ранге и дефекте для $A$ и $A^T$.
+
+**Первая:** $\dim\text{Row}(A) + \dim\text{Nul}(A) = n$.
+
+Для $T: \mathbb{R}^n \to \mathbb{R}^m$: $\dim(\ker T) + \dim(\text{im}\, T) = n$. Для $A$: $\ker = \text{Nul}(A)$, $\text{im} = \text{Col}(A)$. Так как $\dim\text{Col}(A) = r = \dim\text{Row}(A)$ (строчный ранг = столбцовому),
+$$r + \dim\text{Nul}(A) = n \implies \dim\text{Row}(A) + \dim\text{Nul}(A) = n$$
+
+**Вторая:** $\dim\text{Col}(A) + \dim\text{Nul}(A^T) = m$.
+
+Применяем те же к $A^T: \mathbb{R}^m \to \mathbb{R}^n$:
+$$\dim\text{Nul}(A^T) + \dim\text{Col}(A^T) = m$$
+и $\dim\text{Col}(A^T) = \dim\text{Row}(A) = r = \dim\text{Col}(A)$, откуда
+$$\dim\text{Col}(A) + \dim\text{Nul}(A^T) = m \quad \square$$
+
+**Ответ:** обе формулы следуют из теоремы о ранге и дефекте и равенства строчного и столбцового ранга.
+
+</details>
+
+##### **4.16. Эквивалентность: $\text{Col}(A) = \mathbb{R}^m$, $\text{Nul}(A^T)=\{0\}$, согласованность для всех $b$** (Домашнее задание 4, Задание 8)
+
+Пусть $A$ — $m \times n$. Доказать эквивалентность:
+
+(a) Система $Ax = b$ согласована для **каждого** $b \in \mathbb{R}^m$.
+
+(b) $\text{Col}(A) = \mathbb{R}^m$.
+
+(c) $\text{Nul}(A^T) = \{0\}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** все три условия означают, что $A$ **сюръективна (surjective)** как отображение $\mathbb{R}^n \to \mathbb{R}^m$.
+
+**(a) $\Rightarrow$ (b):** из согласованности для любого $b$ следует $b \in \text{Col}(A)$ для всех $b$, значит $\text{Col}(A) = \mathbb{R}^m$.
+
+**(b) $\Rightarrow$ (a):** если $\text{Col}(A) = \mathbb{R}^m$, каждое $b$ — комбинация столбцов, решение $Ax=b$ есть.
+
+**(b) $\Rightarrow$ (c):** $\dim\text{Col}(A)=m \Rightarrow r=m \Rightarrow \dim\text{Nul}(A^T)=m-r=0$.
+
+**(c) $\Rightarrow$ (b):** $\dim\text{Nul}(A^T)=0 \Rightarrow r=m \Rightarrow \dim\text{Col}(A)=m$, и $\text{Col}(A)\subseteq\mathbb{R}^m$ даёт $\text{Col}(A)=\mathbb{R}^m$. $\square$
+
+**Ответ:** (a), (b), (c) эквивалентны.
+
+</details>
+
+##### **4.17. Нормали и построение ортогональных дополнений** (Домашнее задание 4, Задание 9)
+
+Плоскости в $\mathbb{R}^3$:
+$$P_1 = \{x : 3x_1 - 4x_2 + x_3 = 0\}, \quad P_2 = \{x : 5x_1 - 10x_3 = 0\}$$
+
+(a) Найти нормали $n_1, n_2$ к $P_1, P_2$.
+
+(b) Найти базисы $P_1$ и $P_2$.
+
+(c) Построить матрицу $A_1$ размера $2 \times 3$ с $\text{Row}(A_1)=P_1$. Показать $\text{Nul}(A_1) = \text{span}\{n_1\}$.
+
+(d) Построить $A_2$ размера $3 \times 2$ с $\text{Col}(A_2)=P_2$. Показать $\text{Nul}(A_2^T) = \text{span}\{n_2\}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**(a)** $n_1 = (3,-4,1)^T$; $n_2 = (5,0,-10)^T$ или $(1,0,-2)^T$.
+
+**(b)** Базис $P_1$: $\{(4,3,0)^T, (-1,0,3)^T\}$. Базис $P_2$: $\{(0,1,0)^T, (2,0,1)^T\}$.
+
+**(c)** Строки — базис $P_1$:
+$$A_1 = \begin{bmatrix}4&3&0\\-1&0&3\end{bmatrix}$$
+$\text{Nul}(A_1)$ одномерно; специальное решение коллинеарно $(3,-4,1)^T=n_1$. ✓
+
+**(d)** Столбцы — базис $P_2$:
+$$A_2 = \begin{bmatrix}0&2\\1&0\\0&1\end{bmatrix}$$
+$\text{Nul}(A_2^T)$ одномерно; $(1,0,-2)^T \parallel n_2$. ✓
+
+**Ответ:** $n_1 = (3,-4,1)^T$, $n_2 = (1,0,-2)^T$; построения согласованы с ядром и левым ядром.
+
+</details>
+
+##### **4.18. Четыре подпространства у эквивалентных по строкам матриц** (Домашнее задание 4, Задание 10)
+
+Матрицы эквивалентны по строкам:
+$$A = \begin{bmatrix}2&-1&1&-6&8\\1&-2&-4&3&-2\\-7&8&10&3&-10\\4&-5&-7&0&4\end{bmatrix}, \quad B = \begin{bmatrix}1&-2&-4&3&-2\\0&3&9&-12&12\\0&0&0&0&0\\0&0&0&0&0\end{bmatrix}$$
+
+(a) Найти $\text{rank}(A)$ и $\dim\text{Nul}(A)$ без нового приведения $A$.
+
+(b) Базисы $\text{Row}(A)$ и $\text{Col}(A)$.
+
+(c) Базис $\text{Nul}(A)$.
+
+(d) Базис $\text{Nul}(A^T)$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** у эквивалентных по строкам матриц совпадают $\text{Row}$ и $\text{Nul}$; по $B$ всё видно.
+
+**(a)** У $B$ две ненулевые строки, $r=2$, $n=5$, $\dim\text{Nul}(A)=3$.
+
+**(b)** $\text{Row}(A) = \text{span}\{(1,-2,-4,3,-2),\ (0,3,9,-12,12)\}$; $\text{Col}(A)$ — столбцы 1 и 2 исходного $A$:
+$$\text{Col}(A) = \text{span}\left\{\begin{pmatrix}2\\1\\-7\\4\end{pmatrix}, \begin{pmatrix}-1\\-2\\8\\-5\end{pmatrix}\right\}$$
+
+**(c) RREF** из $B$:
+$$\begin{bmatrix}1&0&2&-5&6\\0&1&3&-4&4\\0&0&0&0&0\\0&0&0&0&0\end{bmatrix}$$
+Специальные: $(-2,-3,1,0,0)^T$, $(5,4,0,1,0)^T$, $(-6,-4,0,0,1)^T$.
+
+**(d)** $\dim\text{Nul}(A^T)=2$; нулевые строки $B$ задают линейные связи строк $A$; базис в $\text{Nul}(A^T)$ получают из множителей приведения (или приведением $A^T$).
+
+**Ответ:** $r=2$, $\dim\text{Nul}(A)=3$; базисы как выше.
+
+</details>
+
+##### **4.19. Четыре подпространства и проверка ортогональности** (Домашнее задание 4, Задание 11)
+
+Пусть
+$$A = \begin{bmatrix}5&-2&3\\-1&0&-1\\1&-2&-2\\-5&7&2\end{bmatrix}$$
+Найти базисы $\text{Col}(A)$, $\text{Row}(A)$, $\text{Nul}(A)$, $\text{Nul}(A^T)$ и проверить две ортогональные пары.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+1.  Приведение $A$ к **REF** (как в оригинале) даёт три **pivot**-столбца: $r=3=n$, $\text{Nul}(A)=\{0\}$.
+
+2.  **Базисы:** три столбца $A$ — базис $\text{Col}(A)$; ненулевые строки **REF** — базис $\text{Row}(A)$; $\text{Nul}(A^T)$ одномерно ($4-3=1$), вектор из $A^Ty=0$.
+
+3.  **Ортогональность:** $\text{Row}\perp\text{Nul}$ тривиально; $\text{Col}\perp\text{Nul}(A^T)$ — по фундаментальной теореме.
+
+**Ответ:** $r=3$, $\text{Nul}(A)=\{0\}$, $\dim\text{Nul}(A^T)=1$; ортогональные соотношения выполняются.
+
+</details>
+
+##### **4.20. Матрица $2 \times 5$** (Домашнее задание 4, Задание 12)
+
+Пусть
+$$A = \begin{bmatrix}4&5&-2&6&0\\1&1&0&1&0\end{bmatrix}$$
+Найти базисы четырёх подпространств и проверить ортогональные пары.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**RREF:** $\begin{bmatrix}1&0&2&-1&0\\0&1&-2&2&0\end{bmatrix}$, $r=2$, свободные $x_3,x_4,x_5$.
+
+*   $\text{Col}(A)$: 1-й и 2-й столбцы исходной $A$.
+*   $\text{Row}(A)$: две строки **RREF**.
+*   $\text{Nul}(A)$: три специальных решения $(-2,2,1,0,0)^T$, $(1,-2,0,1,0)^T$, $(0,0,0,0,1)^T$.
+*   $\text{Nul}(A^T)=\{0\}$ (полный строчный ранг, $r=m=2$).
+
+Проверка скалярных произведений строк на базисные векторы $\text{Nul}$ даёт 0.
+
+**Ответ:** $r=2$; базисы как выше; ортогональность выполнена.
+
+</details>
+
+##### **4.21. Размерности при параметрах $\alpha$, $\beta$** (Домашнее задание 4, Задание 13)
+
+Найти размерности четырёх фундаментальных подпространств $A$ в зависимости от $\alpha$ и $\beta$:
+$$A = \begin{bmatrix}1&-1&-2\\1&\alpha&-1\\-1&1&\beta\end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** после приведения
+$$\begin{bmatrix}1&-1&-2\\0&\alpha+1&1\\0&0&\beta-2\end{bmatrix}$$
+разбор случаев по обнулению **pivot**.
+
+**Ответ:**
+
+| Условие | $r$ | $\dim\text{Nul}$ | $\dim\text{Nul}(A^T)$ |
+|:----------|:----|:-----------------|:----------------------|
+| $\alpha \neq -1$ и $\beta \neq 2$ | 3 | 0 | 0 |
+| $\alpha = -1$ или $\beta = 2$ (или оба) | 2 | 1 | 1 |
+
+</details>
+
+##### **4.22. Ступенчатый вид и свободные переменные** (Туториал 4, Задание 1)
+
+Привести $A$ и $B$ к ступенчатому виду, найти ранги и указать свободные переменные:
+
+$$A = \begin{bmatrix}1&2&0&1\\0&1&1&0\\1&2&0&1\end{bmatrix}, \qquad B = \begin{bmatrix}1&2&3\\4&5&6\\7&8&9\end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Матрица $A$ ($3 \times 4$):**
+
+1.  Приведение:
+$$\begin{bmatrix}1&2&0&1\\0&1&1&0\\1&2&0&1\end{bmatrix} \xrightarrow{R_3-R_1} \begin{bmatrix}1&2&0&1\\0&1&1&0\\0&0&0&0\end{bmatrix}$$
+
+2.  $r = 2$, **pivot** в столбцах 1 и 2. **Свободные:** $x_3$, $x_4$.
+
+**Матрица $B$ ($3 \times 3$):**
+
+1.  Приведение:
+$$\begin{bmatrix}1&2&3\\4&5&6\\7&8&9\end{bmatrix} \xrightarrow{R_2-4R_1,\,R_3-7R_1} \begin{bmatrix}1&2&3\\0&-3&-6\\0&-6&-12\end{bmatrix} \xrightarrow{R_3-2R_2} \begin{bmatrix}1&2&3\\0&-3&-6\\0&0&0\end{bmatrix}$$
+
+2.  $r = 2$, **pivot** в столбцах 1 и 2. **Свободная:** $x_3$.
+
+**Ответ:** для $A$: ранг 2, свободные $x_3, x_4$; для $B$: ранг 2, свободная $x_3$.
+
+</details>
+
+##### **4.23. Столбцовое пространство обратимой матрицы** (Туториал 4, Задание 2)
+
+Если $A$ — любая обратимая матрица $8 \times 8$, чему равно $\text{Col}(A)$? Почему?
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** у обратимой матрицы полный ранг, $\text{Col}(A)$ совпадает со всем $\mathbb{R}^8$.
+
+Если $A$ обратима, $\text{rank}(A) = 8$. Так как $\text{Col}(A) \subseteq \mathbb{R}^8$ и $\dim\text{Col}(A)=8$:
+$$\text{Col}(A) = \mathbb{R}^8$$
+
+Для каждого $\mathbf{b}$ есть единственное решение $\mathbf{x}=A^{-1}\mathbf{b}$, значит любой $\mathbf{b}$ лежит в $\text{Col}(A)$.
+
+**Ответ:** $\text{Col}(A) = \mathbb{R}^8$.
+
+</details>
+
+##### **4.24. Условие согласованности и полное решение** (Туториал 4, Задание 3)
+
+При каком условии на $b_1, b_2, b_3$ система согласована? (В расширенной матрице $[A \mid b]$ столбец $b$ — четвёртый.) Найти все решения при выполнении условия:
+$$\begin{aligned}x + 2y - 2z &= b_1 \\ 2x + 5y - 4z &= b_2 \\ 4x + 9y - 8z &= b_3\end{aligned}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** по $[A \mid b]$ получается условие на $b$; свободная переменная даёт ядро.
+
+1.  Приведение $[A \mid b]$:
+$$\left[\begin{array}{ccc|c}1&2&-2&b_1\\2&5&-4&b_2\\4&9&-8&b_3\end{array}\right] \xrightarrow{R_2-2R_1,\,R_3-4R_1} \left[\begin{array}{ccc|c}1&2&-2&b_1\\0&1&0&b_2-2b_1\\0&1&0&b_3-4b_1\end{array}\right]$$
+
+$$\xrightarrow{R_3-R_2} \left[\begin{array}{ccc|c}1&2&-2&b_1\\0&1&0&b_2-2b_1\\0&0&0&b_3-b_2-2b_1\end{array}\right]$$
+
+2.  **Согласованность:** $b_3 - b_2 - 2b_1 = 0$, т.е.
+$$\boxed{2b_1 + b_2 - b_3 = 0}$$
+
+3.  **Полное решение** (при выполнении): $z = t$, $y = b_2 - 2b_1$, $x = 5b_1 - 2b_2 + 2t$.
+
+$$\begin{pmatrix}x\\y\\z\end{pmatrix} = \begin{pmatrix}5b_1-2b_2\\b_2-2b_1\\0\end{pmatrix} + t\begin{pmatrix}2\\0\\1\end{pmatrix}$$
+
+**Ответ:** условие $2b_1 + b_2 = b_3$; решение $(5b_1-2b_2,\; b_2-2b_1,\; 0)^T + t(2,0,1)^T$.
+
+</details>
+
+##### **4.25. Подобрать $q$ для заданного ранга** (Туториал 4, Задание 4)
+
+Подобрать $q$ так, чтобы (если возможно) ранг был (a) 1, (b) 2, (c) 3:
+
+$$A = \begin{bmatrix}6&4&2\\-3&-2&-1\\9&6&q\end{bmatrix}, \qquad B = \begin{bmatrix}3&1&3\\q&2&q\end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Матрица $A$ ($3 \times 3$):**
+
+$$\begin{bmatrix}6&4&2\\-3&-2&-1\\9&6&q\end{bmatrix} \xrightarrow{R_2+\frac{1}{2}R_1,\,R_3-\frac{3}{2}R_1} \begin{bmatrix}6&4&2\\0&0&0\\0&0&q-3\end{bmatrix}$$
+
+Первые две строки пропорциональны — только один **pivot** из них.
+
+*   **(a) Ранг 1:** нужна нулевая третья строка: $q = 3$.
+*   **(b) Ранг 2:** $q \neq 3$.
+*   **(c) Ранг 3:** невозможно, максимум 2.
+
+**Матрица $B$ ($2 \times 3$):** после $R_2 - \frac{q}{3}R_1$:
+$$\begin{bmatrix}3&1&3\\0&2-\frac{q}{3}&0\end{bmatrix}$$
+
+*   (a) $q = 6$; (b) $q \neq 6$; (c) невозможно.
+
+**Ответ:**
+
+| | Ранг 1 | Ранг 2 | Ранг 3 |
+|:--|:--|:--|:--|
+| $A$ | $q = 3$ | $q \neq 3$ | нет |
+| $B$ | $q = 6$ | $q \neq 6$ | нет |
+
+</details>
+
+##### **4.26. Грама — Шмидта и $QR$** (Туториал 4, Задание 5)
+
+Применить **Gram–Schmidt** к столбцам
+$$\mathbf{a} = \begin{bmatrix}0\\0\\1\end{bmatrix}, \quad \mathbf{b} = \begin{bmatrix}0\\1\\1\end{bmatrix}, \quad \mathbf{c} = \begin{bmatrix}1\\1\\1\end{bmatrix}$$
+и записать $A = QR$ для матрицы с этими столбцами.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** ортонормированные столбцы $Q$, $R = Q^T A$ — верхнетреугольная.
+
+Как в оригинале: $\mathbf{q}_1=(0,0,1)^T$, $\mathbf{q}_2=(0,1,0)^T$, $\mathbf{q}_3=(1,0,0)^T$,
+
+$$Q = \begin{bmatrix}0&0&1\\0&1&0\\1&0&0\end{bmatrix}, \quad
+R = \begin{bmatrix}1&1&1\\0&1&1\\0&0&1\end{bmatrix}$$
+
+**Проверка:** $QR = A$ ✓
+
+**Ответ:** $Q$, $R$ как выше.
+
+</details>
+
+##### **4.27. Симметричное разложение $LDL^T$** (Туториал 4, Задание 6)
+
+Найти $LDL^T$ для
+
+$$A_1 = \begin{bmatrix}1&3&5\\3&12&18\\5&18&30\end{bmatrix}, \qquad A_2 = \begin{bmatrix}a&b\\b&d\end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** для симметричной $A$: $A = LDL^T$, $L$ унитреугольная нижняя, $D$ диагональная (**симметричный вариант $LU$**).
+
+**$A_1$:** как в вычислениях оригинала,
+$$L = \begin{bmatrix}1&0&0\\3&1&0\\5&-7/3&1\end{bmatrix}, \quad D = \begin{bmatrix}1&0&0\\0&3&0\\0&0&12\end{bmatrix}$$
+
+**$A_2$ (символьно):** при $a \neq 0$, $ad - b^2 \neq 0$,
+$$L = \begin{bmatrix}1&0\\b/a&1\end{bmatrix}, \quad D = \begin{bmatrix}a&0\\0&\frac{ad-b^2}{a}\end{bmatrix}$$
+
+**Ответ:** см. формулы выше.
+
+</details>
+
+##### **4.28. Подпространство, дополнение и разложение** (Туториал 4, Задание 7)
+
+Найти базис $S \subseteq \mathbb{R}^4$ — линейной оболочки всех решений $x_1 + x_2 + x_3 - x_4 = 0$.
+
+(a) Базис $S^\perp$.
+
+(b) Найти $b_1 \in S$ и $b_2 \in S^\perp$ с $b_1 + b_2 = b = (1, 1, 1, 1)^T$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** $S = \text{Nul}([1,1,1,-1])$, $S^\perp = \text{Row}([1,1,1,-1])$.
+
+Базис $S$: $(-1,1,0,0)^T$, $(-1,0,1,0)^T$, $(1,0,0,1)^T$; $\dim S = 3$.
+
+**(a)** $S^\perp = \text{span}\{(1,1,1,-1)^T\}$.
+
+**(b)** $n=(1,1,1,-1)^T$:
+$$b_2 = \frac{b\cdot n}{n\cdot n}n = \tfrac{1}{2}(1,1,1,-1)^T, \quad b_1 = b - b_2 = (\tfrac{1}{2},\tfrac{1}{2},\tfrac{1}{2},\tfrac{3}{2})^T$$
+
+**Ответ:** базисы и $b_1,b_2$ как выше.
+
+</details>
+
+##### **4.29. Построить СЛАУ с заданным общим решением** (Повторение к тесту I, Задание 1)
+
+I. Найти СЛАУ $A\mathbf{x}=\mathbf{b}$ размера $2 \times 3$ с полным решением
+$$\mathbf{x} = \begin{bmatrix}1\\2\\0\end{bmatrix} + w\begin{bmatrix}1\\3\\1\end{bmatrix}$$
+
+II. Найти систему $3 \times 3$, которая имеет решения **ровно** при условии $b_1 + b_2 = b_3$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** полное решение — частное решение плюс ядро; нужно подобрать $A$ и $\mathbf{b}$ по этой информации.
+
+**Часть I ($2 \times 3$)**
+
+1.  Частное: $\mathbf{x}_p = (1,2,0)^T$; направление в $\mathcal{N}(A)$: $\mathbf{x}_h = (1,3,1)^T$ (свободный параметр $w$).
+2.  Подбираем $A$ с $A\mathbf{x}_h = \mathbf{0}$:
+
+    $$A = \begin{bmatrix}1&0&-1\\0&1&-3\end{bmatrix}$$
+
+    **Проверка:** $A\mathbf{x}_h = (0,0)^T$ ✓
+3.  $\mathbf{b} = A\mathbf{x}_p$:
+
+    $$\mathbf{b} = \begin{bmatrix}1&0&-1\\0&1&-3\end{bmatrix}\begin{bmatrix}1\\2\\0\end{bmatrix} = \begin{bmatrix}1\\2\end{bmatrix}$$
+
+**Часть II ($3 \times 3$)**
+
+Добавляем третью строку — сумму первых двух:
+$$A = \begin{bmatrix}1&0&-1\\0&1&-3\\1&1&-4\end{bmatrix}, \quad \mathbf{b} = \begin{bmatrix}b_1\\b_2\\b_1+b_2\end{bmatrix}$$
+
+**Ответ:**
+
+*   I: $\begin{bmatrix}1&0&-1\\0&1&-3\end{bmatrix}\mathbf{x} = \begin{bmatrix}1\\2\end{bmatrix}$
+*   II: $\begin{bmatrix}1&0&-1\\0&1&-3\\1&1&-4\end{bmatrix}\mathbf{x} = \begin{bmatrix}b_1\\b_2\\b_1+b_2\end{bmatrix}$
+
+</details>
+
+##### **4.30. Общие решения СЛАУ** (Повторение к тесту I, Задание 2)
+
+Найти общие решения систем.
+
+(a)
+$$\begin{bmatrix}1&3&3\\2&6&9\\-1&-3&3\end{bmatrix}\begin{bmatrix}x\\y\\z\end{bmatrix} = \begin{bmatrix}1\\5\\5\end{bmatrix}$$
+
+(b)
+$$\begin{bmatrix}1&3&1&2\\2&6&4&8\\0&0&2&4\end{bmatrix}\begin{bmatrix}x\\y\\z\\t\end{bmatrix} = \begin{bmatrix}1\\3\\1\end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** общее решение = частное решение неоднородной системы + общее решение однородной.
+
+**(a)**
+
+1.  Приведение расширенной матрицы:
+
+    $$\left[\begin{array}{ccc|c}1&3&3&1\\2&6&9&5\\-1&-3&3&5\end{array}\right] \xrightarrow{R_2-2R_1,\,R_3+R_1} \left[\begin{array}{ccc|c}1&3&3&1\\0&0&3&3\\0&0&6&6\end{array}\right] \xrightarrow{R_3-2R_2} \left[\begin{array}{ccc|c}1&3&3&1\\0&0&3&3\\0&0&0&0\end{array}\right]$$
+2.  Обратный ход: из второй строки $z = 1$; из первой $x + 3y = -2$. Свободная $y = \alpha$.
+3.  Общее решение:
+$$\begin{pmatrix}x\\y\\z\end{pmatrix} = \begin{pmatrix}-2\\0\\1\end{pmatrix} + \alpha\begin{pmatrix}-3\\1\\0\end{pmatrix}$$
+
+**(b)**
+
+1.  Приведение:
+$$\left[\begin{array}{cccc|c}1&3&1&2&1\\2&6&4&8&3\\0&0&2&4&1\end{array}\right] \xrightarrow{R_2-2R_1} \left[\begin{array}{cccc|c}1&3&1&2&1\\0&0&2&4&1\\0&0&2&4&1\end{array}\right] \xrightarrow{R_3-R_2} \left[\begin{array}{cccc|c}1&3&1&2&1\\0&0&2&4&1\\0&0&0&0&0\end{array}\right]$$
+$$\xrightarrow{R_1-\frac{1}{2}R_2} \left[\begin{array}{cccc|c}1&3&0&0&\frac{1}{2}\\0&0&1&2&\frac{1}{2}\\0&0&0&0&0\end{array}\right]$$
+
+2.  Свободные $y = \alpha$, $t = \beta$; базисные $x = \tfrac{1}{2} - 3\alpha$, $z = \tfrac{1}{2} - 2\beta$.
+3.  Общее решение:
+$$\begin{pmatrix}x\\y\\z\\t\end{pmatrix} = \begin{pmatrix}1/2\\0\\1/2\\0\end{pmatrix} + \alpha\begin{pmatrix}-3\\1\\0\\0\end{pmatrix} + \beta\begin{pmatrix}0\\0\\-2\\1\end{pmatrix}$$
+
+**Ответ:**
+
+*   (a): $(-2,0,1)^T + \alpha(-3,1,0)^T$
+*   (b): $(1/2,0,1/2,0)^T + \alpha(-3,1,0,0)^T + \beta(0,0,-2,1)^T$
+
+</details>
+
+##### **4.31. Ортогональное дополнение к $\text{Row}(A)$** (Повторение к тесту I, Задание 3)
+
+(a) Найти базис ортогонального дополнения к строчному пространству матрицы
+$$A = \begin{bmatrix}1&0&2\\1&1&4\end{bmatrix}$$
+
+(b) Разложить $\mathbf{x} = (3,3,3)^T$ в сумму $\mathbf{x}_r \in \text{Row}(A)$ и $\mathbf{x}_n \in \text{Nul}(A)$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** $\text{Row}(A)^\perp = \text{Nul}(A)$ (**Fundamental Theorem of Linear Algebra**). В (b) разложение по базисам $\text{Row}(A)$ и $\text{Nul}(A)$.
+
+**(a)**
+
+$$\begin{bmatrix}1&0&2\\1&1&4\end{bmatrix} \xrightarrow{R_2-R_1} \begin{bmatrix}1&0&2\\0&1&2\end{bmatrix}$$
+
+Свободная $z$: $x = -2z$, $y = -2z$. Базис $\text{Nul}(A)$: $\left\{\begin{pmatrix}-2\\-2\\1\end{pmatrix}\right\}$.
+
+**(b)**
+
+Базис $\text{Row}(A)$: $\mathbf{r}_1 = (1,0,2)^T$, $\mathbf{r}_2 = (0,1,2)^T$. Пишем $\mathbf{x} = \alpha\mathbf{r}_1 + \beta\mathbf{r}_2 + \gamma(-2,-2,1)^T$:
+
+$$\begin{cases}\alpha - 2\gamma = 3\\\beta - 2\gamma = 3\\2\alpha + 2\beta + \gamma = 3\end{cases}$$
+
+Из первых двух: $\alpha = \beta = 3 + 2\gamma$. Подстановка в третью: $12 + 9\gamma = 3 \Rightarrow \gamma = -1$, $\alpha = \beta = 1$:
+
+*   $\mathbf{x}_r = (1,1,4)^T$
+*   $\mathbf{x}_n = (2,2,-1)^T$
+
+**Проверка:** $(1,1,4) + (2,2,-1) = (3,3,3)$ ✓; $A\mathbf{x}_n = (0,0)^T$ ✓.
+
+**Ответ:**
+
+*   (a): базис $\text{Row}(A)^\perp = \text{Nul}(A)$: $\left\{\begin{pmatrix}-2\\-2\\1\end{pmatrix}\right\}$
+*   (b): $\mathbf{x}_r = (1,1,4)^T$, $\mathbf{x}_n = (2,2,-1)^T$
+
+</details>
+
+##### **4.32. Почему эти утверждения об ортогональности неверны** (Повторение к тесту I, Задание 4)
+
+Почему ложны утверждения:
+
+*   **Утверждение 1:** если $V \perp W$, то $V^\perp \perp W^\perp$.
+*   **Утверждение 2:** если $V \perp W$ и $W \perp Z$, то $V^\perp \perp Z$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** контрпримеры в $\mathbb{R}^3$.
+
+**Утверждение 1:** $V = \text{span}\{(1,0,0)^T\}$, $W = \text{span}\{(0,1,0)^T\}$ — тогда $V \perp W$.
+
+$V^\perp = \text{span}\{(0,1,0)^T, (0,0,1)^T\}$, $W^\perp = \text{span}\{(1,0,0)^T, (0,0,1)^T\}$.
+
+В обоих дополнениях есть $(0,0,1)^T$, и $(0,0,1)^T \cdot (0,0,1)^T = 1 \neq 0$, значит $V^\perp \not\perp W^\perp$. **Неверно.**
+
+**Утверждение 2:** $V = \text{span}\{(1,0,0)^T\}$, $W = \text{span}\{(0,1,0)^T\}$, $Z = \text{span}\{(1,0,1)^T\}$.
+
+*   $V \perp W$ ✓; $W \perp Z$ ✓
+*   $(0,0,1)^T \in V^\perp$, но $(0,0,1)\cdot(1,0,1) = 1 \neq 0$, значит $V^\perp \not\perp Z$. **Неверно.**
+
+**Ответ:** оба утверждения опровергаются примерами выше.
+
+</details>
+
+##### **4.33. Ортогонализация Грама — Шмидта** (Повторение к тесту I, Задание 5)
+
+По векторам (не ортонормированным) построить ортонормированный набор процессом **Gram–Schmidt**:
+$$\mathbf{a} = \begin{bmatrix}1\\1\\0\end{bmatrix}, \quad \mathbf{b} = \begin{bmatrix}1\\0\\1\end{bmatrix}, \quad \mathbf{c} = \begin{bmatrix}0\\1\\1\end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** вычитание проекций на уже построенные векторы, затем нормировка.
+
+1.  $$\mathbf{v}_1 = \mathbf{a} = \begin{pmatrix}1\\1\\0\end{pmatrix}, \quad \|\mathbf{v}_1\| = \sqrt{2}, \quad \mathbf{q}_1 = \frac{1}{\sqrt{2}}\begin{pmatrix}1\\1\\0\end{pmatrix}$$
+
+2.  Проекция $\mathbf{b}$ на $\mathbf{v}_1$: $\mathbf{b}\cdot\mathbf{v}_1 = 1$, $\|\mathbf{v}_1\|^2 = 2$;
+    $\mathbf{v}_2 = \mathbf{b} - \frac{1}{2}\mathbf{v}_1 = (1/2,-1/2,1)^T$, $\|\mathbf{v}_2\|^2 = 3/2$,
+    $\mathbf{q}_2 = (1/\sqrt{6},-1/\sqrt{6},2/\sqrt{6})^T$.
+3.  Аналогично для $\mathbf{c}$:
+    $\mathbf{q}_3 = (-1/\sqrt{3},1/\sqrt{3},1/\sqrt{3})^T$.
+
+**Ответ:**
+$$\mathbf{q}_1 = \frac{1}{\sqrt{2}}\begin{pmatrix}1\\1\\0\end{pmatrix}, \quad \mathbf{q}_2 = \frac{1}{\sqrt{6}}\begin{pmatrix}1\\-1\\2\end{pmatrix}, \quad \mathbf{q}_3 = \frac{1}{\sqrt{3}}\begin{pmatrix}-1\\1\\1\end{pmatrix}$$
+
+</details>
+
+##### **4.34. Решение через $LU$-разложение** (Повторение к тесту I, Задание 6)
+
+Решить матричное уравнение с помощью $LU$-разложения и прямого/обратного хода:
+$$\begin{bmatrix}2&1&1\\4&1&0\\-2&2&1\end{bmatrix}\begin{bmatrix}x_1\\x_2\\x_3\end{bmatrix} = \begin{bmatrix}3\\3\\-2\end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** $A = LU$, $L$ унитреугольная нижняя, $U$ верхняя; сначала $L\mathbf{y} = \mathbf{b}$ (прямой ход), затем $U\mathbf{x} = \mathbf{y}$ (обратный).
+
+1.  **$LU$:** исключение по Гауссу для $A$:
+    *   $m_{21} = 2$, $m_{31} = -1$; после шага 1: $\begin{bmatrix}2&1&1\\0&-1&-2\\0&3&2\end{bmatrix}$.
+    *   $m_{32} = -3$; $U = \begin{bmatrix}2&1&1\\0&-1&-2\\0&0&-4\end{bmatrix}$, $L = \begin{bmatrix}1&0&0\\2&1&0\\-1&-3&1\end{bmatrix}$.
+2.  **Прямой ход $L\mathbf{y} = \mathbf{b}$:** $y_1 = 3$, $y_2 = -3$, $y_3 = -8$.
+3.  **Обратный ход $U\mathbf{x} = \mathbf{y}$:** $x_3 = 2$, $x_2 = -1$, $x_1 = 1$.
+
+**Ответ:** $\mathbf{x} = (1,-1,2)^T$.
+
+</details>
+
+##### **4.35. Симметричная положительная определённость** (Повторение к тесту I, Задание 7)
+
+Проверить, являются ли матрицы симметричными положительно определёнными (**symmetric positive definite**):
+$$A = \begin{bmatrix}2&-1&0\\-1&2&-1\\0&-1&2\end{bmatrix}, \quad B = \begin{bmatrix}5&2&1\\2&4&1\\1&1&3\end{bmatrix}, \quad C = \begin{bmatrix}4&0&1\\0&3&0\\1&0&2\end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** для симметричной матрицы **SPD** $\Leftrightarrow$ все ведущие угловые миноры $> 0$ (**критерий Сильвестра**, Sylvester's criterion).
+
+**Матрица $A$:** $D_1=2$, $D_2=3$, $D_3=4$ — все $> 0$ ✓; $A$ **положительно определена**.
+
+**Матрица $B$:** $D_1=5$, $D_2=16$, $D_3=43$ — все $> 0$ ✓; $B$ **положительно определена**.
+
+**Матрица $C$:** $D_1=4$, $D_2=12$, $D_3=21$ (разложение по второй строке) ✓; $C$ **положительно определена**.
+
+**Ответ:** все три матрицы $A$, $B$, $C$ — симметричные положительно определённые.
+
+</details>

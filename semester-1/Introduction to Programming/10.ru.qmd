@@ -1,0 +1,2548 @@
+---
+title: "W11. Интерфейс и реализация, final-методы и final-классы, интерфейсы, перечисления, Java Collections Framework"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2025-11-13
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Резюме**
+##### **1.1 Проектирование интерфейса и реализации**
+
+Проектируя ОО-программы, важно решить: от базового класса наследовать только **interface** (сигнатуры методов) или ещё и **implementation** (готовый код)? От этого зависит сопровождаемость и устойчивость к логическим ошибкам.
+
+###### **1.1.1 Проблема наследования реализации**
+
+Пусть несколько моделей самолёта должны реализовать `fly()`. Если сделать конкретный базовый класс `Airplane` с реализацией `fly()` по умолчанию, все подклассы унаследуют этот код автоматически:
+
+```java
+class Airplane {
+    public void fly() {
+        // Standard Airbus flying algorithm
+    }
+}
+
+class AirbusA extends Airplane { }
+class AirbusB extends Airplane { }
+class Boeing extends Airplane { }
+```
+
+Тогда `Boeing` неожиданно использует алгоритм полёта Airbus! Синтаксис корректен, компилятор молчит, а ошибка **semantic** — неверное поведение наследуется незаметно.
+
+###### **1.1.2 Решение: разделить interface и implementation**
+
+Правильный путь — **разделить interface и implementation** через абстрактные классы и методы:
+
+```java
+abstract class Airplane {
+    public abstract void fly();  // Interface only
+    
+    protected void defaultFly() {  // Optional default implementation
+        // Standard flying algorithm
+    }
+}
+
+class AirbusA extends Airplane {
+    public void fly() { defaultFly(); }  // Uses default
+}
+
+class Boeing extends Airplane {
+    public void fly() {
+        // Boeing's own flying algorithm
+    }
+}
+```
+
+Теперь компилятор **заставляет** каждый подкласс явно реализовать `fly()`. Модели Airbus могут вызвать общий `defaultFly()`, а Boeing обязан написать свой код — «тихого» наследования чужого поведения нет.
+
+###### **1.1.3 Рекомендации для базовых классов**
+
+При проектировании базового класса полезны такие правила:
+
+1. **Только interface**: метод `abstract`, если подклассы обязаны дать свою реализацию; общий код спрячьте во вспомогательный метод вроде `defaultFly()`.  
+2. **Interface + implementation**: метод **virtual** (в C++/C# явно, в Java — по умолчанию), если нужна реализация по умолчанию с возможностью переопределения.  
+3. **Фиксированное поведение**: non-virtual (C++/C#) или `final` (Java), если подклассы не должны менять семантику.
+
+##### **1.2 Final-методы**
+
+**Final methods** — методы, которые нельзя переопределить в подклассах. Два главных эффекта: **guaranteed behavior** и **performance optimization**.
+
+###### **1.2.1 Запрет переопределения**
+
+Ключевое слово `final` не даёт подклассу изменить поведение метода:
+
+```java
+class Base {
+    public final void method() {
+        System.out.println("Base's method");
+    }
+}
+
+class Derived extends Base {
+    public void method() {  // ERROR: Cannot override final method
+        System.out.println("Derived's method");
+    }
+}
+```
+
+Так `method()` всегда ведёт себя как в `Base`, независимо от динамического типа ссылки.
+
+###### **1.2.2 Эффект для производительности**
+
+`final` способствует **early binding** (**static dispatch**) вместо **late binding** (**dynamic dispatch**):
+
+- **Late binding**: какой метод вызвать, решается в runtime по динамическому типу; есть накладные расходы (поиск в vtable).  
+- **Early binding**: выбор по статическому типу на этапе компиляции; быстрее.
+
+Если метод `final`, компилятор знает, что переопределений нет, и может:
+
+1. генерировать более эффективные вызовы;  
+2. **inline** — встроить тело метода в место вызова для мелких методов.
+
+##### **1.3 Final-классы**
+
+**Final class** нельзя расширять (subclass). Это удобно, когда наследование для класса нужно полностью запретить.
+
+```java
+final class Base {
+    // Class implementation
+}
+
+class Derived extends Base {  // ERROR: Cannot subclass final class
+}
+```
+
+**Ключевые свойства:**
+
+- у `final`-класса все методы неявно `final`;  
+- класс не может быть одновременно `abstract` и `final` — это противоречие: абстрактный класс **должен** расширяться.
+
+##### **1.4 Интерфейсы**
+
+**Interface** — чистая абстракция: контракт поведения без реализации. Это другой акцент в ОО-дизайне: **что объекты умеют делать**, а не **что они «есть»**.
+
+###### **1.4.1 Два взгляда на предметную область**
+
+- **Class-based approach**: объекты со состоянием и связями; акцент на «что это за вещь».  
+- **Interface-based approach**: сущности задаются поведением («что умеют»).
+
+Интерфейсы воплощают второй подход и дают более чистую альтернативу множественному наследованию реализации.
+
+###### **1.4.2 Объявление интерфейса**
+
+Интерфейс задаёт только сигнатуры методов:
+
+```java
+interface Features {
+    int numOfLegs();
+    boolean canFly();
+    boolean canSwim();
+}
+```
+
+**Свойства интерфейсов:**
+
+- у методов нет тел (реализацию пишут классы);  
+- методы неявно `public` и `abstract`;  
+- нельзя создать экземпляр интерфейса (`new`);  
+- нельзя иметь поля экземпляра (только константы);  
+- это контракт: класс, реализующий интерфейс, **обязан** предоставить все методы.
+
+###### **1.4.3 Реализация интерфейса**
+
+Класс реализует интерфейс ключевым словом `implements`:
+
+```java
+class Lion implements Features {
+    public int numOfLegs() { return 4; }
+    public boolean canFly() { return false; }
+    public boolean canSwim() { return true; }
+}
+
+Features f = new Lion();  // Treat Lion as a set of features
+if (f.canFly()) { /* ... */ }
+```
+
+Класс **обязан** реализовать все методы интерфейса, иначе код не скомпилируется.
+
+###### **1.4.4 Несколько интерфейсов**
+
+Класс может реализовать несколько интерфейсов — это безопаснее множественного наследования реализации:
+
+```java
+class Person implements iBodyParams, iSkills, iRelations {
+    // Must implement all methods from all three interfaces
+}
+
+Person john = new Person();
+iSkills johnsSkills = john;  // View John as a set of skills
+```
+
+Так один объект можно рассматривать под разными углами (**facets**) в зависимости от контекста.
+
+###### **1.4.5 Наследование интерфейсов**
+
+Интерфейсы могут расширять другие интерфейсы:
+
+```java
+interface SpeedFeatures {
+    float maxSpeed();
+    float maxAcceleration();
+}
+
+interface EngineFeatures extends SpeedFeatures {
+    float numOfCyls();
+    float enginePower();
+}
+
+class Car implements EngineFeatures {
+    // Must implement methods from both interfaces
+}
+```
+
+Класс может унаследовать реализацию методов интерфейса от предка:
+
+```java
+interface HasLegs {
+    int noLegs();
+}
+
+class Mammal implements HasLegs {
+    public int noLegs() { return 4; }
+}
+
+class Lion extends Mammal {
+    // Inherits the noLegs() implementation
+}
+```
+
+###### **1.4.6 Интерфейсы вместе с наследованием классов**
+
+Интерфейсы и наследование классов комбинируются:
+
+```java
+interface ColorFeatures {
+    Color color();
+    Border border();
+}
+
+abstract class Shape {
+    abstract void draw();
+}
+
+class Rectangle extends Shape {
+    void draw() { /* ... */ }
+}
+
+class ColoredRectangle extends Rectangle implements ColorFeatures {
+    // Inherits from Rectangle AND implements ColorFeatures
+    public Color color() { /* ... */ }
+    public Border border() { /* ... */ }
+}
+```
+
+Интерфейсы **orthogonal** к наследованию классов — это отдельное измерение абстракции.
+
+###### **1.4.7 Проверка типов с интерфейсами**
+
+Оператор `instanceof` работает и с интерфейсами:
+
+```java
+interface Printable { void print(); }
+interface Movable { void move(); }
+
+class Rectangle extends Shape implements Printable, Movable {
+    // Implementation
+}
+
+Shape a = new Rectangle();
+if (a instanceof Printable) {
+    ((Printable)a).print();
+}
+if (a instanceof Movable) {
+    ((Movable)a).move();
+}
+```
+
+Интерфейс может быть **пустым** — маркером / **marker interface** для свойств объекта.
+
+###### **1.4.8 Вложенные интерфейсы**
+
+Интерфейсы можно вкладывать в классы:
+
+```java
+class SomeClass {
+    public interface Nested {
+        boolean isNotNegative(int x);
+    }
+}
+
+class MyClass implements SomeClass.Nested {
+    public boolean isNotNegative(int x) {
+        return x >= 0;
+    }
+}
+
+SomeClass.Nested obj = new MyClass();
+```
+
+###### **1.4.9 Интерфейсы как facets**
+
+Интерфейсы задают разные **facets** / **views** одного объекта — разные «контракты» для разных клиентов одной реализации.
+
+##### **1.5 Интерфейсы и абстрактные классы**
+
+Различие между **interface** и **abstract class** — базовый навык.
+
+**Сходства:**
+
+- оба задают абстракцию;  
+- напрямую не инстанцируются.
+
+**Различия:**
+
+- **Interface**: абстракция поведения — *что* объект умеет, а не *как* и какое у него состояние. (В современной Java есть `default`-методы и константы, но смысл остаётся поведенческим.)  
+- **Abstract class** может содержать:  
+  - объявления абстрактных методов;  
+  - конкретные методы (поведение);  
+  - поля экземпляра (состояние).
+
+**Когда что выбирать:**
+
+- **interfaces** — общая способность/роль, которую могут разделять несвязанные классы;  
+- **abstract classes** — общее состояние и поведение для тесно связанной иерархии.
+
+##### **1.6 Перечисления (enum)**
+
+**Enumerations** (`enum`) — тип с фиксированным набором именованных констант; читабельнее и типобезопаснее «магических» целых.
+
+###### **1.6.1 Зачем enum**
+
+Состояния светофора часто моделируют целыми константами:
+
+```java
+final int GREEN = 0;
+final int YELLOW = 1;
+final int RED = 2;
+
+int trafficLight = GREEN;
+trafficLight = 777;  // Nothing prevents this!
+```
+
+Проблема: откуда взялись именно эти числа? Что мешает записать `777`?
+
+Подход с `enum`:
+
+```java
+enum Lights {
+    GREEN,
+    YELLOW,
+    RED
+}
+
+Lights tl = Lights.GREEN;
+tl = 777;  // Compiler ERROR: type mismatch
+```
+
+Компилятор обеспечивает типобезопасность: в `tl` нельзя подставить произвольное число.
+
+###### **1.6.2 Базовые перечисления**
+
+Набор именованных констант (**enumerators**):
+
+```java
+enum Compass {
+    NORTH,
+    SOUTH,
+    EAST,
+    WEST
+}
+
+enum Day {
+    SUNDAY,
+    MONDAY,
+    TUESDAY,
+    WEDNESDAY,
+    THURSDAY,
+    FRIDAY,
+    SATURDAY
+}
+```
+
+**Замечание:** имена констант традиционно в `UPPERCASE` (наследие C/ассемблера), но это соглашение, не требование языка.
+
+Внутри JVM константы связаны с порядковыми номерами, начиная с 0 (`SUNDAY = 0`, `MONDAY = 1`, …), но на этом уровне обычно не программируют.
+
+###### **1.6.3 Использование enum**
+
+С `switch` `enum` сочетается естественно:
+
+```java
+public void tellItLikeItIs(Day day) {
+    switch (day) {
+        case MONDAY:
+            System.out.println("Mondays are bad.");
+            break;
+        case FRIDAY:
+            System.out.println("Fridays are better.");
+            break;
+        default:
+            System.out.println("Midweek days are so-so.");
+            break;
+    }
+}
+```
+
+###### **1.6.4 Расширенные возможности enum в Java**
+
+В Java `enum` существенно богаче, чем в C/C++: **enum — это полноценные классы.** Отсюда следуют возможности:
+
+**1. Поля и конструкторы:**
+
+```java
+enum Coin {
+    PENNY(1), NICKEL(5), DIME(10), QUARTER(25);
+    
+    private final int value;
+    
+    Coin(int value) {
+        this.value = value;
+    }
+}
+
+Coin c = Coin.DIME;  // c is associated with value 10
+```
+
+Каждую константу можно инициализировать параметрами; конструктор вызывается при загрузке типа `enum`.
+
+**2. Методы у enum:**
+
+```java
+enum Coin {
+    PENNY(1), NICKEL(5), DIME(10), QUARTER(25);
+    
+    private final int value;
+    
+    Coin(int value) {
+        this.value = value;
+    }
+    
+    public int getValue() {
+        return value;
+    }
+}
+
+Coin c = Coin.DIME;
+int v = c.getValue();  // Returns 10
+```
+
+**3. Стандартные методы `enum`:**
+
+У любого `enum` есть:
+
+- `values()`: массив всех констант в порядке объявления
+
+```java
+enum Season { WINTER, SPRING, SUMMER, FALL }
+
+for (Season s : Season.values()) {
+    System.out.println(s);
+}
+// Output: WINTER, SPRING, SUMMER, FALL
+```
+
+- `ordinal()`: индекс константы (с нуля)
+
+```java
+for (Season s : Season.values()) {
+    System.out.println(s.ordinal());
+}
+// Output: 0, 1, 2, 3
+```
+
+**4. Тела у отдельных констант:**
+
+Каждая константа может переопределять методы:
+
+```java
+enum Operation {
+    PLUS { double eval(double x, double y) { return x + y; } },
+    MINUS { double eval(double x, double y) { return x - y; } },
+    TIMES { double eval(double x, double y) { return x * y; } },
+    DIVIDE { double eval(double x, double y) { return x / y; } };
+    
+    abstract double eval(double x, double y);
+}
+
+// Usage:
+for (Operation op : Operation.values()) {
+    System.out.println("2.0 " + op + " 4.0 = " + op.eval(2.0, 4.0));
+}
+// Output:
+// 2.0 PLUS 4.0 = 6.0
+// 2.0 MINUS 4.0 = -2.0
+// 2.0 TIMES 4.0 = 8.0
+// 2.0 DIVIDE 4.0 = 0.5
+```
+
+**5. Порядок вызова конструкторов:**
+
+Конструкторы `enum` вызываются при первой «загрузке» типа:
+
+```java
+enum Color {
+    RED, GREEN, BLUE;
+    
+    private Color() {
+        System.out.println("Constructor called for: " + this.toString());
+    }
+}
+
+Color c = Color.RED;
+// Output:
+// Constructor called for: RED
+// Constructor called for: GREEN
+// Constructor called for: BLUE
+```
+
+Все константы создаются при первом обращении к типу `enum`.
+
+##### **1.7 Java Collections Framework**
+
+**Java Collections Framework** — единая архитектура для хранения и обработки наборов объектов; избавляет от ручной реализации типовых структур и даёт стандартные абстракции.
+
+Коллекции хранят **reference type** (объекты). Размер динамический — не нужно вручную расширять массивы.
+
+###### **1.7.1 Основные интерфейсы коллекций**
+
+Три ключевых вида:
+
+**1. List:** упорядоченная коллекция с доступом по индексу; дубликаты разрешены.
+
+**2. Set:** коллекция уникальных элементов без гарантированного порядка; дубликаты игнорируются; не более одного `null`.
+
+**3. Map:** отображение **keys** → **values**; каждый ключ — не более одного значения; разные ключи могут указывать на одно значение.
+
+###### **1.7.2 Иерархия коллекций**
+
+Иерархия JCF:
+
+- `Collection` (root interface)
+  - `List` (ordered, indexed)
+    - `ArrayList` (resizable array)
+    - `LinkedList` (doubly-linked list)
+    - `Vector` (synchronized array)
+      - `Stack` (LIFO stack)
+  - `Set` (unique elements)
+    - `HashSet` (hash table)
+    - `LinkedHashSet` (hash table + insertion order)
+    - `SortedSet` (sorted set)
+      - `TreeSet` (red-black tree)
+  - `Queue` (FIFO queue)
+    - `Deque` (double-ended queue)
+      - `LinkedList` (also implements Deque)
+- `Map` (separate hierarchy, not part of `Collection`)
+  - `HashMap` (hash table)
+  - `LinkedHashMap` (hash table + insertion order)
+  - `Hashtable` (legacy synchronized hash table)
+  - `SortedMap` (sorted map)
+    - `TreeMap` (red-black tree)
+
+###### **1.7.3 Списки (List)**
+
+**List** — упорядоченная коллекция: порядок элементов совпадает с порядком добавления; доступ по целому индексу.
+
+**Создание и пример:**
+
+```java
+import java.util.List;
+import java.util.ArrayList;
+
+List<String> list = new ArrayList<>();
+list.add("Geeks");
+list.add("Geeks");
+list.add(1, "For");  // Insert at index 1
+System.out.println(list);  // [Geeks, For, Geeks]
+```
+
+**Часто используемые методы `List`:**
+
+- `int size()`: число элементов  
+- `boolean isEmpty()`: пуст ли список  
+- `void clear()`: очистить  
+- `boolean add(E element)`: добавить в конец  
+- `void add(int index, E element)`: вставить по индексу  
+- `E get(int index)`: элемент по индексу  
+- `E set(int index, E element)`: заменить элемент  
+- `E remove(int index)`: удалить по индексу  
+- `boolean remove(Object o)`: удалить первое вхождение объекта  
+
+**Ключевые свойства:**
+
+- дубликаты разрешены;  
+- сохраняется порядок вставки;  
+- доступ по позиции.
+
+###### **1.7.4 Множества (Set)**
+
+**Set** — коллекция без дубликатов; не более одного `null`; порядок не гарантирован (кроме специализированных реализаций).
+
+**Создание и пример:**
+
+```java
+import java.util.Set;
+import java.util.HashSet;
+
+Set<String> set = new HashSet<>();
+set.add("Geeks");
+set.add("For");
+set.add("Geeks");  // Duplicate, will be ignored
+set.add("Example");
+set.add("Set");
+System.out.println(set);  // Order not guaranteed: [Geeks, Example, Set, For]
+```
+
+**Часто используемые методы `Set`:**
+
+- `int size()`, `boolean isEmpty()`, `void clear()`  
+- `boolean add(E element)` — `false`, если элемент уже был  
+- `boolean remove(Object o)`, `boolean contains(Object o)`  
+
+**Ключевые свойства:**
+
+- без дубликатов;  
+- порядок не фиксирован (если не `LinkedHashSet` / `TreeSet`);  
+- быстрая проверка принадлежности.
+
+**Сравнение реализаций `Set`:**
+
+| Реализация | Порядок | Сложность (поиск) | Структура |
+|---|---|---|---|
+| `HashSet` | нет | $O(1)$ | Хеш-таблица |
+| `LinkedHashSet` | порядок вставки | $O(1)$ | Хеш-таблица + список |
+| `TreeSet` | по возрастанию | $O(\log n)$ | Красно-чёрное дерево |
+
+###### **1.7.5 Отображения (Map)**
+
+**Map** хранит пары ключ–значение: ключ уникален, значения могут повторяться.
+
+**Создание и пример:**
+
+```java
+import java.util.Map;
+import java.util.HashMap;
+
+Map<String, Integer> map = new HashMap<>();
+map.put("a", 100);
+map.put("b", 200);
+map.put("c", 300);
+map.put("a", 150);  // Replaces previous value for key "a"
+
+// Traversing the map
+for (Map.Entry<String, Integer> entry : map.entrySet()) {
+    System.out.println(entry.getKey() + ": " + entry.getValue());
+}
+```
+
+**Часто используемые методы `Map`:**
+
+- `int size()`, `boolean isEmpty()`, `void clear()`  
+- `V put(K key, V value)` — возвращает старое значение  
+- `V get(K key)` — или `null`  
+- `V remove(K key)`  
+- `boolean containsKey`, `boolean containsValue`  
+- `Set<K> keySet()`, `Collection<V> values()`, `Set<Map.Entry<K,V>> entrySet()`  
+
+**Ключевые свойства:**
+
+- один ключ → не более одного значения;  
+- ключи уникальны;  
+- значения могут совпадать;  
+- быстрый поиск по ключу.
+
+**Сравнение реализаций `Map`:**
+
+| Реализация | Порядок | `null` в значении | Потокобезопасность | Сложность (поиск) | Структура |
+|---|---|---|---|---|---|
+| `HashMap` | нет | да | нет | $O(1)$ | Хеш-таблица |
+| `Hashtable` | нет | нет | да | $O(1)$ | Хеш-таблица |
+| `TreeMap` | по ключу | да/нет* | нет | $O(\log n)$ | Красно-чёрное дерево |
+
+*\*`TreeMap`: `null` в значении допустим (в зависимости от версии/компаратора), в ключах — нет.*
+
+**List vs Set vs Map:**
+
+| List | Set | Map |
+|---|---|---|
+| доступ по индексу | без дубликатов | пары ключ–значение |
+| дубликаты | повторный `add` игнорируется | ключи уникальны |
+| порядок вставки | порядок не гарантирован | поиск значения по ключу |
+
+###### **1.7.6 Iterator**
+
+**Iterator** — объект обхода коллекции; единообразный способ пройти по любой `Collection`.
+
+**Пример с `Iterator`:**
+
+```java
+import java.util.Iterator;
+import java.util.HashSet;
+import java.util.Set;
+
+Set<Integer> set = new HashSet<>();
+set.add(5);
+set.add(1);
+set.add(3);
+
+Iterator<Integer> iterator = set.iterator();
+while (iterator.hasNext()) {
+    Integer value = iterator.next();
+    System.out.print(value + " ");
+}
+```
+
+**Методы `Iterator`:**
+
+- `boolean hasNext()`  
+- `E next()`  
+- `void remove()` — удаляет элемент, последний возвращённый `next()`  
+
+**С `ArrayList`:**
+
+```java
+import java.util.ArrayList;
+import java.util.Iterator;
+
+ArrayList<String> cars = new ArrayList<>();
+cars.add("Volvo");
+cars.add("BMW");
+cars.add("Ford");
+cars.add("Mazda");
+
+Iterator<String> it = cars.iterator();
+System.out.println(it.next());  // Volvo
+```
+
+`iterator()` есть у любой коллекции, реализующей `Collection`.
+
+##### **1.8 UML-диаграммы классов**
+
+**UML Class Diagrams** наглядно показывают классы, поля, методы и связи в ОО-системе; полезны при проектировании и обсуждении архитектуры до кода.
+
+###### **1.8.1 Обозначение класса**
+
+Прямоугольник из трёх секций:
+
+1. имя класса  
+2. атрибуты (поля) с видимостью и типом  
+3. методы с видимостью, параметрами и типом результата  
+
+**Видимость:**
+
+- `+` : public
+- `-` : private
+- `#` : protected
+- `~` : package-private
+
+###### **1.8.2 Связи**
+
+**1. Association**: общая связь «класс использует другой класс»
+
+- сплошная линия  
+- кратность: `1`, `*`, `0..1`, `1..*`, …  
+
+**2. Navigable Association**: направленная связь
+
+- сплошная линия со стрелкой  
+
+**3. Inheritance (Generalization)**: отношение «is-a»
+
+- сплошная линия с пустым треугольником к надклассу  
+
+**4. Realization / Implementation**: класс реализует интерфейс
+
+- пунктир с пустым треугольником к интерфейсу  
+
+**5. Dependency**: слабая зависимость одного класса от другого
+
+- пунктир со стрелкой  
+
+**6. Aggregation**: «has-a», часть может существовать отдельно
+
+- сплошная линия с пустым ромбом со стороны контейнера  
+
+**7. Composition**: «has-a», часть не существует отдельно от целого
+
+- сплошная линия с закрашенным ромбом  
+
+**Пример:**
+
+```
+University (1) ---- (1..*) Department
+Department (1) <>---- (1..*) Professor  [aggregation]
+Professor ---|> Person  [inheritance]
+```
+
+На схеме:
+
+- у университета много кафедр;  
+- кафедра **aggregates** множество профессоров;  
+- `Professor` наследует `Person`.
+
+***
+
+#### **2. Определения**
+*   **Interface** (как абстракция контракта): публичные сигнатуры методов класса — что можно делать с объектами этого класса.
+*   **Implementation**: фактический код, задающий работу методов: алгоритмы, структуры данных и внутренняя логика.
+*   **Abstract Method**: метод без тела, который обязаны реализовать подклассы.
+*   **Abstract Class**: класс, который нельзя инстанцировать напрямую; может содержать абстрактные методы; задаёт общий интерфейс и частичную реализацию для иерархии.
+*   **Final Method**: метод, который нельзя переопределить в подклассах; объявляется с ключевым словом `final` в Java.
+*   **Final Class**: класс, который нельзя расширять (subclass); объявляется с `final`.
+*   **Late Binding (Dynamic Dispatch)**: выбор метода во время выполнения по динамическому типу объекта; для виртуальных / переопределяемых методов.
+*   **Early Binding (Static Dispatch)**: выбор метода на этапе компиляции по статическому типу; для non-virtual методов, `final` и `static`.
+*   **Method Inlining**: оптимизация компилятора — подстановка тела метода в место вызова; для `final` это особенно реалистично.
+*   **Interface (language construct)**: в Java — тип, задающий контракт сигнатур без реализации; класс может реализовать несколько интерфейсов.
+*   **Interface Implementation**: предоставление тел для всех методов интерфейса с помощью `implements`.
+*   **Multiple Interface Implementation**: один класс реализует несколько интерфейсов — безопасная альтернатива множественному наследованию реализации.
+*   **Interface Inheritance**: интерфейс расширяет другой интерфейс, наследуя объявления методов.
+*   **Facet**: «грань» или представление объекта (часто через интерфейс), показывающее лишь часть возможностей.
+*   **Empty Interface (Marker Interface)**: интерфейс без методов — маркер свойства класса.
+*   **Nested Interface**: интерфейс, объявленный внутри класса или другого интерфейса.
+*   **Ad-hoc Polymorphism (Duck Typing)**: обращение с объектом по набору методов без явного объявления типа; в Java напрямую не поддерживается.
+*   **Enumeration (Enum)**: тип с фиксированным набором именованных констант (**enumerators**); повышает типобезопасность категориальных значений.
+*   **Enumerator**: именованная константа внутри перечисления.
+*   **Enum Constructor**: конструктор в Java-enum, инициализирующий каждую константу.
+*   **Enum Methods**: методы enum, задающие поведение констант.
+*   **Collection**: структура для группы объектов с операциями добавления, удаления и доступа.
+*   **List**: упорядоченная коллекция с доступом по индексу; допускает дубликаты и обычно сохраняет порядок вставки.
+*   **Set**: коллекция без дубликатов; не больше одного `null`.
+*   **Map**: пары ключ–значение; каждый ключ уникален и отображается не более чем в одно значение.
+*   **ArrayList**: реализация `List` на динамическом массиве; быстрый произвольный доступ.
+*   **LinkedList**: двусвязный список; реализует `List` и `Deque`; удобные вставки/удаления.
+*   **HashSet**: множество на хеш-таблице; амортизированно $O(1)$ для базовых операций.
+*   **HashMap**: отображение на хеш-таблице; амортизированно $O(1)$ для поиска по ключу.
+*   **TreeSet**: множество на красно-чёрном дереве; элементы в отсортированном порядке.
+*   **TreeMap**: отображение на красно-чёрном дереве; ключи упорядочены.
+*   **Iterator**: объект обхода коллекции с `hasNext` / `next` / `remove`.
+*   **Generic Type Parameter**: параметр типа (`<E>`, `<K,V>`), обеспечивающий проверку типов на этапе компиляции.
+*   **Entry (Map.Entry)**: пара ключ–значение при обходе `entrySet()` у `Map`.
+*   **UML (Unified Modeling Language)**: стандартизованный язык визуального моделирования ПО.
+*   **UML Class Diagram**: диаграмма классов: поля, методы и связи между классами.
+*   **Association (UML)**: связь «класс использует другой класс».
+*   **Aggregation (UML)**: «has-a», часть может существовать отдельно; пустой ромб.
+*   **Composition (UML)**: «has-a», часть не существует отдельно от целого; закрашенный ромб.
+*   **Multiplicity (UML)**: кратность связи (`1`, `*`, `0..1`, `1..*`).
+
+***
+
+#### **3. Примеры**
+
+##### **3.1. Поведение конструкторов enum** (Лаба 10, Задание 1)
+
+Покажите, когда вызываются конструкторы enum.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** конструкторы enum вызываются при первом обращении к типу, по одному разу на каждую константу.
+
+```java
+enum Color {
+    RED,
+    GREEN,
+    BLUE;
+    
+    private Color() {
+        System.out.println("Constructor called for: " + this.toString());
+    }
+    
+    public void colorInfo() {
+        System.out.println("Universal Color");
+    }
+}
+
+public class Test {
+    public static void main(String[] args) {
+        System.out.println("Before accessing enum");
+        
+        Color c1 = Color.RED;
+        System.out.println(c1);
+        c1.colorInfo();
+        
+        System.out.println("\nAccessing another color:");
+        Color c2 = Color.GREEN;
+        System.out.println(c2);
+    }
+}
+```
+
+**Вывод:**
+```
+Before accessing enum
+Constructor called for: RED
+Constructor called for: GREEN
+Constructor called for: BLUE
+RED
+Universal Color
+
+Accessing another color:
+GREEN
+```
+
+**Пояснение:** все константы enum создаются при первом обращении к типу, а не «лениво» при первом обращении к каждой константе по отдельности.
+
+**Ответ:** конструктор enum вызывается по разу на каждую константу при загрузке класса enum — при первом обращении к любой константе или методу типа.
+
+</details>
+
+##### **3.2. Программа со списком животных** (Лаба 10, Задание 3)
+
+Напишите программу: список животных и методы добавления, удаления, обновления и вывода.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** инкапсулируйте операции со списком в методы — проще сопровождать и переиспользовать.
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class AnimalManager {
+    private List<String> animals;
+    
+    public AnimalManager() {
+        animals = new ArrayList<>();
+    }
+    
+    // Method to add an animal
+    public void addAnimal(String animal) {
+        animals.add(animal);
+        System.out.println("Added: " + animal);
+    }
+    
+    // Method to remove an animal
+    public void removeAnimal(String animal) {
+        if (animals.remove(animal)) {
+            System.out.println("Removed: " + animal);
+        } else {
+            System.out.println("Animal not found: " + animal);
+        }
+    }
+    
+    // Method to update an animal at a specific index
+    public void updateAnimal(int index, String newAnimal) {
+        if (index >= 0 && index < animals.size()) {
+            String old = animals.set(index, newAnimal);
+            System.out.println("Updated: " + old + " -> " + newAnimal);
+        } else {
+            System.out.println("Invalid index: " + index);
+        }
+    }
+    
+    // Method to display all animals
+    public void displayAnimals() {
+        System.out.println("\nCurrent animals:");
+        if (animals.isEmpty()) {
+            System.out.println("  (no animals)");
+        } else {
+            for (int i = 0; i < animals.size(); i++) {
+                System.out.println("  " + i + ": " + animals.get(i));
+            }
+        }
+    }
+    
+    public static void main(String[] args) {
+        AnimalManager manager = new AnimalManager();
+        
+        // Adding animals
+        manager.addAnimal("Lion");
+        manager.addAnimal("Tiger");
+        manager.addAnimal("Bear");
+        manager.addAnimal("Elephant");
+        manager.displayAnimals();
+        
+        // Updating an animal
+        manager.updateAnimal(1, "Leopard");
+        manager.displayAnimals();
+        
+        // Removing an animal
+        manager.removeAnimal("Bear");
+        manager.displayAnimals();
+        
+        // Try removing non-existent animal
+        manager.removeAnimal("Giraffe");
+    }
+}
+```
+
+**Вывод:**
+```
+Added: Lion
+Added: Tiger
+Added: Bear
+Added: Elephant
+
+Current animals:
+  0: Lion
+  1: Tiger
+  2: Bear
+  3: Elephant
+Updated: Tiger -> Leopard
+
+Current animals:
+  0: Lion
+  1: Leopard
+  2: Bear
+  3: Elephant
+Removed: Bear
+
+Current animals:
+  0: Lion
+  1: Leopard
+  2: Elephant
+Animal not found: Giraffe
+```
+
+**Ответ:** четыре операции над `List` — add/remove/update/display; методы дают обратную связь и обрабатывают ошибки.
+
+</details>
+
+##### **3.3. Удаление из Set строк нечётной длины** (Лаба 10, Задание 4)
+
+Напишите программу: множество строк, удалить все элементы нечётной длины, оставить только чётной длины.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** при удалении во время обхода используйте `Iterator`, чтобы избежать `ConcurrentModificationException`.
+
+```java
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Iterator;
+
+public class StringSetFilter {
+    public static void main(String[] args) {
+        // Create a Set with strings
+        Set<String> strings = new HashSet<>();
+        strings.add("cat");        // length 3 (odd)
+        strings.add("dog");        // length 3 (odd)
+        strings.add("bird");       // length 4 (even)
+        strings.add("fish");       // length 4 (even)
+        strings.add("elephant");   // length 8 (even)
+        strings.add("tiger");      // length 5 (odd)
+        strings.add("bear");       // length 4 (even)
+        
+        System.out.println("Original set: " + strings);
+        
+        // Remove odd-length strings using Iterator
+        Iterator<String> it = strings.iterator();
+        while (it.hasNext()) {
+            String str = it.next();
+            if (str.length() % 2 != 0) {  // Odd length
+                System.out.println("Removing: " + str + " (length " + str.length() + ")");
+                it.remove();  // Safe removal using iterator
+            }
+        }
+        
+        System.out.println("Final set (even lengths only): " + strings);
+    }
+}
+```
+
+**Возможный вывод:**
+```
+Original set: [cat, bear, bird, fish, dog, elephant, tiger]
+Removing: cat (length 3)
+Removing: dog (length 3)
+Removing: tiger (length 5)
+Final set (even lengths only): [bear, bird, fish, elephant]
+```
+
+**Замечание:** Order may vary since `HashSet` is unordered.
+
+**Альтернативное решение using removeIf (Java 8+):**
+
+```java
+import java.util.Set;
+import java.util.HashSet;
+
+public class StringSetFilterLambda {
+    public static void main(String[] args) {
+        Set<String> strings = new HashSet<>();
+        strings.add("cat");
+        strings.add("dog");
+        strings.add("bird");
+        strings.add("fish");
+        strings.add("elephant");
+        strings.add("tiger");
+        strings.add("bear");
+        
+        System.out.println("Original set: " + strings);
+        
+        // Remove odd-length strings using removeIf
+        strings.removeIf(str -> str.length() % 2 != 0);
+        
+        System.out.println("Final set (even lengths only): " + strings);
+    }
+}
+```
+
+**Ответ:** для удаления при обходе используйте `Iterator.remove()` — без `ConcurrentModificationException`. В Java 8 короче записывается `removeIf()`.
+
+</details>
+
+##### **3.4. Map и повторяющиеся значения** (Лаба 10, Задание 5)
+
+Напишите программу: `Map<String, Integer>` из ввода пользователя и отчёт о повторяющихся значениях и их количестве.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** используйте `Map` для подсчёта вхождений, затем анализируйте значения на повторы.
+
+```java
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Scanner;
+
+public class RepetitiveValueCounter {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        Map<String, Integer> wordCount = new HashMap<>();
+        
+        System.out.println("Enter words (type 'done' to finish):");
+        
+        // Read input and build the map
+        while (true) {
+            String word = scanner.next();
+            if (word.equalsIgnoreCase("done")) {
+                break;
+            }
+            
+            // Count occurrences
+            wordCount.put(word, wordCount.getOrDefault(word, 0) + 1);
+        }
+        
+        System.out.println("\nWord counts:");
+        for (Map.Entry<String, Integer> entry : wordCount.entrySet()) {
+            System.out.println(entry.getKey() + ": " + entry.getValue());
+        }
+        
+        // Find and report repetitive values
+        System.out.println("\nAnalysis:");
+        boolean hasRepetitions = false;
+        
+        for (Map.Entry<String, Integer> entry : wordCount.entrySet()) {
+            if (entry.getValue() > 1) {
+                hasRepetitions = true;
+                System.out.println("'" + entry.getKey() + "' appears " + 
+                                 entry.getValue() + " times (repetitive)");
+            }
+        }
+        
+        if (!hasRepetitions) {
+            System.out.println("No repetitive values found.");
+        }
+        
+        scanner.close();
+    }
+}
+```
+
+**Пример запуска:**
+```
+Enter words (type 'done' to finish):
+apple banana apple orange banana apple done
+
+Word counts:
+apple: 3
+banana: 2
+orange: 1
+
+Analysis:
+'apple' appears 3 times (repetitive)
+'banana' appears 2 times (repetitive)
+```
+
+**Альтернативная интерпретация (checking if different keys map to same value):**
+
+```java
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Scanner;
+import java.util.List;
+import java.util.ArrayList;
+
+public class RepetitiveValueChecker {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        Map<String, Integer> map = new HashMap<>();
+        
+        System.out.println("Enter key-value pairs (format: key value)");
+        System.out.println("Type 'done' as key to finish:");
+        
+        // Read key-value pairs
+        while (true) {
+            System.out.print("Key: ");
+            String key = scanner.next();
+            if (key.equalsIgnoreCase("done")) {
+                break;
+            }
+            System.out.print("Value: ");
+            int value = scanner.nextInt();
+            map.put(key, value);
+        }
+        
+        System.out.println("\nMap contents: " + map);
+        
+        // Check for repetitive values
+        Map<Integer, List<String>> valueToKeys = new HashMap<>();
+        
+        for (Map.Entry<String, Integer> entry : map.entrySet()) {
+            int value = entry.getValue();
+            valueToKeys.putIfAbsent(value, new ArrayList<>());
+            valueToKeys.get(value).add(entry.getKey());
+        }
+        
+        System.out.println("\nAnalysis:");
+        boolean hasRepetitions = false;
+        
+        for (Map.Entry<Integer, List<String>> entry : valueToKeys.entrySet()) {
+            if (entry.getValue().size() > 1) {
+                hasRepetitions = true;
+                System.out.println("Value " + entry.getKey() + 
+                                 " is mapped by " + entry.getValue().size() + 
+                                 " keys: " + entry.getValue());
+            }
+        }
+        
+        if (!hasRepetitions) {
+            System.out.println("No repetitive values found.");
+        }
+        
+        scanner.close();
+    }
+}
+```
+
+**Пример запуска:**
+```
+Enter key-value pairs (format: key value)
+Type 'done' as key to finish:
+Key: apple
+Value: 100
+Key: banana
+Value: 200
+Key: orange
+Value: 100
+Key: grape
+Value: 200
+Key: done
+
+Map contents: {apple=100, banana=200, orange=100, grape=200}
+
+Analysis:
+Value 100 is mapped by 2 keys: [apple, orange]
+Value 200 is mapped by 2 keys: [banana, grape]
+```
+
+**Ответ:** первый вариант считает частоту слов через `Map`; второй ищет одинаковые значения у разных ключей через «обращение» структуры.
+
+</details>
+
+##### **3.5. Система онлайн-чтения книг** (Лаба 10, Домашнее задание 1)
+
+Спроектируйте и реализуйте базовую систему онлайн-чтения книг со следующими требованиями:
+
+**Функциональность:**
+
+- поиск по базе книг и чтение книги
+- создание и продление подписки пользователя
+- одновременно только один активный пользователь и только одна активная книга у него
+
+**Подсказки по проектированию:**
+
+Класс `OnlineReaderSystem` — точка входа. Не помещайте всё в один класс; разнесите ответственность:
+
+- `Library`: коллекция книг
+- `UserManager`: пользователи
+- `Display`: вывод / UI
+- `Book`: сущность книги
+- `User`: сущность пользователя
+
+**Замечание:** похожие задачи встречаются на собеседованиях в Amazon, Microsoft и др.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** разделяйте ответственность по ОО-принципам; у каждого класса — одна чёткая роль.
+
+**Шаг 1: UML-диаграмма классов**
+
+Перед кодом спланируйте классы и связи:
+
+- `OnlineReaderSystem` aggregates `Library`, `UserManager`, and `Display`
+- `Library` contains a collection of `Book` objects
+- `UserManager` manages a collection of `User` objects
+- `User` has an association with `Book` (current book being read)
+
+**Шаг 2: реализация**
+
+```java
+import java.util.*;
+
+// Book class
+class Book {
+    private String id;
+    private String title;
+    private String author;
+    private String content;
+    
+    public Book(String id, String title, String author, String content) {
+        this.id = id;
+        this.title = title;
+        this.author = author;
+        this.content = content;
+    }
+    
+    public String getId() { return id; }
+    public String getTitle() { return title; }
+    public String getAuthor() { return author; }
+    public String getContent() { return content; }
+    
+    @Override
+    public String toString() {
+        return title + " by " + author;
+    }
+}
+
+// User class
+class User {
+    private String userId;
+    private String name;
+    private String membershipType;
+    private Book currentBook;
+    
+    public User(String userId, String name, String membershipType) {
+        this.userId = userId;
+        this.name = name;
+        this.membershipType = membershipType;
+        this.currentBook = null;
+    }
+    
+    public String getUserId() { return userId; }
+    public String getName() { return name; }
+    public String getMembershipType() { return membershipType; }
+    public Book getCurrentBook() { return currentBook; }
+    
+    public void setCurrentBook(Book book) {
+        this.currentBook = book;
+    }
+    
+    public void extendMembership(String newType) {
+        this.membershipType = newType;
+        System.out.println("Membership extended to: " + newType);
+    }
+    
+    @Override
+    public String toString() {
+        return name + " (ID: " + userId + ", " + membershipType + ")";
+    }
+}
+
+// Library class - manages books
+class Library {
+    private Map<String, Book> books;
+    
+    public Library() {
+        books = new HashMap<>();
+    }
+    
+    public void addBook(Book book) {
+        books.put(book.getId(), book);
+        System.out.println("Added book: " + book);
+    }
+    
+    public Book findBook(String id) {
+        return books.get(id);
+    }
+    
+    public List<Book> searchBooks(String keyword) {
+        List<Book> results = new ArrayList<>();
+        for (Book book : books.values()) {
+            if (book.getTitle().toLowerCase().contains(keyword.toLowerCase()) ||
+                book.getAuthor().toLowerCase().contains(keyword.toLowerCase())) {
+                results.add(book);
+            }
+        }
+        return results;
+    }
+    
+    public void displayAllBooks() {
+        System.out.println("\n=== Library Books ===");
+        for (Book book : books.values()) {
+            System.out.println(book);
+        }
+    }
+}
+
+// UserManager class - manages users
+class UserManager {
+    private Map<String, User> users;
+    private User activeUser;
+    
+    public UserManager() {
+        users = new HashMap<>();
+        activeUser = null;
+    }
+    
+    public User createUser(String userId, String name, String membershipType) {
+        User user = new User(userId, name, membershipType);
+        users.put(userId, user);
+        System.out.println("User created: " + user);
+        return user;
+    }
+    
+    public User findUser(String userId) {
+        return users.get(userId);
+    }
+    
+    public boolean setActiveUser(String userId) {
+        User user = users.get(userId);
+        if (user != null) {
+            activeUser = user;
+            System.out.println("Active user set to: " + user);
+            return true;
+        }
+        System.out.println("User not found: " + userId);
+        return false;
+    }
+    
+    public User getActiveUser() {
+        return activeUser;
+    }
+    
+    public void logoutActiveUser() {
+        if (activeUser != null) {
+            System.out.println("User logged out: " + activeUser);
+            activeUser = null;
+        }
+    }
+}
+
+// Display class - manages display output
+class Display {
+    private Book activeBook;
+    private User activeUser;
+    
+    public void displayBook(Book book) {
+        if (book == null) {
+            System.out.println("No book to display.");
+            return;
+        }
+        activeBook = book;
+        System.out.println("\n========== READING ==========");
+        System.out.println("Title: " + book.getTitle());
+        System.out.println("Author: " + book.getAuthor());
+        System.out.println("-----------------------------");
+        System.out.println(book.getContent());
+        System.out.println("=============================\n");
+    }
+    
+    public void displayUser(User user) {
+        if (user == null) {
+            System.out.println("No active user.");
+            return;
+        }
+        activeUser = user;
+        System.out.println("\n=== Active User ===");
+        System.out.println(user);
+        if (user.getCurrentBook() != null) {
+            System.out.println("Currently reading: " + user.getCurrentBook());
+        } else {
+            System.out.println("Not reading any book.");
+        }
+        System.out.println("===================\n");
+    }
+    
+    public void refreshDisplay(User user, Book book) {
+        displayUser(user);
+        if (book != null) {
+            displayBook(book);
+        }
+    }
+}
+
+// Main OnlineReaderSystem class
+class OnlineReaderSystem {
+    private Library library;
+    private UserManager userManager;
+    private Display display;
+    
+    public OnlineReaderSystem() {
+        library = new Library();
+        userManager = new UserManager();
+        display = new Display();
+    }
+    
+    public Library getLibrary() { return library; }
+    public UserManager getUserManager() { return userManager; }
+    public Display getDisplay() { return display; }
+    
+    public void setActiveUserAndBook(String userId, String bookId) {
+        User user = userManager.findUser(userId);
+        if (user == null) {
+            System.out.println("User not found.");
+            return;
+        }
+        
+        userManager.setActiveUser(userId);
+        
+        Book book = library.findBook(bookId);
+        if (book == null) {
+            System.out.println("Book not found.");
+            return;
+        }
+        
+        user.setCurrentBook(book);
+        display.refreshDisplay(user, book);
+    }
+    
+    public void searchAndDisplay(String keyword) {
+        List<Book> results = library.searchBooks(keyword);
+        System.out.println("\n=== Search Results for: " + keyword + " ===");
+        if (results.isEmpty()) {
+            System.out.println("No books found.");
+        } else {
+            for (Book book : results) {
+                System.out.println(book);
+            }
+        }
+    }
+    
+    public static void main(String[] args) {
+        OnlineReaderSystem system = new OnlineReaderSystem();
+        
+        // Add books to library
+        system.getLibrary().addBook(new Book("B001", "Java Programming", 
+            "John Smith", "This is a comprehensive guide to Java..."));
+        system.getLibrary().addBook(new Book("B002", "Data Structures", 
+            "Jane Doe", "Learn about arrays, lists, trees..."));
+        system.getLibrary().addBook(new Book("B003", "Design Patterns", 
+            "Bob Johnson", "Explore common software design patterns..."));
+        
+        // Display all books
+        system.getLibrary().displayAllBooks();
+        
+        // Create users
+        system.getUserManager().createUser("U001", "Alice", "Premium");
+        system.getUserManager().createUser("U002", "Bob", "Basic");
+        
+        // Set active user and read a book
+        System.out.println("\n--- Alice starts reading ---");
+        system.setActiveUserAndBook("U001", "B001");
+        
+        // Search for books
+        system.searchAndDisplay("Data");
+        
+        // Extend membership
+        User alice = system.getUserManager().findUser("U001");
+        alice.extendMembership("Gold");
+        
+        // Logout
+        system.getUserManager().logoutActiveUser();
+        
+        // Another user
+        System.out.println("\n--- Bob starts reading ---");
+        system.setActiveUserAndBook("U002", "B003");
+    }
+}
+```
+
+**Вывод:**
+```
+Added book: Java Programming by John Smith
+Added book: Data Structures by Jane Doe
+Added book: Design Patterns by Bob Johnson
+
+=== Library Books ===
+Java Programming by John Smith
+Data Structures by Jane Doe
+Design Patterns by Bob Johnson
+User created: Alice (ID: U001, Premium)
+User created: Bob (ID: U002, Basic)
+
+--- Alice starts reading ---
+Active user set to: Alice (ID: U001, Premium)
+
+=== Active User ===
+Alice (ID: U001, Premium)
+Currently reading: Java Programming by John Smith
+===================
+
+========== READING ==========
+Title: Java Programming
+Author: John Smith
+-----------------------------
+This is a comprehensive guide to Java...
+=============================
+
+=== Search Results for: Data ===
+Data Structures by Jane Doe
+Membership extended to: Gold
+User logged out: Alice (ID: U001, Gold)
+
+--- Bob starts reading ---
+Active user set to: Bob (ID: U002, Basic)
+
+=== Active User ===
+Bob (ID: U002, Basic)
+Currently reading: Design Patterns by Bob Johnson
+===================
+
+========== READING ==========
+Title: Design Patterns
+Author: Bob Johnson
+-----------------------------
+Explore common software design patterns...
+=============================
+```
+
+**Применённые принципы проектирования:**
+
+1. **Single Responsibility Principle**: у каждого класса одна ясная роль
+   - `Library`: каталог книг  
+   - `UserManager`: пользователи  
+   - `Display`: вывод / UI  
+   - `OnlineReaderSystem`: координация  
+2. **Encapsulation**: данные класса скрыты полями `private`, доступ через публичные методы
+3. **Aggregation**: `OnlineReaderSystem` агрегирует `Library`, `UserManager` и `Display`
+4. **Association**: связь `User` ↔ `Book` (объекты существуют независимо)
+
+**Ответ:** разделение ответственности упрощает сопровождение и расширение; ограничение «один активный пользователь и одна книга» задаётся через `UserManager` и `User`.
+
+</details>
+
+##### **3.6. Разделение interface и implementation** (Лекция 10, Пример 1)
+
+Иерархия самолётов с разными алгоритмами полёта: реализуйте корректно, разделяя interface и implementation.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `abstract` заставляет явно реализовать метод; общий код вынесите в `protected`-хелпер.
+
+**Неверный подход (в чём проблема):**
+
+```java
+class Airplane {
+    public void fly() {
+        // Standard flying algorithm for Airbus
+    }
+}
+
+class AirbusA extends Airplane { }  // Inherits Airbus algorithm
+class AirbusB extends Airplane { }  // Inherits Airbus algorithm
+class Boeing extends Airplane { }   // WRONG: Also inherits Airbus algorithm!
+```
+
+**Проблема:** `Boeing` унаследовал алгоритм Airbus; синтаксис верный, ошибка семантическая.
+
+**Правильный подход (решение):**
+
+```java
+abstract class Airplane {
+    // Interface: must be implemented by all subclasses
+    public abstract void fly();
+    
+    // Optional default implementation
+    protected void defaultFly() {
+        // Standard flying algorithm
+        System.out.println("Standard flying algorithm");
+    }
+}
+
+class AirbusA extends Airplane {
+    public void fly() {
+        defaultFly();  // Can choose to use default
+    }
+}
+
+class AirbusB extends Airplane {
+    public void fly() {
+        defaultFly();  // Can choose to use default
+    }
+}
+
+class Boeing extends Airplane {
+    public void fly() {
+        // MUST provide its own implementation
+        System.out.println("Boeing's own flying algorithm");
+    }
+}
+```
+
+**Использование:**
+
+```java
+Airplane a = new AirbusA();
+a.fly();  // Standard flying algorithm
+
+Airplane b = new AirbusB();
+b.fly();  // Standard flying algorithm
+
+Airplane c = new Boeing();
+c.fly();  // Boeing's own flying algorithm
+```
+
+**Ответ:** `abstract void fly()` заставляет каждый подкласс явно реализовать полёт; `defaultFly()` даёт опциональную общую реализацию.
+
+</details>
+
+##### **3.7. Использование final-методов** (Лекция 10, Пример 2)
+
+Создайте базовый класс с final-методом и покажите, что его нельзя переопределить.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `final` у метода запрещает переопределение и стабилизирует поведение.
+
+```java
+class Base {
+    public final void method() {
+        System.out.println("Base's method");
+    }
+}
+
+class Derived extends Base {
+    // This would cause a compilation error:
+    // public void method() {
+    //     System.out.println("Derived's method");
+    // }
+    // Error: Cannot override the final method from Base
+}
+```
+
+**Проверка кода:**
+
+```java
+Base b1 = new Base();
+b1.method();  // Output: Base's method
+
+Base b2 = new Derived();
+b2.method();  // Output: Base's method (same implementation)
+```
+
+**Ответ:** `final`-методы фиксируют поведение базового класса и помогают компилятору оптимизировать вызовы.
+
+</details>
+
+##### **3.8. Создание final-класса** (Лекция 10, Пример 3)
+
+Покажите final-класс и невозможность от него наследоваться.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+final class Base {
+    public void method() {
+        System.out.println("Base's method");
+    }
+}
+
+// This would cause a compilation error:
+// class Derived extends Base {
+// }
+// Error: The type Derived cannot subclass the final class Base
+```
+
+**Why can't a class be both abstract and final?**
+
+```java
+// This is illegal and won't compile:
+// abstract final class InvalidClass {
+//     abstract void method();
+// }
+```
+
+**Пояснение:** An `abstract` class is incomplete by design—it *requires* subclasses to provide implementations. A `final` class *forbids* subclasses. These two concepts are contradictory, so using both is illegal.
+
+**Ответ:** `final`-класс нельзя расширять; все его методы неявно `final`; `abstract` и `final` вместе недопустимы.
+
+</details>
+
+##### **3.9. Реализация интерфейса** (Лекция 10, Пример 4)
+
+Создайте интерфейс `Features` и класс `Lion`, который его реализует.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** интерфейс задаёт контракт; класс обязан реализовать все объявленные методы.
+
+```java
+interface Features {
+    int numOfLegs();
+    boolean canFly();
+    boolean canSwim();
+}
+
+class Lion implements Features {
+    public int numOfLegs() {
+        return 4;
+    }
+    
+    public boolean canFly() {
+        return false;
+    }
+    
+    public boolean canSwim() {
+        return true;
+    }
+}
+```
+
+**Использование:**
+
+```java
+// Can treat Lion as a Features interface
+Features f = new Lion();
+
+System.out.println("Number of legs: " + f.numOfLegs());
+
+if (f.canFly()) {
+    System.out.println("Can fly");
+} else {
+    System.out.println("Cannot fly");
+}
+
+if (f.canSwim()) {
+    System.out.println("Can swim");
+}
+```
+
+**Вывод:**
+```
+Number of legs: 4
+Cannot fly
+Can swim
+```
+
+**Ответ:** `Lion` реализует все три метода `Features`; ссылку типа `Features` можно направить на экземпляр `Lion`.
+
+</details>
+
+##### **3.10. Несколько интерфейсов у одного класса** (Лекция 10, Пример 5)
+
+Создайте класс `Person`, реализующий несколько интерфейсов — разные аспекты одного человека.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** класс может реализовать несколько интерфейсов — безопасная альтернатива множественному наследованию.
+
+```java
+interface iBodyParams {
+    int getHeight();
+    int getWeight();
+}
+
+interface iSkills {
+    String getProgrammingLanguage();
+    int getExperienceYears();
+}
+
+interface iRelations {
+    String getFriendName();
+}
+
+class Person implements iBodyParams, iSkills, iRelations {
+    private int height;
+    private int weight;
+    private String programmingLanguage;
+    private int experienceYears;
+    private String friendName;
+    
+    public Person(int height, int weight, String language, 
+                  int experience, String friend) {
+        this.height = height;
+        this.weight = weight;
+        this.programmingLanguage = language;
+        this.experienceYears = experience;
+        this.friendName = friend;
+    }
+    
+    // iBodyParams implementation
+    public int getHeight() { return height; }
+    public int getWeight() { return weight; }
+    
+    // iSkills implementation
+    public String getProgrammingLanguage() { return programmingLanguage; }
+    public int getExperienceYears() { return experienceYears; }
+    
+    // iRelations implementation
+    public String getFriendName() { return friendName; }
+}
+```
+
+**Использование (разные «ракурсы»):**
+
+```java
+Person john = new Person(180, 75, "Java", 5, "Alice");
+
+// View John as a set of skills
+iSkills johnsSkills = john;
+System.out.println("Programming language: " + johnsSkills.getProgrammingLanguage());
+System.out.println("Experience: " + johnsSkills.getExperienceYears() + " years");
+
+// View John's body parameters
+iBodyParams johnsBody = john;
+System.out.println("Height: " + johnsBody.getHeight() + " cm");
+
+// View John's relationships
+iRelations johnsRelations = john;
+System.out.println("Friend: " + johnsRelations.getFriendName());
+```
+
+**Ответ:** один `Person` можно рассматривать через разные интерфейсы — разные **facets**.
+
+</details>
+
+##### **3.11. Наследование интерфейсов** (Лекция 10, Пример 6)
+
+Покажите расширение интерфейсов и влияние на реализующие классы.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** интерфейс может расширять другой интерфейс, наследуя все объявления методов.
+
+```java
+interface SpeedFeatures {
+    float maxSpeed();
+    float maxAcceleration();
+}
+
+interface EngineFeatures extends SpeedFeatures {
+    float numOfCyls();
+    float enginePower();
+}
+
+class Car implements EngineFeatures {
+    // Must implement ALL methods from both interfaces
+    
+    // From SpeedFeatures
+    public float maxSpeed() {
+        return 200.0f;
+    }
+    
+    public float maxAcceleration() {
+        return 5.5f;
+    }
+    
+    // From EngineFeatures
+    public float numOfCyls() {
+        return 6.0f;
+    }
+    
+    public float enginePower() {
+        return 300.0f;
+    }
+}
+```
+
+**Использование:**
+
+```java
+Car myCar = new Car();
+
+// Can be treated as EngineFeatures
+EngineFeatures engine = myCar;
+System.out.println("Engine power: " + engine.enginePower() + " HP");
+System.out.println("Cylinders: " + engine.numOfCyls());
+
+// Can also be treated as SpeedFeatures
+SpeedFeatures speed = myCar;
+System.out.println("Max speed: " + speed.maxSpeed() + " km/h");
+System.out.println("Max acceleration: " + speed.maxAcceleration() + " m/s²");
+```
+
+**Ответ:** `Car` реализует методы и `SpeedFeatures`, и `EngineFeatures`, потому что `EngineFeatures` расширяет `SpeedFeatures`; объект можно рассматривать через любой из этих типов.
+
+</details>
+
+##### **3.12. Проверка типов с интерфейсами** (Лекция 10, Пример 7)
+
+Используйте `instanceof`, чтобы проверить реализацию интерфейсов и выполнить нужные действия.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `instanceof` работает с интерфейсами и проверяет, реализует ли объект данный интерфейс.
+
+```java
+interface Printable {
+    void print();
+}
+
+interface Movable {
+    void move();
+}
+
+interface Serializable {
+    void serialize();
+}
+
+abstract class Shape {
+    abstract void draw();
+}
+
+class Rectangle extends Shape implements Printable, Movable, Serializable {
+    public void draw() {
+        System.out.println("Drawing rectangle");
+    }
+    
+    public void print() {
+        System.out.println("Printing rectangle");
+    }
+    
+    public void move() {
+        System.out.println("Moving rectangle");
+    }
+    
+    public void serialize() {
+        System.out.println("Serializing rectangle");
+    }
+}
+```
+
+**Использование:**
+
+```java
+Shape a = new Rectangle();
+
+// Check and use different interfaces
+if (a instanceof Printable) {
+    ((Printable)a).print();  // Prints: Printing rectangle
+}
+
+if (a instanceof Movable) {
+    ((Movable)a).move();  // Prints: Moving rectangle
+}
+
+if (a instanceof Serializable) {
+    ((Serializable)a).serialize();  // Prints: Serializing rectangle
+}
+
+// This would be false
+if (a instanceof String) {
+    System.out.println("Never executes");
+}
+```
+
+**Ответ:** `instanceof` проверяет, реализует ли класс объекта интерфейс; после проверки безопасно приводить ссылку к типу интерфейса.
+
+</details>
+
+##### **3.13. Вложенный интерфейс** (Лекция 10, Пример 8)
+
+Создайте вложенный интерфейс внутри класса и реализуйте его.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+class SomeClass {
+    public interface Nested {
+        boolean isNotNegative(int x);
+    }
+}
+
+class MyClass implements SomeClass.Nested {
+    public boolean isNotNegative(int x) {
+        return x >= 0;
+    }
+}
+
+class Demo {
+    public static void main(String[] args) {
+        SomeClass.Nested obj = new MyClass();
+        
+        if (obj.isNotNegative(10)) {
+            System.out.println("10 is not negative");
+        }
+        
+        if (obj.isNotNegative(-5)) {
+            System.out.println("Never prints");
+        } else {
+            System.out.println("-5 is negative");
+        }
+    }
+}
+```
+
+**Вывод:**
+```
+10 is not negative
+-5 is negative
+```
+
+**Ответ:** к вложенному интерфейсу обращаются как `SomeClass.Nested`; реализовать может любой класс.
+
+</details>
+
+##### **3.14. Базовое перечисление** (Лекция 10, Пример 9)
+
+Создайте перечисление дней недели и используйте его в `switch`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** enum даёт типобезопасные константы и естественно сочетается с `switch`.
+
+```java
+public enum Day {
+    SUNDAY,
+    MONDAY,
+    TUESDAY,
+    WEDNESDAY,
+    THURSDAY,
+    FRIDAY,
+    SATURDAY
+}
+
+public class DayDemo {
+    public void tellItLikeItIs(Day day) {
+        switch (day) {
+            case MONDAY:
+                System.out.println("Mondays are bad.");
+                break;
+            case FRIDAY:
+                System.out.println("Fridays are better.");
+                break;
+            case SATURDAY:
+            case SUNDAY:
+                System.out.println("Weekends are best.");
+                break;
+            default:
+                System.out.println("Midweek days are so-so.");
+                break;
+        }
+    }
+    
+    public static void main(String[] args) {
+        DayDemo demo = new DayDemo();
+        
+        demo.tellItLikeItIs(Day.MONDAY);     // Mondays are bad.
+        demo.tellItLikeItIs(Day.FRIDAY);     // Fridays are better.
+        demo.tellItLikeItIs(Day.SATURDAY);   // Weekends are best.
+        demo.tellItLikeItIs(Day.WEDNESDAY);  // Midweek days are so-so.
+    }
+}
+```
+
+**Ответ:** enum даёт читаемые типобезопасные константы; в `tellItLikeItIs` передаются только корректные `Day`.
+
+</details>
+
+##### **3.15. Enum с полями и конструктором** (Лекция 10, Пример 10)
+
+Создайте перечисление `Coin` со значениями в центах и методами.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** в Java enum — класс: поля, конструкторы и методы мощнее «простых» констант.
+
+```java
+enum Coin {
+    PENNY(1),
+    NICKEL(5),
+    DIME(10),
+    QUARTER(25);
+    
+    private final int value;
+    
+    // Constructor is private by default
+    Coin(int value) {
+        this.value = value;
+    }
+    
+    public int getValue() {
+        return value;
+    }
+}
+
+public class CoinDemo {
+    public static void main(String[] args) {
+        Coin c = Coin.DIME;
+        System.out.println("A dime is worth " + c.getValue() + " cents");
+        
+        // Print all coins and their values
+        System.out.println("\nAll coins:");
+        for (Coin coin : Coin.values()) {
+            System.out.println(coin + ": " + coin.getValue() + " cents");
+        }
+    }
+}
+```
+
+**Вывод:**
+```
+A dime is worth 10 cents
+
+All coins:
+PENNY: 1 cents
+NICKEL: 5 cents
+DIME: 10 cents
+QUARTER: 25 cents
+```
+
+**Ответ:** конструктор задаёт значения констант; `values()` возвращает массив констант в порядке объявления.
+
+</details>
+
+##### **3.16. Enum с разными телами методов у констант** (Лекция 10, Пример 11)
+
+Создайте `Operation`, у каждой константы — своя реализация `eval()`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** у каждой константы enum может быть своё тело метода — поведение зависит от константы.
+
+```java
+enum Operation {
+    PLUS {
+        double eval(double x, double y) {
+            return x + y;
+        }
+    },
+    MINUS {
+        double eval(double x, double y) {
+            return x - y;
+        }
+    },
+    TIMES {
+        double eval(double x, double y) {
+            return x * y;
+        }
+    },
+    DIVIDE {
+        double eval(double x, double y) {
+            return x / y;
+        }
+    };
+    
+    // Abstract method that each constant must implement
+    abstract double eval(double x, double y);
+    
+    public static void main(String[] args) {
+        double x = 2.0;
+        double y = 4.0;
+        
+        for (Operation op : Operation.values()) {
+            System.out.println(x + " " + op + " " + y + " = " + op.eval(x, y));
+        }
+    }
+}
+```
+
+**Вывод:**
+```
+2.0 PLUS 4.0 = 6.0
+2.0 MINUS 4.0 = -2.0
+2.0 TIMES 4.0 = 8.0
+2.0 DIVIDE 4.0 = 0.5
+```
+
+**Ответ:** у каждой константы своё тело `eval()` — альтернатива большому `switch`.
+
+</details>
+
+##### **3.17. Методы values() и ordinal()** (Туториал 10, Задание 1)
+
+Покажите стандартные методы `values()` и `ordinal()` у любого enum.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** у любого Java-enum есть `values()` (все константы) и `ordinal()` (индекс).
+
+```java
+public class Test {
+    enum Season {
+        WINTER,
+        SPRING,
+        SUMMER,
+        FALL
+    }
+    
+    public static void main(String[] args) {
+        System.out.println("All seasons:");
+        for (Season s : Season.values()) {
+            System.out.println(s);
+        }
+        
+        System.out.println("\nSeasons with ordinals:");
+        for (Season s : Season.values()) {
+            System.out.println(s + " has ordinal " + s.ordinal());
+        }
+        
+        System.out.println("\nOrdinal of SUMMER: " + Season.SUMMER.ordinal());
+    }
+}
+```
+
+**Вывод:**
+```
+All seasons:
+WINTER
+SPRING
+SUMMER
+FALL
+
+Seasons with ordinals:
+WINTER has ordinal 0
+SPRING has ordinal 1
+SUMMER has ordinal 2
+FALL has ordinal 3
+
+Ordinal of SUMMER: 2
+```
+
+**Ответ:** `values()` — массив констант по порядку объявления; `ordinal()` — нулевой индекс позиции.
+
+</details>
+
+##### **3.18. Создание и использование ArrayList** (Туториал 10, Задание 2)
+
+Создайте `ArrayList` строк и выполните базовые операции.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `ArrayList` is a resizable array implementation of the `List` interface.
+
+```java
+import java.util.List;
+import java.util.ArrayList;
+
+public class GFG {
+    public static void main(String args[]) {
+        // Creating an ArrayList
+        List<String> al = new ArrayList<>();
+        
+        // Adding elements
+        al.add("Geeks");
+        al.add("Geeks");
+        al.add(1, "For");  // Insert at index 1
+        
+        // Print all elements
+        System.out.println(al);
+        
+        // Access by index
+        System.out.println("Element at index 0: " + al.get(0));
+        System.out.println("Element at index 1: " + al.get(1));
+        
+        // Size
+        System.out.println("Size: " + al.size());
+        
+        // Remove
+        al.remove(2);  // Remove element at index 2
+        System.out.println("After removal: " + al);
+    }
+}
+```
+
+**Вывод:**
+```
+[Geeks, For, Geeks]
+Element at index 0: Geeks
+Element at index 1: For
+Size: 3
+After removal: [Geeks, For]
+```
+
+**Ответ:** `ArrayList` сохраняет порядок вставки и дубликаты; индексация с нуля.
+
+</details>
+
+##### **3.19. Создание и использование HashSet** (Туториал 10, Задание 3)
+
+Создайте `HashSet` и покажите, что дубликаты отбрасываются.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `HashSet` stores unique elements only. Attempting to add a duplicate has no effect.
+
+```java
+import java.util.Set;
+import java.util.HashSet;
+
+public class GFG {
+    public static void main(String[] args) {
+        // Create a HashSet
+        Set<String> hashSet = new HashSet<>();
+        
+        // Adding elements
+        hashSet.add("Geeks");
+        hashSet.add("For");
+        hashSet.add("Geeks");    // Duplicate - will be ignored
+        hashSet.add("Example");
+        hashSet.add("Set");
+        
+        // Print (order not guaranteed)
+        System.out.println(hashSet);
+        
+        // Check if contains
+        System.out.println("Contains 'Geeks': " + hashSet.contains("Geeks"));
+        System.out.println("Contains 'Java': " + hashSet.contains("Java"));
+        
+        // Size
+        System.out.println("Size: " + hashSet.size());
+    }
+}
+```
+
+**Возможный вывод:**
+```
+[Geeks, Example, Set, For]
+Contains 'Geeks': true
+Contains 'Java': false
+Size: 4
+```
+
+**Замечание:** порядок элементов в выводе `HashSet` не определён.
+
+**Ответ:** `HashSet` отбрасывает дубликаты; второй `Geeks` не добавится — в множестве 4 элемента.
+
+</details>
+
+##### **3.20. Создание и использование HashMap** (Туториал 10, Задание 4)
+
+Создайте `HashMap`, сохраните пары ключ–значение и обойдите его.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `HashMap` stores key-value pairs where each unique key maps to one value.
+
+```java
+import java.util.Map;
+import java.util.HashMap;
+
+public class HashMapDemo {
+    public static void main(String args[]) {
+        // Create a HashMap
+        Map<String, Integer> hm = new HashMap<>();
+        
+        // Adding key-value pairs
+        hm.put("a", 100);
+        hm.put("b", 200);
+        hm.put("c", 300);
+        hm.put("d", 400);
+        
+        // Replacing a value
+        hm.put("a", 150);  // Replaces previous value for key "a"
+        
+        System.out.println("HashMap contents:");
+        // Traversing through the map
+        for (Map.Entry<String, Integer> me : hm.entrySet()) {
+            System.out.println(me.getKey() + ": " + me.getValue());
+        }
+        
+        // Access by key
+        System.out.println("\nValue for key 'b': " + hm.get("b"));
+        
+        // Check if key exists
+        System.out.println("Contains key 'c': " + hm.containsKey("c"));
+        System.out.println("Contains key 'z': " + hm.containsKey("z"));
+        
+        // Size
+        System.out.println("Size: " + hm.size());
+    }
+}
+```
+
+**Возможный вывод:**
+```
+HashMap contents:
+a: 150
+b: 200
+c: 300
+d: 400
+
+Value for key 'b': 200
+Contains key 'c': true
+Contains key 'z': false
+Size: 4
+```
+
+**Замечание:** порядок пар в выводе `HashMap` не определён (без `LinkedHashMap`).
+
+**Ответ:** в `HashMap` ключи уникальны; повторный `put` заменяет значение; обход через `entrySet()`.
+
+</details>
+
+##### **3.21. Использование Iterator** (Туториал 10, Задание 5)
+
+Обойдите `ArrayList` с помощью `Iterator`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `Iterator` — единообразный обход любой коллекции.
+
+```java
+import java.util.ArrayList;
+import java.util.Iterator;
+
+public class Main {
+    public static void main(String[] args) {
+        // Create a collection
+        ArrayList<String> cars = new ArrayList<>();
+        cars.add("Volvo");
+        cars.add("BMW");
+        cars.add("Ford");
+        cars.add("Mazda");
+        
+        // Get the iterator
+        Iterator<String> it = cars.iterator();
+        
+        // Print all elements using iterator
+        System.out.println("All cars:");
+        while (it.hasNext()) {
+            String car = it.next();
+            System.out.println(car);
+        }
+        
+        // Create a new iterator for another traversal
+        Iterator<String> it2 = cars.iterator();
+        
+        // Print the first item
+        System.out.println("\nFirst car: " + it2.next());
+    }
+}
+```
+
+**Вывод:**
+```
+All cars:
+Volvo
+BMW
+Ford
+Mazda
+
+First car: Volvo
+```
+
+**Ответ:** `iterator()` выдаёт `Iterator`; `hasNext`/`next` для обхода; после прохода нужен новый итератор.
+
+</details>

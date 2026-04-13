@@ -1,0 +1,1073 @@
+---
+title: "W12. Паттерны проектирования: Bridge, Flyweight, Factory Method"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "2026-04-07"
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Паттерны проектирования в контексте**
+
+На этой неделе продолжаем разбор каталога паттернов **GoF (Gang of Four)**. Три паттерна — **Bridge**, **Flyweight** и **Factory Method** — относятся к двум категориям:
+
+*   **Структурные (structural)** (Bridge, Flyweight): описывают, как классы и объекты **компонуются** в более крупные и полезные структуры.
+*   **Порождающие (creational)** (Factory Method): описывают, как **лучше создавать экземпляры** объектов.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Три паттерна этой недели в таксономии GoF"
+%%| fig-width: 6.2
+%%| fig-height: 3.0
+flowchart TB
+    Patterns["Design Patterns"]
+    Structural["Structural"]
+    Creational["Creational"]
+    B["Bridge"]
+    FW["Flyweight"]
+    FM["Factory Method"]
+    Patterns --> Structural
+    Patterns --> Creational
+    Structural --> B
+    Structural --> FW
+    Creational --> FM
+```
+
+##### **1.2 Мост (Bridge)**
+
+###### **1.2.1 Мотивация: проблема «комбинаторного взрыва» наследования**
+
+Типичный приём в ООП — держать интерфейс и реализацию в одном классе и наращивать поведение подклассами. Сложность возникает, когда две *независимые* оси изменчивости нужно выразить *одной* иерархией наследования. Пример: портативная GUI‑система окон с разными типами окон (*текстовое окно*, *окно‑иконка*, *диалог*) и разными платформами (*Android*, *iOS*, *Linux*). При «чистом» наследовании получается отдельный подкласс на каждую комбинацию:
+
+```
+AbstractWindow → TextWindowAndroid, TextWindowIOS, IconWindowAndroid, IconWindowIOS, ...
+```
+
+Добавление третьей платформы заставляет добавлять новые подклассы для *каждого* уже существующего типа окна — это **combinatorial explosion (комбинаторный взрыв)**. Корневая причина: связь между **abstraction** и **implementation** зафиксирована на этапе компиляции через наследование, и две оси нельзя развивать независимо.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Проблема: новая платформа требует новых подклассов для каждого типа окна"
+%%| fig-width: 7
+%%| fig-height: 3.8
+classDiagram
+    class AbstractWindow
+    class TextWindowAndroid
+    class TextWindowIOS
+    class IconWindowAndroid
+    class IconWindowIOS
+    AbstractWindow <|-- TextWindowAndroid
+    AbstractWindow <|-- TextWindowIOS
+    AbstractWindow <|-- IconWindowAndroid
+    AbstractWindow <|-- IconWindowIOS
+```
+
+###### **1.2.2 Решение Bridge**
+
+Паттерн **Bridge** устраняет это, разделяя одну «монолитную» иерархию на две независимо расширяемые, связанные *композицией* (поле‑ссылка), а не наследованием:
+
+1.  **Иерархия абстракции (abstraction)** — высокоуровневое понятие (например, типы окон). Базовая абстракция держит ссылку на объект реализации и делегирует ей низкоуровневые вызовы.
+2.  **Иерархия реализации (implementation)** — платформенные детали. Все варианты платформы реализуют общий интерфейс `Implementation`.
+
+Ссылка от абстракции к реализации — это и есть *мост (bridge)*. Клиент создаёт объект абстракции и передаёт нужную реализацию в конструктор; дальше работает только через интерфейс абстракции.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Bridge: две независимые иерархии, связанные полем‑ссылкой"
+%%| fig-width: 8
+%%| fig-height: 5.5
+classDiagram
+    class Client
+    class Abstraction {
+        -impl: Implementation
+        +feature1()
+        +feature2()
+    }
+    class RefinedAbstraction {
+        +featureN()
+    }
+    class Implementation {
+        <<interface>>
+        +method1()
+        +method2()
+        +method3()
+    }
+    class ConcreteImplementationA {
+        +method1()
+        +method2()
+        +method3()
+    }
+    class ConcreteImplementationB {
+        +method1()
+        +method2()
+        +method3()
+    }
+    Client --> Abstraction
+    Abstraction <|-- RefinedAbstraction
+    Abstraction o-- Implementation : impl
+    Implementation <|.. ConcreteImplementationA
+    Implementation <|.. ConcreteImplementationB
+```
+
+Пример GUI, переписанный с **Bridge**:
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Решение Bridge: типы окон и платформы развиваются независимо"
+%%| fig-width: 8
+%%| fig-height: 4.5
+classDiagram
+    class Window {
+        -impl: WindowImpl
+        +open()
+        +close()
+        +drawLine()
+    }
+    class TextWindow
+    class IconWindow
+    class WindowImpl {
+        <<interface>>
+        +drawLine()
+        +drawRect()
+        +drawText()
+    }
+    class AndroidWindowImpl
+    class IOSWindowImpl
+    class LinuxWindowImpl
+    Window <|-- TextWindow
+    Window <|-- IconWindow
+    Window o-- WindowImpl : impl
+    WindowImpl <|.. AndroidWindowImpl
+    WindowImpl <|.. IOSWindowImpl
+    WindowImpl <|.. LinuxWindowImpl
+```
+
+Набросок на C++, как задаётся ссылка‑мост:
+
+```cpp
+class Window {
+public:
+    Window(WindowImpl* i) : impl(i) { }
+    virtual void open();
+    virtual void close();
+    virtual void drawLine(coords) { impl->drawLine(coords); }
+    virtual void drawRect(coords) { impl->drawRect(coords); }
+    virtual void drawText(const char* t, coords) { impl->drawText(t, coords); }
+private:
+    WindowImpl* impl;   // the bridge
+};
+
+class WindowImpl {
+public:
+    virtual void drawLine(coords) = 0;
+    virtual void drawRect(coords) = 0;
+    virtual void drawText(const char*, coords) = 0;
+};
+
+class IosWindow : public WindowImpl {
+public:
+    void drawLine(coords) override { /* iOS rendering */ }
+    void drawRect(coords) override { /* iOS rendering */ }
+    void drawText(const char*, coords) override { /* iOS rendering */ }
+};
+
+// Client usage
+Window* w = new Window(new IosWindow());
+w->drawLine(coords);   // delegates to IosWindow::drawLine
+```
+
+Клиентский код вообще не зависит от `IosWindow` — он использует только интерфейс `Window`. Когда добавляют Linux, создают лишь новый класс `LinuxWindow : WindowImpl`; `Window`, `TextWindow` и клиентский код не меняются.
+
+###### **1.2.3 Когда применять**
+
+Имеет смысл выбирать **Bridge**, когда:
+
+*   у класса несколько *независимо* меняющихся измерений (например, форма × цвет, тип окна × платформа);
+*   нужно переключать **implementation** в runtime, не пересобирая абстракцию;
+*   и абстракции, и реализации должны расширяться подклассами;
+*   изменения в реализации не должны ломать клиентский код.
+
+###### **1.2.4 Как внедрить Bridge (пошагово)**
+
+1.  Найдите независимые измерения (например, абстракция vs платформа, домен vs инфраструктура).
+2.  Определите операции, которые нужны клиенту, в базовом классе абстракции.
+3.  Зафиксируйте операции, общие для всех платформ, в интерфейсе `Implementation`.
+4.  Создайте конкретные реализации для каждой платформы, соблюдая `Implementation`.
+5.  Добавьте в абстракцию поле типа `Implementation` и делегируйте низкоуровневую работу объекту в этом поле.
+6.  Добавьте **refined abstractions** (уточнённые абстракции) — подклассы базовой абстракции для вариантов высокоуровневой логики.
+7.  В клиентском коде передайте конкретную реализацию в конструктор абстракции; дальше клиент работает только с абстракцией.
+
+###### **1.2.5 Bridge vs Adapter**
+
+**Bridge** и **Adapter** похожи структурно (композиция и делегирование), но различаются *намерением (intent)*:
+
+*   **Adapter** устраняет несовместимость *двух уже существующих* интерфейсов — это «надстройка постфактум».
+*   **Bridge** закладывается *заранее*, чтобы разделить абстракцию и реализации и развивать их независимо.
+
+###### **1.2.6 Плюсы и минусы**
+
+*   **Плюсы**
+    *   платформенно независимые абстракции: клиент не касается деталей платформы;
+    *   *Open/Closed Principle (OCP)*: новые абстракции и новые реализации добавляются независимо;
+    *   *Single Responsibility Principle (SRP)*: высокоуровневая логика — в абстракции, платформенные детали — в реализации;
+    *   реализацию можно заменить в runtime, обновив ссылку.
+*   **Минусы**
+    *   лишняя сложность, если класс изначально связный и имеет одну разумную реализацию.
+
+##### **1.3 Приспособленец (Flyweight)**
+
+###### **1.3.1 Мотивация: память под множество похожих объектов**
+
+Некоторым приложениям нужны огромные количества мелкозернистых объектов: рендер леса — десятки/сотни тысяч деревьев; текстовый редактор — символ как объект со шрифтом, размером и цветом; симулятор трафика — объект на каждую машину. Если каждый объект хранит *все* данные сам по себе, память растёт почти линейно по числу объектов и быстро становится неприемлемой.
+
+Ключевая мысль: в таких сценариях у большинства объектов совпадает большая часть состояния. Например, все «Summer Oak» делят имя, цвет листвы и текстуры; различаются только координаты ($x$, $y$). Вместо дублирования общих данных в каждом экземпляре их выносят в один разделяемый объект и на него ссылаются.
+
+###### **1.3.2 Внутреннее и внешнее состояние (intrinsic state и extrinsic state)**
+
+**Flyweight** делит поля объекта на две категории:
+
+*   **Intrinsic state (внутреннее/повторяющееся состояние)**: одинаковые для многих объектов данные, которые не меняются и безопасно разделяются. Хранится внутри **flyweight** и делается **immutable** (задаётся в конструкторе и дальше не меняется).
+*   **Extrinsic state (внешнее/уникальное состояние)**: данные, различающиеся у экземпляров (позиция, идентичность). В flyweight *не хранятся*; передаются параметром при вызове методов flyweight или лежат в отдельном объекте **context**.
+
+###### **1.3.3 Структура**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Flyweight: intrinsic state разделяется; extrinsic state остаётся в Context"
+%%| fig-width: 8
+%%| fig-height: 5.5
+classDiagram
+    class Client
+    class FlyweightFactory {
+        -cache: Flyweight[]
+        +getFlyweight(repeatingState)
+    }
+    class Flyweight {
+        -intrinsicState
+        +operation(uniqueState)
+    }
+    class Context {
+        -uniqueState
+        -flyweight: Flyweight
+        +operation()
+    }
+    Client --> Context
+    Client --> FlyweightFactory
+    FlyweightFactory o-- Flyweight : cache
+    Context --> Flyweight : flyweight
+```
+
+*   **Flyweight**: хранит только intrinsic (общее) состояние. Метод `operation()` каждый раз принимает extrinsic state параметром.
+*   **FlyweightFactory**: ведёт пул (кэш) экземпляров flyweight. Если под запрошенный intrinsic state объект уже есть — возвращает его; иначе создаёт, кладёт в кэш и возвращает.
+*   **Context**: хранит extrinsic (уникальное) состояние одной логической сущности. Метод `operation()` делегирует flyweight, передавая уникальные данные аргументом.
+*   **Client**: либо сам вычисляет extrinsic state и передаёт его в методы flyweight, либо хранит его в `Context`.
+
+###### **1.3.4 Пример: лес**
+
+Пример из лекции наглядно показывает экономию памяти.
+
+**Без Flyweight** — каждое дерево хранит все данные самостоятельно:
+
+```cpp
+class Tree {
+public:
+    int x, y;
+    int age;
+    Tree(...) { ... }
+    void display() { ... }
+};
+// 100 000 экземпляров Tree, каждый тащит свою копию общих данных отрисовки
+```
+
+**С Flyweight** — общие данные отрисовки живут в одном `TreeType`; позиция и возраст — extrinsic:
+
+```java
+// TreeType.java — Flyweight: intrinsic (shared) state
+public class TreeType {
+    private String name;
+    private Color  leafColor;
+    private String otherTreeData;   // e.g., texture
+
+    public TreeType(String name, Color color, String otherTreeData) {
+        this.name = name;
+        this.leafColor = color;
+        this.otherTreeData = otherTreeData;
+    }
+
+    public void draw(Graphics g, int x, int y) {
+        g.setColor(Color.BLACK);
+        g.fillRect(x - 1, y, 3, 5);
+        g.setColor(leafColor);
+        g.fillOval(x - 5, y - 10, 10, 10);
+    }
+}
+
+// Tree.java — Context: extrinsic (unique) state
+public class Tree {
+    private int x;
+    private int y;
+    private TreeType type;   // reference to the shared flyweight
+
+    public Tree(int x, int y, TreeType type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+    }
+
+    public void draw(Graphics g) {
+        type.draw(g, x, y);   // pass extrinsic state (x, y) to flyweight
+    }
+}
+
+// TreeFactory.java — FlyweightFactory: pool of TreeType objects
+public class TreeFactory {
+    static Map<String, TreeType> treeTypes = new HashMap<>();
+
+    public static TreeType getTreeType(String name, Color color, String data) {
+        TreeType result = treeTypes.get(name);
+        if (result == null) {
+            result = new TreeType(name, color, data);
+            treeTypes.put(name, result);
+        }
+        return result;
+    }
+}
+```
+
+При 100 000 деревьев двух типов экономия памяти резкая: вместо 100 000 «тяжёлых» объектов система держит 100 000 лёгких контекстов `Tree` (условно по 8 байт каждый) плюс всего 2 flyweight `TreeType` (условно по ~30 байт). Итого порядка ~782 КБ вместо ~3.6 МБ — снижение более чем в 4 раза.
+
+###### **1.3.5 Как внедрить Flyweight (пошагово)**
+
+1.  Разделите поля класса на intrinsic (общее, immutable) и extrinsic (уникальное, контекстное).
+2.  Перенесите intrinsic поля в класс flyweight и сделайте их неизменяемыми.
+3.  Перепишите методы, которые читали extrinsic поля: вместо поля используйте параметр метода.
+4.  Создайте `FlyweightFactory` с кэшем (например, `HashMap`) по ключу intrinsic state. Клиенты получают flyweight только через фабрику.
+5.  При необходимости вынесите extrinsic state и ссылку на flyweight в отдельный `Context`.
+
+###### **1.3.6 Когда применять**
+
+Flyweight уместен только если:
+
+*   нужно очень много объектов, и память «на пределе»;
+*   у многих объектов есть дублирующееся состояние, которое можно вынести и разделить;
+*   extrinsic state удобно вычислять или хранить у клиента.
+
+###### **1.3.7 Плюсы и минусы**
+
+*   **Плюсы**
+    *   сильное снижение RAM, когда много объектов делят большой объём одинакового состояния.
+*   **Минусы**
+    *   возможен рост CPU: extrinsic state приходится передавать/вычислять на каждом вызове вместо чтения поля;
+    *   разделение intrinsic/extrinsic заметно усложняет понимание кода;
+    *   нельзя независимо «улучшить поведение» одного экземпляра: все, кто делят flyweight, связаны одним intrinsic state.
+
+##### **1.4 Фабричный метод (Factory Method)**
+
+###### **1.4.1 Мотивация: ослабить связь с конкретным созданием**
+
+Класс, который напрямую делает `new ConcreteProduct()`, жёстко связан с конкретным типом. Если набор продуктов меняется или в разных окружениях нужны разные продукты, базовый «создатель» приходится править — это бьёт по *Open/Closed Principle (OCP)*.
+
+Паттерн **Factory Method** переносит ответственность за создание объектов в подклассы. Базовый **Creator** объявляет абстрактный `createProduct()` (именно он и есть factory method) с типом возврата общего интерфейса `Product`. Каждый **ConcreteCreator** переопределяет `createProduct()` и возвращает нужный **ConcreteProduct**. Метод `someOperation()` у создателя вызывает `createProduct()`, не зная конкретного класса — только контракт `Product`.
+
+###### **1.4.2 Структура**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Структура паттерна Factory Method"
+%%| fig-width: 8
+%%| fig-height: 5.5
+classDiagram
+    class Creator {
+        <<abstract>>
+        +someOperation()
+        +createProduct() Product
+    }
+    class ConcreteCreatorA {
+        +createProduct() Product
+    }
+    class ConcreteCreatorB {
+        +createProduct() Product
+    }
+    class Product {
+        <<interface>>
+        +doStuff()
+    }
+    class ConcreteProductA {
+        +doStuff()
+    }
+    class ConcreteProductB {
+        +doStuff()
+    }
+    Creator <|-- ConcreteCreatorA
+    Creator <|-- ConcreteCreatorB
+    Product <|.. ConcreteProductA
+    Product <|.. ConcreteProductB
+    ConcreteCreatorA ..> ConcreteProductA : creates
+    ConcreteCreatorB ..> ConcreteProductB : creates
+```
+
+Внутри `Creator`:
+
+```java
+public abstract class Creator {
+    public void someOperation() {
+        Product p = createProduct();   // factory method — type unknown here
+        p.doStuff();
+    }
+
+    public abstract Product createProduct();
+}
+```
+
+Внутри конкретного создателя:
+
+```java
+public class ConcreteCreatorA extends Creator {
+    @Override
+    public Product createProduct() {
+        return new ConcreteProductA();
+    }
+}
+```
+
+Вызывающий код выбирает нужный `Creator` и зовёт `someOperation()` — напрямую `new ConcreteProductA()` не использует.
+
+###### **1.4.3 Пример: логистика**
+
+На слайдах лаборатории — логистика: `Logistics` — абстрактный создатель; `RoadLogistics` в `createTransport()` возвращает `Truck`, `SeaLogistics` — `Ship`. Базовый `planDelivery()` вызывает `createTransport()` и отправляет груз — одинаково для грузовика, корабля и, в будущем, самолёта.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Factory Method в логистической системе"
+%%| fig-width: 8
+%%| fig-height: 4.5
+classDiagram
+    class Logistics {
+        <<abstract>>
+        +planDelivery()
+        +createTransport() Transport
+    }
+    class RoadLogistics {
+        +createTransport() Transport
+    }
+    class SeaLogistics {
+        +createTransport() Transport
+    }
+    class Transport {
+        <<interface>>
+        +deliver()
+    }
+    class Truck {
+        +deliver()
+    }
+    class Ship {
+        +deliver()
+    }
+    Logistics <|-- RoadLogistics
+    Logistics <|-- SeaLogistics
+    Transport <|.. Truck
+    Transport <|.. Ship
+    RoadLogistics ..> Truck : creates
+    SeaLogistics ..> Ship : creates
+```
+
+###### **1.4.4 Когда применять**
+
+Factory Method уместен, когда:
+
+*   заранее неизвестен точный тип объекта — выбор делается в runtime (конфигурация, ввод пользователя);
+*   хотите позволить пользователям библиотеки/фреймворка расширять внутренние компоненты подклассами `Creator`, не меняя саму библиотеку;
+*   нужно переиспользовать объекты (кэш фабрики) вместо постоянного `new`.
+
+###### **1.4.5 Как внедрить Factory Method (пошагово)**
+
+1.  Введите общий интерфейс `Product` с методами, которые нужны всем вариантам продукта.
+2.  Добавьте в `Creator` абстрактный `createProduct(): Product` и замените прямые `new ConcreteProduct()` в остальных методах создателя на вызовы `createProduct()`.
+3.  Создайте по одному `ConcreteCreator` на тип продукта; каждый переопределяет `createProduct()`.
+4.  Если после выноса фабричный метод «пустой» — сделайте его `abstract`; иначе оставьте разумную реализацию по умолчанию.
+
+###### **1.4.6 Плюсы и минусы**
+
+*   **Плюсы**
+    *   снимает жёсткую связь создателя с конкретными продуктами;
+    *   *SRP*: создание продукта сосредоточено в `ConcreteCreator`;
+    *   *OCP*: новый тип продукта — новый `ConcreteCreator`, базовый создатель и клиенты не трогаем.
+*   **Минусы**
+    *   каждый новый тип продукта — ещё один подкласс создателя; при большой иерархии навигация усложняется.
+
+---
+
+#### **2. Определения**
+
+*   **Bridge**: структурный паттерн GoF; разделяет класс на две независимые иерархии — *abstraction* и *implementation*, связанные полем‑ссылкой (мост), чтобы обе менялись независимо.
+*   **Abstraction (Bridge)**: высокоуровневый слой управления; держит ссылку на `Implementation` и делегирует низкоуровневую работу.
+*   **Implementation (Bridge)**: платформенный интерфейс; все конкретные платформы ему соответствуют.
+*   **Refined Abstraction**: подкласс абстракции в Bridge, добавляющий/специализирующий высокоуровневую логику без правок реализаций.
+*   **Combinatorial Explosion**: рост числа подклассов как произведение размеров независимых осей при попытке выразить их одной иерархией наследования.
+*   **Flyweight**: структурный паттерн GoF; снижает память, разделяя общий **intrinsic state** между множеством мелких объектов, а **extrinsic state** держит вне разделяемого объекта.
+*   **Intrinsic State**: неизменяемая общая часть состояния flyweight; хранится внутри flyweight.
+*   **Extrinsic State**: уникальная контекстная часть; не хранится в flyweight — передаётся параметром или лежит в `Context`.
+*   **FlyweightFactory**: фабрика с кэшем flyweight; новый объект создаётся, если для данного intrinsic state ещё нет экземпляра.
+*   **Context (Flyweight)**: лёгкий объект, хранящий extrinsic state одной сущности и ссылку на общий flyweight.
+*   **Factory Method**: порождающий паттерн GoF; в базовом `Creator` объявляют фабричный метод создания `Product`, а подклассы (`ConcreteCreator`) решают, какой `ConcreteProduct` вернуть.
+*   **Creator**: абстрактный базовый класс в Factory Method; объявляет `createProduct()` и содержит бизнес‑логику, работающую через интерфейс `Product`.
+*   **ConcreteCreator**: подкласс `Creator`, переопределяющий `createProduct()` для конкретного продукта.
+*   **Product (Factory Method)**: общий интерфейс продуктов; контракт, на который опирается логика `Creator`.
+*   **Open/Closed Principle (OCP)**: принцип SOLID — открыт для расширения, закрыт для модификации.
+*   **Single Responsibility Principle (SRP)**: принцип SOLID — у класса должна быть одна причина для изменений.
+
+---
+
+#### **3. Примеры**
+
+##### **3.1. Повторение лекции — теоретические вопросы** (Лаба 11, **Задание** 1)
+
+Ответьте на шесть вопросов, чтобы проверить понимание трёх паттернов недели.
+
+**(a)** Зачем нужен паттерн **Bridge**?
+
+**(b)** Приведите реалистичный сценарий, где **Bridge** даст выигрыш.
+
+**(c)** Зачем нужен паттерн **Flyweight**?
+
+**(d)** Приведите реалистичный сценарий для **Flyweight**.
+
+**(e)** Зачем нужен паттерн **Factory** (имеется в виду **Factory Method**)?
+
+**(f)** Приведите реалистичный сценарий для **Factory Method**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**(a) Зачем Bridge:**
+**Bridge** устраняет **combinatorial explosion**: две независимые оси изменчивости нельзя безболезненно совмещать в одной иерархии наследования. Разделение на иерархию **abstraction** (высокоуровневая логика) и **implementation** (платформа/движок) плюс композиция позволяет расширять обе стороны независимо.
+
+**(b) Сценарий для Bridge:**
+Приложение **пульта**: разные типы устройств (TV, stereo, кондиционер) и разные протоколы (Bluetooth, IR, Wi‑Fi). Чистое наследование дало бы комбинаторику (`BluetoothTV`, …). С **Bridge** иерархия `RemoteControl` ссылается на `DeviceProtocol`: новый протокол — один новый класс реализации; новый тип устройства — один новый класс абстракции.
+
+**(c) Зачем Flyweight:**
+**Flyweight** борется с **чрезмерным расходом памяти**, когда нужно очень много похожих объектов. Общий **intrinsic state** выносится в разделяемый объект, уникальный **extrinsic state** хранится снаружи — число тяжёлых дубликатов резко падает.
+
+**(d) Сценарий для Flyweight:**
+**Текстовый редактор**: каждый символ как объект со шрифтом, кеглем и цветом. В документе на 200 000 символов хранить атрибуты в каждом символе дорого. С **Flyweight** каждая уникальная тройка (шрифт, размер, цвет) — один `CharacterFormat`; у символа остаются позиция и ссылка на формат.
+
+**(e) Зачем Factory Method:**
+**Factory Method** ослабляет **связь создателя с конкретными продуктами**: создание делегируется переопределяемому методу, базовый `Creator` работает через `Product`, клиент выбирает нужный `ConcreteCreator`.
+
+**(f) Сценарий для Factory Method:**
+**Кроссплатформенный UI**: базовый `Dialog` в `renderWindow()` создаёт кнопки через абстрактный `createButton()`. `WindowsDialog` возвращает `WindowsButton`, `WebDialog` — `HTMLButton`; остальной код `Dialog` не меняется.
+
+</details>
+
+##### **3.2. Реализовать Bridge для музыкального стриминга** (Лаба 11, **Задание** 2)
+
+Музыкальному приложению нужны плееры, которые умеют играть разные жанры (pop, jazz) и поддерживают разные аудиокодеки (MP3, WAV).
+
+**Задание:**
+
+1.  Укажите абстракцию, реализацию, refined abstractions и concrete implementations.
+2.  Перепроектируйте приложение с паттерном **Bridge**.
+3.  Добавьте плеер для жанра **rock** и кодек **FLAC**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** жанр (pop, jazz, rock) и кодек (MP3, WAV, FLAC) — две независимые оси. Через наследование получилось бы $n \times m$ подклассов. С **Bridge** жанр — это **abstraction**, кодек — **implementation**, и нужно лишь $n + m$ классов.
+
+**Шаг 1 — роли:**
+
+*   **Abstraction**: `MusicPlayer` — плеер под жанр; знает, *какой* это стиль музыки, и делегирует кодирование **implementation**.
+*   **Implementation interface**: `AudioCodec` — кодек; знает, *как* кодировать/декодировать поток.
+*   **Refined Abstractions**: `PopPlayer`, `JazzPlayer`, `RockPlayer`
+*   **Concrete Implementations**: `MP3Codec`, `WAVCodec`, `FLACCodec`
+
+**Шаг 2 — реализация:**
+
+```java
+// AudioCodec.java — Implementation interface
+public interface AudioCodec {
+    void encode(String track);
+}
+
+// MP3Codec.java — Concrete Implementation
+public class MP3Codec implements AudioCodec {
+    @Override
+    public void encode(String track) {
+        System.out.println("Encoding [" + track + "] as MP3");
+    }
+}
+
+// WAVCodec.java — Concrete Implementation
+public class WAVCodec implements AudioCodec {
+    @Override
+    public void encode(String track) {
+        System.out.println("Encoding [" + track + "] as WAV");
+    }
+}
+
+// FLACCodec.java — Concrete Implementation (Step 3 addition)
+public class FLACCodec implements AudioCodec {
+    @Override
+    public void encode(String track) {
+        System.out.println("Encoding [" + track + "] as FLAC (lossless)");
+    }
+}
+
+// MusicPlayer.java — Abstraction
+public abstract class MusicPlayer {
+    protected AudioCodec codec;   // the bridge
+
+    public MusicPlayer(AudioCodec codec) {
+        this.codec = codec;
+    }
+
+    public abstract void play(String track);
+}
+
+// PopPlayer.java — Refined Abstraction
+public class PopPlayer extends MusicPlayer {
+    public PopPlayer(AudioCodec codec) { super(codec); }
+
+    @Override
+    public void play(String track) {
+        System.out.print("Pop style: ");
+        codec.encode(track);
+    }
+}
+
+// JazzPlayer.java — Refined Abstraction
+public class JazzPlayer extends MusicPlayer {
+    public JazzPlayer(AudioCodec codec) { super(codec); }
+
+    @Override
+    public void play(String track) {
+        System.out.print("Jazz improvisation: ");
+        codec.encode(track);
+    }
+}
+
+// RockPlayer.java — Refined Abstraction (Step 3 addition)
+public class RockPlayer extends MusicPlayer {
+    public RockPlayer(AudioCodec codec) { super(codec); }
+
+    @Override
+    public void play(String track) {
+        System.out.print("Rock riff: ");
+        codec.encode(track);
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        MusicPlayer popMp3  = new PopPlayer(new MP3Codec());
+        MusicPlayer jazzWav = new JazzPlayer(new WAVCodec());
+        MusicPlayer rockFl  = new RockPlayer(new FLACCodec());
+
+        popMp3.play("Happy");
+        jazzWav.play("Blue Moon");
+        rockFl.play("Stairway to Heaven");
+
+        // Switch codec at runtime — no new class needed
+        MusicPlayer rockMp3 = new RockPlayer(new MP3Codec());
+        rockMp3.play("Highway to Hell");
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+Pop style: Encoding [Happy] as MP3
+Jazz improvisation: Encoding [Blue Moon] as WAV
+Rock riff: Encoding [Stairway to Heaven] as FLAC (lossless)
+Rock riff: Encoding [Highway to Hell] as MP3
+```
+
+**Ответ:** `RockPlayer` добавляет один класс в иерархию абстракций; `FLACCodec` — один класс в иерархию реализаций. Существующие классы не меняются.
+
+</details>
+
+##### **3.3. Реализовать Flyweight для текстового форматтера** (Лаба 11, **Задание** 3)
+
+Дан стартовый код неэффективного форматтера: у каждого символа свои шрифт, кегль и цвет.
+
+**Задание:**
+
+1.  Создайте класс `FormatType` для пресета «шрифт–размер–цвет» (**flyweight**).
+2.  Создайте `FormatFactory` со статическим словарём уже созданных форматов.
+3.  Допишите код по паттерну **Flyweight**, чтобы сильно снизить расход памяти.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** тройка (font, size, color) — **intrinsic state**, общая для всех символов с одинаковым форматированием. Позиция в документе и сам глиф — **extrinsic state**. `FormatType` — flyweight; `FormatFactory` — кэш; каждый `Character` (**Context**) хранит только extrinsic часть и ссылку на `FormatType`.
+
+```java
+// FormatType.java — Flyweight: intrinsic (shared, immutable) state
+public class FormatType {
+    private final String font;
+    private final int    size;
+    private final String color;
+
+    public FormatType(String font, int size, String color) {
+        this.font  = font;
+        this.size  = size;
+        this.color = color;
+    }
+
+    public void applyFormat(char glyph, int position) {
+        System.out.printf(
+            "Char '%c' at pos %d — font=%s, size=%d, color=%s%n",
+            glyph, position, font, size, color);
+    }
+
+    @Override
+    public String toString() {
+        return font + "-" + size + "-" + color;
+    }
+}
+
+// FormatFactory.java — FlyweightFactory: maintains a cache of FormatType instances
+public class FormatFactory {
+    private static final Map<String, FormatType> cache = new HashMap<>();
+
+    public static FormatType getFormat(String font, int size, String color) {
+        String key = font + "-" + size + "-" + color;
+        FormatType ft = cache.get(key);
+        if (ft == null) {
+            ft = new FormatType(font, size, color);
+            cache.put(key, ft);
+            System.out.println("FormatFactory: created new FormatType — " + key);
+        }
+        return ft;
+    }
+
+    public static int cacheSize() { return cache.size(); }
+}
+
+// Character.java — Context: extrinsic (unique) state + flyweight reference
+public class Character {
+    private final char       glyph;
+    private final int        position;
+    private final FormatType format;   // shared flyweight
+
+    public Character(char glyph, int position, FormatType format) {
+        this.glyph    = glyph;
+        this.position = position;
+        this.format   = format;
+    }
+
+    public void display() {
+        format.applyFormat(glyph, position);
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        List<Character> document = new ArrayList<>();
+
+        // Two thousand characters share the same two FormatType objects
+        for (int i = 0; i < 1000; i++) {
+            FormatType bold = FormatFactory.getFormat("Arial", 12, "black");
+            document.add(new Character('A', i, bold));
+        }
+        for (int i = 1000; i < 2000; i++) {
+            FormatType italic = FormatFactory.getFormat("Times", 10, "blue");
+            document.add(new Character('b', i, italic));
+        }
+
+        System.out.println("\nDocument size: " + document.size() + " characters");
+        System.out.println("Distinct FormatType objects: " + FormatFactory.cacheSize());
+
+        // Display first three characters
+        document.get(0).display();
+        document.get(1000).display();
+    }
+}
+```
+
+**Ожидаемый вывод (фрагмент):**
+
+```
+FormatFactory: created new FormatType — Arial-12-black
+FormatFactory: created new FormatType — Times-10-blue
+
+Document size: 2000 characters
+Distinct FormatType objects: 2
+Char 'A' at pos 0 — font=Arial, size=12, color=black
+Char 'b' at pos 1000 — font=Times, size=10, color=blue
+```
+
+**Ответ:** 2000 объектов символов, но созданы только **2** экземпляра `FormatType`. Без **Flyweight** каждый символ тащил бы свою копию шрифта, размера и цвета — рост памяти примерно в 2000 раз по сравнению с разделяемыми форматами.
+
+</details>
+
+##### **3.4. Реализовать Factory Method для транспортной системы** (Лаба 11, **Задание** 4)
+
+По диаграмме ниже — учебный кейс **Factory Method** для транспорта. Реализуйте его.
+
+*   Интерфейс `ITransport` с методом `deliver(): void`.
+*   Три класса: `Truck` (поле `address: String`), `Ship` (`country: String`), `Plane` (`country: String`).
+*   Класс `TransportFactory` с `getTransport(): ITransport`, создающий нужный транспорт по входу.
+*   Класс `FactoryDemo` с `main()`, демонстрирующий фабрику.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `TransportFactory.getTransport()` выбирает конкретный `ITransport`. Клиент `FactoryDemo` работает только через `ITransport` и не пишет `new Truck()` напрямую.
+
+```java
+// ITransport.java — Product interface
+public interface ITransport {
+    void deliver();
+}
+
+// Truck.java — Concrete Product
+public class Truck implements ITransport {
+    private String address;
+
+    public Truck(String address) {
+        this.address = address;
+    }
+
+    @Override
+    public void deliver() {
+        System.out.println("Truck delivering by road to: " + address);
+    }
+}
+
+// Ship.java — Concrete Product
+public class Ship implements ITransport {
+    public String country;
+
+    public Ship(String country) {
+        this.country = country;
+    }
+
+    @Override
+    public void deliver() {
+        System.out.println("Ship delivering by sea to: " + country);
+    }
+}
+
+// Plane.java — Concrete Product
+public class Plane implements ITransport {
+    public String country;
+
+    public Plane(String country) {
+        this.country = country;
+    }
+
+    @Override
+    public void deliver() {
+        System.out.println("Plane delivering by air to: " + country);
+    }
+}
+
+// TransportFactory.java — Creator / Factory
+public class TransportFactory {
+    /**
+     * Factory method: selects and creates the appropriate transport.
+     * In a real system the selection could be driven by config, distance, weight, etc.
+     */
+    public ITransport getTransport(String type, String destination) {
+        switch (type.toLowerCase()) {
+            case "truck": return new Truck(destination);
+            case "ship":  return new Ship(destination);
+            case "plane": return new Plane(destination);
+            default: throw new IllegalArgumentException("Unknown transport type: " + type);
+        }
+    }
+}
+
+// FactoryDemo.java — Client
+public class FactoryDemo {
+    public static void main(String[] args) {
+        TransportFactory factory = new TransportFactory();
+
+        ITransport t1 = factory.getTransport("truck", "123 Main St, Kazan");
+        ITransport t2 = factory.getTransport("ship",  "Germany");
+        ITransport t3 = factory.getTransport("plane", "Japan");
+
+        t1.deliver();
+        t2.deliver();
+        t3.deliver();
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+Truck delivering by road to: 123 Main St, Kazan
+Ship delivering by sea to: Germany
+Plane delivering by air to: Japan
+```
+
+**Ответ:** `FactoryDemo` не зависит от конкретных классов транспорта. Чтобы добавить `ElectricBike`, достаточно нового класса и ветки в `TransportFactory` — `FactoryDemo` не меняется.
+
+</details>
+
+##### **3.5. Спроектировать Bridge для списка с расширением Stack** (Лекция 11, **Задание** 1)
+
+Есть две реализации списка: на массиве и на указателях (связный список).
+
+1.  Опишите конфигурацию **абстрактного интерфейса списка** (независимого от хранения) и две реализации в духе **Bridge**.
+2.  Добавьте класс `Stack`, производный от абстракции списка, снова используя **Bridge**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** абстракция — сама структура списка; реализация — механизм хранения (массив vs связный список). `Stack` — **refined abstraction**: добавляет операции стека (`push`, `pop`, `peek`) поверх списка, не трогая классы хранения.
+
+**Назначение ролей:**
+
+| Роль | Класс |
+|:-----|:------|
+| Abstraction | `AbstractList` |
+| Refined Abstraction | `AbstractStack` |
+| Implementation interface | `ListImpl` |
+| Concrete Implementation 1 | `ArrayListImpl` |
+| Concrete Implementation 2 | `LinkedListImpl` |
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Bridge для списка и стека: абстракция и реализация развиваются независимо"
+%%| fig-width: 8
+%%| fig-height: 5
+classDiagram
+    class AbstractList {
+        #impl: ListImpl
+        +add(item)
+        +remove(index)
+        +get(index)
+        +size()
+    }
+    class AbstractStack {
+        +push(item)
+        +pop()
+        +peek()
+    }
+    class ListImpl {
+        <<interface>>
+        +implAdd(item)
+        +implRemove(index)
+        +implGet(index)
+        +implSize()
+    }
+    class ArrayListImpl {
+        +implAdd(item)
+        +implRemove(index)
+        +implGet(index)
+        +implSize()
+    }
+    class LinkedListImpl {
+        +implAdd(item)
+        +implRemove(index)
+        +implGet(index)
+        +implSize()
+    }
+    AbstractList <|-- AbstractStack
+    AbstractList o-- ListImpl : impl
+    ListImpl <|.. ArrayListImpl
+    ListImpl <|.. LinkedListImpl
+```
+
+```java
+// ListImpl.java — Implementation interface
+public interface ListImpl {
+    void   implAdd(Object item);
+    void   implRemove(int index);
+    Object implGet(int index);
+    int    implSize();
+}
+
+// ArrayListImpl.java — Concrete Implementation 1
+import java.util.ArrayList;
+public class ArrayListImpl implements ListImpl {
+    private ArrayList<Object> data = new ArrayList<>();
+    public void   implAdd(Object item)  { data.add(item); }
+    public void   implRemove(int index) { data.remove(index); }
+    public Object implGet(int index)    { return data.get(index); }
+    public int    implSize()            { return data.size(); }
+}
+
+// LinkedListImpl.java — Concrete Implementation 2
+import java.util.LinkedList;
+public class LinkedListImpl implements ListImpl {
+    private LinkedList<Object> data = new LinkedList<>();
+    public void   implAdd(Object item)  { data.add(item); }
+    public void   implRemove(int index) { data.remove(index); }
+    public Object implGet(int index)    { return data.get(index); }
+    public int    implSize()            { return data.size(); }
+}
+
+// AbstractList.java — Abstraction
+public class AbstractList {
+    protected ListImpl impl;   // the bridge
+
+    public AbstractList(ListImpl impl) { this.impl = impl; }
+
+    public void   add(Object item)  { impl.implAdd(item); }
+    public void   remove(int index) { impl.implRemove(index); }
+    public Object get(int index)    { return impl.implGet(index); }
+    public int    size()            { return impl.implSize(); }
+}
+
+// AbstractStack.java — Refined Abstraction
+public class AbstractStack extends AbstractList {
+    public AbstractStack(ListImpl impl) { super(impl); }
+
+    public void push(Object item) {
+        add(item);   // append to end
+    }
+
+    public Object pop() {
+        int last = size() - 1;
+        Object top = get(last);
+        remove(last);
+        return top;
+    }
+
+    public Object peek() {
+        return get(size() - 1);
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        // Stack backed by an array
+        AbstractStack stackArr = new AbstractStack(new ArrayListImpl());
+        stackArr.push(10);
+        stackArr.push(20);
+        stackArr.push(30);
+        System.out.println("Peek: " + stackArr.peek());    // 30
+        System.out.println("Pop:  " + stackArr.pop());     // 30
+        System.out.println("Size: " + stackArr.size());    // 2
+
+        // Same stack logic, different implementation — just swap the bridge
+        AbstractStack stackLink = new AbstractStack(new LinkedListImpl());
+        stackLink.push("A");
+        stackLink.push("B");
+        System.out.println("Pop:  " + stackLink.pop());    // B
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+Peek: 30
+Pop:  30
+Size: 2
+Pop:  B
+```
+
+**Ответ:** реализацию можно поменять с массива на связный список, передав другой аргумент конструктору — логика `AbstractStack` не меняется. Добавление refined abstraction вроде `Deque` снова не требует правок `ArrayListImpl` и `LinkedListImpl`.
+
+</details>

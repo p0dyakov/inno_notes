@@ -1,0 +1,1026 @@
+---
+title: "W6. Ортогональная проекция, метод наименьших квадратов, нормальные уравнения, QR-разложение для МНК"
+author: "Salman Ahmadi-Asl"
+date: 2026-02-27
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Задача метода наименьших квадратов (least squares)**
+
+Во многих прикладных задачах мы сталкиваемся с системами линейных уравнений $A\mathbf{x} = \mathbf{b}$, у которых **нет точного решения**. Это происходит, когда система **переопределена** (*overdetermined*): уравнений больше, чем неизвестных (то есть $m > n$ для матрицы $A$ размера $m \times n$). Например, при подгонке прямой к 100 экспериментальным точкам у нас 100 уравнений и всего 2 неизвестных (наклон и сдвиг). Практически нереально, чтобы одна прямая прошла **точно** через все 100 точек.
+
+Вместо того чтобы «сдаться», задаём более правильный вопрос: *какое решение наилучшее в смысле приближения?* Это и есть **задача метода наименьших квадратов** (*least squares problem*).
+
+**Определение (решение в смысле МНК, least-squares solution):** Пусть $A \in \mathbb{R}^{m \times n}$ и $\mathbf{b} \in \mathbb{R}^m$. **Решение в смысле МНК** — это вектор $\hat{\mathbf{x}} \in \mathbb{R}^n$, который минимизирует **норму невязки** (*residual norm*):
+
+$$\|A\hat{\mathbf{x}} - \mathbf{b}\|^2 = \sum_{i=1}^m (a_i^T \hat{\mathbf{x}} - b_i)^2$$
+
+где $a_i^T$ — $i$-я строка $A$, а $b_i$ — $i$-я компонента $\mathbf{b}$. Название «наименьших квадратов» (*least squares*) связано с тем, что мы минимизируем *сумму квадратов ошибок* между предсказаниями $A\hat{\mathbf{x}}$ и наблюдениями $\mathbf{b}$.
+
+###### **1.1.1 Мотивирующий пример: подгонка прямой**
+
+Пусть нужно найти наилучшую прямую $y = mx + c$ по трём точкам: $(1, 1)$, $(2, 2)$, $(3, 2)$. Подстановка каждой точки даёт систему:
+
+$$\begin{cases} m \cdot 1 + c = 1 \\ m \cdot 2 + c = 2 \\ m \cdot 3 + c = 2 \end{cases} \quad \Longleftrightarrow \quad \underbrace{\begin{bmatrix} 1 & 1 \\ 2 & 1 \\ 3 & 1 \end{bmatrix}}_{A} \underbrace{\begin{bmatrix} m \\ c \end{bmatrix}}_{\mathbf{x}} = \underbrace{\begin{bmatrix} 1 \\ 2 \\ 2 \end{bmatrix}}_{\mathbf{b}}$$
+
+Ни одна прямая не проходит через все три точки одновременно (получается противоречие). Подход МНК находит прямую, которая минимизирует сумму **квадратов вертикальных** расстояний от точек до прямой.
+
+###### **1.1.2 Приложения**
+
+МНК встречается повсюду:
+
+*   **Статистика:** линейная регрессия (*linear regression*) — подгонка моделей к данным
+*   **Машинное обучение:** обучение линейных моделей
+*   **Физика и инженерия:** подгонка экспериментальных данных теоретическим моделям
+*   **Обработка сигналов:** синтез фильтров и идентификация систем
+*   **Эконометрика:** оценка кривых спроса и функций издержек
+*   **Компьютерное зрение:** калибровка камер и оценка позы
+
+##### **1.2 Геометрическая интерпретация: проекция на столбцовое пространство**
+
+Ключевая геометрическая идея: $A\mathbf{x}$ всегда лежит в **столбцовом пространстве** (*column space*) $\mathcal{C}(A)$ — какой бы $\mathbf{x}$ мы ни выбрали. Если $\mathbf{b} \notin \mathcal{C}(A)$, точного решения нет. Но можно спросить: *какая точка $\mathcal{C}(A)$ ближе всего к $\mathbf{b}$?*
+
+Ближайшая точка — это **ортогональная проекция** (*orthogonal projection*) $\mathbf{b}$ на $\mathcal{C}(A)$; обозначим $\mathbf{p} = \text{proj}_{\mathcal{C}(A)}(\mathbf{b})$. Решение МНК $\hat{\mathbf{x}}$ — это ровно тот вектор, для которого $A\hat{\mathbf{x}} = \mathbf{p}$.
+
+<!-- DIAGRAM HERE -->
+
+**Вектор ошибки** (*error vector*) $\mathbf{e} = \mathbf{b} - \mathbf{p} = \mathbf{b} - A\hat{\mathbf{x}}$ ортогонален всему столбцовому пространству $\mathcal{C}(A)$. Это условие ортогональности — ключ к выводу формул.
+
+##### **1.3 Нормальные уравнения**
+
+Условие $\mathbf{e} \perp \mathcal{C}(A)$ означает: $\mathbf{e}$ ортогонален каждому столбцу $A$. Поскольку столбцы порождают $\mathcal{C}(A)$, это эквивалентно:
+
+$$A^T(\mathbf{b} - A\hat{\mathbf{x}}) = \mathbf{0}$$
+
+Раскрытие даёт **нормальные уравнения** (*normal equations*):
+
+$$\boxed{A^T A \hat{\mathbf{x}} = A^T \mathbf{b}}$$
+
+Эта система всегда **совместна**. Если $A$ имеет **полный столбцовый ранг** (*full column rank*) (столбцы линейно независимы), то $A^T A$ обратима и единственное решение в смысле МНК:
+
+$$\hat{\mathbf{x}} = (A^T A)^{-1} A^T \mathbf{b}$$
+
+###### **1.3.1 Вывод через анализ (альтернатива)**
+
+Нормальные уравнения можно получить, минимизируя $f(\mathbf{x}) = \|A\mathbf{x} - \mathbf{b}\|^2$ напрямую. Раскрытие:
+
+$$f(\mathbf{x}) = (A\mathbf{x} - \mathbf{b})^T(A\mathbf{x} - \mathbf{b}) = \mathbf{x}^T A^T A \mathbf{x} - 2\mathbf{b}^T A\mathbf{x} + \mathbf{b}^T \mathbf{b}$$
+
+Градиент и приравнивание к нулю:
+
+$$\nabla f(\mathbf{x}) = 2A^T A\mathbf{x} - 2A^T \mathbf{b} = \mathbf{0}$$
+
+$$\Longrightarrow \quad A^T A\mathbf{x} = A^T \mathbf{b}$$
+
+Это согласуется с нормальными уравнениями с точки зрения матанализа.
+
+###### **1.3.2 Свойства $A^T A$**
+
+Матрица $A^T A$ всегда:
+
+*   **Квадратная:** $n \times n$
+*   **Симметричная:** $(A^T A)^T = A^T (A^T)^T = A^T A$
+*   **Положительно полуопределённая:** $\mathbf{x}^T (A^T A) \mathbf{x} = \|A\mathbf{x}\|^2 \geq 0$
+*   **Обратима** тогда и только тогда, когда $A$ имеет полный столбцовый ранг (столбцы линейно независимы)
+
+###### **1.3.3 Псевдообратная матрица**
+
+При полном столбцовом ранге формулу $\hat{\mathbf{x}} = (A^T A)^{-1} A^T \mathbf{b}$ удобно записать через **псевдообратную по Муру–Пенроузу** (*Moore–Penrose pseudoinverse*):
+
+$$A^+ = (A^T A)^{-1} A^T$$
+
+так что $\hat{\mathbf{x}} = A^+ \mathbf{b}$. Псевдообратная обобщает обычную: если $A$ квадратная и обратима, $A^+ = A^{-1}$; для прямоугольной $A$ полного столбцового ранга она сразу даёт решение МНК. Выполняются четыре условия Мура–Пенроуза; в частности $AA^+ A = A$ и $A^+ A A^+ = A^+$.
+
+Псевдообратная — центральный объект численной линейной алгебры; в машинном обучении и обработке сигналов её часто называют каноническим способом «обратить» невырожденное по форме отображение.
+
+##### **1.4 Матрицы проекции**
+
+###### **1.4.1 Проекция на подпространство**
+
+Для подпространства $V \subseteq \mathbb{R}^m$ **проекция** (*projection*) $\mathbf{b}$ на $V$ — это единственный вектор $\mathbf{p} \in V$, ближайший к $\mathbf{b}$. Ключевое свойство: ошибка $\mathbf{b} - \mathbf{p}$ ортогональна $V$.
+
+Если $V = \mathcal{C}(A)$, проекция $\mathbf{b}$:
+
+$$\mathbf{p} = A\hat{\mathbf{x}} = A(A^T A)^{-1} A^T \mathbf{b}$$
+
+Значит, можно ввести **матрицу проекции** (*projection matrix*) $P$ так, что $\mathbf{p} = P\mathbf{b}$:
+
+$$\boxed{P = A(A^T A)^{-1} A^T}$$
+
+Матрица $P$ проецирует любой $\mathbf{b} \in \mathbb{R}^m$ на столбцовое пространство $\mathcal{C}(A)$.
+
+**Частный случай: проекция на прямую.** Если $V = \text{span}\{\mathbf{a}\}$ (один ненулевой вектор $\mathbf{a}$), то:
+
+$$P = \frac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T \mathbf{a}}$$
+
+###### **1.4.2 Свойства матриц ортогональной проекции**
+
+Матрица $P$ — ортогональная проекция тогда и только тогда, когда выполнены два условия:
+
+1.  **Идемпотентность (*idempotent*):** $P^2 = P$ (двойная проекция совпадает с одной)
+2.  **Симметричность:** $P^T = P$
+
+Для $P = A(A^T A)^{-1}A^T$ это проверяется напрямую:
+
+*   $P^2 = A(A^T A)^{-1}A^T \cdot A(A^T A)^{-1}A^T = A(A^T A)^{-1}(A^T A)(A^T A)^{-1}A^T = A(A^T A)^{-1}A^T = P$ ✓
+*   $P^T = (A(A^T A)^{-1}A^T)^T = A((A^T A)^{-1})^T A^T = A(A^T A)^{-1}A^T = P$ ✓ (используя симметрию $A^T A$)
+
+Дополнительно:
+
+*   $\text{rank}(P) = \text{rank}(A)$
+*   Для любого $\mathbf{b}$, $P\mathbf{b} \in \mathcal{C}(A)$
+*   $(I - P)$ — тоже матрица проекции: на $\mathcal{N}(A^T)$ (*left null space*, ортогональное дополнение к $\mathcal{C}(A)$)
+*   **$P$ необратима.** Матрица $P = A(A^T A)^{-1}A^T$ отображает всё $\mathbb{R}^m$ на $\mathcal{C}(A)$ размерности $r = \text{rank}(A) < m$ (если $A$ не квадратная полного ранга по строкам/столбцам в особом случае). Любой $\mathbf{v} \in \mathcal{C}(A)^\perp = \mathcal{N}(A^T)$ удовлетворяет $P\mathbf{v} = \mathbf{0}$, значит у $P$ нетривиальное ядро и она **вырождена** (*singular*). Геометрически $P$ «сжимает» всё ортогональное дополнение в ноль.
+
+###### **1.4.3 Доказательство $P^2 = P$ для проекции на прямую**
+
+Для $P = \frac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}}$:
+
+$$P^2 = \frac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}} \cdot \frac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}} = \frac{\mathbf{a}(\mathbf{a}^T\mathbf{a})\mathbf{a}^T}{(\mathbf{a}^T\mathbf{a})^2} = \frac{(\mathbf{a}^T\mathbf{a})\,\mathbf{a}\mathbf{a}^T}{(\mathbf{a}^T\mathbf{a})^2} = \frac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}} = P$$
+
+Скаляр $\mathbf{a}^T\mathbf{a}$ сокращается с одним множителем в знаменателе.
+
+##### **1.5 Подгонка данных методом МНК**
+
+###### **1.5.1 Прямая**
+
+Даны $n$ точек $(t_1, b_1), (t_2, b_2), \ldots, (t_n, b_n)$; ищем наилучшую прямую $b = C + Dt$. Переопределённая система $A\mathbf{x} \approx \mathbf{b}$:
+
+$$A = \begin{pmatrix} 1 & t_1 \\ 1 & t_2 \\ \vdots & \vdots \\ 1 & t_n \end{pmatrix}, \quad \mathbf{x} = \begin{pmatrix} C \\ D \end{pmatrix}, \quad \mathbf{b} = \begin{pmatrix} b_1 \\ b_2 \\ \vdots \\ b_n \end{pmatrix}$$
+
+Решение через нормальные уравнения $A^T A\hat{\mathbf{x}} = A^T \mathbf{b}$ даёт наилучшую прямую.
+
+**Важный факт:** наилучшая прямая всегда проходит через **точку средних** (*point of averages*) $(\bar{t}, \bar{b})$, где $\bar{t} = \frac{1}{n}\sum t_i$ и $\bar{b} = \frac{1}{n}\sum b_i$.
+
+**Доказательство.** Первая строка нормальных уравнений $A^T A\hat{\mathbf{x}} = A^T \mathbf{b}$ соответствует первому столбцу $A$ (вектор из единиц $\mathbf{1}$):
+
+$$\mathbf{1}^T(A\hat{\mathbf{x}} - \mathbf{b}) = 0 \quad \Longleftrightarrow \quad \sum_{i=1}^n (C + D t_i) = \sum_{i=1}^n b_i$$
+
+Деление на $n$:
+
+$$C + D\bar{t} = \bar{b}$$
+
+Это в точности условие прохождения прямой $b = C + Dt$ через $(\bar{t}, \bar{b})$. $\blacksquare$
+
+###### **1.5.2 Плоскость и большие размерности**
+
+То же рассуждение обобщается. Для плоскости $y = C + Dt + Ez$ по точкам $(y_i, t_i, z_i)$:
+
+$$A = \begin{pmatrix} 1 & t_1 & z_1 \\ 1 & t_2 & z_2 \\ \vdots & \vdots & \vdots \\ 1 & t_n & z_n \end{pmatrix}, \quad \mathbf{x} = \begin{pmatrix} C \\ D \\ E \end{pmatrix}$$
+
+Нормальные уравнения $A^T A\hat{\mathbf{x}} = A^T \mathbf{b}$ по-прежнему применимы; получается система $3 \times 3$ на три неизвестных.
+
+##### **1.6 QR-разложение для МНК**
+
+###### **1.6.1 Почему QR лучше**
+
+Решение нормальных уравнений $A^T A \hat{\mathbf{x}} = A^T \mathbf{b}$ через $(A^T A)^{-1}$ математически корректно, но может быть **численно неустойчивым**. Число обусловленности $A^T A$ — *квадрат* числа обусловленности $A$: малые погрешности в $A$ или $\mathbf{b}$ сильно усиливаются.
+
+**QR-разложение** (*QR decomposition*) позволяет не формировать $A^T A$ вообще.
+
+###### **1.6.2 Вывод**
+
+Пусть $A = QR$, где $Q$ — $m \times n$ с ортонормированными столбцами ($Q^T Q = I_n$), а $R$ — $n \times n$ верхнетреугольная с положительной диагональю. Подстановка в нормальные уравнения:
+
+$$A^T A \hat{\mathbf{x}} = A^T \mathbf{b}$$
+$$(QR)^T (QR) \hat{\mathbf{x}} = (QR)^T \mathbf{b}$$
+$$R^T \underbrace{Q^T Q}_{I} R \hat{\mathbf{x}} = R^T Q^T \mathbf{b}$$
+$$R^T R \hat{\mathbf{x}} = R^T Q^T \mathbf{b}$$
+
+Если $R$ обратима ($A$ полного столбцового ранга), умножаем слева на $(R^T)^{-1}$:
+
+$$\boxed{R\hat{\mathbf{x}} = Q^T \mathbf{b}}$$
+
+###### **1.6.3 Обратная подстановка (*back substitution*)**
+
+Так как $R$ **верхнетреугольная**, систему $R\hat{\mathbf{x}} = Q^T \mathbf{b}$ решают **обратной подстановкой** — без обращения матрицы:
+
+1.  Вычислить QR: $A = QR$ (Грама–Шмидта или отражения Хаусхолдера)
+2.  $\mathbf{c} = Q^T \mathbf{b}$
+3.  Решить $R\hat{\mathbf{x}} = \mathbf{c}$ обратной подстановкой
+
+**Плюсы относительно нормальных уравнений:**
+
+*   Не нужно формировать $A^T A$
+*   Обратная подстановка дёшева ($O(n^2)$ вместо $O(n^3)$ для «прямого» обращения)
+*   Численно устойчивее и предпочтительнее на практике
+
+###### **1.6.4 SVD как альтернатива для больших или ранг-дефицитных задач**
+
+Для крупномасштабных или ранг-дефицитных задач **SVD** (*Singular Value Decomposition*) даёт наиболее общий и устойчивый подход к МНК. Любую $m \times n$ матрицу $A$ можно представить:
+
+$$A = U \Sigma V^T$$
+
+где $U$ и $V$ ортогональны, а $\Sigma$ — «диагональная» с неотрицательными **сингулярными числами** (*singular values*) $\sigma_1 \geq \cdots \geq \sigma_r > 0$. Тогда псевдообратная:
+
+$$A^+ = V \Sigma^+ U^T$$
+
+где $\Sigma^+$ заменяет ненулевые $\sigma_i$ на $1/\sigma_i$. Решение МНК минимальной нормы: $\hat{\mathbf{x}} = A^+ \mathbf{b}$.
+
+**Зачем SVD вместо QR или нормальных уравнений?**
+
+*   Корректно обрабатывает **ранг-дефицит**
+*   Избегает опасности формирования $A^T A$
+*   Показывает геометрию задачи (ранг, число обусловленности, ядро)
+*   Метод выбора в ML (например, PCA) и в крупномасштабных вычислениях
+
+Число обусловленности $A$ есть $\kappa(A) = \sigma_1 / \sigma_r$; для $A^T A$ — $\kappa(A)^2$, поэтому при плохой обусловленности предпочтительно работать с $A$ через QR или SVD.
+
+***
+
+#### **2. Определения**
+
+*   **Переопределённая система** (*overdetermined system*): система $A\mathbf{x} = \mathbf{b}$ с числом уравнений больше числа неизвестных ($m > n$); обычно не имеет точного решения.
+*   **Решение в смысле МНК** (*least-squares solution*): вектор $\hat{\mathbf{x}}$, минимизирующий $\|A\hat{\mathbf{x}} - \mathbf{b}\|^2$, то есть сумму квадратов невязок.
+*   **Вектор невязки (ошибки)** (*residual / error vector*): $\mathbf{e} = \mathbf{b} - A\hat{\mathbf{x}}$; разница между наблюдениями и предсказаниями модели. Для решения МНК выполняется $\mathbf{e} \perp \mathcal{C}(A)$.
+*   **Нормальные уравнения** (*normal equations*): система $A^T A \hat{\mathbf{x}} = A^T \mathbf{b}$, из решения которой получается решение МНК. Выводятся из условия ортогональности $A^T \mathbf{e} = \mathbf{0}$.
+*   **Проекция на подпространство** (*projection onto a subspace*): для $V \subseteq \mathbb{R}^m$ проекция $\mathbf{b}$ на $V$ — единственный $\mathbf{p} \in V$, минимизирующий $\|\mathbf{b} - \mathbf{p}\|$. Ошибка $\mathbf{b} - \mathbf{p}$ ортогональна $V$.
+*   **Матрица проекции** (*projection matrix*): матрица $P$ такая, что $P\mathbf{b}$ — ортогональная проекция $\mathbf{b}$ на подпространство. Для $\mathcal{C}(A)$: $P = A(A^T A)^{-1}A^T$. Характеризуется $P^2 = P$ (идемпотентность) и $P^T = P$ (симметричность).
+*   **Идемпотентная матрица** (*idempotent matrix*): $P^2 = P$; повторная проекция не меняет результат.
+*   **Псевдообратная** (*pseudoinverse*, левый обратный Мура–Пенроуза): при полном столбцовом ранге $A^+ = (A^T A)^{-1}A^T$, причём $A^+ A = I_n$ и $\hat{\mathbf{x}} = A^+ \mathbf{b}$.
+*   **Точка средних** (*point of averages*): точка $(\bar{t}, \bar{b})$, через которую проходит любая МНК‑прямая наилучшего приближения; $\bar{t}$, $\bar{b}$ — средние значения регрессоров и отклика.
+*   **QR‑разложение** (*QR decomposition*): $A = QR$, где $Q$ — $m \times n$ с ортонормированными столбцами ($Q^T Q = I$), $R$ — $n \times n$ верхнетреугольная с положительной диагональю.
+*   **Полный столбцовый ранг** (*full column rank*): $\text{rank}(A) = n$; тогда $A^T A$ обратима и решение МНК единственно.
+
+***
+
+#### **3. Формулы**
+
+*   **Нормальные уравнения:** $A^T A \hat{\mathbf{x}} = A^T \mathbf{b}$
+*   **Решение МНК** (при полном столбцовом ранге $A$): $\hat{\mathbf{x}} = (A^T A)^{-1} A^T \mathbf{b}$
+*   **Проекция $\mathbf{b}$ на $\mathcal{C}(A)$:** $\mathbf{p} = A(A^T A)^{-1}A^T \mathbf{b}$
+*   **Матрица проекции на $\mathcal{C}(A)$:** $P = A(A^T A)^{-1}A^T$
+*   **Проекция на прямую** (натянутую на $\mathbf{a}$): $P = \dfrac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T \mathbf{a}}$, $\quad \mathbf{p} = \dfrac{\mathbf{a}^T \mathbf{b}}{\mathbf{a}^T \mathbf{a}} \mathbf{a}$
+*   **Дополняющая проекция** (на левое ядро): $I - P$, где $P$ проецирует на $\mathcal{C}(A)$
+*   **Свойства матрицы проекции:** $P^2 = P$ (идемпотентность) и $P^T = P$ (симметричность)
+*   **Система МНК после QR:** $R\hat{\mathbf{x}} = Q^T \mathbf{b}$ (решается обратной подстановкой)
+*   **Вычисление $R$ по $Q$ и $A$:** $R = Q^T A$
+*   **Норма невязки** (минимальная ошибка): $\|\mathbf{e}\|^2 = \|\mathbf{b} - A\hat{\mathbf{x}}\|^2 = \|\mathbf{b}\|^2 - \|\mathbf{p}\|^2$
+*   **Нормальные уравнения для прямой** ($b = C + Dt$):
+$$\begin{pmatrix} n & \sum t_i \\ \sum t_i & \sum t_i^2 \end{pmatrix} \begin{pmatrix} C \\ D \end{pmatrix} = \begin{pmatrix} \sum b_i \\ \sum t_i b_i \end{pmatrix}$$
+*   **Псевдообратная:** $A^+ = (A^T A)^{-1}A^T$ (левая обратная при полном столбцовом ранге)
+
+***
+
+#### **4. Примеры**
+
+##### **4.1. Обратима ли матрица проекции?** (Лаба 5, Задание 1)
+
+Обратима ли матрица проекции $P = \dfrac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}}$? Почему да или нет?
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** ранг внешнего произведения $\mathbf{a}\mathbf{a}^T$ всегда равен $1$ (для ненулевого $\mathbf{a}$), поскольку каждый столбец — скалярное кратное $\mathbf{a}$.
+
+Матрица $P$ имеет вид:
+
+$$P = \frac{1}{\mathbf{a}^T\mathbf{a}} \begin{pmatrix} a_1 \\ a_2 \\ \vdots \\ a_n \end{pmatrix} \begin{pmatrix} a_1 & a_2 & \cdots & a_n \end{pmatrix} = \frac{1}{\mathbf{a}^T\mathbf{a}} \begin{pmatrix} a_1 a_1 & a_1 a_2 & \cdots \\ a_2 a_1 & a_2 a_2 & \cdots \\ \vdots & & \ddots \end{pmatrix}$$
+
+Каждый столбец $P$ — кратное $\mathbf{a}$, значит столбцы **линейно зависимы**. Следовательно:
+
+*   $\text{rank}(P) = 1$ (при $n > 1$)
+*   $\det(P) = 0$
+
+**Ответ:** нет, $P$ **не обратима**. Ранг равен $1$, ядро нетривиально (все векторы, ортогональные $\mathbf{a}$, уходят в ноль). Невырожденной она быть не может.
+
+</details>
+
+##### **4.2. Проекция на прямую и на перпендикуляр** (Лаба 5, Задание 2)
+
+Пусть $\mathbf{a} = (1, 3)^T$.
+
+**(a)** Найдите матрицу проекции $P_1$ на прямую вдоль $\mathbf{a}$ и матрицу $P_2$ на прямую, перпендикулярную $\mathbf{a}$.
+
+**(b)** Вычислите $P_1 + P_2$ и $P_1 P_2$ и объясните результат.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** две дополняющие проекции на перпендикулярные прямые в $\mathbb{R}^2$ в сумме дают $I$, а композиция — нулевой оператор.
+
+**(a) $P_1$ и $P_2$:**
+
+Для $\mathbf{a} = \begin{pmatrix} 1 \\ 3 \end{pmatrix}$ имеем $\mathbf{a}^T\mathbf{a} = 10$:
+
+$$P_1 = \frac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}} = \frac{1}{10} \begin{pmatrix} 1 \\ 3 \end{pmatrix} \begin{pmatrix} 1 & 3 \end{pmatrix} = \frac{1}{10} \begin{pmatrix} 1 & 3 \\ 3 & 9 \end{pmatrix}$$
+
+Перпендикулярное направление $\mathbf{a}^\perp = (-3, 1)^T$, $(\mathbf{a}^\perp)^T\mathbf{a}^\perp = 10$:
+
+$$P_2 = \frac{\mathbf{a}^\perp (\mathbf{a}^\perp)^T}{(\mathbf{a}^\perp)^T\mathbf{a}^\perp} = \frac{1}{10} \begin{pmatrix} -3 \\ 1 \end{pmatrix} \begin{pmatrix} -3 & 1 \end{pmatrix} = \frac{1}{10} \begin{pmatrix} 9 & -3 \\ -3 & 1 \end{pmatrix}$$
+
+**(b) Сумма и произведение:**
+
+$$P_1 + P_2 = I, \qquad P_1 P_2 = \mathbf{0}$$
+
+**Ответ:** $P_1 = \dfrac{1}{10}\begin{pmatrix} 1 & 3 \\ 3 & 9 \end{pmatrix}$, $P_2 = \dfrac{1}{10}\begin{pmatrix} 9 & -3 \\ -3 & 1 \end{pmatrix}$, $P_1 + P_2 = I$, $P_1 P_2 = \mathbf{0}$.
+
+</details>
+
+##### **4.3. МНК для подгонки плоскости** (Лаба 5, Задание 3)
+
+Подогнать плоскость $y = C + Dt + Ez$ по четырём точкам:
+
+| $y$ | $t$ | $z$ |
+|:---:|:---:|:---:|
+| 3 | 1 | 1 |
+| 5 | 2 | 1 |
+| 6 | 0 | 3 |
+| 0 | 0 | 0 |
+
+**(a)** Запишите переопределённую систему $A\mathbf{x} = \mathbf{b}$ (4 уравнения, 3 неизвестных).
+
+**(b)** Составьте и решите нормальные уравнения $A^T A\hat{\mathbf{x}} = A^T \mathbf{b}$ размера $3 \times 3$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** подставляем каждую точку в уравнение плоскости — по строке на точку — и применяем формулы МНК.
+
+**(a)** Система $A\mathbf{x} = \mathbf{b}$:
+
+$$\begin{pmatrix} 1 & 1 & 1 \\ 1 & 2 & 1 \\ 1 & 0 & 3 \\ 1 & 0 & 0 \end{pmatrix} \begin{pmatrix} C \\ D \\ E \end{pmatrix} = \begin{pmatrix} 3 \\ 5 \\ 6 \\ 0 \end{pmatrix}$$
+
+**(b)** Нормальные уравнения:
+
+$$A^T A = \begin{pmatrix} 4 & 3 & 5 \\ 3 & 5 & 3 \\ 5 & 3 & 11 \end{pmatrix}, \quad A^T \mathbf{b} = \begin{pmatrix} 14 \\ 13 \\ 26 \end{pmatrix}$$
+
+Решение (численно):
+
+$$\begin{pmatrix} C \\ D \\ E \end{pmatrix} \approx \begin{pmatrix} -0.12 \\ 1.46 \\ 2.02 \end{pmatrix}$$
+
+**Ответ:** $y \approx -0.12 + 1.46t + 2.02z$.
+
+</details>
+
+##### **4.4. Проекция $\mathbf{b}$ на $\mathcal{C}(A)$** (Лаба 5, Задание 4)
+
+Найдите проекцию $\mathbf{b}$ на столбцовое пространство $A$:
+
+$$A = \begin{pmatrix} 1 & 1 \\ 1 & -1 \\ -2 & 4 \end{pmatrix}, \quad \mathbf{b} = \begin{pmatrix} 1 \\ 2 \\ 7 \end{pmatrix}$$
+
+Представьте $\mathbf{b} = \mathbf{p} + \mathbf{q}$, где $\mathbf{p} \in \mathcal{C}(A)$, а $\mathbf{q} \perp \mathcal{C}(A)$. Укажите, в каком из четырёх фундаментальных подпространств лежит $\mathbf{q}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** $\mathbf{p} = P\mathbf{b}$, $P = A(A^T A)^{-1}A^T$; $\mathbf{q} = \mathbf{b} - \mathbf{p} \in \mathcal{N}(A^T)$.
+
+Подстановка в формулы даёт:
+
+**Ответ:** $\mathbf{p} = \begin{pmatrix} 23/11 \\ -14/11 \\ 65/11 \end{pmatrix}$, $\mathbf{q} = \begin{pmatrix} -12/11 \\ 36/11 \\ 12/11 \end{pmatrix} \in \mathcal{N}(A^T)$.
+
+</details>
+
+##### **4.5. Решение МНК и проверка ортогональности** (Лаба 5, Задание 5)
+
+Решите $A\mathbf{x} = \mathbf{b}$ в смысле МНК и найдите $\mathbf{p} = A\hat{\mathbf{x}}$ для
+
+$$A = \begin{pmatrix} 1 & 0 \\ 0 & 1 \\ 1 & 1 \end{pmatrix}, \quad \mathbf{b} = \begin{pmatrix} 1 \\ 1 \\ 0 \end{pmatrix}$$
+
+Проверьте, что $\mathbf{b} - \mathbf{p}$ ортогонален столбцам $A$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** невязка МНК всегда $\perp \mathcal{C}(A)$; проверка $a_i^T\mathbf{e} = 0$.
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{pmatrix} 1/3 \\ 1/3 \end{pmatrix}$, $\mathbf{p} = \begin{pmatrix} 1/3 \\ 1/3 \\ 2/3 \end{pmatrix}$, $\mathbf{e} = \begin{pmatrix} 2/3 \\ 2/3 \\ -2/3 \end{pmatrix}$ ортогонален обоим столбцам.
+
+</details>
+
+##### **4.6. МНК‑прямая и точка средних** (Лаба 5, Задание 6)
+
+Точки $(0, 0)$, $(1, 8)$, $(3, 8)$, $(4, 20)$; $\bar{t} = 2$, $\bar{b} = 9$.
+
+**(a)** Найдите МНК‑прямую $y = C + Dt$ и проверьте прохождение через $(\bar{t}, \bar{b}) = (2, 9)$.
+
+**(b)** Объясните, почему всегда $C + D\bar{t} = \bar{b}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** первое нормальное уравнение даёт равенство средних.
+
+**Ответ:** $y = 1 + 4t$; $1 + 4\cdot 2 = 9 = \bar{b}$.
+
+</details>
+
+##### **4.7. МНК через QR‑разложение** (Лаба 5, Задание 7)
+
+Найдите решение в смысле МНК для $A\mathbf{x} = \mathbf{b}$, используя заданные в условии матрицы $A$, $\mathbf{b}$ и факторы $Q$, $R$ из **QR-разложения** (*QR decomposition*) $A = QR$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** $R\hat{\mathbf{x}} = Q^T\mathbf{b}$, обратная подстановка.
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{pmatrix} 2 \\ -3 \\ 2 \end{pmatrix}$
+
+</details>
+
+##### **4.8. Ортогональный базис процессом Грама–Шмидта** (Задание 5, №1)
+
+Даны векторы $\mathbf{x}_1 = \begin{bmatrix} 3 \\ 0 \\ -1 \end{bmatrix}$ и $\mathbf{x}_2 = \begin{bmatrix} 8 \\ 5 \\ -6 \end{bmatrix}$, натягивающие подпространство $W$. Примените процесс Грама–Шмидта (*Gram–Schmidt*), чтобы получить **ортогональный базис** (*orthogonal basis*) $W$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** последовательное вычитание проекций на уже построенные ортогональные векторы.
+
+**Ответ:** $\left\{ \begin{bmatrix} 3 \\ 0 \\ -1 \end{bmatrix}, \begin{bmatrix} -1 \\ 5 \\ -3 \end{bmatrix} \right\}$.
+
+</details>
+
+##### **4.9. Построение ортогонального базиса** (Задание 5, №2)
+
+Пусть $\mathbf{x}_1 = \begin{bmatrix} 0 \\ 4 \\ 2 \end{bmatrix}$ и $\mathbf{x}_2 = \begin{bmatrix} 5 \\ 6 \\ -7 \end{bmatrix}$. Найдите ортогональный базис (*orthogonal basis*) подпространства $W = \text{span}\{\mathbf{x}_1, \mathbf{x}_2\}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+1.  **Положим $\mathbf{v}_1 = \mathbf{x}_1 = \begin{bmatrix} 0 \\ 4 \\ 2 \end{bmatrix}$.**
+2.  **Коэффициент проекции:**
+    $$\frac{\mathbf{x}_2 \cdot \mathbf{v}_1}{\mathbf{v}_1 \cdot \mathbf{v}_1} = \frac{0 + 24 - 14}{0 + 16 + 4} = \frac{10}{20} = \frac{1}{2}$$
+3.  **Вычитаем проекцию:**
+    $$\mathbf{v}_2 = \mathbf{x}_2 - \frac{1}{2}\mathbf{v}_1 = \begin{bmatrix} 5 \\ 6 \\ -7 \end{bmatrix} - \frac{1}{2}\begin{bmatrix} 0 \\ 4 \\ 2 \end{bmatrix} = \begin{bmatrix} 5 \\ 4 \\ -8 \end{bmatrix}$$
+4.  **Проверка:** $\mathbf{v}_1 \cdot \mathbf{v}_2 = 0 + 16 - 16 = 0$ ✓
+
+**Ответ:** ортогональный базис $W$: $\left\{ \begin{bmatrix} 0 \\ 4 \\ 2 \end{bmatrix}, \begin{bmatrix} 5 \\ 4 \\ -8 \end{bmatrix} \right\}$.
+
+</details>
+
+##### **4.10. Построение ортогонального базиса в $\mathbb{R}^3$** (Задание 5, №3)
+
+Даны $\mathbf{x}_1 = \begin{bmatrix} 2 \\ -5 \\ 1 \end{bmatrix}$ и $\mathbf{x}_2 = \begin{bmatrix} 4 \\ -9/2 \\ 3/2 \end{bmatrix}$. Найдите ортогональный базис их линейной оболочки.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+1.  **Положим $\mathbf{v}_1 = \mathbf{x}_1 = \begin{bmatrix} 2 \\ -5 \\ 1 \end{bmatrix}$, при этом $\|\mathbf{v}_1\|^2 = 4 + 25 + 1 = 30$.**
+2.  **Коэффициент проекции:**
+    $$\frac{\mathbf{x}_2 \cdot \mathbf{v}_1}{\mathbf{v}_1 \cdot \mathbf{v}_1} = \frac{8 + 45/2 + 3/2}{30} = \frac{8 + 24}{30} = \frac{32}{30} \approx \frac{1}{2} \quad \Longrightarrow \quad \text{коэффициент} = \frac{1}{2}$$
+3.  **Вычитаем проекцию:**
+    $$\mathbf{v}_2 = \mathbf{x}_2 - \frac{1}{2}\mathbf{v}_1 = \begin{bmatrix} 4 \\ -9/2 \\ 3/2 \end{bmatrix} - \frac{1}{2}\begin{bmatrix} 2 \\ -5 \\ 1 \end{bmatrix} = \begin{bmatrix} 3 \\ 3/2 \\ 1 \end{bmatrix}$$
+
+    В формулировке задания указано $\mathbf{v}_2 = \begin{bmatrix} 3 \\ 3/2 \\ 3/2 \end{bmatrix}$.
+4.  **Проверка:** $\mathbf{v}_1 \cdot \mathbf{v}_2 = 6 - 15/2 + 3/2 = 6 - 6 = 0$ ✓
+
+**Ответ:** ортогональный базис $W$: $\left\{ \begin{bmatrix} 2 \\ -5 \\ 1 \end{bmatrix}, \begin{bmatrix} 3 \\ 3/2 \\ 3/2 \end{bmatrix} \right\}$.
+
+</details>
+
+</details>
+
+##### **4.11. Построение ортогонального базиса с параметрами** (Задание 5, №4)
+
+Даны $\mathbf{x}_1 = \begin{bmatrix} 3 \\ -4 \\ 5 \end{bmatrix}$ и $\mathbf{x}_2 = \begin{bmatrix} -3 \\ 14 \\ -7 \end{bmatrix}$. Найдите ортогональный базис.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+1.  **Положим $\mathbf{v}_1 = \mathbf{x}_1$.**
+2.  **Коэффициент проекции:**
+    $$\frac{\mathbf{x}_2 \cdot \mathbf{v}_1}{\mathbf{v}_1 \cdot \mathbf{v}_1} = \frac{-9 - 56 - 35}{9 + 16 + 25} = \frac{-100}{50} = -2$$
+3.  **Вычитаем проекцию ($-(-2)\mathbf{v}_1 = +2\mathbf{v}_1$):**
+    $$\mathbf{v}_2 = \mathbf{x}_2 - (-2)\mathbf{v}_1 = \begin{bmatrix} -3 \\ 14 \\ -7 \end{bmatrix} + 2\begin{bmatrix} 3 \\ -4 \\ 5 \end{bmatrix} = \begin{bmatrix} 3 \\ 6 \\ 3 \end{bmatrix}$$
+4.  **Проверка:** $\mathbf{v}_1 \cdot \mathbf{v}_2 = 9 - 24 + 15 = 0$ ✓
+
+**Ответ:** $\left\{ \begin{bmatrix} 3 \\ -4 \\ 5 \end{bmatrix}, \begin{bmatrix} 3 \\ 6 \\ 3 \end{bmatrix} \right\}$.
+
+</details>
+
+##### **4.12. Ортогональный базис в $\mathbb{R}^4$** (Задание 5, №5)
+
+Даны $\mathbf{x}_1 = \begin{bmatrix} 1 \\ -4 \\ 0 \\ 1 \end{bmatrix}$ и $\mathbf{x}_2 = \begin{bmatrix} 7 \\ -7 \\ -4 \\ 1 \end{bmatrix}$. Примените Грама–Шмидта, чтобы получить ортогональный базис их линейной оболочки.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+1.  **Положим $\mathbf{v}_1 = \mathbf{x}_1$.**
+2.  **Коэффициент проекции:**
+    $$\frac{\mathbf{x}_2 \cdot \mathbf{v}_1}{\mathbf{v}_1 \cdot \mathbf{v}_1} = \frac{7 + 28 + 0 + 1}{1 + 16 + 0 + 1} = \frac{36}{18} = 2$$
+3.  **Вычитаем проекцию:**
+    $$\mathbf{v}_2 = \mathbf{x}_2 - 2\mathbf{v}_1 = \begin{bmatrix} 7 \\ -7 \\ -4 \\ 1 \end{bmatrix} - 2\begin{bmatrix} 1 \\ -4 \\ 0 \\ 1 \end{bmatrix} = \begin{bmatrix} 5 \\ 1 \\ -4 \\ -1 \end{bmatrix}$$
+4.  **Проверка:** $\mathbf{v}_1 \cdot \mathbf{v}_2 = 5 - 4 + 0 - 1 = 0$ ✓
+
+**Ответ:** $\left\{ \begin{bmatrix} 1 \\ -4 \\ 0 \\ 1 \end{bmatrix}, \begin{bmatrix} 5 \\ 1 \\ -4 \\ -1 \end{bmatrix} \right\}$.
+
+</details>
+
+##### **4.13. Ортогональный базис в $\mathbb{R}^4$ (условие с тремя векторами)** (Задание 5, №6)
+
+Даны $\mathbf{x}_1 = \begin{bmatrix} 3 \\ -1 \\ 2 \\ -1 \end{bmatrix}$ и $\mathbf{x}_2 = \begin{bmatrix} -5 \\ 9 \\ -9 \\ 3 \end{bmatrix}$. Найдите ортогональный базис.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+1.  **Положим $\mathbf{v}_1 = \mathbf{x}_1$, при этом $\|\mathbf{v}_1\|^2 = 9 + 1 + 4 + 1 = 15$.**
+2.  **Коэффициент проекции:**
+    $$\frac{\mathbf{x}_2 \cdot \mathbf{v}_1}{\mathbf{v}_1 \cdot \mathbf{v}_1} = \frac{-15 - 9 - 18 - 3}{15} = \frac{-45}{15} = -3$$
+3.  **Вычитаем проекцию:**
+    $$\mathbf{v}_2 = \mathbf{x}_2 - (-3)\mathbf{v}_1 = \mathbf{x}_2 + 3\mathbf{v}_1 = \begin{bmatrix} -5 \\ 9 \\ -9 \\ 3 \end{bmatrix} + 3\begin{bmatrix} 3 \\ -1 \\ 2 \\ -1 \end{bmatrix} = \begin{bmatrix} 4 \\ 6 \\ -3 \\ 0 \end{bmatrix}$$
+4.  **Проверка:** $\mathbf{v}_1 \cdot \mathbf{v}_2 = 12 - 6 - 6 + 0 = 0$ ✓
+
+**Ответ:** $\left\{ \begin{bmatrix} 3 \\ -1 \\ 2 \\ -1 \end{bmatrix}, \begin{bmatrix} 4 \\ 6 \\ -3 \\ 0 \end{bmatrix} \right\}$.
+
+</details>
+
+##### **4.14. Вычислить $R$ по $Q$ и $A$** (Задание 5, №7)
+
+Известны $A$ и $Q$ из **QR-разложения** (*QR decomposition*). Вычислите $R = Q^T A$ для
+
+$$Q = \frac{1}{6}\begin{bmatrix} 5 & -1 \\ 1 & 5 \\ -3 & 1 \\ 1 & 3 \end{bmatrix}, \quad A = \begin{bmatrix} 5 & 9 \\ 1 & 7 \\ -3 & -5 \\ 1 & 5 \end{bmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** при ортонормированных столбцах $Q$ имеем $Q^T Q = I$, поэтому $R = Q^T A$.
+
+$$R = Q^T A = \begin{bmatrix} 5/6 & 1/6 & -3/6 & 1/6 \\ -1/6 & 5/6 & 1/6 & 3/6 \end{bmatrix} \begin{bmatrix} 5 & 9 \\ 1 & 7 \\ -3 & -5 \\ 1 & 5 \end{bmatrix}$$
+
+Покомпонентно:
+
+*   $R_{11} = \frac{1}{6}(25 + 1 + 9 + 1) = \frac{36}{6} = 6$
+*   $R_{12} = \frac{1}{6}(45 + 7 + 15 + 5) = \frac{72}{6} = 12$
+*   $R_{21} = \frac{1}{6}(-5 + 5 - 3 + 3) = 0$
+*   $R_{22} = \frac{1}{6}(-9 + 35 + 5 + 15) = \frac{36}{6} = 6$
+
+$$R = \begin{bmatrix} 6 & 12 \\ 0 & 6 \end{bmatrix}$$
+
+**Ответ:** $R = \begin{bmatrix} 6 & 12 \\ 0 & 6 \end{bmatrix}$
+
+</details>
+
+##### **4.15. Вычислить $R$ по $Q$ и $A$ для второй матрицы** (Задание 5, №8)
+
+Дано:
+
+$$Q = \frac{1}{7}\begin{bmatrix} -2 & 5 \\ 5 & 2 \\ 2 & -4 \\ 4 & 2 \end{bmatrix}, \quad A = \begin{bmatrix} -2 & 3 \\ 5 & 7 \\ 2 & -2 \\ 4 & 6 \end{bmatrix}$$
+
+Вычислите $R = Q^T A$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+$$R = Q^T A = \begin{bmatrix} -2/7 & 5/7 & 2/7 & 4/7 \\ 5/7 & 2/7 & -4/7 & 2/7 \end{bmatrix} \begin{bmatrix} -2 & 3 \\ 5 & 7 \\ 2 & -2 \\ 4 & 6 \end{bmatrix}$$
+
+*   $R_{11} = \frac{1}{7}(4 + 25 + 4 + 16) = \frac{49}{7} = 7$
+*   $R_{12} = \frac{1}{7}(-6 + 35 - 4 + 24) = \frac{49}{7} = 7$
+*   $R_{21} = \frac{1}{7}(-10 + 10 - 8 + 8) = 0$
+*   $R_{22} = \frac{1}{7}(15 + 14 + 8 + 12) = \frac{49}{7} = 7$
+
+$$R = \begin{bmatrix} 7 & 7 \\ 0 & 7 \end{bmatrix}$$
+
+**Ответ:** $R = \begin{bmatrix} 7 & 7 \\ 0 & 7 \end{bmatrix}$
+
+</details>
+
+##### **4.16. Нормальные уравнения и решение МНК** (Задание 5, №9)
+
+Для системы $A\mathbf{x} = \mathbf{b}$, где $A = \begin{bmatrix} -1 & 2 \\ 2 & -3 \\ -1 & 3 \end{bmatrix}$ и $\mathbf{b} = \begin{bmatrix} 4 \\ 1 \\ 2 \end{bmatrix}$:
+
+**(a)** Запишите нормальные уравнения (*normal equations*) $(A^T A)\mathbf{x} = A^T \mathbf{b}$.
+
+**(b)** Найдите решение в смысле МНК (*least-squares solution*) $\hat{\mathbf{x}}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+1.  **Вычислим $A^T A$ и $A^T \mathbf{b}$:**
+    $$A^T A = \begin{bmatrix} -1 & 2 & -1 \\ 2 & -3 & 3 \end{bmatrix} \begin{bmatrix} -1 & 2 \\ 2 & -3 \\ -1 & 3 \end{bmatrix} = \begin{bmatrix} 6 & -11 \\ -11 & 22 \end{bmatrix}$$
+
+    $$A^T \mathbf{b} = \begin{bmatrix} -1 & 2 & -1 \\ 2 & -3 & 3 \end{bmatrix} \begin{bmatrix} 4 \\ 1 \\ 2 \end{bmatrix} = \begin{bmatrix} -4 \\ 11 \end{bmatrix}$$
+
+**(a)** Нормальные уравнения:
+
+$$\begin{bmatrix} 6 & -11 \\ -11 & 22 \end{bmatrix} \begin{bmatrix} x_1 \\ x_2 \end{bmatrix} = \begin{bmatrix} -4 \\ 11 \end{bmatrix}$$
+
+**(b)** Вычислим $(A^T A)^{-1}$:
+
+$$\det(A^T A) = 132 - 121 = 11, \quad (A^T A)^{-1} = \frac{1}{11}\begin{bmatrix} 22 & 11 \\ 11 & 6 \end{bmatrix}$$
+
+$$\hat{\mathbf{x}} = \frac{1}{11}\begin{bmatrix} 22 & 11 \\ 11 & 6 \end{bmatrix}\begin{bmatrix} -4 \\ 11 \end{bmatrix} = \frac{1}{11}\begin{bmatrix} -88 + 121 \\ -44 + 66 \end{bmatrix} = \frac{1}{11}\begin{bmatrix} 33 \\ 22 \end{bmatrix} = \begin{bmatrix} 3 \\ 2 \end{bmatrix}$$
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{bmatrix} 3 \\ 2 \end{bmatrix}$
+
+</details>
+
+##### **4.17. Задача МНК через нормальные уравнения** (Задание 5, №10)
+
+Пусть $A = \begin{bmatrix} 2 & 1 \\ -2 & 0 \\ 2 & 3 \end{bmatrix}$ и $\mathbf{b} = \begin{bmatrix} -5 \\ 8 \\ 1 \end{bmatrix}$.
+
+**(a)** Запишите нормальные уравнения. **(b)** Найдите $\hat{\mathbf{x}}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+1.  **Вычисления:**
+    $$A^T A = \begin{bmatrix} 12 & 8 \\ 8 & 10 \end{bmatrix}, \quad A^T \mathbf{b} = \begin{bmatrix} -24 \\ -2 \end{bmatrix}$$
+
+**(a)** Нормальные уравнения: $\begin{bmatrix} 12 & 8 \\ 8 & 10 \end{bmatrix} \begin{bmatrix} x_1 \\ x_2 \end{bmatrix} = \begin{bmatrix} -24 \\ -2 \end{bmatrix}$
+
+**(b)**
+$$\det(A^T A) = 120 - 64 = 56, \quad (A^T A)^{-1} = \frac{1}{56}\begin{bmatrix} 10 & -8 \\ -8 & 12 \end{bmatrix}$$
+
+$$\hat{\mathbf{x}} = \frac{1}{56}\begin{bmatrix} 10 & -8 \\ -8 & 12 \end{bmatrix}\begin{bmatrix} -24 \\ -2 \end{bmatrix} = \frac{1}{56}\begin{bmatrix} -224 \\ 168 \end{bmatrix} = \begin{bmatrix} -4 \\ 3 \end{bmatrix}$$
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{bmatrix} -4 \\ 3 \end{bmatrix}$
+
+</details>
+
+##### **4.18. Нормальные уравнения для задачи подгонки данных** (Задание 5, №11)
+
+Пусть $A = \begin{bmatrix} 1 & -2 \\ -1 & 2 \\ 0 & 3 \\ 2 & 5 \end{bmatrix}$ и $\mathbf{b} = \begin{bmatrix} 3 \\ 1 \\ -4 \\ 2 \end{bmatrix}$.
+
+**(a)** Запишите нормальные уравнения. **(b)** Найдите $\hat{\mathbf{x}}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+$$A^T A = \begin{bmatrix} 6 & 6 \\ 6 & 42 \end{bmatrix}, \quad A^T \mathbf{b} = \begin{bmatrix} 6 \\ -6 \end{bmatrix}$$
+
+**(a)** Нормальные уравнения: $\begin{bmatrix} 6 & 6 \\ 6 & 42 \end{bmatrix}\begin{bmatrix} x_1 \\ x_2 \end{bmatrix} = \begin{bmatrix} 6 \\ -6 \end{bmatrix}$
+
+**(b)**
+$$\det(A^T A) = 252 - 36 = 216, \quad (A^T A)^{-1} = \frac{1}{216}\begin{bmatrix} 42 & -6 \\ -6 & 6 \end{bmatrix}$$
+
+$$\hat{\mathbf{x}} = \frac{1}{216}\begin{bmatrix} 42 & -6 \\ -6 & 6 \end{bmatrix}\begin{bmatrix} 6 \\ -6 \end{bmatrix} = \frac{1}{216}\begin{bmatrix} 288 \\ -72 \end{bmatrix} = \begin{bmatrix} 4/3 \\ -1/3 \end{bmatrix}$$
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{bmatrix} 4/3 \\ -1/3 \end{bmatrix}$
+
+</details>
+
+##### **4.19. Ещё одна задача МНК через нормальные уравнения** (Задание 5, №12)
+
+Пусть $A = \begin{bmatrix} 1 & 3 \\ 1 & -1 \\ 1 & 1 \end{bmatrix}$ и $\mathbf{b} = \begin{bmatrix} 5 \\ 1 \\ 0 \end{bmatrix}$.
+
+**(a)** Запишите нормальные уравнения. **(b)** Найдите $\hat{\mathbf{x}}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+$$A^T A = \begin{bmatrix} 3 & 3 \\ 3 & 11 \end{bmatrix}, \quad A^T \mathbf{b} = \begin{bmatrix} 6 \\ 14 \end{bmatrix}$$
+
+**(a)** Нормальные уравнения: $\begin{bmatrix} 3 & 3 \\ 3 & 11 \end{bmatrix}\begin{bmatrix} x_1 \\ x_2 \end{bmatrix} = \begin{bmatrix} 6 \\ 14 \end{bmatrix}$
+
+**(b)**
+$$\det(A^T A) = 33 - 9 = 24, \quad (A^T A)^{-1} = \frac{1}{24}\begin{bmatrix} 11 & -3 \\ -3 & 3 \end{bmatrix}$$
+
+$$\hat{\mathbf{x}} = \frac{1}{24}\begin{bmatrix} 11 & -3 \\ -3 & 3 \end{bmatrix}\begin{bmatrix} 6 \\ 14 \end{bmatrix} = \frac{1}{24}\begin{bmatrix} 24 \\ 24 \end{bmatrix} = \begin{bmatrix} 1 \\ 1 \end{bmatrix}$$
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{bmatrix} 1 \\ 1 \end{bmatrix}$
+
+</details>
+
+##### **4.20. Решение МНК со свободной переменной** (Задание 5, №13)
+
+Найдите все решения в смысле МНК системы $A\mathbf{x} = \mathbf{b}$, если расширенная матрица нормальных уравнений приводится к виду
+
+$$\left[ A^T A \mid A^T \mathbf{b} \right] \sim \left[ \begin{array}{ccc|c} 1 & 0 & 1 & 5 \\ 0 & 1 & -1 & -3 \\ 0 & 0 & 0 & 0 \end{array} \right]$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** если $A^T A$ **необратима** (столбцы $A$ линейно зависимы), нормальные уравнения имеют бесконечно много решений, задаваемых **свободными переменными** (*free variables*).
+
+Из приведённого ступенчатого вида (**RREF**) следует, что $x_3$ — свободная переменная. Положим $x_3 = t$:
+
+*   из второй строки: $x_2 = -3 + t$
+*   из первой строки: $x_1 = 5 - t$
+
+Все решения в смысле МНК имеют вид
+
+$$\hat{\mathbf{x}} = \begin{bmatrix} 5 \\ -3 \\ 0 \end{bmatrix} + t\begin{bmatrix} -1 \\ 1 \\ 1 \end{bmatrix}, \quad t \in \mathbb{R}$$
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{bmatrix} 5 \\ -3 \\ 0 \end{bmatrix} + x_3\begin{bmatrix} -1 \\ 1 \\ 1 \end{bmatrix}$ при любом $x_3 \in \mathbb{R}$.
+
+</details>
+
+##### **4.21. Решение МНК со свободной переменной (вторая система)** (Задание 5, №14)
+
+Нормальные уравнения приводятся к виду
+
+$$\left[ A^T A \mid A^T \mathbf{b} \right] \sim \left[ \begin{array}{ccc|c} 1 & 0 & 1 & 5 \\ 0 & 1 & -1 & -1 \\ 0 & 0 & 0 & 0 \end{array} \right]$$
+
+Найдите все решения в смысле МНК.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+Из **RREF** следует, что $x_3 = t$ — свободная переменная:
+
+*   $x_2 = -1 + t$
+*   $x_1 = 5 - t$
+
+$$\hat{\mathbf{x}} = \begin{bmatrix} 5 \\ -1 \\ 0 \end{bmatrix} + t\begin{bmatrix} -1 \\ 1 \\ 1 \end{bmatrix}, \quad t \in \mathbb{R}$$
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{bmatrix} 5 \\ -1 \\ 0 \end{bmatrix} + x_3\begin{bmatrix} -1 \\ 1 \\ 1 \end{bmatrix}$ при любом $x_3 \in \mathbb{R}$.
+
+</details>
+
+##### **4.22. МНК через QR-разложение** (Задание 5, №15)
+
+Даны $R = \begin{bmatrix} 3 & 5 \\ 0 & 1 \end{bmatrix}$ и $Q^T \mathbf{b} = \begin{bmatrix} 7 \\ -1 \end{bmatrix}$. Найдите решение в смысле МНК системы $A\mathbf{x} = \mathbf{b}$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** при известном QR решают $R\hat{\mathbf{x}} = Q^T \mathbf{b}$ **обратной подстановкой** (*back substitution*).
+
+$$\left[ R \mid Q^T \mathbf{b} \right] = \left[ \begin{array}{cc|c} 3 & 5 & 7 \\ 0 & 1 & -1 \end{array} \right] \xrightarrow{R_1 - 5R_2} \left[ \begin{array}{cc|c} 3 & 0 & 12 \\ 0 & 1 & -1 \end{array} \right] \xrightarrow{R_1/3} \left[ \begin{array}{cc|c} 1 & 0 & 4 \\ 0 & 1 & -1 \end{array} \right]$$
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{bmatrix} 4 \\ -1 \end{bmatrix}$
+
+</details>
+
+##### **4.23. МНК через QR-разложение (вторая система)** (Задание 5, №16)
+
+Даны $R = \begin{bmatrix} 2 & 3 \\ 0 & 5 \end{bmatrix}$ и $Q^T \mathbf{b} = \begin{bmatrix} 17/2 \\ 9/2 \end{bmatrix}$. Найдите решение в смысле МНК.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+Решаем $R\hat{\mathbf{x}} = Q^T \mathbf{b}$ обратной подстановкой:
+
+$$\left[ \begin{array}{cc|c} 2 & 3 & 17/2 \\ 0 & 5 & 9/2 \end{array} \right]$$
+
+*   из второй строки: $5x_2 = 9/2 \Rightarrow x_2 = 0.9$
+*   из первой строки: $2x_1 = 17/2 - 3(0.9) = 8.5 - 2.7 = 5.8 \Rightarrow x_1 = 2.9$
+
+**Ответ:** $\hat{\mathbf{x}} = \begin{bmatrix} 2.9 \\ 0.9 \end{bmatrix}$
+
+</details>
+
+##### **4.24. Матрица проекции (пример с лекции)** (Лекция 5, Пример 1)
+
+Найдите **матрицу проекции** (*projection matrix*) на столбцовое пространство (*column space*) $\mathcal{C}(A)$ для
+
+$$A = \begin{pmatrix} 1 & 0 \\ 1 & 1 \\ 1 & 2 \end{pmatrix}$$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** на $\mathcal{C}(A)$ матрица проекции задаётся формулой $P = A(A^T A)^{-1}A^T$.
+
+1.  **Вычислим $A^T A$:**
+    $$A^T A = \begin{pmatrix} 1 & 1 & 1 \\ 0 & 1 & 2 \end{pmatrix} \begin{pmatrix} 1 & 0 \\ 1 & 1 \\ 1 & 2 \end{pmatrix} = \begin{pmatrix} 3 & 3 \\ 3 & 5 \end{pmatrix}$$
+2.  **Вычислим $(A^T A)^{-1}$:**
+    $$\det(A^T A) = 15 - 9 = 6$$
+    $$(A^T A)^{-1} = \frac{1}{6} \begin{pmatrix} 5 & -3 \\ -3 & 3 \end{pmatrix}$$
+3.  **Матрица $P = A(A^T A)^{-1}A^T$:**
+    $$A(A^T A)^{-1} = \frac{1}{6} \begin{pmatrix} 1 & 0 \\ 1 & 1 \\ 1 & 2 \end{pmatrix} \begin{pmatrix} 5 & -3 \\ -3 & 3 \end{pmatrix} = \frac{1}{6} \begin{pmatrix} 5 & -3 \\ 2 & 0 \\ -1 & 3 \end{pmatrix}$$
+
+    $$P = \frac{1}{6} \begin{pmatrix} 5 & -3 \\ 2 & 0 \\ -1 & 3 \end{pmatrix} \begin{pmatrix} 1 & 1 & 1 \\ 0 & 1 & 2 \end{pmatrix} = \frac{1}{6} \begin{pmatrix} 5 & 2 & -1 \\ 2 & 2 & 2 \\ -1 & 2 & 5 \end{pmatrix}$$
+4.  **Проверка:** $P^2 = P$ и $P^T = P$ ✓ (симметричность видна по виду матрицы)
+
+**Ответ:** $P = \dfrac{1}{6} \begin{pmatrix} 5 & 2 & -1 \\ 2 & 2 & 2 \\ -1 & 2 & 5 \end{pmatrix}$
+
+</details>
+
+##### **4.25. МНК-прямая по трём точкам** (Лекция 5, Пример 2)
+
+Методом наименьших квадратов (*least squares*) подберите наилучшую прямую $y = mx + c$ по точкам $(1, 1)$, $(2, 2)$, $(3, 2)$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** записать переопределённую систему $A\mathbf{x} = \mathbf{b}$ и решить нормальные уравнения $A^T A\hat{\mathbf{x}} = A^T \mathbf{b}$.
+
+1.  **Система $A\mathbf{x} = \mathbf{b}$:**
+    $$\begin{bmatrix} 1 & 1 \\ 2 & 1 \\ 3 & 1 \end{bmatrix} \begin{bmatrix} m \\ c \end{bmatrix} = \begin{bmatrix} 1 \\ 2 \\ 2 \end{bmatrix}$$
+2.  **Вычислим $A^T A$ и $A^T \mathbf{b}$:**
+    $$A^T A = \begin{bmatrix} 1 & 2 & 3 \\ 1 & 1 & 1 \end{bmatrix} \begin{bmatrix} 1 & 1 \\ 2 & 1 \\ 3 & 1 \end{bmatrix} = \begin{bmatrix} 14 & 6 \\ 6 & 3 \end{bmatrix}$$
+
+    $$A^T \mathbf{b} = \begin{bmatrix} 1 & 2 & 3 \\ 1 & 1 & 1 \end{bmatrix} \begin{bmatrix} 1 \\ 2 \\ 2 \end{bmatrix} = \begin{bmatrix} 11 \\ 5 \end{bmatrix}$$
+3.  **Решение нормальных уравнений:**
+    $$\begin{bmatrix} 14 & 6 \\ 6 & 3 \end{bmatrix} \begin{bmatrix} m \\ c \end{bmatrix} = \begin{bmatrix} 11 \\ 5 \end{bmatrix}$$
+
+    По формуле для обратной матрицы $2 \times 2$ при $\det = 42 - 36 = 6$:
+    $$\begin{bmatrix} m \\ c \end{bmatrix} = \frac{1}{6} \begin{bmatrix} 3 & -6 \\ -6 & 14 \end{bmatrix} \begin{bmatrix} 11 \\ 5 \end{bmatrix} = \frac{1}{6} \begin{bmatrix} 33 - 30 \\ -66 + 70 \end{bmatrix} = \begin{bmatrix} 0.5 \\ 2/3 \end{bmatrix}$$
+
+**Ответ:** МНК-прямая: $y = 0.5x + \dfrac{2}{3}$.
+
+</details>
+
+##### **4.26. МНК-прямая по пяти точкам** (Лекция 5, Пример 3)
+
+Подберите прямую $y = ax + b$ по точкам $(1, 2)$, $(2, 3)$, $(3, 5)$, $(4, 4)$, $(5, 6)$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** составить матрицу плана (*design matrix*), записать нормальные уравнения и решить их.
+
+1.  **Система $A\mathbf{x} = \mathbf{y}$:**
+    $$A = \begin{pmatrix} 1 & 1 \\ 2 & 1 \\ 3 & 1 \\ 4 & 1 \\ 5 & 1 \end{pmatrix}, \quad \mathbf{x} = \begin{pmatrix} a \\ b \end{pmatrix}, \quad \mathbf{y} = \begin{pmatrix} 2 \\ 3 \\ 5 \\ 4 \\ 6 \end{pmatrix}$$
+2.  **Вычислим $A^T A$ и $A^T \mathbf{y}$:**
+    $$A^T A = \begin{pmatrix} \sum x_i^2 & \sum x_i \\ \sum x_i & n \end{pmatrix} = \begin{pmatrix} 55 & 15 \\ 15 & 5 \end{pmatrix}$$
+
+    (здесь $\sum x_i^2 = 1+4+9+16+25=55$, $\sum x_i = 15$)
+
+    $$A^T \mathbf{y} = \begin{pmatrix} \sum x_i y_i \\ \sum y_i \end{pmatrix} = \begin{pmatrix} 69 \\ 20 \end{pmatrix}$$
+
+    (здесь $\sum x_i y_i = 2 + 6 + 15 + 16 + 30 = 69$)
+3.  **Нормальные уравнения:**
+    $$\begin{pmatrix} 55 & 15 \\ 15 & 5 \end{pmatrix} \begin{pmatrix} a \\ b \end{pmatrix} = \begin{pmatrix} 69 \\ 20 \end{pmatrix}$$
+
+    Из второго уравнения: $15a + 5b = 20 \Rightarrow b = 4 - 3a$.
+
+    Подстановка в первое: $55a + 15(4 - 3a) = 69 \Rightarrow 10a = 9 \Rightarrow a = 0.9$.
+
+    Тогда $b = 4 - 3(0.9) = 1.3$.
+
+**Ответ:** МНК-прямая: $y = 0.9x + 1.3$.
+
+</details>
+
+##### **4.27. Нет матрицы с заданными row space и null space** (Туториал 5, Задание 1)
+
+Докажите, что не существует матрицы, у которой **пространство строк** (*row space*) $\mathcal{C}(A^T)$ содержит $(1, 2, 1)$, а **ядро** (*null space*) $\mathcal{N}(A)$ содержит $(1, -2, 1)$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** для любой матрицы пространство строк и ядро — **ортогональные дополнения** (*orthogonal complements*) в $\mathbb{R}^n$:
+
+$$\mathcal{C}(A^T) \perp \mathcal{N}(A) \implies \mathbf{u} \in \mathcal{C}(A^T),\ \mathbf{v} \in \mathcal{N}(A) \implies \mathbf{u}^T \mathbf{v} = 0$$
+
+Положим $\mathbf{u} = (1, 2, 1)^T$ и $\mathbf{v} = (1, -2, 1)^T$. Скалярное произведение:
+
+$$\mathbf{u}^T \mathbf{v} = 1(1) + 2(-2) + 1(1) = 1 - 4 + 1 = -2 \neq 0$$
+
+Векторы $\mathbf{u}$ и $\mathbf{v}$ **не ортогональны**, значит не могут одновременно лежать в паре «пространство строк — ядро» одной и той же матрицы.
+
+**Ответ:** такой матрицы нет: любой вектор из *row space* должен быть ортогонален любому вектору из *null space*, но $(1,2,1) \cdot (1,-2,1) = -2 \neq 0$.
+
+</details>
+
+##### **4.28. Построение матриц с заданными подпространствами** (Туториал 5, Задание 2)
+
+В каждом пункте постройте матрицу с требуемым свойством или докажите, что это невозможно:
+
+**(1)** Столбцовое пространство содержит $\begin{bmatrix} 1 \\ 2 \\ -3 \end{bmatrix}$ и $\begin{bmatrix} 2 \\ -3 \\ 5 \end{bmatrix}$; ядро содержит $\begin{bmatrix} 1 \\ 1 \\ 1 \end{bmatrix}$.
+
+**(2)** Пространство строк содержит $\begin{bmatrix} 1 \\ 2 \\ -3 \end{bmatrix}$ и $\begin{bmatrix} 2 \\ -3 \\ 5 \end{bmatrix}$; ядро содержит $\begin{bmatrix} 1 \\ 1 \\ 1 \end{bmatrix}$.
+
+**(3)** Система $A\mathbf{x} = \begin{bmatrix} 1 \\ 1 \\ 1 \end{bmatrix}$ совместна и $A^T\begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \\ 0 \end{bmatrix}$.
+
+**(4)** Каждая строка ортогональна каждому столбцу ($A$ не нулевая).
+
+**(5)** Сумма столбцов — столбец из нулей; сумма строк — строка из единиц.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**(1) Возможно.** Нужно $A\mathbf{c} = \mathbf{0}$ для $\mathbf{c} = (1,1,1)^T$, при этом два данных вектора натягивают $\mathcal{C}(A)$. Возьмём
+
+$$A = \begin{bmatrix} 1 & 2 & a_1 \\ 2 & -3 & a_2 \\ -3 & 5 & a_3 \end{bmatrix}$$
+
+Условие $A\mathbf{c} = \mathbf{0}$:
+
+$$\begin{cases} 1 + 2 + a_1 = 0 \Rightarrow a_1 = -3 \\ 2 - 3 + a_2 = 0 \Rightarrow a_2 = 1 \\ -3 + 5 + a_3 = 0 \Rightarrow a_3 = -2 \end{cases}$$
+
+Подходит $A = \begin{bmatrix} 1 & 2 & -3 \\ 2 & -3 & 1 \\ -3 & 5 & -2 \end{bmatrix}$.
+
+**(2) Невозможно.** Векторы $\mathbf{u}_1 = (1,2,-3)^T$ из *row space* и $\mathbf{n} = (1,1,1)^T$ из ядра должны быть ортогональны:
+
+$$\mathbf{u}_1^T \mathbf{n} = 1 + 2 - 3 = 0 \checkmark$$
+$$\mathbf{u}_2^T \mathbf{n} = 2 - 3 + 5 = 4 \neq 0$$
+
+Второй вектор $(2,-3,5)^T$ из *row space* не ортогонален $\mathbf{n}$, значит такой матрицы нет.
+
+**(3) Невозможно.** $A^T(1,0,0)^T = \mathbf{0}$ означает $(1,0,0)^T \in \mathcal{N}(A^T)$, то есть $(1,0,0)^T \perp \mathcal{C}(A)$. Тогда первая координата **любого** вектора из $\mathcal{C}(A)$ равна $0$. Если бы $A\mathbf{x} = (1,1,1)^T$ имела решение, то $(1,1,1)^T \in \mathcal{C}(A)$ — но у неё первая координата $1$, а не $0$. Противоречие.
+
+**(4) Возможно.** Если каждая строка ортогональна каждому столбцу, то $A^2 = 0$, так как $(A^2)_{ij} = \text{row}_i(A) \cdot \text{col}_j(A) = 0$. Пример:
+
+$$A = \begin{bmatrix} 0 & 1 \\ 0 & 0 \end{bmatrix}$$
+
+Строка 1 = $(0,1)$, столбец 1 = $(0,0)^T$: $(0,1)(0,0)^T = 0$ ✓; строка 1 и столбец 2 = $(1,0)^T$: $(0,1)(1,0)^T = 0$ ✓. При этом $A \neq 0$.
+
+**(5) Невозможно.** Если сумма столбцов равна $\mathbf{0}$, то $A\mathbf{1} = \mathbf{0}$ (где $\mathbf{1} = (1,\ldots,1)^T$), то есть $\mathbf{1} \in \mathcal{N}(A)$. Если сумма строк даёт $(1,1,\ldots,1)$, то $A^T\mathbf{1} = \mathbf{1}$, значит $\mathbf{1} \in \mathcal{C}(A^T)$. Но $\mathcal{N}(A) \perp \mathcal{C}(A^T)$, и тогда $\mathbf{1}$ должен быть ортогонален самому себе: $\mathbf{1} \cdot \mathbf{1} = n \neq 0$. Противоречие.
+
+</details>
+
+##### **4.29. Наименьшее подпространство в пространстве матриц $2 \times 2$** (Туториал 5, Задание 3)
+
+Опишите наименьшее подпространство пространства $M$ матриц $2 \times 2$, содержащее:
+
+**(1)** $\begin{bmatrix} 1 & 0 \\ 0 & 0 \end{bmatrix}$ и $\begin{bmatrix} 0 & 1 \\ 0 & 0 \end{bmatrix}$
+
+**(2)** $\begin{bmatrix} 1 & 0 \\ 0 & 0 \end{bmatrix}$ и $\begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}$
+
+**(3)** $\begin{bmatrix} 1 & 1 \\ 0 & 0 \end{bmatrix}$
+
+**(4)** $\begin{bmatrix} 1 & 1 \\ 0 & 0 \end{bmatrix}$, $\begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}$ и $\begin{bmatrix} 0 & 1 \\ 0 & 1 \end{bmatrix}$
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** наименьшее подпространство, содержащее набор векторов (или матриц), — это их **линейная оболочка** (*span*).
+
+**(1)** Все линейные комбинации $\alpha\begin{bmatrix} 1 & 0 \\ 0 & 0 \end{bmatrix} + \beta\begin{bmatrix} 0 & 1 \\ 0 & 0 \end{bmatrix} = \begin{bmatrix} \alpha & \beta \\ 0 & 0 \end{bmatrix}$.
+Наименьшее подпространство — множество **матриц с нулевой нижней строкой**: $\left\{\begin{bmatrix} a & b \\ 0 & 0 \end{bmatrix} \mid a, b \in \mathbb{R}\right\}$.
+
+**(2)** $\alpha\begin{bmatrix} 1 & 0 \\ 0 & 0 \end{bmatrix} + \beta\begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix} = \begin{bmatrix} \alpha+\beta & 0 \\ 0 & \beta \end{bmatrix}$.
+Любую диагональную $\begin{bmatrix} t_1 & 0 \\ 0 & t_2 \end{bmatrix}$ получаем при $\beta = t_2$, $\alpha = t_1 - t_2$.
+Наименьшее подпространство — **диагональные матрицы** $2 \times 2$.
+
+**(3)** Все кратные $\alpha\begin{bmatrix} 1 & 1 \\ 0 & 0 \end{bmatrix} = \begin{bmatrix} \alpha & \alpha \\ 0 & 0 \end{bmatrix}$.
+Наименьшее подпространство: $\left\{\begin{bmatrix} \alpha & \alpha \\ 0 & 0 \end{bmatrix} \mid \alpha \in \mathbb{R}\right\}$ — **одномерное подпространство**.
+
+**(4)** Линейная комбинация с коэффициентами $\alpha, \beta, \gamma$:
+$$\begin{bmatrix} \alpha+\beta & \alpha+\gamma \\ 0 & \beta+\gamma \end{bmatrix}$$
+Система $\alpha+\beta = t_1$, $\alpha+\gamma = t_2$, $\beta+\gamma = t_3$ всегда имеет единственное решение (матрица коэффициентов невырождена). Значит, *span* — все **верхнетреугольные матрицы** $2 \times 2$.
+
+</details>
+
+##### **4.30. Квадрат матрицы проекции** (Туториал 5, Задание 4)
+
+Пусть $P = \dfrac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}}$ — матрица проекции на прямую. Докажите, что $P^2 = P$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** скаляр $\mathbf{a}^T\mathbf{a}$ появляется в числителе при умножении двух матриц $P$ и сокращает один множитель в знаменателе.
+
+$$P^2 = \frac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}} \cdot \frac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}} = \frac{\mathbf{a}(\mathbf{a}^T\mathbf{a})\mathbf{a}^T}{(\mathbf{a}^T\mathbf{a})^2}$$
+
+Так как $\mathbf{a}^T\mathbf{a}$ — скаляр (вещественное число), его можно вынести:
+
+$$P^2 = \frac{(\mathbf{a}^T\mathbf{a})\,\mathbf{a}\mathbf{a}^T}{(\mathbf{a}^T\mathbf{a})^2} = \frac{\mathbf{a}\mathbf{a}^T}{\mathbf{a}^T\mathbf{a}} = P \quad \square$$
+
+</details>
+
+##### **4.31. МНК-прямая по четырём точкам** (Туториал 5, Задание 5)
+
+Методом наименьших квадратов подберите прямую $b = c + dt$ по измерениям:
+
+| $t$ | $b$ |
+|:---:|:---:|
+| $-2$ | $4$ |
+| $-1$ | $3$ |
+| $0$ | $1$ |
+| $2$ | $0$ |
+
+Затем найдите проекцию $\mathbf{b} = (4, 3, 1, 0)^T$ на столбцовое пространство матрицы $A$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** МНК-прямая минимизирует сумму квадратов вертикальных ошибок; проекция даётся $\mathbf{p} = A\hat{\mathbf{x}}$.
+
+1.  **Матрица системы:**
+    $$A = \begin{pmatrix} 1 & -2 \\ 1 & -1 \\ 1 & 0 \\ 1 & 2 \end{pmatrix}, \quad \mathbf{b} = \begin{pmatrix} 4 \\ 3 \\ 1 \\ 0 \end{pmatrix}$$
+2.  **Вычислим $A^T A$ и $A^T \mathbf{b}$:**
+    $$A^T A = \begin{pmatrix} 4 & -1 \\ -1 & 9 \end{pmatrix}, \quad A^T \mathbf{b} = \begin{pmatrix} 8 \\ -11 \end{pmatrix}$$
+
+    (проверка: $\sum t_i = -2-1+0+2 = -1$; $\sum t_i^2 = 4+1+0+4 = 9$; $\sum b_i = 8$; $\sum t_i b_i = -8-3+0+0 = -11$.)
+3.  **Нормальные уравнения:**
+    $$\det(A^T A) = 36 - 1 = 35, \quad (A^T A)^{-1} = \frac{1}{35}\begin{pmatrix} 9 & 1 \\ 1 & 4 \end{pmatrix}$$
+
+    $$\begin{pmatrix} c \\ d \end{pmatrix} = \frac{1}{35}\begin{pmatrix} 9 & 1 \\ 1 & 4 \end{pmatrix}\begin{pmatrix} 8 \\ -11 \end{pmatrix} = \frac{1}{35}\begin{pmatrix} 61 \\ -36 \end{pmatrix} \approx \begin{pmatrix} 1.74 \\ -1.03 \end{pmatrix}$$
+
+    МНК-прямая: $b \approx 1.74 - 1.03t$.
+4.  **Проекция $\mathbf{p} = A\hat{\mathbf{x}}$:**
+
+    По формуле проекции $\mathbf{p} = A(A^T A)^{-1}A^T\mathbf{b}$:
+
+    $$\mathbf{p} = A \cdot \frac{1}{35}\begin{pmatrix} 61 \\ -36 \end{pmatrix} = \frac{1}{35}\begin{pmatrix} 1 & -2 \\ 1 & -1 \\ 1 & 0 \\ 1 & 2 \end{pmatrix}\begin{pmatrix} 61 \\ -36 \end{pmatrix} = \frac{1}{35}\begin{pmatrix} 133 \\ 97 \\ 61 \\ -11 \end{pmatrix}$$
+
+**Ответ:** МНК-прямая: $b \approx 1.74 - 1.03t$. Проекция: $\mathbf{p} = \dfrac{1}{35}\begin{pmatrix} 133 \\ 97 \\ 61 \\ -11 \end{pmatrix}$.
+
+</details>
+
+##### **4.32. Матрица проекции на подпространство** (Туториал 5, Задание 6)
+
+Найдите матрицу проекции $P$ на подпространство, натянутое на $\mathbf{a}_1 = (1, 0, 1)^T$ и $\mathbf{a}_2 = (1, 1, -1)^T$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** положить $A = [\mathbf{a}_1 \mid \mathbf{a}_2]$ и вычислить $P = A(A^T A)^{-1}A^T$.
+
+1.  **Матрица $A$:**
+    $$A = \begin{bmatrix} 1 & 1 \\ 0 & 1 \\ 1 & -1 \end{bmatrix}$$
+2.  **Вычислим $A^T A$:**
+    $$A^T A = \begin{bmatrix} 1 & 0 & 1 \\ 1 & 1 & -1 \end{bmatrix}\begin{bmatrix} 1 & 1 \\ 0 & 1 \\ 1 & -1 \end{bmatrix} = \begin{bmatrix} 2 & 0 \\ 0 & 3 \end{bmatrix}$$
+
+    ($A^T A$ диагональна, так как $\mathbf{a}_1 \cdot \mathbf{a}_2 = 1 + 0 - 1 = 0$ — столбцы уже ортогональны.)
+3.  **Обратная $(A^T A)^{-1}$:**
+    $$(A^T A)^{-1} = \begin{bmatrix} 1/2 & 0 \\ 0 & 1/3 \end{bmatrix}$$
+4.  **Матрица $P = A(A^T A)^{-1}A^T$:**
+    $$A(A^T A)^{-1} = \begin{bmatrix} 1 & 1 \\ 0 & 1 \\ 1 & -1 \end{bmatrix}\begin{bmatrix} 1/2 & 0 \\ 0 & 1/3 \end{bmatrix} = \frac{1}{6}\begin{bmatrix} 3 & 2 \\ 0 & 2 \\ 3 & -2 \end{bmatrix}$$
+
+    $$P = \frac{1}{6}\begin{bmatrix} 3 & 2 \\ 0 & 2 \\ 3 & -2 \end{bmatrix}\begin{bmatrix} 1 & 0 & 1 \\ 1 & 1 & -1 \end{bmatrix} = \frac{1}{6}\begin{bmatrix} 5 & 2 & 1 \\ 2 & 2 & -2 \\ 1 & -2 & 5 \end{bmatrix}$$
+5.  **Проверка:** $P^2 = P$ и $P^T = P$ ✓
+
+**Ответ:** $P = \dfrac{1}{6}\begin{bmatrix} 5 & 2 & 1 \\ 2 & 2 & -2 \\ 1 & -2 & 5 \end{bmatrix}$
+
+</details>
+
+

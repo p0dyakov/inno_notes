@@ -1,0 +1,1770 @@
+---
+title: "W10. Паттерны проектирования: Strategy, Adapter, Composite"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "2026-03-24"
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Введение: паттерны проектирования**
+
+###### **1.1.1 Что такое паттерн проектирования?**
+
+**Design pattern** (паттерн проектирования) — это **архитектурная схема**: определённая организация классов, объектов и методов, которая даёт приложениям стандартизованное, многократно используемое решение типичной проектной задачи. Идею популяризовала так называемая **«банда четырёх» (Gang of Four, GoF)** — Erich Gamma, Richard Helm, Ralph Johnson и John Vlissides — в фундаментальной книге 1994 года *Design Patterns: Elements of Reusable Object-Oriented Software* (Addison-Wesley).
+
+Характерная формулировка из GoF: *«Каждый паттерн описывает задачу, которая вновь и вновь возникает в нашей среде, а затем описывает суть решения этой задачи так, что это решение можно использовать миллион раз — и каждый раз по-своему».*
+
+> **Важно:** за паттернами не стоит строгой формальной теории; скорее они обобщают огромный практический опыт реальных ОО‑приложений. Почти все паттерны опираются на **парадигму ОО** — речь почти целиком об объектно‑ориентированном проектировании.
+
+###### **1.1.2 Классификация паттернов GoF**
+
+GoF разделили 23 паттерна на три семейства по назначению:
+
+*   **Creational patterns** (порождающие) — про то, как лучше всего *создавать экземпляры* объектов: абстрагируют процесс создания, упрощая появление новых видов объектов или контроль числа экземпляров. Примеры: Abstract Factory, Factory Method, Singleton, Builder, Prototype.
+*   **Structural patterns** (структурные) — про то, как классы и объекты *компонуются* в более крупные структуры. Примеры: **Adapter**, Bridge, **Composite**, Decorator, Facade, Flyweight, Proxy.
+*   **Behavioral patterns** (поведенческие) — про *распределение обязанностей* между объектами, инкапсуляцию поведения и делегирование запросов. Примеры: Chain of Responsibility, Command (undo/redo), Interpreter, Iterator, Mediator, **Strategy**, Visitor, Observer, State, Memento, Template Method.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Паттерны недели в таксономии GoF"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+flowchart TB
+    Patterns["Design Patterns"]
+    Structural["Structural<br/>Adapter, Composite"]
+    Behavioral["Behavioral<br/>Strategy"]
+    Patterns --> Structural
+    Patterns --> Behavioral
+```
+
+На этой неделе — два **structural** паттерна — **Adapter** и **Composite** — и один **behavioral**: **Strategy**.
+
+##### **1.2 Strategy**
+
+###### **1.2.1 Мотивация: симулятор озера с утками**
+
+Чтобы понять, *зачем* нужен паттерн **Strategy**, разберём классическую мысленную модель. Представьте, что вы строите **Duck Lake Simulator** — программу, которая моделирует разные виды уток, плавающих на озере.
+
+**Шаг 1 — исходный дизайн.** Вы вводите базовый класс `Duck` с общим поведением: все утки умеют крякать, плавать и отображаться. Конкретные подклассы вроде `MallardDuck` и `RedheadDuck` наследуют `Duck` и переопределяют `display()`, чтобы выглядеть по‑разному.
+
+```cpp
+class Duck {
+public:
+    quack()
+    swim()
+    display()   // each kind looks differently
+};
+
+class MallardDuck : Duck {
+public:
+    display() { /* looks like a mallard */ }
+};
+```
+
+Пока это аккуратное, простое наследование — и оно работает.
+
+**Шаг 2 — добавляем полёт.** Симулятор развивается: утки должны уметь летать. Наивное решение — добавить метод `fly()` в базовый класс `Duck`.
+
+```cpp
+class Duck {
+public:
+    quack()
+    swim()
+    display()
+    fly()   // added to all ducks
+};
+```
+
+Кажется удобным: все уже существующие подклассы автоматически получают `fly()`. Проблема проявляется, как только появляется **резиновая утка** (`RubberDuck`):
+
+**Шаг 3 — проблема резиновой утки.**
+
+```cpp
+class RubberDuck : Duck {
+public:
+    quack()    // squeaks, not quacks
+    swim()
+    display()
+    fly()      // Rubber ducks fly!? — THIS IS A BUG
+};
+```
+
+Добавление `fly()` через наследование в базовый класс дало **нелокальный побочный эффект**: каждый существующий и будущий подкласс унаследовал поведение, которое для него может быть неуместным. Локальное изменение одного класса (добавили `fly()` в `Duck`) тихо поломало семантику всех потомков.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Проблема наследования в примере с утками: fly в базовом классе затрагивает все подклассы"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+classDiagram
+    class Duck {
+      +quack()
+      +swim()
+      +fly()
+    }
+    class MallardDuck
+    class RubberDuck
+    class DecoyDuck
+    Duck <|-- MallardDuck
+    Duck <|-- RubberDuck
+    Duck <|-- DecoyDuck
+```
+
+###### **1.2.2 Почему простые решения не спасают**
+
+**Решение 1 — переопределение в каждом подклассе.** В каждом подклассе, который не должен летать, переопределить `fly()` (оставить пустым или бросать исключение). Это *работает*, но:
+
+*   для каждого нового вида уток нужно помнить про осмотр и возможное переопределение каждого поведения;
+*   растут **издержки сопровождения** и **жёсткая связность** между базой и наследниками;
+*   наследование должно было убирать дублирование, а теперь вы пишете и копируете код переопределений во многих местах.
+
+**Решение 2 — интерфейсы (`Flyable`, `Quackable`).** Убрать `fly()` и `quack()` из базового класса и объявить их интерфейсами, которые реализуют только заинтересованные подклассы.
+
+```cpp
+interface Flyable  { fly() }
+interface Quackable { quack() }
+
+class MallardDuck : Duck, Flyable, Quackable {
+    quack() { /* real quack */ }
+    fly()   { /* real flight */ }
+};
+
+class RubberDuck : Duck, Quackable {
+    quack() { /* squeaks */ }
+    // no fly — correct!
+};
+```
+
+Так вы устраняете проблему *«не того»* поведения, но появляется новая: **интерфейсы не несут реализации**. Каждый класс, который умеет летать, должен реализовать `fly()` с нуля. Если 20 подклассов уток летают и в логике полёта ошибка, править придётся все 20 классов. **Повторное использование кода рушится.**
+
+###### **1.2.3 Правильный ход: отделить стабильное от изменчивого**
+
+Ключевая архитектурная мысль почти всех паттернов такова:
+
+> **Найдите в приложении то, что меняется, и отделите это от того, что остаётся неизменным.**
+
+В нашем примере:
+
+*   **стабильно** — то, что утки плавают и имеют внешний вид;
+*   **изменчиво** — *как* утка летает и *как* она крякает.
+
+Вместо того чтобы кодировать эти поведения прямо в иерархии классов (через наследование), выносим их в **отдельные иерархии поведения** и используем **composition** (композицию):
+
+```cpp
+// Fly behavior hierarchy
+interface FlyBehavior {
+    fly()
+}
+
+class FlyWithWings : FlyBehavior {
+    fly() { /* flaps wings and soars */ }
+}
+
+class FlyNoWay : FlyBehavior {
+    fly() { /* does nothing */ }
+}
+
+// Quack behavior hierarchy
+interface QuackBehavior {
+    quack()
+}
+
+class Quack : QuackBehavior {
+    quack() { /* real quack */ }
+}
+
+class Squeak : QuackBehavior {
+    quack() { /* rubber squeak */ }
+}
+
+class MuteSqueak : QuackBehavior {
+    quack() { /* silence */ }
+}
+```
+
+Класс `Duck` теперь **держит ссылки** на объекты поведения и **делегирует** им фактическую работу:
+
+```cpp
+class Duck {
+public:
+    FlyBehavior flyBehavior;
+    QuackBehavior quackBehavior;
+
+    doFly()   { flyBehavior.fly(); }     // delegates to behavior object
+    doQuack() { quackBehavior.quack(); } // delegates to behavior object
+
+    display()   // still abstract — each duck looks different
+};
+
+class MallardDuck : Duck {
+public:
+    MallardDuck() {
+        flyBehavior = new FlyWithWings();
+        quackBehavior = new Quack();
+    }
+    display() { /* looks like a mallard */ }
+};
+```
+
+У `RubberDuck` достаточно задать `flyBehavior = new FlyNoWay()` — без переопределений и без пустых тел методов.
+
+**Главный бонус — смена поведения в runtime.** Поведения — это объекты в полях, их можно *подменять во время работы* через сеттер:
+
+```cpp
+void setFlyBehavior(FlyBehavior fb) {
+    flyBehavior = fb;
+}
+```
+
+Утка может менять способ полёта без изменения определения класса. На чистом наследовании так не сделать.
+
+**Принцип проектирования:** *Prefer composition over inheritance* (предпочитайте композицию наследованию).
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Композиция вместо наследования: поведение подставляется сменными объектами"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+classDiagram
+    class Duck
+    class FlyBehavior {
+      <<interface>>
+    }
+    class QuackBehavior {
+      <<interface>>
+    }
+    Duck --> FlyBehavior
+    Duck --> QuackBehavior
+```
+
+###### **1.2.4 Паттерн Strategy: формальное определение**
+
+Именно это и есть паттерн **Strategy**:
+
+> **Strategy** — задать семейство алгоритмов, инкапсулировать каждый и сделать их взаимозаменяемыми. **Strategy** позволяет менять алгоритм независимо от клиентов, которые им пользуются.
+
+У паттерна три ключевых участника:
+
+*   **Context** — класс, которому нужно выполнить операцию (как `Duck`). Держит ссылку на объект **Strategy** и делегирует работу через интерфейс стратегии. Он не знает, *как именно* выполняется работа.
+*   **Strategy** — общий интерфейс для всех конкретных стратегий (как `FlyBehavior`). Объявляет метод, который вызывает контекст.
+*   **ConcreteStrategies** — конкретные реализации алгоритма (как `FlyWithWings`, `FlyNoWay`).
+*   **Client** — создаёт конкретную стратегию и передаёт её контексту (или задаёт через сеттер).
+
+Типичный клиентский код выглядит так:
+
+```java
+Strategy str = new SomeStrategy();
+context.setStrategy(str);
+context.doSomething();
+// ...
+Strategy other = new OtherStrategy();
+context.setStrategy(other);
+context.doSomething();
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Структура паттерна Strategy"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+classDiagram
+    class Context
+    class Strategy {
+      <<interface>>
+      +doSomething()
+    }
+    class ConcreteStrategyA
+    class ConcreteStrategyB
+    Context --> Strategy : делегирует
+    Strategy <|.. ConcreteStrategyA
+    Strategy <|.. ConcreteStrategyB
+```
+
+###### **1.2.5 Когда применять Strategy**
+
+*   Нужно использовать разные варианты алгоритма внутри объекта и уметь **переключать алгоритм в runtime**.
+*   В классе разросся **большой условный оператор** (`if`/`switch`), выбирающий варианты одного и того же алгоритма — вынесите каждую ветку в отдельную concrete strategy.
+*   Нужно **отделить бизнес‑логику** от деталей реализации алгоритмов.
+*   Нужно **уменьшить число подклассов**, которые отличаются только тем, как инициализируют поведение (взрыв подклассов заменяется небольшим набором объектов‑стратегий).
+
+###### **1.2.6 Strategy: плюсы и минусы**
+
+**Плюсы:**
+
+*   можно менять алгоритм внутри объекта **в runtime**;
+*   детали реализации алгоритма изолируются от кода, который его использует;
+*   можно **заменить наследование композицией** и не строить хрупкие иерархии;
+*   *Open/Closed Principle* — новые стратегии без изменения контекста.
+
+**Минусы:**
+
+*   если алгоритмов пара и они почти не меняются, лишние классы и интерфейсы дают лишнюю сложность;
+*   клиентам нужно понимать различия стратегий, чтобы выбрать подходящую;
+*   в современных языках есть **лямбды**, которые часто дают тот же эффект без отдельных классов стратегий.
+
+###### **1.2.7 Как внедрить Strategy (пошагово)**
+
+1.  В классе контекста **найдите алгоритм**, который часто меняется, или массивный условный выбор между вариантами алгоритма.
+2.  **Объявите интерфейс Strategy**, общий для всех вариантов.
+3.  По очереди **вынесите алгоритмы** в отдельные классы; каждый реализует интерфейс стратегии.
+4.  В контексте **добавьте поле** со ссылкой на объект стратегии и **сеттер** для замены. Контекст работает со стратегией только через интерфейс.
+5.  **Клиенты** контекста должны сопоставить ему подходящую стратегию под свои ожидания.
+
+##### **1.3 Adapter**
+
+###### **1.3.1 Какую задачу решает Adapter**
+
+Есть полезный класс — сторонняя библиотека, legacy‑сервис или просто код, который нельзя менять. Его интерфейс не совпадает с тем, что ожидает остальная система. Сервисный класс править нельзя. Клиентский код тоже (или это слишком дорого). Паттерн **Adapter** закрывает этот разрыв.
+
+> **Adapter** (также **Wrapper**) — преобразовать интерфейс класса к другому интерфейсу, который ожидают клиенты. **Adapter** позволяет совместно работать классам, которые иначе несовместимы по интерфейсу.
+
+Бытовая аналогия: дорожный адаптер питания переводит форму розетки и напряжение. Устройство (**client**) рассчитывает на один тип вилки; стена (**service**) даёт другой. Между ними стоит адаптер — и ничего не ломается в самом устройстве и в «розетке».
+
+###### **1.3.2 Пример симулятора уток**
+
+Вернёмся к симулятору: теперь там не только утки, но и **индейки**. Утки и индейки похожи по смыслу, но интерфейсы несовместимы:
+
+```cpp
+class Duck {
+public:
+    virtual void quack() = 0;
+    virtual void fly() = 0;
+};
+
+class MallardDuck : public Duck {
+public:
+    void quack() override { /* real quack */ }
+    void fly() override   { /* real flight */ }
+};
+```
+
+```cpp
+class Turkey {
+public:
+    virtual void gobble() = 0;  // turkeys gobble, not quack
+    virtual void fly() = 0;     // turkeys fly very short distances
+};
+
+class WildTurkey : public Turkey {
+public:
+    void gobble() override { /* gobble gobble */ }
+    void fly() override    { /* short hops */ }
+};
+```
+
+Остальная программа работает с объектами `Duck`. Как заставить индейку вести себя как утку? Пишем **TurkeyAdapter**:
+
+```cpp
+class TurkeyAdapter : public Duck {
+public:
+    TurkeyAdapter(Turkey t) : turkey(t) { }
+
+    void quack() override {
+        turkey.gobble();     // map quack → gobble
+    }
+
+    void fly() override {
+        for (int i = 1; i < 5; i++)
+            turkey.fly();    // 5 short hops ≈ one long duck flight
+    }
+
+private:
+    Turkey turkey;           // holds the adaptee internally
+};
+```
+
+Адаптер **выглядит** как утка (реализует интерфейс `Duck`), но **внутри ведёт себя** как индейка (делегирует объекту‑индейке). Клиентский код не меняется:
+
+```cpp
+void testDuck(Duck duck) {
+    duck.quack();
+    duck.fly();
+}
+
+MallardDuck duck;
+WildTurkey turkey;
+
+TurkeyAdapter ta(turkey);
+
+testDuck(duck);   // works — duck is a Duck
+testDuck(ta);     // works — TurkeyAdapter is also a Duck
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Adapter: клиент говорит на Duck, adaptee — на Turkey, адаптер их стыкует"
+%%| fig-width: 6.4
+%%| fig-height: 3.4
+classDiagram
+    class Duck {
+      <<interface>>
+      +quack()
+      +fly()
+    }
+    class Turkey {
+      <<interface>>
+      +gobble()
+      +fly()
+    }
+    class TurkeyAdapter
+    Duck <|.. TurkeyAdapter
+    TurkeyAdapter --> Turkey : оборачивает
+```
+
+###### **1.3.3 Object Adapter и Class Adapter**
+
+Есть два варианта паттерна **Adapter**:
+
+**Object Adapter** (чаще всего, как выше): адаптер **держит ссылку** на объект сервиса (**adaptee**) в приватном поле. Это *composition* (композиция). Работает в любом языке.
+
+```cpp
+class TurkeyAdapter : public Duck {
+private:
+    Turkey turkey;  // composition: holds the adaptee
+    ...
+};
+```
+
+**Class Adapter** (нужно множественное наследование): адаптер **наследует и** клиентский интерфейс, **и** класс сервиса — реализацию сервиса получает напрямую:
+
+```cpp
+class TurkeyAdapter : public Duck, private Turkey {
+public:
+    void quack() override {
+        Turkey::gobble();    // call inherited turkey method
+    }
+    void fly() override {
+        for (int i = 1; i < 5; i++)
+            Turkey::fly();
+    }
+};
+```
+
+Приватное наследование от `Turkey` даёт адаптеру реализацию индейки, но не выставляет наружу интерфейс `Turkey`. Во многих языках (Java, C#) множественного наследования классов нет — там остаётся только **object adapter**.
+
+###### **1.3.4 Общая структура Adapter**
+
+В общем виде участники такие:
+
+*   **Client** — существующий код, который пользуется **Client Interface**.
+*   **Client Interface** — интерфейс, который ожидает клиент.
+*   **Adapter** — реализует **Client Interface**, держит ссылку на **Service** и переводит вызовы.
+*   **Service** — несовместимый класс (сторонний, legacy) с другим интерфейсом.
+
+Суть логики адаптера:
+
+```java
+// Inside Adapter.method(data):
+specialData = convertToServiceFormat(data)
+return adaptee.serviceMethod(specialData)
+```
+
+###### **1.3.5 Когда применять Adapter**
+
+*   Нужно использовать **существующий класс**, но его интерфейс не стыкуется с остальным кодом.
+*   Нужно **переиспользовать несколько существующих подклассов**, у которых нет общей функциональности, которую нельзя добавить в суперкласс.
+
+###### **1.3.6 Adapter: плюсы и минусы**
+
+**Плюсы:**
+
+*   *Single Responsibility Principle* — код преобразования интерфейса/данных можно отделить от основной бизнес‑логики;
+*   *Open/Closed Principle* — новые адаптеры без поломки существующих клиентов.
+
+**Минусы:**
+
+*   растёт общая сложность: появляются новые интерфейсы и классы; иногда проще поправить сам **Service**, чтобы он совпал с остальной системой.
+
+###### **1.3.7 Как внедрить Adapter (пошагово)**
+
+1.  **Зафиксируйте несовместимость**: есть полезный **Service** (его нельзя менять) и **Client**, которому он нужен.
+2.  **Объявите Client Interface** — как клиент должен общаться с сервисом.
+3.  **Создайте класс Adapter**, реализующий этот интерфейс; методы пока оставьте пустыми.
+4.  **Добавьте поле** со ссылкой на сервис; инициализируйте в конструкторе.
+5.  **Реализуйте методы интерфейса клиента**: каждый метод делегирует сервису, выполняя только перевод формата/имён вызовов.
+6.  **Пользуйтесь адаптером через Client Interface** — клиенты не обращаются к сервису напрямую.
+
+##### **1.4 Composite**
+
+###### **1.4.1 Проблема: атомарные и составные объекты**
+
+Во многих предметных областях приходится работать с объектами, образующими **дерево**: часть элементов простые (атомарные), часть — контейнеры из других элементов. Задача: обращаться с *простыми* и *составными* узлами **одинаково**, без постоянных проверок типа перед вызовом операций.
+
+Примеры пар «атом / композит»:
+
+| Область | Атомарный (**leaf**) | Композит |
+|:---|:---|:---|
+| Графика | Линия, круг, прямоугольник | Picture (группа фигур) |
+| Система типов | `int`, `float`, `char`, `bool` | `struct`, `class`, `array` |
+| Кулинария | Перец, соль, мясо, масло | Блюдо (смесь ингредиентов) |
+| Доставка | Отдельный товар | Коробка с товарами или другими коробками |
+| Файловая система | Файл | Каталог |
+
+Конкретный пример доставки: заказ FEDEX — большая коробка. Внутри две поменьше и квитанция. В одной маленькой коробке молоток и телефон; в другой наушники и зарядка. Чтобы посчитать общую цену заказа, нужно суммировать всё содержимое — при произвольной глубине вложенности.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Composite: коробка доставки с вложенными коробками и отдельными позициями"
+%%| fig-width: 6.4
+%%| fig-height: 4
+flowchart TB
+    Order["Large Box"]
+    Box1["Small Box 1"]
+    Box2["Small Box 2"]
+    Receipt["Receipt"]
+    Hammer["Hammer"]
+    Phone["Phone"]
+    Headphones["Headphones"]
+    Charger["Charger"]
+    Order --> Box1
+    Order --> Box2
+    Order --> Receipt
+    Box1 --> Hammer
+    Box1 --> Phone
+    Box2 --> Headphones
+    Box2 --> Charger
+```
+
+###### **1.4.2 Паттерн Composite: структура**
+
+> **Composite** — составить объекты в древовидные структуры и работать с ними как с единым объектом.
+
+Три участника:
+
+*   **Component** — базовый класс или интерфейс с общей операцией (например `execute()` или `calculatePrice()`). Реализуют и листья, и композиты.
+*   **Leaf** — простой элемент без детей; здесь выполняется фактическая работа.
+*   **Composite** — контейнер: хранит список дочерних **Component** (листья или другие композиты) и реализует операцию, **делегируя детям** и агрегируя результат.
+
+Во время выполнения получается перевёрнутое дерево:
+
+```
+aComposite (root)
+├── aLeaf
+├── aLeaf
+├── aComposite
+│   ├── aLeaf
+│   ├── aLeaf
+│   └── aLeaf
+└── aLeaf
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Структура паттерна Composite"
+%%| fig-width: 6.2
+%%| fig-height: 3.4
+classDiagram
+    class Component {
+      +operation()
+    }
+    class Leaf {
+      +operation()
+    }
+    class Composite {
+      +add(c)
+      +remove(c)
+      +operation()
+    }
+    Component <|-- Leaf
+    Component <|-- Composite
+    Composite --> Component : children
+```
+
+###### **1.4.3 Два варианта реализации**
+
+**Вариант 1 — safe architecture.** Методы `add`/`remove`/`getChildren` объявлены *только* в классе `Composite`, а не в базовом `Component`.
+
+```java
+class Component {
+    Component parent;
+}
+
+class Composite extends Component {
+    public Component get() { ... }
+    public void add(Component c) { ... }
+    public Component remove() { ... }
+
+    private List<Component> components;
+}
+
+class Leaf extends Component { ... }
+```
+
+*Плюс:* у `Leaf` нет `add`/`remove` — случайно вызвать их на листе нельзя.
+
+*Минус:* клиент должен в runtime проверять, что объект — `Composite`, прежде чем звать эти методы; нужен downcast. Менее прозрачно и сильнее связывает клиента с конкретными типами.
+
+**Вариант 2 — максимальный интерфейс (transparent architecture).** Методы `add`/`remove`/`get` переносятся в базовый `Component` как абстрактные.
+
+```java
+class Component {
+    Component parent;
+
+    abstract public Component get();
+    abstract public void add(Component c);
+    abstract public Component remove();
+}
+
+class Composite extends Component {
+    @Override public Component get() { ... }
+    @Override public void add(Component c) { ... }
+    @Override public Component remove() { ... }
+
+    private List<Component> components;
+}
+
+class Leaf extends Component {
+    @Override public Component get() { return this; }  // trivial
+    @Override public void add(Component c) { }         // empty — no children
+    @Override public Component remove() { return null; } // empty
+}
+```
+
+*Плюс:* клиент может вызывать `add`/`remove` на *любом* компоненте, не зная конкретного типа — максимальная **прозрачность**.
+
+*Минус:* `Leaf` вынужден реализовывать методы, которые ему логически не подходят (пустые `add`/`remove`). Это бьёт по **Interface Segregation Principle (ISP)** — клиентов не должны заставлять зависеть от неиспользуемых методов.
+
+На практике встречаются оба варианта; выбор между **type safety** и прозрачностью интерфейса.
+
+###### **1.4.4 Когда применять Composite**
+
+*   Нужна **древовидная структура** объектов.
+*   Клиентский код должен **одинаково обрабатывать простые и составные элементы** — без знания, лист это или композит.
+
+###### **1.4.5 Composite: плюсы и минусы**
+
+**Плюсы:**
+
+*   сложные деревья удобно обходить через **полиморфизм и рекурсию**;
+*   *Open/Closed Principle* — новые виды элементов (подклассы `Leaf` или `Composite`) без поломки клиентов.
+
+**Минусы:**
+
+*   если функциональность классов слишком разная, общий интерфейс дать трудно — риск **переобобщить** **Component** и запутать читателя;
+*   во **втором** варианте реализации страдает **ISP** — листья реализуют управление детьми «впустую».
+
+###### **1.4.6 Как внедрить Composite (пошагово)**
+
+1.  Убедитесь, что предметную модель **можно представить деревом**: простые элементы (**leaf**) и контейнеры (**composite**), причём контейнеры держат и простые узлы, и другие контейнеры.
+2.  **Объявите интерфейс Component** с операциями, осмысленными и для простых, и для составных узлов.
+3.  **Создайте класс листа** для атомарных элементов; листьев может быть несколько разных классов.
+4.  **Создайте класс контейнера (composite)** со списком/массивом ссылок на дочерние **Component** (тип списка — интерфейс, чтобы хранить и листья, и композиты). В операциях контейнер в основном делегирует подэлементам.
+5.  **Определите add/remove** либо только на контейнере, либо на базовом **Component** — см. варианты 1 и 2 выше.
+
+---
+
+#### **2. Определения**
+
+*   **Design pattern** (**паттерн проектирования**): архитектурная схема — организация классов, объектов и методов — дающая стандартизированное переиспользуемое решение типичной задачи ООП-проектирования.
+*   **Gang of Four (GoF)**: Эрих Гамма, Ричард Хелм, Ральф Джонсон и Джон Влиссидес — авторы книги 1994 года с 23 классическими паттернами.
+*   **Creational patterns** (**порождающие паттерны**): как лучше создавать объекты (**Singleton**, **Factory Method**, **Prototype**, **Builder** и др.).
+*   **Structural patterns** (**структурные паттерны**): как объединять классы и объекты в крупные структуры (**Adapter**, **Composite**, **Decorator** и др.).
+*   **Behavioral patterns** (**поведенческие паттерны**): распределение обязанностей и инкапсуляция поведения (**Strategy**, **Observer**, **State** и др.).
+*   **Strategy pattern**: поведенческий паттерн — семейство алгоритмов, каждый в своём классе, взаимозаменяемы; алгоритм меняется независимо от клиентов.
+*   **Context**: в **Strategy** — класс, хранящий ссылку на **Strategy** и делегирующий ему выполнение алгоритма.
+*   **Strategy interface**: общий интерфейс с методом алгоритма для всех **concrete strategies**.
+*   **Concrete strategy**: конкретная реализация интерфейса **Strategy** — один вариант алгоритма.
+*   **Composition over inheritance**: предпочитать композицию (вложенные объекты с нужным поведением) наследованию для повторного использования поведения.
+*   **Adapter pattern**: структурный паттерн — преобразует интерфейс класса к ожидаемому клиентом; несовместимые классы работают вместе. Иначе **Wrapper**.
+*   **Adaptee (service)**: в **Adapter** — класс с «чужим» интерфейсом, который нужно адаптировать.
+*   **Object adapter**: адаптер держит ссылку на **adaptee** (композиция).
+*   **Class adapter**: адаптер наследует и интерфейс клиента, и **adaptee** (множественное наследование).
+*   **Composite pattern**: структурный паттерн — дерево объектов; с деревом можно работать как с одним целым.
+*   **Component**: в **Composite** — базовый класс/интерфейс для листьев и композитов.
+*   **Leaf**: в **Composite** — узел без детей, выполняет работу.
+*   **Composite (class)**: в **Composite** — контейнер с дочерними **Component** (листья или другие композиты), делегирует им.
+*   **Open/Closed Principle**: **SOLID** — открыты для расширения, закрыты для модификации.
+*   **Single Responsibility Principle**: **SOLID** — одна причина для изменения класса.
+*   **Interface Segregation Principle (ISP)**: **SOLID** — клиенты не должны зависеть от неиспользуемых частей интерфейса.
+
+---
+
+#### **3. Примеры**
+
+##### **3.1. Конспект лекции — теоретические вопросы** (Лаба 9, **Задание** 1)
+
+Ответьте на шесть вопросов ниже, чтобы проверить понимание трёх паттернов материала этой недели.
+
+**(a)** В чём назначение паттерна **Strategy**? Какую проблему он решает?
+
+**(b)** Приведите пример из практики, где **Strategy** был бы уместен.
+
+**(c)** В чём назначение паттерна **Adapter**?
+
+**(d)** Приведите пример из практики, где **Adapter** был бы уместен.
+
+**(e)** В чём назначение паттерна **Composite**?
+
+**(f)** Приведите пример из практики, где **Composite** был бы уместен.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**(a) Назначение Strategy:**
+**Strategy** решает задачу *выбора алгоритма*. Если операцию можно выполнять по-разному (сортировка, маршрутизация, сжатие), запихивание всех вариантов в один большой `switch`/`if` делает класс жёстким и плохо расширяемым. **Strategy** выносит каждый вариант в отдельный класс (**concrete strategy**) за общим интерфейсом. **Context** хранит ссылку на стратегию и делегирует ей работу, не зная конкретной реализации. Алгоритм можно менять в **runtime**, добавляя новые стратегии без правок контекста.
+
+**(b) Пример для Strategy:**
+**Навигационное приложение** (в духе карт) строит маршрут по-разному: авто, пешком, велосипед, общественный транспорт. Без **Strategy** получился бы один «простынный» метод с ветвлениями. Со **Strategy** каждый режим (`RoadStrategy`, `WalkingStrategy`, `PublicTransportStrategy`) реализует общий `RouteStrategy`, а контекст вроде `Navigator` вызывает `strategy.buildRoute(A, B)` — активный алгоритм можно переключать.
+
+**(c) Назначение Adapter:**
+**Adapter** решает *несовместимость интерфейсов*. Полезный класс (сторонняя библиотека, легаси, много зависимостей) не подходит под ожидаемый API — и клиент, и сервис трогать рискованно. **Adapter** — обёртка с нужным интерфейсом, которая переводит вызовы в операции «чужого» класса; клиент и сервис остаются как были.
+
+**(d) Пример для Adapter:**
+Система логирует в консоль через `Logger` с `log(String message)`. Появляется облачный SDK с `sendEvent(Map<String, Object> payload)`. Вместо переписывания всех мест вызова пишут `CloudLoggerAdapter`, реализующий `Logger` и внутри превращающий `log(message)` в `sendEvent(...)`.
+
+**(e) Назначение Composite:**
+**Composite** даёт *единообразную работу с листьями и контейнерами*. В дереве объектов клиенту иначе пришлось бы различать типы узлов. Общий интерфейс и рекурсивное делегирование в контейнерах позволяют вызвать одну операцию у корня и обойти всё дерево без ручных проверок типов.
+
+**(f) Пример для Composite:**
+**GUI**: элементы реализуют `Widget` с `render()`. `Button` (лист) рисует себя; `Panel` и `Window` (композиты) обходят детей. Приложение вызывает `window.render()` — вся иерархия отрисовывается рекурсивно.
+
+</details>
+
+##### **3.2. Симулятор озера с утками (Duck Lake Simulator)** (Лекция 9, **Пример** 1)
+
+Реализуйте симулятор озера с утками (**Duck Lake Simulator**) на паттерне **Strategy** (как на лекции) на **Java**, **C#** или **C++**. В модели должны быть:
+
+*   абстрактный класс `Duck` с полями `FlyBehavior` и `QuackBehavior`, методами делегирования `doFly()` и `doQuack()` и абстрактным `display()`;
+*   как минимум реализации поведений: `FlyWithWings`, `FlyNoWay`, `Quack`, `Squeak`, `MuteSqueak`;
+*   не менее двух конкретных классов уток (например `MallardDuck`, `RubberDuck`), задающих поведение в конструкторе.
+
+Проверьте, что модель работает корректно.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **Strategy** отделяет *что такое утка* от *как она себя ведёт*. Поведения вынесены в отдельные иерархии и внедряются в `Duck` через композицию; сам `Duck` не реализует `fly()` и `quack()`, а делегирует объектам поведения.
+
+**Интерфейсы поведения и реализации:**
+
+```java
+// FlyBehavior.java — Strategy interface for flying
+public interface FlyBehavior {
+    void fly();
+}
+
+// FlyWithWings.java — Concrete Strategy
+public class FlyWithWings implements FlyBehavior {
+    @Override
+    public void fly() {
+        System.out.println("I'm flying with wings!");
+    }
+}
+
+// FlyNoWay.java — Concrete Strategy
+public class FlyNoWay implements FlyBehavior {
+    @Override
+    public void fly() {
+        System.out.println("I can't fly.");
+    }
+}
+
+// QuackBehavior.java — Strategy interface for quacking
+public interface QuackBehavior {
+    void quack();
+}
+
+// Quack.java — Concrete Strategy
+public class Quack implements QuackBehavior {
+    @Override
+    public void quack() {
+        System.out.println("Quack!");
+    }
+}
+
+// Squeak.java — Concrete Strategy
+public class Squeak implements QuackBehavior {
+    @Override
+    public void quack() {
+        System.out.println("Squeak!");
+    }
+}
+
+// MuteSqueak.java — Concrete Strategy
+public class MuteSqueak implements QuackBehavior {
+    @Override
+    public void quack() {
+        System.out.println("...(silence)...");
+    }
+}
+```
+
+**Класс контекста `Duck`:**
+
+```java
+// Duck.java — Context class
+public abstract class Duck {
+    // Strategy references — the core of the pattern
+    protected FlyBehavior flyBehavior;
+    protected QuackBehavior quackBehavior;
+
+    // Delegate to fly strategy
+    public void doFly() {
+        flyBehavior.fly();
+    }
+
+    // Delegate to quack strategy
+    public void doQuack() {
+        quackBehavior.quack();
+    }
+
+    // Allow runtime strategy swap
+    public void setFlyBehavior(FlyBehavior fb) {
+        flyBehavior = fb;
+    }
+
+    public void setQuackBehavior(QuackBehavior qb) {
+        quackBehavior = qb;
+    }
+
+    // Each duck looks different — subclasses must implement this
+    public abstract void display();
+}
+```
+
+**Concrete duck subclasses:**
+
+```java
+// MallardDuck.java — sets real flying and quacking in constructor
+public class MallardDuck extends Duck {
+    public MallardDuck() {
+        flyBehavior = new FlyWithWings();
+        quackBehavior = new Quack();
+    }
+
+    @Override
+    public void display() {
+        System.out.println("I'm a Mallard Duck.");
+    }
+}
+
+// RubberDuck.java — sets no-fly and squeak in constructor
+public class RubberDuck extends Duck {
+    public RubberDuck() {
+        flyBehavior = new FlyNoWay();
+        quackBehavior = new Squeak();
+    }
+
+    @Override
+    public void display() {
+        System.out.println("I'm a Rubber Duck.");
+    }
+}
+```
+
+**Client / main:**
+
+```java
+// Main.java
+public class Main {
+    public static void main(String[] args) {
+        Duck mallard = new MallardDuck();
+        mallard.display();
+        mallard.doFly();
+        mallard.doQuack();
+
+        System.out.println("---");
+
+        Duck rubberDuck = new RubberDuck();
+        rubberDuck.display();
+        rubberDuck.doFly();
+        rubberDuck.doQuack();
+
+        System.out.println("--- Runtime behavior change ---");
+        // Give the rubber duck a jetpack at runtime!
+        rubberDuck.setFlyBehavior(new FlyWithWings());
+        rubberDuck.doFly();
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+I'm a Mallard Duck.
+I'm flying with wings!
+Quack!
+---
+I'm a Rubber Duck.
+I can't fly.
+Squeak!
+--- Runtime behavior change ---
+I'm flying with wings!
+```
+
+**Ответ:** Важно, что `MallardDuck` и `RubberDuck` сами не реализуют `fly()` и `quack()`. Новое поведение (например `FlyWithRocketBooster`) добавляется отдельным классом — существующие классы не меняются; это соответствует **Open/Closed Principle**.
+
+</details>
+
+##### **3.3. Расширение симулятора уток: DiveBehavior** (Лекция 9, **Пример** 2)
+
+Расширьте симулятор озера с утками из предыдущего примера:
+
+*   добавьте поведение: интерфейс `DiveBehavior` и как минимум две реализации — `DiveDeep` и `DiveNone`;
+*   добавьте новый вид утки (например `DivingDuck`), которая ныряет, но не крякает;
+*   убедитесь, что для нового поведения *не* пришлось менять ни один уже существующий класс.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** упражнение иллюстрирует **Open/Closed Principle**: при корректном **Strategy** новое измерение поведения (ныряние) добавляется только *новым* кодом — без правок старых классов.
+
+```java
+// DiveBehavior.java — new Strategy interface
+public interface DiveBehavior {
+    void dive();
+}
+
+// DiveDeep.java — new Concrete Strategy
+public class DiveDeep implements DiveBehavior {
+    @Override
+    public void dive() {
+        System.out.println("Diving deep underwater!");
+    }
+}
+
+// DiveNone.java — new Concrete Strategy
+public class DiveNone implements DiveBehavior {
+    @Override
+    public void dive() {
+        System.out.println("I can't dive.");
+    }
+}
+```
+
+Добавьте `diveBehavior` в класс `Duck` (или сделайте подкласс — здесь расширяем `Duck`):
+
+```java
+// Duck.java — updated with dive behavior
+public abstract class Duck {
+    protected FlyBehavior flyBehavior;
+    protected QuackBehavior quackBehavior;
+    protected DiveBehavior diveBehavior;  // new behavior added
+
+    public void doFly()   { flyBehavior.fly(); }
+    public void doQuack() { quackBehavior.quack(); }
+    public void doDive()  { diveBehavior.dive(); }  // new delegation
+
+    public void setFlyBehavior(FlyBehavior fb)   { flyBehavior = fb; }
+    public void setQuackBehavior(QuackBehavior qb){ quackBehavior = qb; }
+    public void setDiveBehavior(DiveBehavior db) { diveBehavior = db; }
+
+    public abstract void display();
+}
+
+// DivingDuck.java — new concrete duck
+public class DivingDuck extends Duck {
+    public DivingDuck() {
+        flyBehavior  = new FlyWithWings();
+        quackBehavior = new MuteSqueak();  // cannot quack — stays silent
+        diveBehavior  = new DiveDeep();    // dives deep
+    }
+
+    @Override
+    public void display() {
+        System.out.println("I'm a Diving Duck.");
+    }
+}
+```
+
+**Verification in main:**
+
+```java
+Duck diver = new DivingDuck();
+diver.display();
+diver.doFly();
+diver.doQuack();
+diver.doDive();
+```
+
+**Ожидаемый вывод:**
+
+```
+I'm a Diving Duck.
+I'm flying with wings!
+...(silence)...
+Diving deep underwater!
+```
+
+**Ответ:** `MallardDuck`, `RubberDuck`, `FlyWithWings`, `Quack` и прочие существующие классы **не менялись** — добавлены только новые. Так **Strategy** поддерживает **Open/Closed Principle**.
+
+</details>
+
+##### **3.4. TurkeyAdapter без множественного наследования** (Лекция 9, **Пример** 3)
+
+In the lecture, a `TurkeyAdapter` was shown using multiple inheritance (`class TurkeyAdapter : public Duck, private Turkey`). Implement the same adapter *without* multiple inheritance — using composition (the object adapter approach).
+
+Интерфейсы и классы:
+
+```java
+// Duck.java
+public interface Duck {
+    void quack();
+    void fly();
+}
+
+// Turkey.java
+public interface Turkey {
+    void gobble();
+    void fly();
+}
+
+// WildTurkey.java
+public class WildTurkey implements Turkey {
+    @Override
+    public void gobble() { System.out.println("Gobble gobble!"); }
+    @Override
+    public void fly()    { System.out.println("I'm flying a short distance"); }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** *object adapter* держит **adaptee** (индейку) в приватном поле через композицию — без множественного наследования, подходит для любого языка. Адаптер реализует *target*-интерфейс (`Duck`) и переводит каждый вызов в нужный вызов **adaptee**.
+
+```java
+// TurkeyAdapter.java — Object Adapter (no multiple inheritance)
+public class TurkeyAdapter implements Duck {
+
+    // Composition: holds the adaptee as a private field
+    private Turkey turkey;
+
+    public TurkeyAdapter(Turkey turkey) {
+        this.turkey = turkey;
+    }
+
+    // Translate quack → gobble
+    @Override
+    public void quack() {
+        turkey.gobble();
+    }
+
+    // Translate fly: turkey needs 5 short hops to match one duck flight
+    @Override
+    public void fly() {
+        for (int i = 0; i < 5; i++) {
+            turkey.fly();
+        }
+    }
+}
+```
+
+**Использование адаптера в клиентском коде:**
+
+```java
+public class Main {
+    // This function only knows about Duck — it doesn't know about Turkey at all
+    static void testDuck(Duck duck) {
+        duck.quack();
+        duck.fly();
+    }
+
+    public static void main(String[] args) {
+        WildTurkey turkey = new WildTurkey();
+        Duck turkeyAdapter = new TurkeyAdapter(turkey);
+
+        System.out.println("Testing turkey adapted as duck:");
+        testDuck(turkeyAdapter);
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+Testing turkey adapted as duck:
+Gobble gobble!
+I'm flying a short distance
+I'm flying a short distance
+I'm flying a short distance
+I'm flying a short distance
+I'm flying a short distance
+```
+
+**Ответ:** `TurkeyAdapter` реализует `Duck` (проходит проверку типов как утка), но внутри делегирует индейке `Turkey`. Клиентская функция `testDuck` не знает, что получила индейку — **Adapter** «подгоняет» её под утку.
+
+</details>
+
+##### **3.5. Адаптер USB‑картридера** (Лекция 9, **Пример** 4)
+
+Study the following code, which demonstrates the Adapter pattern in a USB card reader scenario. Explain the role of each class and trace the execution.
+
+```java
+// Usb.java — Client Interface
+public interface Usb {
+    void connectWithUsbCable();
+    void extract();
+    void erase();
+}
+
+// MemoryCard.java — Service class (adaptee)
+public class MemoryCard {
+    public void insert()     { System.out.println("Memory card inserted"); }
+    public void copyData()   { System.out.println("Data is copied to computer"); }
+    public void extract()    { System.out.println("Memory card extracted"); }
+    public void eraseData()  { System.out.println("Data is erased from the memory card"); }
+}
+
+// CardReader.java — Adapter class
+public class CardReader implements Usb {
+    private MemoryCard memoryCard;
+
+    public CardReader(MemoryCard memoryCard) {
+        this.memoryCard = memoryCard;
+    }
+
+    @Override
+    public void connectWithUsbCable() {
+        memoryCard.insert();
+        memoryCard.copyData();
+    }
+
+    @Override
+    public void extract() {
+        memoryCard.extract();
+    }
+
+    @Override
+    public void erase() {
+        memoryCard.eraseData();
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        Usb cardReader = new CardReader(new MemoryCard());
+        cardReader.connectWithUsbCable();
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** у `MemoryCard` другой интерфейс, чем ожидает «USB-слой» (`Usb`). `CardReader` приводит интерфейс карты к `Usb`, поэтому клиент (`Main`) работает только с `Usb` и не вызывает `MemoryCard` напрямую.
+
+1.  **`Usb` (интерфейс клиента):** ожидаемые операции — `connectWithUsbCable()`, `extract()`, `erase()`; с ними умеет работать «компьютер».
+2.  **`MemoryCard` (service / adaptee):** устройство со своим API: `insert()`, `copyData()`, `extract()`, `eraseData()`; считаем, что менять его нельзя.
+3.  **`CardReader` (adapter):** реализует `Usb`, внутри держит `MemoryCard` и переводит вызовы:
+    *   `connectWithUsbCable()` → `insert()`, затем `copyData()`
+    *   `extract()` → `extract()` на карте (прямое делегирование)
+    *   `erase()` → `eraseData()` (несовпадение имён снимает адаптер)
+4.  **`Main` (client):** создаёт `CardReader` вокруг `MemoryCard` и использует как `Usb`.
+
+**Трассировка `cardReader.connectWithUsbCable()`:**
+
+```
+Main вызывает cardReader.connectWithUsbCable()
+  → выполняется CardReader.connectWithUsbCable():
+      memoryCard.insert()   → печать "Memory card inserted"
+      memoryCard.copyData() → печать "Data is copied to computer"
+```
+
+**Ожидаемый вывод:**
+
+```
+Memory card inserted
+Data is copied to computer
+```
+
+**Ответ:** `CardReader` — **Adapter**; `MemoryCard` — **adaptee** (сервис); `Usb` — интерфейс клиента. `Main` работает только с `Usb` и не зависит от имён методов `MemoryCard`.
+
+</details>
+
+##### **3.6. Калькулятор стоимости заказа (коробки)** (Лекция 9, **Пример** 5)
+
+Study the following Composite pattern implementation for calculating the total price of a shipping box. Trace the execution and explain how the recursive price calculation works.
+
+```java
+// PackageComponent.java — Component interface
+public interface PackageComponent {
+    int calculatePrice();
+}
+
+// AtomicItem.java — Abstract Leaf
+public abstract class AtomicItem implements PackageComponent {
+    private int price;
+
+    public AtomicItem(int price) { this.price = price; }
+
+    @Override
+    public int calculatePrice() { return price; }
+}
+
+// CokeCan.java and IPhone.java — Concrete Leaves
+public class CokeCan extends AtomicItem {
+    public CokeCan(int price) { super(price); }
+}
+
+public class IPhone extends AtomicItem {
+    public IPhone(int price) { super(price); }
+}
+
+// BoxContainer.java — Composite
+public class BoxContainer implements PackageComponent {
+    private final List<PackageComponent> childrenComponents;
+
+    public BoxContainer(List<PackageComponent> childrenComponents) {
+        this.childrenComponents = childrenComponents;
+    }
+
+    @Override
+    public int calculatePrice() {
+        return childrenComponents.stream()
+                .map(PackageComponent::calculatePrice)
+                .mapToInt(Integer::intValue).sum();
+    }
+
+    public void add(PackageComponent c)    { childrenComponents.add(c); }
+    public void remove(PackageComponent c) { childrenComponents.remove(c); }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        PackageComponent box1 = new BoxContainer(List.of(new CokeCan(100)));
+        PackageComponent box2 = new BoxContainer(List.of(new CokeCan(200)));
+        PackageComponent box3 = new BoxContainer(List.of(new IPhone(50000), box2));
+        PackageComponent box4 = new BoxContainer(List.of(box1, box3));
+
+        System.out.println("box4 price is " + box4.calculatePrice());
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `calculatePrice()` объявлен в интерфейсе `PackageComponent` — его реализуют и листья, и композиты. У `BoxContainer` метод суммирует вызовы `calculatePrice()` у детей; если ребёнок снова `BoxContainer`, получается рекурсия. Клиенту не нужно различать лист и контейнер.
+
+**Структура дерева:**
+
+```
+box4 (BoxContainer)
+├── box1 (BoxContainer)
+│   └── CokeCan(100)          → price: 100
+└── box3 (BoxContainer)
+    ├── IPhone(50000)          → price: 50000
+    └── box2 (BoxContainer)
+        └── CokeCan(200)       → price: 200
+```
+
+**Рекурсивный расчёт цены:**
+
+1.  `box4.calculatePrice()` обходит `[box1, box3]`:
+    *   вызывает `box1.calculatePrice()`:
+        *   обход `[CokeCan(100)]`
+        *   возврат `100`
+    *   вызывает `box3.calculatePrice()`:
+        *   обход `[IPhone(50000), box2]`
+        *   `IPhone(50000).calculatePrice()` → `50000`
+        *   `box2.calculatePrice()`:
+            *   обход `[CokeCan(200)]`
+            *   возврат `200`
+        *   возврат `50000 + 200 = 50200`
+    *   возврат `100 + 50200 = 50300`
+
+**Ожидаемый вывод:**
+
+```
+box4 price is 50300
+```
+
+**Ответ:** `50300`. Сила **Composite**: `Main` вызывает только `box4.calculatePrice()` — без ручного обхода дерева и проверок «лист это или коробка»; структура дерева для клиента прозрачна.
+
+</details>
+
+##### **3.7. Игра «атака» — паттерн Strategy** (Туториал 9, **Пример** 1)
+
+Спроектируйте и реализуйте «игру атак» на паттерне **Strategy**. Требования:
+
+*   **Команда персонажей** (игроки): у каждого **имя** и сменяемая **attack strategy**.
+*   Не менее трёх стилей атаки (например меч, лук, магия).
+*   Класс **Enemy** с полем `name`, уровнем `strength` (здоровье), выводом текущей силы и уменьшением силы при атаке.
+*   Игрок может **менять стиль атаки в бою**.
+*   Приведите **UML**-диаграмму классов решения.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **Strategy** позволяет каждому персонажу хранить объект `AttackStrategy` и менять его в любой момент. `Character` — *context*; `AttackStrategy` — *strategy interface*; классы атак — *concrete strategies*. `Enemy` — общая изменяемая цель, на которую действуют стратегии.
+
+**UML class diagram (described):**
+
+```
+«interface»
+AttackStrategy
+────────────
++ attack(Enemy): void
+       ▲
+       │ implements
+┌──────┴──────┬─────────────┐
+SwordAttack  BowAttack  MagicAttack
+(damage: 30) (damage: 20) (damage: 50)
+```
+
+```
+Character ──────────────► «interface» AttackStrategy
+- name: String          strategy field
+- strategy: AttackStrategy
++ setStrategy(AttackStrategy)
++ performAttack(Enemy)
+```
+
+```
+Enemy
+- name: String
+- strength: int
++ displayStrength()
++ takeDamage(int)
+```
+
+**Full implementation:**
+
+```java
+// AttackStrategy.java — Strategy interface
+public interface AttackStrategy {
+    void attack(Enemy enemy);
+}
+
+// SwordAttack.java — Concrete Strategy
+public class SwordAttack implements AttackStrategy {
+    @Override
+    public void attack(Enemy enemy) {
+        System.out.println("Slashing with a sword!");
+        enemy.takeDamage(30);
+    }
+}
+
+// BowAttack.java — Concrete Strategy
+public class BowAttack implements AttackStrategy {
+    @Override
+    public void attack(Enemy enemy) {
+        System.out.println("Shooting an arrow!");
+        enemy.takeDamage(20);
+    }
+}
+
+// MagicAttack.java — Concrete Strategy
+public class MagicAttack implements AttackStrategy {
+    @Override
+    public void attack(Enemy enemy) {
+        System.out.println("Casting a fire spell!");
+        enemy.takeDamage(50);
+    }
+}
+
+// Enemy.java
+public class Enemy {
+    private String name;
+    private int strength;
+
+    public Enemy(String name, int strength) {
+        this.name = name;
+        this.strength = strength;
+    }
+
+    public void displayStrength() {
+        System.out.println(name + " has " + strength + " HP remaining.");
+    }
+
+    public void takeDamage(int damage) {
+        strength -= damage;
+        System.out.println(name + " took " + damage + " damage. HP: " + strength);
+    }
+}
+
+// Character.java — Context
+public class Character {
+    private String name;
+    private AttackStrategy strategy;
+
+    public Character(String name, AttackStrategy strategy) {
+        this.name = name;
+        this.strategy = strategy;
+    }
+
+    public void setStrategy(AttackStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public void performAttack(Enemy enemy) {
+        System.out.println(name + " attacks!");
+        strategy.attack(enemy);
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        Enemy dragon = new Enemy("Dragon", 200);
+        dragon.displayStrength();
+
+        Character warrior = new Character("Aragorn", new SwordAttack());
+        Character archer  = new Character("Legolas", new BowAttack());
+
+        warrior.performAttack(dragon);
+        archer.performAttack(dragon);
+
+        // Switch strategy at runtime — warrior picks up a magic staff
+        System.out.println("Aragorn switches to magic!");
+        warrior.setStrategy(new MagicAttack());
+        warrior.performAttack(dragon);
+
+        dragon.displayStrength();
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+Dragon has 200 HP remaining.
+Aragorn attacks!
+Slashing with a sword!
+Dragon took 30 damage. HP: 170
+Legolas attacks!
+Shooting an arrow!
+Dragon took 20 damage. HP: 150
+Aragorn switches to magic!
+Aragorn attacks!
+Casting a fire spell!
+Dragon took 50 damage. HP: 100
+Dragon has 100 HP remaining.
+```
+
+**Ответ:** **Strategy** позволяет `Aragorn` в **runtime** сменить меч на магию без подклассов персонажа и без цепочки `if`/`switch` в `Character`. Новый тип атаки — новый класс `AttackStrategy`.
+
+</details>
+
+##### **3.8. Платёжный шлюз — паттерн Adapter** (Туториал 9, **Пример** 2)
+
+Постройте платёжный шлюз, интегрирующий провайдеров (**PayPal**, **Stripe**) через паттерн **Adapter**.
+
+**Требования:**
+
+1.  **Единый интерфейс** для всех провайдеров: обработка платежа, возврат (**refund**), проверка платёжных данных.
+2.  **Класс-адаптер на каждого провайдера**, переводящий единый интерфейс в конкретный API.
+3.  Класс **`PaymentGateway`**, принимающий запросы и делегирующий выбранному адаптеру.
+4.  **UML**-диаграмма классов решения.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** у **PayPal** и **Stripe** разные API (имена методов, форматы данных). Вместо `if (provider == PAYPAL) … else if (provider == STRIPE) …` по всему коду вводят единый интерфейс `PaymentProvider` и по одному адаптеру на провайдера; `PaymentGateway` работает только с `PaymentProvider`.
+
+**UML (описание):**
+
+```
+«interface»
+PaymentProvider
+────────────────────────────
++ processPayment(amount): boolean
++ refund(transactionId): boolean
++ verifyPayment(paymentInfo): boolean
+        ▲
+        │ implements
+┌───────┴─────────┐
+PayPalAdapter   StripeAdapter
+─ paypal: PayPalService   ─ stripe: StripeService
+```
+
+```
+PaymentGateway
+─ provider: PaymentProvider
++ pay(amount)
++ refund(transactionId)
+```
+
+**Реализация:**
+
+```java
+// PaymentProvider.java — Client Interface (uniform interface)
+public interface PaymentProvider {
+    boolean processPayment(double amount);
+    boolean refund(String transactionId);
+    boolean verifyPayment(String paymentInfo);
+}
+
+// --- PayPal side (external / incompatible API) ---
+
+// PayPalService.java — Adaptee (cannot modify)
+public class PayPalService {
+    public void sendPayment(double amount) {
+        System.out.println("PayPal: Sending payment of $" + amount);
+    }
+    public void initiateRefund(String txId) {
+        System.out.println("PayPal: Initiating refund for transaction " + txId);
+    }
+    public boolean checkPayment(String info) {
+        System.out.println("PayPal: Checking payment info: " + info);
+        return true;
+    }
+}
+
+// PayPalAdapter.java — Adapter for PayPal
+public class PayPalAdapter implements PaymentProvider {
+    private PayPalService paypal;
+
+    public PayPalAdapter(PayPalService paypal) {
+        this.paypal = paypal;
+    }
+
+    @Override
+    public boolean processPayment(double amount) {
+        paypal.sendPayment(amount);
+        return true;
+    }
+
+    @Override
+    public boolean refund(String transactionId) {
+        paypal.initiateRefund(transactionId);
+        return true;
+    }
+
+    @Override
+    public boolean verifyPayment(String paymentInfo) {
+        return paypal.checkPayment(paymentInfo);
+    }
+}
+
+// --- Stripe side (external / incompatible API) ---
+
+// StripeService.java — Adaptee (cannot modify)
+public class StripeService {
+    public void charge(double amountInCents) {
+        System.out.println("Stripe: Charging " + amountInCents + " cents");
+    }
+    public void reverseCharge(String chargeId) {
+        System.out.println("Stripe: Reversing charge " + chargeId);
+    }
+    public boolean validateCard(String cardToken) {
+        System.out.println("Stripe: Validating card token: " + cardToken);
+        return true;
+    }
+}
+
+// StripeAdapter.java — Adapter for Stripe
+public class StripeAdapter implements PaymentProvider {
+    private StripeService stripe;
+
+    public StripeAdapter(StripeService stripe) {
+        this.stripe = stripe;
+    }
+
+    @Override
+    public boolean processPayment(double amount) {
+        stripe.charge(amount * 100);   // Stripe uses cents
+        return true;
+    }
+
+    @Override
+    public boolean refund(String transactionId) {
+        stripe.reverseCharge(transactionId);
+        return true;
+    }
+
+    @Override
+    public boolean verifyPayment(String paymentInfo) {
+        return stripe.validateCard(paymentInfo);
+    }
+}
+
+// PaymentGateway.java — Context that uses the uniform interface
+public class PaymentGateway {
+    private PaymentProvider provider;
+
+    public PaymentGateway(PaymentProvider provider) {
+        this.provider = provider;
+    }
+
+    public void pay(double amount) {
+        if (provider.processPayment(amount)) {
+            System.out.println("Payment successful.");
+        }
+    }
+
+    public void refund(String transactionId) {
+        if (provider.refund(transactionId)) {
+            System.out.println("Refund processed.");
+        }
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("=== Paying with PayPal ===");
+        PaymentGateway gatewayPP = new PaymentGateway(
+            new PayPalAdapter(new PayPalService()));
+        gatewayPP.pay(99.99);
+        gatewayPP.refund("TXN-001");
+
+        System.out.println("\n=== Paying with Stripe ===");
+        PaymentGateway gatewayStripe = new PaymentGateway(
+            new StripeAdapter(new StripeService()));
+        gatewayStripe.pay(49.95);
+        gatewayStripe.refund("CHG-456");
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+=== Paying with PayPal ===
+PayPal: Sending payment of $99.99
+Payment successful.
+PayPal: Initiating refund for transaction TXN-001
+Refund processed.
+
+=== Paying with Stripe ===
+Stripe: Charging 4995.0 cents
+Payment successful.
+Stripe: Reversing charge CHG-456
+Refund processed.
+```
+
+**Ответ:** `PaymentGateway` only talks to `PaymentProvider`. It has no knowledge of PayPal or Stripe internals. To add a new provider (e.g., Apple Pay), you only need to write a new adapter class — `PaymentGateway` remains unchanged.
+
+</details>
+
+##### **3.9. Файловая система — паттерн Composite** (Туториал 9, **Пример** 3)
+
+Спроектируйте файловую систему на паттерне **Composite**. **Требования:**
+
+*   **Файл** — атомарный элемент с именем, без детей.
+*   **Каталог** — содержит файлы и подкаталоги; имя и список компонентов.
+*   У каталога — операции добавления и удаления компонентов.
+*   Вывести в консоль имена **всех каталогов и файлов** от корня с отступами по глубине.
+*   **UML**-диаграмма классов.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** и `File`, и `Directory` реализуют `FileSystemComponent` с методом `print(String indent)`. У `Directory.print()` печатается имя каталога, затем `print()` у каждого ребёнка — рекурсия обходит любую глубину без знания структуры дерева у клиента.
+
+**UML (описание):**
+
+```
+«interface»
+FileSystemComponent
+──────────────────
++ print(indent: String): void
+        ▲
+        │ implements
+┌───────┴────────┐
+File          Directory
+─ name: String   ─ name: String
++ print(indent)  ─ children: List<FileSystemComponent>
+                 + add(FileSystemComponent)
+                 + remove(FileSystemComponent)
+                 + print(indent)
+```
+
+**Реализация:**
+
+```java
+// FileSystemComponent.java — Component interface
+public interface FileSystemComponent {
+    void print(String indent);
+}
+
+// File.java — Leaf
+public class File implements FileSystemComponent {
+    private String name;
+
+    public File(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public void print(String indent) {
+        System.out.println(indent + "📄 " + name);
+    }
+}
+
+// Directory.java — Composite
+import java.util.ArrayList;
+import java.util.List;
+
+public class Directory implements FileSystemComponent {
+    private String name;
+    private List<FileSystemComponent> children = new ArrayList<>();
+
+    public Directory(String name) {
+        this.name = name;
+    }
+
+    public void add(FileSystemComponent component) {
+        children.add(component);
+    }
+
+    public void remove(FileSystemComponent component) {
+        children.remove(component);
+    }
+
+    @Override
+    public void print(String indent) {
+        System.out.println(indent + "📁 " + name);
+        // Recursively print all children with deeper indentation
+        for (FileSystemComponent child : children) {
+            child.print(indent + "  ");
+        }
+    }
+}
+
+// Main.java — Client
+public class Main {
+    public static void main(String[] args) {
+        // Build the file system tree
+        Directory root = new Directory("root");
+
+        Directory home = new Directory("home");
+        Directory user = new Directory("user");
+        user.add(new File("resume.pdf"));
+        user.add(new File("photo.jpg"));
+        home.add(user);
+
+        Directory etc = new Directory("etc");
+        etc.add(new File("config.yaml"));
+        etc.add(new File("hosts"));
+
+        Directory tmp = new Directory("tmp");
+        tmp.add(new File("session_data.tmp"));
+
+        root.add(home);
+        root.add(etc);
+        root.add(tmp);
+        root.add(new File("README.txt"));
+
+        // Print from root — client calls print() once, recursion handles the rest
+        root.print("");
+    }
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+📁 root
+  📁 home
+    📁 user
+      📄 resume.pdf
+      📄 photo.jpg
+  📁 etc
+    📄 config.yaml
+    📄 hosts
+  📁 tmp
+    📄 session_data.tmp
+  📄 README.txt
+```
+
+**Ответ:** клиент один раз вызывает `root.print("")`; **Composite** прозрачно ведёт рекурсию без ручного обхода и без `instanceof`. Новый лист `SymbolicLink` не требует правок `Directory` или `Main`.
+
+</details>

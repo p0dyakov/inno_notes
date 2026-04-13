@@ -1,0 +1,1785 @@
+---
+title: "W9. Паттерны проектирования: Singleton, State, Prototype, Builder"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "2026-03-18"
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Паттерны проектирования: вводная рамка**
+
+###### **1.1.1 Что такое design pattern**
+
+**Design pattern** (паттерн проектирования) — это **архитектурная схема**: устойчивая организация классов, объектов и методов, которая даёт стандартизованное, переиспользуемое решение типичной задачи проектирования. Термин и каталог популяризовали **«Gang of Four» (GoF)** — Erich Gamma, Richard Helm, Ralph Johnson и John Vlissides в книге 1994 года *Design Patterns: Elements of Reusable Object-Oriented Software* (Addison-Wesley).
+
+Каноническая формулировка GoF: *«Каждый паттерн описывает задачу, которая повторяется снова и снова в нашем окружении, затем описывает суть решения этой задачи так, что это решение можно использовать миллион раз, каждый раз по‑своему.»*
+
+После 1994 года появилось много других каталогов и учебников. Из известных ссылок — *Design Patterns Explained* (Alan Shalloway, James R. Trott), а также языковые книги вроде *Design Patterns in Java* (Steven John Metsker, William C. Wake) и *Design Patterns in C#* (Steven John Metsker).
+
+###### **1.1.2 Зачем вообще нужны паттерны**
+
+*"Designing object-oriented software is hard and designing reusable object-oriented software is even harder."* — Erich Gamma
+
+Опытные ОО‑проектировщики стабильно получают более качественные решения, чем новички, потому что у них «на пальцах» стоят повторяющиеся **шаблоны классов и объектов**, встречающиеся в разных приложениях. Паттерны проектирования делают эти шаблоны *явными и передаваемыми*:
+
+*   они привязаны к конкретным классам задач и делают ОО‑дизайн **гибче, аккуратнее и в конечном счёте переиспользуемее**;
+*   без них начинающие разработчики снова и снова изобретают велосипед — или пишут хрупкий, плохо расширяемый код;
+*   они дают **общий словарь**: фраза «здесь логичен **Singleton**» передаёт целый пласт архитектурного замысла в одном слове.
+
+Практически все паттерны из классического обсуждения опираются на **парадигму ОО** — речь почти целиком об объектно‑ориентированном проектировании.
+
+###### **1.1.3 Таксономия паттернов GoF**
+
+GoF разложили 23 паттерна на три семейства по назначению:
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Таксономия паттернов проектирования в каталоге GoF"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+flowchart TB
+    Patterns["Design Patterns"]
+    C["Creational"]
+    S["Structural"]
+    B["Behavioral"]
+    Patterns --> C
+    Patterns --> S
+    Patterns --> B
+```
+
+*   **Creational patterns** — про то, как лучше всего *создавать экземпляры* объектов: абстрагируют процесс создания, упрощают появление новых видов объектов и контроль числа экземпляров. Примеры: Abstract Factory, Factory Method, **Singleton**, **Builder**, **Prototype**.
+*   **Structural patterns** — про то, как классы и объекты *компонуются* в более крупные структуры. Примеры: Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy.
+*   **Behavioral patterns** — про *распределение ответственности* между объектами, инкапсуляцию поведения и делегирование запросов. Примеры: Chain of Responsibility, Command (undo/redo), Interpreter, Observer, Iterator, **State**, Mediator, Memento, Strategy, Template Method, Visitor.
+
+> **Важно:** за паттернами не стоит жёсткая формальная теория в аксиоматическом смысле; это концентрат практики реальных ОО‑систем — скорее эмпирика, чем «доказуемая наука».
+
+На этой неделе разбираем три **creational** паттерна — **Singleton**, **Prototype** и **Builder** — и один **behavioral**: **State**.
+
+##### **1.2 Одиночка (Singleton)**
+
+###### **1.2.1 Мотивация: зачем ровно один экземпляр**
+
+Часть ресурсов в программе должна существовать в *строго одном экземпляре* на всём жизненном цикле приложения. Типичные примеры:
+
+*   **файл кэша** — две независимые копии легко расходятся по данным;
+*   **файл виртуальной памяти** в ОС или VM — управляется глобально;
+*   отдельные **диалоговые окна** в GUI — разумно держать одно окно «Preferences»;
+*   **драйверы устройств** — один драйвер на устройство;
+*   **логгеры, конфигурация, доступ к разделяемым ресурсам** — нужен единый «глобальный» вход.
+
+**Почему не обойтись глобальной (или статической) переменной**
+
+*   **неконтролируемый доступ:** любой код может в любой момент прочитать или перезаписать значение;
+*   **нельзя выбрать момент создания:** глобальная переменная инициализируется при старте программы, даже если объект не нужен — это лишняя трата ресурсов и лишняя связность в порядке инициализации.
+
+###### **1.2.2 Сборка Singleton по шагам**
+
+Исходный вопрос: *«как гарантировать, что класс можно инстанцировать ровно один раз?»*
+
+**Попытка 1:** обычный класс — `new myClass()` можно вызывать сколько угодно, ограничений нет.
+
+**Попытка 2:** сделать конструктор private.
+
+```java
+class myClass {
+    private myClass() { }
+}
+```
+
+Теперь *внешний код* не может вызвать `new myClass()` — но и *никто* не может создать экземпляр, в том числе сам класс.
+
+**Попытка 3:** добавить статическую фабрику.
+
+```java
+class myClass {
+    private myClass() { }
+
+    public static myClass getInstance() {
+        return new myClass(); // still creates a new one every time!
+    }
+}
+```
+
+Конструктор private, но `getInstance()` каждый раз делает `new` — экземпляров по‑прежнему много. *Чего не хватает, чтобы «уникальность» стала инвариантом?*
+
+**Рабочее решение:** завести **private static** поле, где хранится единственный экземпляр, и перед созданием проверять его:
+
+```java
+public class Singleton {
+    // Step 1: private static field — holds the single instance (null at start)
+    private static Singleton unique;
+
+    // Step 4: private constructor — no external code can instantiate this class
+    private Singleton() { }
+
+    // Steps 2 & 3: public static factory method with lazy initialization
+    public static Singleton getInstance() {
+        if (unique == null) {           // first call: instance doesn't exist yet
+            unique = new Singleton();   // create the one and only instance
+        }
+        return unique;                  // all calls return the same instance
+    }
+}
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Singleton: один private‑экземпляр и один public static‑доступ"
+%%| fig-width: 5.8
+%%| fig-height: 3
+classDiagram
+    class Singleton {
+      - static unique
+      - Singleton()
+      + static getInstance()
+    }
+```
+
+**Private static** член держит ссылку на единственный экземпляр (в Java изначально `null`). После самого первого вызова `getInstance` поле `unique` указывает на созданный объект дальше навсегда. До `unique` **нет иного пути**, кроме как через `getInstance`.
+
+Пять шагов реализации:
+
+1.  **Private static** поле для хранения единственного экземпляра.
+2.  **Public static** метод (или свойство) получения экземпляра.
+3.  **Lazy initialization** внутри метода: при первом вызове создать объект и положить в static‑поле; все последующие вызовы возвращают тот же объект.
+4.  **Private** конструктор, чтобы снаружи нельзя было вызвать `new`.
+5.  В клиентском коде **заменить прямые вызовы конструктора** на статический метод доступа.
+
+###### **1.2.3 Lazy vs non‑lazy инициализация**
+
+**Lazy Singleton** (предпочтительный вариант): экземпляр появляется *по требованию* — только при первом вызове `getInstance()`.
+
+```java
+public class LazySingleton {
+    private static LazySingleton unique;
+
+    private LazySingleton() { }
+
+    public static LazySingleton getInstance() {
+        if (unique == null) {
+            unique = new LazySingleton(); // lazy initialization
+        }
+        return unique;
+    }
+}
+```
+
+**Non‑lazy Singleton** (лучше избегать): экземпляр создаётся сразу при загрузке класса, даже если он никогда не понадобится.
+
+```java
+// Better to avoid this implementation
+public class NonLazySingleton {
+    private static final NonLazySingleton unique = new NonLazySingleton();
+
+    private NonLazySingleton() { }
+
+    public static NonLazySingleton getInstance() {
+        return unique;
+    }
+}
+```
+
+Если singleton не используют, eager‑вариант зря тратит память и время инициализации; **lazy** обычно предпочтительнее.
+
+###### **1.2.4 Singleton в C++**
+
+В C++ static‑член нужно не только *объявить* внутри класса, но и *определить* снаружи:
+
+```cpp
+class Singleton {
+private:
+    static Singleton* instance;
+    Singleton() {} // Private constructor
+
+public:
+    static Singleton* getInstance() {
+        if (instance == nullptr) {
+            instance = new Singleton();
+        }
+        return instance;
+    }
+};
+
+// Required: define the static member outside the class
+Singleton* Singleton::instance = nullptr;
+```
+
+###### **1.2.5 Многопоточность**
+
+«Учебная» реализация **не thread‑safe**: два потока могут одновременно пройти проверку `unique == null`, *оба* увидеть `null` и *оба* создать объект — гарантия единственности ломается.
+
+> **Замечание:** в многопоточном приложении перед созданием экземпляра в `getInstance()` нужна синхронизация (lock).
+
+«Промышленный» **Singleton** требует осмысленной синхронизации — например **double‑checked locking** с полем `volatile` в Java (см. раздел примеров).
+
+###### **1.2.6 Singleton — это anti‑pattern?**
+
+Сам по себе **Singleton** anti‑pattern’ом не считается, но его **легко переиспользовать не к месту**. Подключать стоит осознанно, с учётом требований к приложению и тестируемости.
+
+###### **1.2.7 Плюсы и минусы**
+
+**Плюсы**
+
+*   гарантия **ровно одного экземпляра** класса;
+*   **глобальная точка доступа** к этому экземпляру;
+*   при **lazy** инициализации объект создаётся **только при первом запросе**.
+
+**Минусы**
+
+*   **нарушает Single Responsibility Principle**: в одном классе смешиваются бизнес‑логика и управление жизненным циклом экземпляра;
+*   может **маскировать плохую архитектуру**, когда компоненты слишком много знают друг о друге;
+*   в многопоточности нужны **дополнительные меры**, иначе гонки;
+*   **сложно unit‑тестировать**: private‑конструктор и статика мешают подмене реализаций в типичных фреймворках моков.
+
+##### **1.3 Состояние (State)**
+
+###### **1.3.1 Что делает паттерн State**
+
+**State pattern** позволяет объекту *менять поведение*, когда меняется его внутреннее состояние. Снаружи создаётся впечатление, что объект «меняет класс»: один и тот же вызов метода ведёт себя по‑разному в зависимости от текущего **state**.
+
+Опорная модель — **finite state machine (FSM)**: в каждый момент активно ровно одно из конечного числа **states**, а действие или вход переводит машину по **transition** в новое состояние.
+
+###### **1.3.2 Мотивирующий пример: лексический анализатор**
+
+**Lexical analyzer** (первая фаза компилятора) читает исходник посимвольно и собирает **tokens** — минимальные единицы языка с конкретным смыслом (идентификаторы, целые литералы, разделители, знаки операций и т.д.).
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Конечный автомат сканера для идентификаторов и целых"
+%%| fig-width: 6.4
+%%| fig-height: 3.8
+stateDiagram-v2
+    [*] --> S
+    S --> Id: letter
+    S --> Int: digit
+    Id --> Id: letter or digit
+    Id --> IdDone: other
+    Int --> Int: digit
+    Int --> IntDone: other
+```
+
+Сканеру нужно понимать, *какой именно token* он сейчас набирает. Для идентификаторов и целых это такие *состояния*:
+
+*   **S** (старт): подготовить буфер под идентификатор или целое.
+*   **Состояние 1** (читаем идентификатор): уже видели букву; дочитываем буквы и цифры. *Действия: дописать букву в буфер; дописать цифру или букву.*
+*   **Состояние 3** (идентификатор готов): после букв пришёл не букво‑цифровой символ — лексема закончена; занести в таблицу символов.
+*   **Состояние 4** (читаем целое): видели цифру; дочитываем цифры. *Действие: дописать цифру в буфер.*
+*   **Состояние 5** (целое готово): после цифр пришёл не цифра — константа собрана; перевести значение в двоичный вид.
+
+Переходы: из **S** по *letter* → состояние 1; по *digit* → состояние 4. Из **состояния 1** *letter or digit* → остаёмся в 1; *other* → состояние 3. Из **состояния 4** *digit* → остаёмся в 4; *other* → состояние 5. Такая **FSM** напрямую ложится на идею паттерна **State**.
+
+###### **1.3.3 Ещё пример: состояния воды**
+
+Представьте устройство, которое выполняет действия над водой. У воды состояния **Solid** (лёд), **Liquid**, **Gas**, а три действия задают переходы: **Heating**, **Freezing**, **Cooling**. Добавим четвёртое состояние — **High‑temp. Gas**.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Переходы между состояниями воды"
+%%| fig-width: 6.2
+%%| fig-height: 3.6
+stateDiagram-v2
+    Solid --> Liquid: heating
+    Liquid --> Gas: heating
+    Gas --> HighTempGas: heating
+    HighTempGas --> Gas: cooling
+    Gas --> Liquid: cooling
+    Liquid --> Solid: freezing
+```
+
+**Наивная реализация (плохой путь)**
+
+Состояние хранится в `enum`, а внутри каждого метода действия — цепочки `if` / `else if`:
+
+```csharp
+enum WaterState { SOLID, LIQUID, GAS }
+
+class Water {
+    // C# auto-property: { get; set; } is shorthand for a property
+    // with an auto-generated private backing field.
+    // Equivalent to declaring a private field + public getter + public setter.
+    public WaterState State { get; set; }
+
+    public Water(WaterState ws) { State = ws; }
+
+    public void Heating() {
+        if (State == WaterState.SOLID)
+            State = WaterState.LIQUID;      // ice to liquid
+        else if (State == WaterState.LIQUID)
+            State = WaterState.GAS;         // liquid to gas
+        else if (State == WaterState.GAS)
+            { /* increasing temperature */ }
+    }
+
+    public void Freezing() {
+        if (State == WaterState.LIQUID)
+            State = WaterState.SOLID;       // liquid to ice
+        else if (State == WaterState.GAS)
+            State = WaterState.LIQUID;      // gas to liquid
+    }
+
+    public void Cooling() { /* ... */ }
+}
+```
+
+**Почему это плохо**
+
+*   состояния и действия **разнесены по файлам логики**: новое состояние вроде «High‑temp. Gas» заставляет править *каждый* метод действия;
+*   в каждом методе растёт «лестница» из `if` — читать трудно, ошибаться легко.
+
+**Выход:** воспринимать состояние как объект с собственным поведением.
+
+###### **1.3.4 State для воды**
+
+**Шаг 1 — вместо enum интерфейс**
+
+Вместо `enum WaterState` объявляем `interface WaterState`: каждый конкретный класс состояния знает, как реагировать на каждое действие:
+
+```csharp
+// Old: enum WaterState { SOLID, LIQUID, GAS }
+
+// New: interface — each state object handles actions itself
+interface WaterState {
+    void Heating(Water water);
+    void Freezing(Water water);
+    void Cooling(Water water);
+}
+
+class SolidWater  : WaterState { ... }
+class LiquidWater : WaterState { ... }
+class GasWater    : WaterState { ... }
+```
+
+**Шаг 2 — перепроектировать `Water`**
+
+В `Water` больше *нет* ветвлений по состоянию: каждое действие **делегирует** текущему объекту состояния:
+
+```csharp
+class Water {
+    public WaterState State { get; set; }
+    public Water(WaterState ws) { State = ws; }
+
+    // Each action redirects control to the current state object.
+    // Note: there are NO if-statements here.
+    public void Heating()  { State.Heating(this); }
+    public void Freezing() { State.Freezing(this); }
+    public void Cooling()  { State.Cooling(this); }
+}
+```
+
+**Шаг 3 — конкретные состояния**
+
+Каждый класс инкапсулирует переходы *из своего* состояния. Объект состояния меняет поле контекста (`Water.State`), подставляя новый экземпляр состояния:
+
+```csharp
+class LiquidWater : WaterState {
+    public void Heating(Water water) {
+        water.State = new GasWater();    // liquid → gas
+    }
+    public void Freezing(Water water) {
+        water.State = new SolidWater();  // liquid → ice
+    }
+    public void Cooling(Water water) {
+        // cooling liquid — no change
+    }
+}
+
+class GasWater : WaterState {
+    public void Heating(Water water)  { /* increase temperature */ }
+    public void Freezing(Water water) { water.State = new LiquidWater(); }
+    public void Cooling(Water water)  { water.State = new LiquidWater(); }
+}
+
+class SolidWater : WaterState {
+    public void Heating(Water water)  { water.State = new LiquidWater(); }
+    public void Freezing(Water water) { /* already solid */ }
+    public void Cooling(Water water)  { /* already solid */ }
+}
+```
+
+**Шаг 4 — новое состояние почти бесплатно**
+
+Чтобы добавить «High‑temp. Gas», достаточно *нового класса* — **существующие классы не обязаны меняться**:
+
+```csharp
+class HTGasWater : WaterState {
+    public void Heating(Water water)  { /* heating — no change */ }
+    public void Freezing(Water water) { water.State = new GasWater(); }
+    public void Cooling(Water water)  { water.State = new GasWater(); }
+}
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "State: контекст делегирует поведение текущему объекту состояния"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+classDiagram
+    class Context
+    class State {
+      <<interface>>
+      +handle()
+    }
+    class ConcreteStateA
+    class ConcreteStateB
+    Context --> State : currentState
+    State <|.. ConcreteStateA
+    State <|.. ConcreteStateB
+```
+
+###### **1.3.5 State в C++ (пример с документом)**
+
+Иллюстрация на C++: `Document` может находиться в `Draft` или `Published`:
+
+```cpp
+class State {
+public:
+    virtual void review() = 0;
+    virtual ~State() = default;
+};
+
+class Draft : public State {
+public:
+    void review() override {
+        std::cout << "Draft: Reviewing changes\n";
+    }
+};
+
+class Published : public State {
+public:
+    void review() override {
+        std::cout << "Published: Review not allowed\n";
+    }
+};
+
+class Document {
+private:
+    std::unique_ptr<State> state;
+public:
+    Document(std::unique_ptr<State> initialState)
+        : state(std::move(initialState)) { }
+
+    void setState(std::unique_ptr<State> newState) {
+        state = std::move(newState);
+    }
+
+    void review() {
+        state->review(); // delegates to current state
+    }
+};
+```
+
+###### **1.3.6 Плюсы паттерна State**
+
+*   **Инкапсуляция:** поведение каждого состояния живёт в своём классе — правка состояния локализована;
+*   **Расширяемость:** новое состояние = новый класс, часто без правок остальных (**Open/Closed**);
+*   **Нет разросшихся `if`:** контекст остаётся тонким, ветвление сосредоточено в иерархии состояний;
+*   **Изменить реакцию состояния** можно, отредактировав один класс.
+
+##### **1.4 Прототип (Prototype)**
+
+###### **1.4.1 Что такое Prototype**
+
+**Prototype pattern** — **creational** паттерн: новые объекты получают *клонированием* (копированием) уже существующего **prototype**, а не «сборкой с нуля». Прототип «знает», как воспроизвести себя.
+
+**Когда уместен Prototype**
+
+*   конкретный тип создаваемого объекта должен выбираться *динамически* в runtime;
+*   достаточно *простого приёма* (для схожих целей позже по курсу встретится **Abstract Factory**);
+*   копирование настроенного экземпляра выгоднее, чем снова гонять длинный конструктор через `new`;
+*   клиентский код *не должен зависеть* от конкретного класса — достаточно абстрактного контракта `clone()`;
+*   нужно *срезать число подклассов*, которые отличаются только сценарием инициализации.
+
+###### **1.4.2 Мотивирующий пример: геометрические фигуры**
+
+Работаете с фигурами динамически. Вместо того чтобы каждый раз заново задавать все атрибуты, берёте уже настроенный экземпляр и получаете *clone* с теми же значениями:
+
+```csharp
+interface iFigure {
+    // Common interface for cloning: hides the concrete cloning algorithm
+    iFigure Clone();
+    void Display();
+}
+```
+
+Конкретные классы реализуют `Clone()` через свой конструктор с текущими полями:
+
+```csharp
+class Rectangle : iFigure {
+    int width, height;
+    public Rectangle(int w, int h) { width = w; height = h; }
+
+    public iFigure Clone() {
+        // Clone method encapsulates the real cloning algorithm:
+        // it might use 'new', or system tools like MemberwiseClone() in .NET
+        return new Rectangle(this.width, this.height);
+    }
+    public void Display() { /* ... */ }
+}
+
+class Circle : iFigure {
+    int radius;
+    public Circle(int r) { radius = r; }
+
+    public iFigure Clone() {
+        return new Circle(this.radius);
+    }
+    public void Display() { /* ... */ }
+}
+```
+
+Клиент вызывает `figure.Clone()`, не зная, `Rectangle` это, `Circle` или другая реализация: вызов `Clone()` **полиморфно диспатчится**:
+
+```csharp
+iFigure figure, clone;
+
+figure = new Rectangle(30, 40);
+clone  = figure.Clone();   // Clone method call creates the copy of Rectangle
+
+figure = new Circle(30);
+clone  = figure.Clone();   // The same call creates the copy of Circle
+```
+
+> **Замечание про .NET:** `MemberwiseClone()` в C# — встроенный метод `System.Object`, который делает **shallow copy** (копирует поля по значению, но не «углубляется» в объекты по ссылкам). Для простых DTO его иногда используют вместо ручного copy constructor внутри `Clone()`.
+
+###### **1.4.3 Структура Prototype**
+
+На схеме обычно три уровня:
+
+*   **Prototype interface** (или абстрактный класс) с контрактом `clone(): Prototype`.
+*   **ConcretePrototype** с *copy constructor* `ConcretePrototype(prototype)`, копирующим поля (`this.field1 = prototype.field1`), и `clone()` вида `return new ConcretePrototype(this)`.
+*   **SubclassPrototype**, где сначала `super(prototype)` для полей предка, затем свои поля; `clone()` возвращает `new SubclassPrototype(this)`.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Prototype: clone порождает новые объекты от эталона"
+%%| fig-width: 6.2
+%%| fig-height: 3
+classDiagram
+    class Prototype {
+      <<interface>>
+      +clone()
+    }
+    class ConcretePrototype
+    class SubclassPrototype
+    Prototype <|.. ConcretePrototype
+    ConcretePrototype <|-- SubclassPrototype
+```
+
+###### **1.4.4 Java: иерархия Shape**
+
+Полный пример: абстрактный `Shape` задаёт **copy constructor**, а `Circle` и `Rectangle` наследуют эту механику:
+
+```java
+public abstract class Shape {
+    private int x, y;
+    private String color;
+
+    public Shape() { }
+
+    // Copy constructor: copies base-class fields from the given target
+    public Shape(Shape target) {
+        if (target != null) {
+            this.x     = target.x;
+            this.y     = target.y;
+            this.color = target.color;
+        }
+    }
+
+    // Every concrete subclass must implement clone()
+    public abstract Shape clone();
+
+    @Override
+    public boolean equals(Object object2) {
+        if (!(object2 instanceof Shape)) return false;
+        Shape shape2 = (Shape) object2;
+        return shape2.x == x && shape2.y == y
+            && Objects.equals(shape2.color, color);
+    }
+    // getters / setters omitted for brevity
+}
+```
+
+```java
+public class Circle extends Shape {
+    private int radius;
+
+    public Circle() { }
+
+    // Copy constructor: call super to copy base fields, then copy own fields
+    public Circle(Circle target) {
+        super(target);
+        if (target != null) this.radius = target.radius;
+    }
+
+    @Override
+    public Shape clone() {
+        return new Circle(this); // uses copy constructor
+    }
+
+    @Override
+    public boolean equals(Object object2) {
+        if (!(object2 instanceof Circle) || !super.equals(object2)) return false;
+        return ((Circle) object2).radius == radius;
+    }
+
+    public int getRadius() { return radius; }
+    public void setRadius(int radius) { this.radius = radius; }
+}
+```
+
+```java
+public class Rectangle extends Shape {
+    private int width, height;
+
+    public Rectangle() { }
+
+    public Rectangle(Rectangle target) {
+        super(target);
+        if (target != null) {
+            this.width  = target.width;
+            this.height = target.height;
+        }
+    }
+
+    @Override
+    public Shape clone() { return new Rectangle(this); }
+
+    @Override
+    public boolean equals(Object object2) {
+        if (!(object2 instanceof Rectangle) || !super.equals(object2)) return false;
+        Rectangle shape2 = (Rectangle) object2;
+        return shape2.width == width && shape2.height == height;
+    }
+    // getters / setters omitted
+}
+```
+
+**Демо: клонирование смешанного списка фигур**
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        List<Shape> shapes     = new ArrayList<>();
+        List<Shape> shapesCopy = new ArrayList<>();
+
+        Circle circle = new Circle();
+        circle.setX(10); circle.setY(20);
+        circle.setRadius(15); circle.setColor("red");
+        shapes.add(circle);
+
+        Circle anotherCircle = (Circle) circle.clone(); // exact copy
+        shapes.add(anotherCircle);
+
+        Rectangle rectangle = new Rectangle();
+        rectangle.setWidth(10); rectangle.setHeight(20);
+        rectangle.setColor("blue");
+        shapes.add(rectangle);
+
+        cloneAndCompare(shapes, shapesCopy);
+    }
+
+    private static void cloneAndCompare(List<Shape> shapes, List<Shape> shapesCopy) {
+        for (Shape shape : shapes) {
+            shapesCopy.add(shape.clone());
+        }
+
+        for (int i = 0; i < shapes.size(); i++) {
+            if (shapes.get(i) != shapesCopy.get(i)) {
+                System.out.println(i + ": Shapes are different objects (yay!)");
+                if (shapes.get(i).equals(shapesCopy.get(i)))
+                    System.out.println(i + ": And their content are identical (yay!)");
+                else
+                    System.out.println(i + ": But their content are not identical (booo!)");
+            } else {
+                System.out.println(i + ": Shape objects are the same (booo!)");
+            }
+        }
+    }
+}
+```
+
+###### **1.4.5 Пример Prototype на C++**
+
+```cpp
+class Car { // prototype interface
+public:
+    virtual Car* clone() const = 0;  // pure virtual clone
+    virtual void specs() const = 0;
+    virtual ~Car() {}
+};
+
+class Sedan : public Car { // concrete prototype
+private:
+    std::string color;
+public:
+    Sedan(const std::string& color) : color(color) {}
+
+    Car* clone() const override {
+        return new Sedan(*this); // copy constructor — copies all fields
+    }
+
+    void specs() const override {
+        std::cout << "Sedan Car - Color: " << color << std::endl;
+    }
+};
+
+int main() {
+    Car* originalCar = new Sedan("Red");
+    Car* clonedCar   = originalCar->clone();
+
+    originalCar->specs(); // Sedan Car - Color: Red
+    clonedCar->specs();   // Sedan Car - Color: Red
+
+    delete originalCar;
+    delete clonedCar;
+    return 0;
+}
+```
+
+###### **1.4.6 Как внедрить Prototype (пошагово)**
+
+1.  Ввести **prototype interface** (или метод в базе) с `clone()` — либо добавить `clone()` в существующую иерархию.
+2.  У каждого класса‑прототипа определить **copy constructor**, принимающий объект того же класса и копирующий поля; в подклассах сначала `super(prototype)`, затем свои поля.
+3.  **`clone()`** чаще всего — одна строка `return new ConcretePrototype(this)`; важно использовать *имя своего* класса в `new`, иначе легко вернуть объект не того уровня иерархии.
+4.  По желанию — **prototype registry**: словарь «ключ → заранее настроенный прототип» для быстрого доступа и клонирования.
+
+###### **1.4.7 Плюсы и минусы**
+
+**Плюсы**
+
+*   клонирование **без жёсткой связи** с конкретными классами — снаружи виден только `clone()`;
+*   **убирает повторяющийся код инициализации** — держите эталоны и клонируйте;
+*   удобнее собирать сложные объекты;
+*   альтернатива громоздкому наследованию для пресетов конфигурации.
+
+**Минусы**
+
+*   **циклические ссылки** при глубоком клонировании быстро усложняют схему.
+
+##### **1.5 Строитель (Builder)**
+
+###### **1.5.1 Мотивация: telescoping constructor**
+
+Класс `House` с кучей опций: число комнат, гараж, бассейн, тип сада, форма крыши… Наивный путь — *telescoping constructor*: цепочка перегрузок с всё более длинными списками параметров:
+
+```java
+House(int rooms) { ... }
+House(int rooms, boolean garage) { ... }
+House(int rooms, boolean garage, boolean pool) { ... }
+// ... unreadable and error-prone
+```
+
+У класса с большим числом полей конструкторы на десятки аргументов делают код **трудночитаемым и хрупким** — это и есть **telescoping constructor anti-pattern**.
+
+###### **1.5.2 Что такое Builder**
+
+**Builder pattern** — **creational** паттерн, который собирает сложный объект *пошагово*. Один и тот же сценарий сборки может порождать разные представления продукта.
+
+**Ключевые свойства**
+
+*   **Читаемость:** вместо длинного списка параметров — последовательность говорящих методов.
+*   **Гибкость:** можно включать только нужные шаги, проще эволюционировать требования.
+*   **Иммутабельность (часто):** после `build()` готовый объект не мутируют — состояние остаётся целостным.
+
+**Когда применять**
+
+*   нужно избавиться от «телескопического» конструктора;
+*   один продукт имеет несколько осмысленных представлений (каменный/деревянный дом, classic vs sports car);
+*   строите деревья **Composite** и другие составные структуры.
+
+###### **1.5.3 Структура Builder**
+
+Четыре роли:
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Роли паттерна Builder"
+%%| fig-width: 6.4
+%%| fig-height: 3.2
+classDiagram
+    class Director
+    class Builder {
+      <<interface>>
+      +reset()
+      +buildStepA()
+      +buildStepB()
+      +getResult()
+    }
+    class ConcreteBuilder
+    class Product
+    Director --> Builder : directs
+    Builder <|.. ConcreteBuilder
+    ConcreteBuilder --> Product : builds
+```
+
+*   **Product** — итоговый сложный объект (`Car`, `PC`, `Document`, …).
+*   **Builder interface** — шаги сборки (`reset()`, `buildStepA()`, …, `buildStepZ()`). `reset()` очищает внутреннее состояние билдера перед новым циклом; шаги часто возвращают `this`, включая **method chaining**.
+*   **ConcreteBuilder** — реализация для конкретного представления (`ClassicCarBuilder`, `SportsCarBuilder`, …): накапливает частичный результат и отдаёт продукт через `getResult()` / `build()`.
+*   **Director** (опционально) — знает *какие* шаги вызывать и *в каком порядке*, может ветвиться: `builder.reset(); if (type == "simple") { builder.buildStepA(); } else { builder.buildStepB(); builder.buildStepZ(); }`. Инкапсулирует типовые рецепты сборки на одном и том же **Builder**.
+
+Типичный клиентский скелет:
+
+```text
+b = new ConcreteBuilder1();
+d = new Director(b);
+d.make(type);
+Product1 p = b.getResult();
+```
+
+###### **1.5.4 Пример Builder на C++: сборка PC**
+
+```cpp
+// Product
+class PC {
+    std::string m_cpu, m_ram, m_storage;
+public:
+    void setCPU(std::string cpu)         { m_cpu     = cpu;     }
+    void setRAM(std::string ram)         { m_ram     = ram;     }
+    void setStorage(std::string storage) { m_storage = storage; }
+    void showSpecs() { /* prints all fields */ }
+};
+
+// Abstract Builder
+class PCBuilder {
+public:
+    virtual ~PCBuilder() = default;
+    virtual void buildCPU()     = 0;
+    virtual void buildRAM()     = 0;
+    virtual void buildStorage() = 0;
+    virtual PC   getResult()    = 0;
+};
+
+// Concrete Builder
+class GamingPCBuilder : public PCBuilder {
+    PC m_pc;
+public:
+    GamingPCBuilder() { m_pc = PC(); }
+
+    void buildCPU()     override { m_pc.setCPU("Intel i9-13900K"); }
+    void buildRAM()     override { m_pc.setRAM("32GB DDR5"); }
+    void buildStorage() override { m_pc.setStorage("2TB NVMe SSD"); }
+    PC   getResult()    override { return m_pc; }
+};
+
+// Director
+class Director {
+    PCBuilder* m_builder;
+public:
+    void setBuilder(PCBuilder* builder) { m_builder = builder; }
+
+    PC construct() {
+        m_builder->buildCPU();
+        m_builder->buildRAM();
+        m_builder->buildStorage();
+        return m_builder->getResult();
+    }
+};
+
+// Client
+int main() {
+    Director        director;
+    GamingPCBuilder builder;
+
+    director.setBuilder(&builder);
+    PC pc = director.construct();
+    pc.showSpecs();
+    return 0;
+}
+```
+
+###### **1.5.5 Java: автомобиль и method chaining**
+
+Пример на **fluent interface**: каждый шаг возвращает `this`, цепочка читается как сценарий. Два **ConcreteBuilder** — `SportsCarBuilder` и `ClassicCarBuilder` — дают разные представления одного **Product** (`Car`):
+
+```java
+// Builder interface — each step returns CarBuilder for method chaining
+public interface CarBuilder {
+    CarBuilder fixChassis();
+    CarBuilder fixBody();
+    CarBuilder paint();
+    CarBuilder fixInterior();
+    Car build();
+}
+```
+
+```java
+public class SportsCarBuilder implements CarBuilder {
+    private String chassis, body, paint, interior;
+
+    @Override public CarBuilder fixChassis()   { this.chassis  = "Sporty Chassis";          return this; }
+    @Override public CarBuilder fixBody()      { this.body     = "Sporty Body";              return this; }
+    @Override public CarBuilder paint()        { this.paint    = "Sporty Torch Red Paint";   return this; }
+    @Override public CarBuilder fixInterior()  { this.interior = "Sporty interior";           return this; }
+
+    @Override
+    public Car build() {
+        Car car = new Car(chassis, body, paint, interior);
+        if (car.doQualityCheck()) return car;
+        System.out.println("Car assembly is incomplete. Can't deliver!");
+        return null;
+    }
+}
+```
+
+```java
+public class ClassicCarBuilder implements CarBuilder {
+    private String chassis, body, paint, interior;
+
+    @Override public CarBuilder fixChassis()  { this.chassis  = "Classic Chassis";     return this; }
+    @Override public CarBuilder fixBody()     { this.body     = "Classic Body";        return this; }
+    @Override public CarBuilder paint()       { this.paint    = "Classic White Paint"; return this; }
+    @Override public CarBuilder fixInterior() { this.interior = "Classic interior";     return this; }
+
+    @Override
+    public Car build() {
+        Car car = new Car(chassis, body, paint, interior);
+        if (car.doQualityCheck()) return car;
+        System.out.println("Car assembly is incomplete. Can't deliver!");
+        return null;
+    }
+}
+```
+
+```java
+// Director — encapsulates the construction sequence
+public class AutomotiveEngineer {
+    private CarBuilder builder;
+
+    public AutomotiveEngineer(CarBuilder builder) {
+        this.builder = builder;
+        if (this.builder == null)
+            throw new IllegalArgumentException(
+                "Automotive Engineer can't work without Car Builder!");
+    }
+
+    public Car manufactureCar() {
+        return builder.fixChassis()
+                      .fixBody()
+                      .paint()
+                      .fixInterior()
+                      .build();
+    }
+}
+```
+
+```java
+// Client code — swap out the builder to get a different car
+public class Main {
+    public static void main(String[] args) {
+        CarBuilder builder = new SportsCarBuilder();
+        // CarBuilder builder = new ClassicCarBuilder(); // another option
+
+        AutomotiveEngineer engineer = new AutomotiveEngineer(builder);
+        Car car = engineer.manufactureCar();
+        if (car != null) {
+            System.out.println("Below car delivered:");
+            System.out.println("=".repeat(76));
+            System.out.println(car);
+            System.out.println("=".repeat(76));
+        } else {
+            System.out.println("Problems with current producing");
+        }
+    }
+}
+```
+
+Обратите внимание: `Car.toString()` внутри опирается на `StringBuilder` — это тоже вариант идеи **Builder** через `java.lang.Appendable`.
+
+###### **1.5.6 Как внедрить Builder (пошагово)**
+
+1.  Убедитесь, что для всех представлений продукта можно выделить **общие шаги сборки**; иначе паттерн может быть избыточен.
+2.  Зафиксируйте шаги в **Builder interface**.
+3.  Для каждого представления сделайте **ConcreteBuilder** с полной реализацией шагов.
+4.  Решите, нужен ли **Director**, и какие сценарии он инкапсулирует.
+5.  **Клиент** создаёт билдера и, при необходимости, директора; билдер обычно передаётся в конструктор директора один раз (либо в конкретный метод сборки).
+6.  Результат забирают у директора только если все продукты совместимы по интерфейсу; иначе клиент читает **`getResult()` / `build()`** напрямую у билдера.
+
+###### **1.5.7 Плюсы и минусы**
+
+**Плюсы**
+
+*   сборка **пошагово**, шаги можно откладывать или вкладывать рекурсивно;
+*   **переиспользование** одного сценария для разных представлений;
+*   **Single Responsibility Principle**: логика конструирования отделена от бизнес‑логики продукта;
+*   **method chaining** делает клиентский код особенно читаемым.
+
+**Минусы**
+
+*   **больше классов**: интерфейс Builder, несколько ConcreteBuilder, опциональный Director.
+
+##### **1.6 Builder и Prototype рядом**
+
+Оба паттерна **creational**, но решают разные задачи:
+
+| | **Prototype** | **Builder** |
+|---|---|---|
+| **Идея** | Копировать готовый объект | Собирать новый объект по шагам |
+| **Вход** | Настроенный prototype | Последовательность вызовов сборки |
+| **Когда** | Дорого заново конфигурировать с нуля | Много опциональных частей / разных представлений |
+| **Механизм** | `clone()` / copy constructor | `buildStepX()` + `build()` / `getResult()` |
+
+---
+
+#### **2. Определения**
+
+*   **Design pattern**: архитектурная схема — устойчивая организация классов, объектов и методов, дающая переиспользуемое решение типичной задачи ОО‑проектирования.
+*   **Gang of Four (GoF)**: Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides — авторы книги *Design Patterns* (1994), задавшей каталог из 23 базовых паттернов.
+*   **Creational patterns**: паттерны, абстрагирующие создание объектов (**Singleton**, **Prototype**, **Builder**, Factory Method, Abstract Factory).
+*   **Structural patterns**: паттерны композиции классов и объектов в более крупные структуры (Adapter, Composite, Facade и др.).
+*   **Behavioral patterns**: паттерны распределения обязанностей и коммуникации объектов (**State**, Observer, Strategy и др.).
+*   **Singleton**: **creational** паттерн «ровно один экземпляр» с глобальной точкой доступа через static‑метод (`getInstance()` / свойство `Instance`).
+*   **Lazy initialization**: объект создаётся при первом запросе, а не при старте программы; в **Singleton** экономит ресурсы.
+*   **Non‑lazy (eager) initialization**: объект создаётся при загрузке класса, даже если он не понадобится.
+*   **Thread safety**: корректность при параллельном выполнении; базовый **Singleton** без синхронизации гонкам не устойчив.
+*   **State pattern**: **behavioral** паттерн, где поведение контекста меняется через делегирование объектам состояния вместо длинных `if`/`else`.
+*   **Finite state machine (FSM)**: модель с конечным числом состояний, в каждый момент активно одно; переходы задаются действиями или входами.
+*   **Token**: в лексическом анализаторе — минимальная значимая лексема (идентификатор, целый литерал, оператор, разделитель, …).
+*   **C# auto‑property**: синтаксис `{ get; set; }`, порождающий приватное поле‑хранилище и публичные accessor’ы без ручного бойлерплейта.
+*   **Prototype pattern**: **creational** паттерн создания новых объектов клонированием эталона (**prototype**), а не «с нуля».
+*   **Clone**: отдельный объект с теми же полями, полученный вызовом `clone()` / копирующего конструктора.
+*   **Copy constructor**: конструктор `T(const T&)`, копирующий поля из существующего экземпляра того же класса.
+*   **Shallow copy**: побитовое копирование полей; ссылочные поля указывают на *те же* объекты, что и оригинал; `MemberwiseClone()` в .NET делает **shallow copy**.
+*   **MemberwiseClone()**: метод `System.Object` в .NET для **shallow copy**; иногда замена ручному copy constructor для простых типов.
+*   **Prototype registry**: опциональный реестр «ключ → преднастроенный prototype» для быстрого поиска и клонирования.
+*   **Builder pattern**: **creational** паттерн, отделяющий пошаговое конструирование сложного объекта от его представления; один сценарий — разные продукты.
+*   **Director**: опциональный класс, инкапсулирующий порядок вызовов шагов **Builder**.
+*   **Telescoping constructor anti-pattern**: лавина перегрузок конструктора с растущим числом параметров; типичный анти‑патчник, который лечит **Builder**.
+*   **Method chaining (fluent interface)**: стиль, где шаги билдера возвращают `this`, позволяя цепочки `builder.stepA().stepB().build()`.
+*   **reset()**: метод **Builder**, очищающий внутреннее состояние перед сборкой нового продукта.
+
+---
+
+#### **3. Примеры**
+
+##### **3.1. Повторение лекции: паттерны проектирования** (Лаба 8, **Задание** 1)
+
+Кратко ответьте на вопросы:
+
+**(a)** Что такое паттерны проектирования? Зачем они нужны?
+
+**(b)** Какие три большие группы паттернов выделяет GoF? Чем они отличаются по роли?
+
+**(c)** Приведите по три примера паттернов для каждой группы.
+
+**(d)** Какой паттерн запрещает создавать из класса более одного объекта?
+
+**(e)** Верно или нет: паттерн **State** инкапсулирует поведение каждого состояния в отдельном объекте.
+
+**(f)** Когда уместен **Prototype**, и какое главное преимущество он даёт?
+
+**(g)** Чем **Builder** принципиально отличается от **Prototype**?
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**(a) Что такое паттерны и зачем они**
+
+**Design pattern** — это архитектурная схема: стандартизованная организация классов, объектов и методов, решающая повторяющуюся задачу ОО‑дизайна.
+
+Они нужны, потому что:
+
+*   опытные проектировщики опираются на повторяющиеся удачные структуры;
+*   дают **общий словарь** для обсуждения решений;
+*   делают ОО‑системы **гибче, аккуратнее и переиспользуемее**;
+*   без них одни и те же проблемы решаются заново и часто хуже.
+
+**(b) Три семейства GoF**
+
+*   **Creational** — как лучше *создавать экземпляры*, абстрагируя `new` и фабрики.
+*   **Structural** — как *компоновать* классы и объекты (адаптация, обёртки, крупные структуры).
+*   **Behavioral** — как *распределять ответственность* и делегировать поведение.
+
+**(c) Примеры**
+
+*   **Creational:** Singleton, Builder, Prototype (плюс Abstract Factory, Factory Method).
+*   **Structural:** Adapter, Composite, Facade (плюс Bridge, Decorator, Flyweight, Proxy).
+*   **Behavioral:** State, Observer, Strategy (плюс Command, Iterator, Chain of Responsibility, Memento, Template Method, Visitor, Mediator, Interpreter).
+
+**(d) Запрет нескольких экземпляров**
+
+**Singleton** — private‑конструктор + единственная static‑точка входа (`getInstance()` / `Instance`).
+
+**(e) State и инкапсуляция**
+
+**Верно.** Каждое состояние — отдельный класс; контекст делегирует вызовы текущему **state object**, смена состояния = замена объекта.
+
+**(f) Prototype**
+
+Уместен, когда тип создаваемого объекта выбирается в runtime, дорого конфигурировать «с нуля», или нужно снять связь клиента с конкретными классами.
+
+**Плюс:** новые объекты через `clone()` без знания конкретного класса; можно держать готовые эталоны и не дублировать инициализацию.
+
+**(g) Builder vs Prototype**
+
+| | **Prototype** | **Builder** |
+|---|---|---|
+| **Цель** | Копировать настроенный эталон | Пошагово собрать новый объект |
+| **Вход** | Экземпляр‑прототип | Последовательность шагов сборки |
+| **Результат** | Копия с теми же полями | Новый продукт, возможно непохожий на предыдущие |
+| **Когда** | Дорогая инициализация, общая структура | Много опций / несколько представлений |
+| **Механизм** | `clone()` / copy constructor | `buildStepX()` + `build()` / `getResult()` |
+
+**Ответ:** см. формулировки выше.
+
+</details>
+
+
+##### **3.2. Умный редактор документов** (Лаба 8, **Задание** 2)
+
+Реализуйте в C++ систему «Smart Document Editor», где совместно работают **Singleton**, **State** и **Prototype**.
+
+**Требования**
+
+*   **Часть 1 — Singleton Logger:** класс `Logger` с ровно одним экземпляром и методом `log(const std::string& message)`, пишущим в консоль.
+*   **Часть 2 — State:** абстрактный `DocumentState` с `virtual void handleInput(const std::string& input)`; конкретные `DraftState`, `ReviewState`, `FinalState`; класс `Document` с `DocumentState*` и `changeState(DocumentState* newState)`.
+*   **Часть 3 — Prototype:** абстрактный `DocumentPrototype` с `clone()`; конкретные `ReportType` и `InvoiceType`; клонирование и логирование событий через **Singleton** `Logger`.
+*   **Часть 4 — `main`:** продемонстрировать создание документов, переходы состояний и клонирование с логированием ключевых шагов.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **Singleton** централизует журнал, **State** убирает разросшиеся `if` из жизненного цикла документа, **Prototype** даёт быстрые копии от шаблонов.
+
+```cpp
+#include <iostream>
+#include <string>
+
+// ===== PART 1: Singleton Logger =====
+
+class Logger {
+private:
+    static Logger* instance;
+    Logger() {}  // private constructor
+
+public:
+    static Logger* getInstance() {
+        if (instance == nullptr) {
+            instance = new Logger();
+        }
+        return instance;
+    }
+
+    void log(const std::string& message) {
+        std::cout << "[LOG] " << message << std::endl;
+    }
+};
+
+Logger* Logger::instance = nullptr;
+
+// ===== PART 2: State Pattern =====
+
+// Forward declaration needed because states reference Document
+class Document;
+
+// Abstract state
+class DocumentState {
+public:
+    virtual void handleInput(Document* doc, const std::string& input) = 0;
+    virtual std::string getName() const = 0;
+    virtual ~DocumentState() = default;
+};
+
+// Document class — holds current state, delegates behavior to it
+class Document {
+private:
+    DocumentState* state;
+
+public:
+    Document(DocumentState* initialState) : state(initialState) {}
+
+    void changeState(DocumentState* newState) {
+        Logger::getInstance()->log(
+            "State changed from " + state->getName() +
+            " to " + newState->getName()
+        );
+        delete state;
+        state = newState;
+    }
+
+    void handleInput(const std::string& input) {
+        state->handleInput(this, input);
+    }
+
+    std::string getStateName() const { return state->getName(); }
+
+    ~Document() { delete state; }
+};
+
+// Concrete states
+class DraftState : public DocumentState {
+public:
+    void handleInput(Document* doc, const std::string& input) override {
+        Logger::getInstance()->log("DraftState: received input '" + input + "'");
+    }
+    std::string getName() const override { return "Draft"; }
+};
+
+class ReviewState : public DocumentState {
+public:
+    void handleInput(Document* doc, const std::string& input) override {
+        Logger::getInstance()->log("ReviewState: reviewing '" + input + "'");
+    }
+    std::string getName() const override { return "Review"; }
+};
+
+class FinalState : public DocumentState {
+public:
+    void handleInput(Document* doc, const std::string& input) override {
+        Logger::getInstance()->log(
+            "FinalState: document is finalized. No edits allowed.");
+    }
+    std::string getName() const override { return "Final"; }
+};
+
+// ===== PART 3: Prototype Pattern =====
+
+class DocumentPrototype {
+public:
+    virtual DocumentPrototype* clone() const = 0;
+    virtual void describe() const = 0;
+    virtual ~DocumentPrototype() = default;
+};
+
+class ReportType : public DocumentPrototype {
+    std::string defaultHeader;
+public:
+    ReportType(const std::string& header = "Default Report Header")
+        : defaultHeader(header) {}
+
+    DocumentPrototype* clone() const override {
+        Logger::getInstance()->log("Cloning ReportType prototype");
+        return new ReportType(*this); // copy constructor
+    }
+
+    void describe() const override {
+        std::cout << "ReportType | header: " << defaultHeader << std::endl;
+    }
+};
+
+class InvoiceType : public DocumentPrototype {
+    std::string defaultFooter;
+public:
+    InvoiceType(const std::string& footer = "Default Invoice Footer")
+        : defaultFooter(footer) {}
+
+    DocumentPrototype* clone() const override {
+        Logger::getInstance()->log("Cloning InvoiceType prototype");
+        return new InvoiceType(*this);
+    }
+
+    void describe() const override {
+        std::cout << "InvoiceType | footer: " << defaultFooter << std::endl;
+    }
+};
+
+// ===== PART 4: Main =====
+
+int main() {
+    Logger* logger = Logger::getInstance();
+    logger->log("System started");
+
+    // --- Prototype: create prototypes and clone them ---
+    ReportType*  reportProto  = new ReportType("Q1 Financial Report");
+    InvoiceType* invoiceProto = new InvoiceType("Invoice #2026-001");
+
+    DocumentPrototype* report1  = reportProto->clone();
+    DocumentPrototype* invoice1 = invoiceProto->clone();
+
+    report1->describe();
+    invoice1->describe();
+
+    // --- State: demonstrate state transitions ---
+    Document doc(new DraftState());
+    doc.handleInput("initial text");       // DraftState handles it
+
+    doc.changeState(new ReviewState());
+    doc.handleInput("review comment");     // ReviewState handles it
+
+    doc.changeState(new FinalState());
+    doc.handleInput("attempt to edit");    // FinalState: no edits allowed
+
+    // Cleanup
+    delete report1; delete invoice1;
+    delete reportProto; delete invoiceProto;
+
+    logger->log("System shut down");
+    return 0;
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+[LOG] System started
+[LOG] Cloning ReportType prototype
+[LOG] Cloning InvoiceType prototype
+ReportType | header: Q1 Financial Report
+InvoiceType | footer: Invoice #2026-001
+[LOG] DraftState: received input 'initial text'
+[LOG] State changed from Draft to Review
+[LOG] ReviewState: reviewing 'review comment'
+[LOG] State changed from Review to Final
+[LOG] FinalState: document is finalized. No edits allowed.
+[LOG] System shut down
+```
+
+**Ответ:** один **Singleton Logger** даёт общий поток логов; **State** удерживает переходы без «лесенок» `if` в `Document`; **Prototype** создаёт документы от шаблонов одним `clone()`.
+
+</details>
+
+
+##### **3.3. Сборщик документа (Builder)** (Лаба 8, **Задание** 3)
+
+Реализуйте **Builder** в C++ для `Document` с секциями `header`, `body`, `footer`. Нужно:
+
+*   класс `Document` с тремя private `std::string`, сеттерами и `print()`;
+*   абстрактный `DocumentBuilder` с чисто виртуальными шагами на каждую секцию;
+*   конкретный `ReportBuilder` с содержимым «отчёта»;
+*   `Director` с `make()`, вызывающим шаги `ReportBuilder` в нужном порядке;
+*   `main()`, демонстрирующий сборку.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **Director** задаёт порядок шагов, **ConcreteBuilder** наполняет смыслом; клиент видит готовый продукт, а детали сборки изолированы.
+
+```cpp
+#include <iostream>
+#include <string>
+
+// ===== Product =====
+class Document {
+private:
+    std::string header;
+    std::string body;
+    std::string footer;
+
+public:
+    void setHeader(const std::string& h) { header = h; }
+    void setBody(const std::string& b)   { body   = b; }
+    void setFooter(const std::string& f) { footer = f; }
+
+    void print() const {
+        std::cout << "=== DOCUMENT ===" << std::endl;
+        std::cout << "Header: " << header << std::endl;
+        std::cout << "Body:   " << body   << std::endl;
+        std::cout << "Footer: " << footer << std::endl;
+        std::cout << "================" << std::endl;
+    }
+};
+
+// ===== Abstract Builder =====
+class DocumentBuilder {
+protected:
+    Document doc;  // the product being built
+
+public:
+    virtual ~DocumentBuilder() = default;
+
+    virtual void buildHeader()  = 0;
+    virtual void buildBody()    = 0;
+    virtual void buildFooter()  = 0;
+
+    Document getResult() { return doc; }
+};
+
+// ===== Concrete Builder =====
+class ReportBuilder : public DocumentBuilder {
+public:
+    void buildHeader() override {
+        doc.setHeader("Quarterly Financial Report — Q1 2026");
+    }
+
+    void buildBody() override {
+        doc.setBody(
+            "Total Revenue: $1,250,000 | "
+            "Total Expenses: $870,000 | "
+            "Net Profit: $380,000"
+        );
+    }
+
+    void buildFooter() override {
+        doc.setFooter("Prepared by Finance Dept. | Confidential");
+    }
+};
+
+// ===== Director =====
+class Director {
+public:
+    // make() encapsulates the correct construction order
+    Document make(DocumentBuilder& builder) {
+        builder.buildHeader();
+        builder.buildBody();
+        builder.buildFooter();
+        return builder.getResult();
+    }
+};
+
+// ===== Main =====
+int main() {
+    Director      director;
+    ReportBuilder reportBuilder;
+
+    Document report = director.make(reportBuilder);
+    report.print();
+
+    return 0;
+}
+```
+
+**Ожидаемый вывод:**
+
+```
+=== DOCUMENT ===
+Header: Quarterly Financial Report — Q1 2026
+Body:   Total Revenue: $1,250,000 | Total Expenses: $870,000 | Net Profit: $380,000
+Footer: Prepared by Finance Dept. | Confidential
+================
+```
+
+1.  **`Document`** хранит данные и не знает, как их собирали.
+2.  **`DocumentBuilder`** задаёт набор шагов и аккумулирует продукт.
+3.  **`ReportBuilder`** подставляет доменное содержимое для каждого шага.
+4.  **`Director.make()`** вызывает шаги по порядку; другой **ConcreteBuilder** (например `InvoiceBuilder`) даст другой документ при том же **Director**.
+5.  Клиент дергает **Director** и получает готовый **`Document`**.
+
+**Ответ:** **Builder** разделяет *что такое документ* (`Document`), *как его наполнять* (`ReportBuilder`) и *в какой последовательности* (`Director`).
+
+</details>
+
+
+##### **3.4. Singleton в C#** (Лекция 8, **Пример** 1)
+
+Реализуйте паттерн **Singleton** на C#.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** та же схема, что в Java: private static поле, private конструктор и публичное static‑свойство `Instance` с ленивой проверкой.
+
+```csharp
+public class Singleton
+{
+    // private static field — null by default
+    private static Singleton unique;
+
+    // private constructor — prevents external instantiation
+    private Singleton() { }
+
+    // public static accessor with lazy initialization
+    public static Singleton Instance
+    {
+        get
+        {
+            if (unique == null)
+            {
+                // Note: for multithreaded apps, place a thread lock here
+                unique = new Singleton();
+            }
+            return unique;
+        }
+    }
+}
+
+// Usage
+class Program
+{
+    static void Main()
+    {
+        Singleton s1 = Singleton.Instance;
+        Singleton s2 = Singleton.Instance;
+
+        Console.WriteLine(s1 == s2); // True — same object
+    }
+}
+```
+
+1.  **Private static field:** `private static Singleton unique;` — единственный экземпляр (изначально `null`).
+2.  **Private constructor:** запрещает внешний `new Singleton()`.
+3.  **Public property:** при первом обращении `unique == null` → создаём объект; далее возвращаем тот же экземпляр.
+4.  **Проверка:** `s1 == s2` даёт `true`, потому что ссылки совпадают.
+
+**Ответ:** в C# **Singleton** держится на private конструкторе, private static поле и public static свойстве с проверкой на `null`.
+
+</details>
+
+
+##### **3.5. Lazy vs non‑lazy Singleton** (Лекция 8, **Пример** 2)
+
+Ниже две реализации. Объясните разницу, какую предпочесть и почему.
+
+**Реализация A (lazy):**
+```java
+public class LazySingleton {
+    private static LazySingleton unique;
+    private LazySingleton() { }
+    public static LazySingleton getInstance() {
+        if (unique == null) {
+            unique = new LazySingleton();
+        }
+        return unique;
+    }
+}
+```
+
+**Реализация B (non‑lazy):**
+```java
+public class NonLazySingleton {
+    private static final NonLazySingleton unique = new NonLazySingleton();
+    private NonLazySingleton() { }
+    public static NonLazySingleton getInstance() {
+        return unique;
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** разница в том, *когда* появляется единственный экземпляр — при первом использовании (**lazy**) или при загрузке класса (**eager**).
+
+| | **Lazy (A)** | **Non‑lazy (B)** |
+|---|---|---|
+| **Момент создания** | При первом `getInstance()` | При загрузке класса JVM |
+| **Поле** | `private static LazySingleton unique;` (сначала `null`) | `private static final NonLazySingleton unique = new …` |
+| **Память** | Только если singleton реально нужен | Всегда, даже если не вызывали |
+| **Тело `getInstance()`** | Проверка `null` + возможное создание | Просто `return unique` |
+| **Thread safety** | Нужна синхронизация | Загрузка класса JVM потокобезопасна |
+| **Предпочтение** | ✅ Обычно да | ❌ Лучше избегать |
+
+**Почему чаще выбирают lazy:** если singleton ни разу не понадобился, eager‑вариант зря тратит память и время; lazy создаёт объект по факту запроса.
+
+**Почему eager неприятен:** побочные эффекты конструктора (I/O, сеть) выполнятся при старте без реальной необходимости.
+
+**Ответ:** предпочтительна реализация **A (lazy)** — экземпляр появляется при первом запросе; **B (non‑lazy)** стоит избегать, если нет веской причины на eager‑инициализацию.
+
+</details>
+
+
+##### **3.6. Singleton в C++** (Лекция 8, **Пример** 3)
+
+Реализуйте паттерн **Singleton** на C++.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** в C++ static‑член обязательно *определяется* вне класса; остальная логика совпадает с Java/C#.
+
+```cpp
+#include <iostream>
+
+class Singleton {
+private:
+    // declared inside the class (declaration only)
+    static Singleton* instance;
+
+    Singleton() { } // private constructor
+
+public:
+    static Singleton* getInstance() {
+        if (instance == nullptr) {
+            instance = new Singleton();
+        }
+        return instance;
+    }
+
+    void doSomething() {
+        std::cout << "Singleton instance in use" << std::endl;
+    }
+};
+
+// Required: define the static member outside the class (actual memory allocation)
+Singleton* Singleton::instance = nullptr;
+
+int main() {
+    Singleton* s1 = Singleton::getInstance();
+    Singleton* s2 = Singleton::getInstance();
+
+    s1->doSomething();
+    std::cout << (s1 == s2 ? "Same instance" : "Different instances") << std::endl;
+    // Output: Same instance
+    return 0;
+}
+```
+
+1.  **Объявление vs определение:** строка `static Singleton* instance;` внутри класса — только объявление; память выделяется строкой `Singleton* Singleton::instance = nullptr;` снаружи.
+2.  **Lazy:** `if (instance == nullptr)` — реальное выделение только при первом вызове.
+3.  **Private constructor:** блокирует внешний `new Singleton()`.
+
+**Ответ:** в C++ нужно внешнее **определение** static‑указателя; алгоритмически это тот же Singleton, что в Java.
+
+</details>
+
+
+##### **3.7. Prototype: трассировка демо с фигурами** (Лекция 8, **Пример** 4)
+
+Имея классы `Shape`, `Circle`, `Rectangle` из конспекта, проследите за `Demo.main()` и опишите, что напечатает программа и почему.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `clone()` через copy constructor создаёт новый объект с теми же полями, но другой идентичностью (`!=` ссылок); `equals()` сравнивает значения полей.
+
+**Что кладётся в `shapes`:**
+
+1.  `Circle` с `x=10, y=20, radius=15, color="red"`.
+2.  `anotherCircle = (Circle) circle.clone()` — второй `Circle` с теми же полями.
+3.  `Rectangle` с `width=10, height=20, color="blue"`.
+
+`cloneAndCompare()` клонирует все три фигуры в `shapesCopy`.
+
+**Для каждой пары `(shapes.get(i), shapesCopy.get(i))`:**
+
+*   `shapes.get(i) != shapesCopy.get(i)` **всегда true** — `clone()` всегда выделяет новый объект;
+*   `shapes.get(i).equals(shapesCopy.get(i))` **true** — copy constructor скопировал все поля, содержимое совпадает.
+
+**Ожидаемый вывод:**
+
+```
+0: Shapes are different objects (yay!)
+0: And their content are identical (yay!)
+1: Shapes are different objects (yay!)
+1: And their content are identical (yay!)
+2: Shapes are different objects (yay!)
+2: And their content are identical (yay!)
+```
+
+**Ответ:** для всех трёх пар печатается «разные объекты» (новая аллокация) и «идентичное содержимое» (поля скопированы) — это и есть рабочий **Prototype**.
+
+</details>
+
+
+##### **3.8. Builder: трассировка «автозавода»** (Лекция 8, **Пример** 5)
+
+Проследите за `Main.main()` в Java‑примере с `SportsCarBuilder` и восстановите полный вывод в консоль.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **Director** (`AutomotiveEngineer`) вызывает шаги билдера в фиксированном порядке; **method chaining** возвращает тот же `this` после каждого шага.
+
+**Трассировка выполнения:**
+
+```java
+CarBuilder builder    = new SportsCarBuilder();
+AutomotiveEngineer eng = new AutomotiveEngineer(builder);
+// AutomotiveEngineer constructor checks builder != null — OK
+
+Car car = eng.manufactureCar();
+// Calls: builder.fixChassis().fixBody().paint().fixInterior().build()
+```
+
+Пошагово:
+
+1.  `fixChassis()` печатает сообщение о шасси, кладёт `Sporty Chassis`, возвращает `this`.
+2.  `fixBody()` — кузов `Sporty Body`.
+3.  `paint()` — краска `Sporty Torch Red Paint`.
+4.  `fixInterior()` — салон `Sporty interior`.
+5.  `build()` собирает `Car` с этими полями, `doQualityCheck()` проходит — возвращается готовый автомобиль.
+
+`car != null`, поэтому `main` печатает блок доставки:
+
+**Ожидаемый вывод:**
+
+```
+Assembling chassis of the sports model
+Assembling body of the sports model
+Painting body of the sports model
+Setting up interior of the sports model
+Below car delivered:
+============================================================================
+Car [chassis=Sporty Chassis, body=Sporty Body, paint=Sporty Torch Red Paint]
+============================================================================
+```
+
+**Если взять `ClassicCarBuilder`:** тот же **Director**, но тексты сменятся на «classical model», а итоговый `Car` будет с `Classic Chassis`, `Classic Body`, `Classic White Paint` — суть **Builder** в том, что рецепт отделён от конкретного наполнителя.
+
+**Ответ:** сообщения сборки идут подряд; `build()` финализирует объект. Замена `SportsCarBuilder` → `ClassicCarBuilder` меняет продукт без правок **Director**.
+
+</details>
+
+##### **3.9. Thread safety у Singleton** (Лекция 8, **Пример** 6)
+
+**(a)** Почему «наивный» Singleton неполон? **(b)** Покажите гонку. **(c)** Предложите «промышленное» исправление.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** два потока могут одновременно пройти проверку `unique == null` и создать два объекта — контракт единственности рушится.
+
+**(a) Почему базовая версия неполна**
+
+Два потока T1 и T2 параллельно вызывают `getInstance()`:
+
+```
+T1: checks unique == null  → true (instance not yet created)
+T2: checks unique == null  → true (T1 hasn't finished — unique is still null)
+T1: creates new Singleton() → assigns to unique
+T2: creates new Singleton() → overwrites unique with a SECOND instance!
+```
+
+Оба успели увидеть `null` до присваивания. Итог: **два экземпляра Singleton** — инвариант нарушен.
+
+**(b) Иллюстрация гонки**
+
+```java
+public class Singleton {
+    private static Singleton unique;
+    private Singleton() { }
+
+    // NOT thread-safe — race condition possible
+    public static Singleton getInstance() {
+        if (unique == null) {
+            // Both threads can reach this line at the same time
+            unique = new Singleton();
+        }
+        return unique;
+    }
+}
+```
+
+**(c) Промышленные варианты**
+
+**Вариант 1 — `synchronized` на методе (просто, но lock на каждый вызов):**
+
+```java
+public static synchronized Singleton getInstance() {
+    if (unique == null) {
+        unique = new Singleton();
+    }
+    return unique;
+}
+```
+
+`synchronized` сериализует вход в метод: безопасно, но после создания экземпляра lock всё равно берётся на каждый вызов.
+
+**Вариант 2 — double‑checked locking с `volatile` (быстрый путь + корректность):**
+
+```java
+public class Singleton {
+    // volatile ensures changes are visible across threads immediately
+    private static volatile Singleton unique;
+
+    private Singleton() { }
+
+    public static Singleton getInstance() {
+        if (unique == null) {                   // First check — no lock (fast path)
+            synchronized (Singleton.class) {
+                if (unique == null) {           // Second check — with lock (safe)
+                    unique = new Singleton();
+                }
+            }
+        }
+        return unique;
+    }
+}
+```
+
+Внешняя проверка даёт fast path без lock; внутренняя под lock ловит гонку при первом создании.
+
+**Ответ:** базовый Singleton в многопоточности небезопасен; исправление — `synchronized` на методе или double‑checked locking с `volatile`.
+
+</details>

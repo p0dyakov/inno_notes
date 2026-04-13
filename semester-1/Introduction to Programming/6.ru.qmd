@@ -1,0 +1,721 @@
+---
+title: "W6. Введение в Java: компиляция, JVM, JRE, JDK, модель памяти, ООП, классы и объекты"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2025-10-07
+lang: ru
+format: html
+engine: knitr
+---
+
+{{< video 6.mp4 >}}
+
+[Quiz](https://notebooklm.google.com/notebook/f38be260-8610-483c-bba1-9dad711a0949?artifactId=09ce8d1d-9bb3-4447-941c-36775c8da57e) | [Flashcards](https://notebooklm.google.com/notebook/f38be260-8610-483c-bba1-9dad711a0949?artifactId=a72507b3-c18c-49b1-ad7e-e25eab214fe1)
+
+#### **1. Краткое содержание**
+##### **1.1 Ландшафт языков программирования**
+Разработчику полезно знать несколько языков: универсального «лучшего» нет, у каждого языка свой **application domain**. Например, C — системный уровень, JavaScript — веб, Python — скрипты и data science.
+
+Важнее не заучить один синтаксис, а понимать общие **principles** (**принципы**): языки часто делят базовые идеи, и это ускоряет изучение нового. Но похожий синтаксис не гарантирует похожую **semantics** (**семантику**) — под капотом поведение может сильно различаться.
+
+##### **1.2 Компиляция и выполнение программы**
+###### **1.2.1 Классическая модель (например, C/C++)**
+1. **Compilation**: исходник → промежуточное представление.
+2. **Code generation**: промежуточное → **machine code** под конкретный CPU.
+3. **Execution**: ОС загружает и исполняет машинный код на железе.
+
+Минус: бинарник не переносим между разными архитектурами.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.2 Модель Java: независимость от платформы**
+Добавлен уровень абстракции.
+
+1. **Compilation**: `javac` переводит `.java` в **bytecode** (`.class`) — инструкции для абстрактной машины.
+2. **Execution**: **JVM** — программа, которая исполняет bytecode (интерпретация и/или **JIT**‑компиляция в машинный код конкретной платформы).
+
+Отсюда лозунг *«Write once, run everywhere»*: на устройстве достаточно корректной **JVM**.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.3 Платформа Java: JDK, JRE и JVM**
+Три аббревиатуры — вложенные уровни инструментов.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.3.1 JVM (Java Virtual Machine)**
+**JVM** — спецификация виртуального процессора под bytecode; при запуске программы создаётся экземпляр JVM. Важно:
+
+*   **Hardware independence**: скрывает детали ОС и железа.
+*   **Stack-based execution model**: вычисления и вызовы через стек (проще регистровой модели).
+*   **Automatic memory management**: **garbage collector** автоматически возвращает память, которая больше не используется, и тем самым снижает риск типичных **memory leaks**.
+
+###### **1.3.2 JRE (Java Runtime Environment)**
+**JRE** — пакет для *запуска* Java-приложений: реализация JVM + **Java Class Library**. Для запуска чужих программ достаточно JRE.
+
+###### **1.3.3 JDK (Java Development Kit)**
+**JDK** — полный SDK для *разработки*: всё из JRE плюс `javac`, `jdb`, `javadoc` и др.
+
+##### **1.4 Модель памяти Java**
+Три основные области:
+
+*   **Code area**: загруженный bytecode классов (классы подгружаются по мере необходимости).
+*   **Stack**: при каждом вызове метода на стек кладётся (**push**) **stack frame** (**activation record**) с локальными переменными (включая примитивы и **references** на объекты) и параметрами, а также **return address**; при выходе кадр снимается (**pop**). Структура **Last-In, First-Out (LIFO)** удобна для рекурсии.
+*   **Heap**: все объекты Java; управляется **garbage collector**.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.5 Введение в объектно-ориентированное программирование (OOP)**
+###### **1.5.1 Идея**
+**OOP** моделирует систему как совокупность объектов со свойствами и поведением и их взаимодействием.
+
+###### **1.5.2 Class и Object**
+*   **Class** — чертёж (**blueprint**): какие данные и **methods** есть у объектов этого типа; концепция времени компиляции. Пример: класс `Car` — поля `color`, `speed`, методы `startEngine()`, `accelerate()`.
+*   **Object** — конкретный **instance** класса в памяти во время выполнения; у разных объектов своё состояние (`myCar` красный, `yourCar` синий).
+
+В Java программа — это прежде всего набор объявлений классов.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.6 Работа с объектами в Java**
+###### **1.6.1 Value types vs. reference types**
+*   **Value types (Primitives)**: `byte`, `short`, `int`, `long`, `float`, `double`, `char`, `boolean` — переменная хранит само значение (часто на стеке).
+*   **Reference types (Classes)**: переменная хранит **reference** на объект в **heap**, а не сам объект.
+
+###### **1.6.2 Создание объектов**
+Ключевое слово `new`:
+
+```java
+Point p1 = new Point();
+```
+
+`new`: выделяет память в heap, инициализирует поля, возвращает ссылку.
+
+###### **1.6.3 Объекты и ссылки**
+Присваивание ссылок не копирует объект:
+
+```java
+Point p1 = new Point();
+Point p2 = p1; // p2 now refers to the SAME object as p1
+```
+
+Изменения через `p2` видны через `p1`. Если на объект не осталось ссылок, он становится кандидатом на **garbage collection**.
+
+###### **1.6.4 Доступ к полям и методам экземпляра**
+К полям и методам экземпляра обращаются через **dot notation** по ссылке на объект.
+
+```java
+p1.move(10, 5); // вызов move у объекта, на который ссылается p1
+```
+
+###### **1.6.5 Constructors**
+**Constructor** — особый метод инициализации: имя совпадает с классом, вызывается при `new`. Можно перегрузить несколько конструкторов с разными параметрами.
+
+```java
+public class Point {
+    int x, y;
+
+    // Default constructor
+    public Point() {
+        this.x = 0;
+        this.y = 0;
+    }
+
+    // Parameterized constructor
+    public Point(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+```
+
+###### **1.6.6 Interface vs. implementation (инкапсуляция)**
+*   **Interface** класса (в смысле контракта): `public` поля и методы — что видят клиенты.
+*   **Implementation**: `private` детали и тела методов; можно менять, если публичный контракт стабилен.
+
+По умолчанию доступ на уровне пакета; лучше явно помечать `public` / `private`.
+
+##### **1.7 Основы Java**
+###### **1.7.1 Соглашения об именах**
+*   Классы: `UpperCamelCase`.
+*   Методы и переменные: `lowerCamelCase`.
+
+###### **1.7.2 Wrapper classes**
+Для каждого примитива есть класс-обёртка (`Integer`, `Double`, …), чтобы использовать значения там, где нужны объекты (например, обобщённые коллекции).
+
+###### **1.7.3 Комментарии**
+`//`, `/* */`, `/** Javadoc */` для `javadoc`.
+
+***
+
+#### **2. Определения**
+*   **JVM**: виртуальная машина, исполняющая bytecode.
+*   **JRE**: среда выполнения: JVM, библиотеки и компоненты для запуска приложений.
+*   **JDK**: JRE + инструменты разработки (`javac`, `jdb`, …).
+*   **Bytecode**: переносимый промежуточный код для JVM.
+*   **Class**: шаблон объекта: поля и методы.
+*   **Object**: экземпляр класса в памяти во время выполнения.
+*   **Instance**: синоним объекта.
+*   **Stack**: память под локальные переменные и кадры вызовов (LIFO).
+*   **Heap**: динамическая память под объекты.
+*   **Garbage collection**: автоматическое освобождение недостижимых объектов.
+*   **Value type**: примитив, хранит значение напрямую.
+*   **Reference type**: ссылка на объект в heap; все классы — reference types.
+*   **Constructor**: инициализация нового экземпляра.
+*   **Method**: блок кода, выполняющий задачу.
+*   **Interface (of a class)**: совокупность доступных снаружи `public` членов.
+*   **Implementation (of a class)**: внутренняя логика и скрытые данные.
+
+***
+
+#### **3. Примеры**
+##### **3.1. Поменять два числа местами** (**Лаба** 6, **Задание** 1)
+Напишите программу на Java, которая меняет два числа местами.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.util.Scanner;
+
+public class SwapNumbers {
+    public static void main(String[] args) {
+        // Create a Scanner object to read user input.
+        Scanner input = new Scanner(System.in);
+
+        // Prompt for and read the first number.
+        System.out.print("Enter first number: ");
+        int num1 = input.nextInt();
+
+        // Prompt for and read the second number.
+        System.out.print("Enter second number: ");
+        int num2 = input.nextInt();
+
+        System.out.println("--Before swap--");
+        System.out.println("First number = " + num1);
+        System.out.println("Second number = " + num2);
+
+        // Swapping logic using a temporary variable.
+        int temp = num1;
+        num1 = num2;
+        num2 = temp;
+
+        System.out.println("\n--After swap--");
+        System.out.println("First number = " + num1);
+        System.out.println("Second number = " + num2);
+        
+        input.close();
+    }
+}
+```
+</details>
+
+##### **3.2. ASCII-код символа** (**Лаба** 6, **Задание** 2)
+Программа, которая находит числовое значение символа в кодировке, принятой для `char` (в контексте курса — **ASCII** для латиницы).
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.util.Scanner;
+
+public class AsciiValue {
+    public static void main(String[] args) {
+        // Create a Scanner object.
+        Scanner scanner = new Scanner(System.in);
+
+        // Prompt the user to enter a character.
+        System.out.print("Enter a character: ");
+        
+        // Read the first character of the user's input.
+        char character = scanner.next().charAt(0);
+        
+        // In Java, a 'char' can be directly cast to an 'int' to get its ASCII value.
+        int asciiValue = (int) character;
+        
+        // Print the result.
+        System.out.println("The ASCII value of '" + character + "' is: " + asciiValue);
+        
+        scanner.close();
+    }
+}
+```
+</details>
+
+##### **3.3. Индексы всех букв алфавита в строке** (**Лаба** 6, **Задание** 3)
+Программа выводит индекс первого вхождения каждой буквы `a`–`z` в заданной строке.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+public class AlphabetIndex {
+    public static void main(String[] args) {
+        // The string to search within.
+        String str = "The quick brown fox jumps over the lazy dog.";
+
+        System.out.println("Finding indices of alphabet characters in the string:");
+        System.out.println("'" + str + "'\n");
+
+        // Iterate through each character of the alphabet from 'a' to 'z'.
+        for (char alphabet = 'a'; alphabet <= 'z'; alphabet++) {
+            // Use the indexOf method to find the first occurrence of the character.
+            // indexOf returns -1 if the character is not found.
+            int index = str.indexOf(alphabet);
+            
+            // If the character is found, print its index.
+            if (index != -1) {
+                System.out.println("'" + alphabet + "' is found at index: " + index);
+            } else {
+                System.out.println("'" + alphabet + "' is not found in the string.");
+            }
+        }
+    }
+}
+```
+</details>
+
+##### **3.4. Лексикографическое сравнение двух строк** (**Лаба** 6, **Задание** 4)
+Сравните две строки в лексикографическом порядке (`compareTo`).
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.util.Scanner;
+
+public class LexicographicalCompare {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        // Get the first string from the user.
+        System.out.print("Enter the first string: ");
+        String str1 = scanner.nextLine();
+
+        // Get the second string from the user.
+        System.out.print("Enter the second string: ");
+        String str2 = scanner.nextLine();
+
+        // The compareTo() method is the standard way to compare strings lexicographically in Java.
+        int result = str1.compareTo(str2);
+
+        // Analyze the result of compareTo().
+        if (result < 0) {
+            System.out.println("\"" + str1 + "\" is lexicographically less than \"" + str2 + "\"");
+        } else if (result > 0) {
+            System.out.println("\"" + str1 + "\" is lexicographically greater than \"" + str2 + "\"");
+        } else {
+            System.out.println("\"" + str1 + "\" is lexicographically equal to \"" + str2 + "\"");
+        }
+        
+        scanner.close();
+    }
+}
+```
+</details>
+
+##### **3.5. Подсчёт гласных в строке** (**Лаба** 6, **Задание** 5)
+Метод, считающий гласные `a,e,i,o,u` (без учёта регистра).
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.util.Scanner;
+
+public class VowelCounter {
+
+    // This method takes a string and returns the number of vowels in it.
+    public static int countVowels(String str) {
+        int count = 0;
+        // Convert the string to lower case to simplify the check.
+        String lowerStr = str.toLowerCase();
+        
+        // Iterate through each character of the string.
+        for (int i = 0; i < lowerStr.length(); i++) {
+            char ch = lowerStr.charAt(i);
+            // Check if the character is a vowel.
+            if (ch == 'a' || ch == 'e' || ch == 'i' || ch == 'o' || ch == 'u') {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Enter a string: ");
+        String userInput = scanner.nextLine();
+        
+        // Call the method to count the vowels.
+        int vowelCount = countVowels(userInput);
+        
+        System.out.println("The number of vowels in the string is: " + vowelCount);
+        
+        scanner.close();
+    }
+}
+```
+</details>
+
+##### **3.6. Фаренгейт → Цельсий** (**Лаба** 6, **Задание** 6)
+Перевод температуры из градусов Фаренгейта в Цельсия.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.util.Scanner;
+
+public class TempConverter {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        
+        // Prompt the user for the temperature in Fahrenheit.
+        System.out.print("Enter temperature in Fahrenheit: ");
+        // Use double to allow for decimal values.
+        double fahrenheit = scanner.nextDouble();
+        
+        // Apply the conversion formula: Celsius = (Fahrenheit - 32) * 5 / 9.
+        double celsius = (fahrenheit - 32) * 5.0 / 9.0;
+        
+        // Print the result, formatted to two decimal places.
+        System.out.printf("Temperature in Celsius is: %.2f\n", celsius);
+        
+        scanner.close();
+    }
+}
+```
+</details>
+
+##### **3.7. Разница между двумя интервалами времени** (**Лаба** 6, **Задание** 7)
+Вычислите разницу между двумя моментами, используя класс `Time`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+public class TimeDifference {
+
+    // The Time class to store hours, minutes, and seconds.
+    static class Time {
+        int hours;
+        int minutes;
+        int seconds;
+
+        // Constructor to initialize the Time object.
+        public Time(int h, int m, int s) {
+            this.hours = h;
+            this.minutes = m;
+            this.seconds = s;
+        }
+        
+        // Method to convert the entire time period into seconds for easy calculation.
+        public int toSeconds() {
+            return hours * 3600 + minutes * 60 + seconds;
+        }
+
+        // Static method to calculate the difference between two Time objects.
+        public static Time difference(Time start, Time stop) {
+            int diffInSeconds = stop.toSeconds() - start.toSeconds();
+            
+            // Handle cases where the difference might be negative.
+            if (diffInSeconds < 0) {
+                diffInSeconds = -diffInSeconds; // Take the absolute difference
+            }
+            
+            // Convert the difference in seconds back to H:M:S format.
+            int h = diffInSeconds / 3600;
+            int m = (diffInSeconds % 3600) / 60;
+            int s = diffInSeconds % 60;
+            
+            return new Time(h, m, s);
+        }
+    }
+
+    public static void main(String[] args) {
+        // Create two Time objects.
+        Time startTime = new Time(10, 30, 15);
+        Time endTime = new Time(12, 15, 45);
+
+        // Calculate the difference.
+        Time diff = Time.difference(startTime, endTime);
+
+        // Print the results.
+        System.out.printf("Start Time = %d:%d:%d\n", startTime.hours, startTime.minutes, startTime.seconds);
+        System.out.printf("End Time   = %d:%d:%d\n", endTime.hours, endTime.minutes, endTime.seconds);
+        System.out.printf("Difference = %d:%d:%d\n", diff.hours, diff.minutes, diff.seconds);
+    }
+}
+```
+</details>
+
+##### **3.8. Конвертер систем счисления** (**Лаба** 6, **Задание** 8)
+Перевод между двоичной, десятичной и шестнадцатеричной записью.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.util.Scanner;
+
+public class NumberConverter {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        
+        // --- Decimal to Others ---
+        System.out.print("Enter a decimal number: ");
+        int decimal = scanner.nextInt();
+        
+        // Java's Integer class has built-in static methods for conversion.
+        String binary = Integer.toBinaryString(decimal);
+        String hex = Integer.toHexString(decimal);
+        
+        System.out.println("Binary equivalent: " + binary);
+        System.out.println("Hexadecimal equivalent: " + hex.toUpperCase());
+        
+        // --- Binary to Decimal ---
+        System.out.print("\nEnter a binary number: ");
+        String binaryInput = scanner.next();
+        // The parseInt method can take a radix (base) as a second argument.
+        int decimalFromBinary = Integer.parseInt(binaryInput, 2);
+        System.out.println("Decimal equivalent: " + decimalFromBinary);
+        
+        // --- Hexadecimal to Decimal ---
+        System.out.print("\nEnter a hexadecimal number: ");
+        String hexInput = scanner.next();
+        int decimalFromHex = Integer.parseInt(hexInput, 16);
+        System.out.println("Decimal equivalent: " + decimalFromHex);
+        
+        scanner.close();
+    }
+}
+```
+</details>
+
+##### **3.9. Среднее по массиву целых** (**Лаба** 6, **Задание** 9)
+Среднее арифметическое элементов `int[]`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+public class ArrayAverage {
+    public static void main(String[] args) {
+        // Initialize an integer array.
+        int[] numbers = {10, 20, 30, 40, 50, 60};
+        
+        // Variable to hold the sum of the elements.
+        double sum = 0;
+        
+        // Iterate through the array using an enhanced for loop.
+        for (int number : numbers) {
+            sum += number;
+        }
+        
+        // Calculate the average. Cast one of the operands to double for floating-point division.
+        double average = sum / numbers.length;
+        
+        // Print the result.
+        System.out.println("The average of the array elements is: " + average);
+    }
+}
+```
+</details>
+
+##### **3.10. Вставка элемента в массив** (**Лаба** 6, **Задание** 10)
+Вставить элемент в массив в заданную позицию (новый массив большего размера).
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.util.Arrays;
+import java.util.Scanner;
+
+public class InsertIntoArray {
+    public static void main(String[] args) {
+        // Original array. Note: array size is fixed in Java.
+        int[] originalArray = {10, 20, 30, 40, 50};
+        int currentSize = originalArray.length;
+        
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.println("Original array: " + Arrays.toString(originalArray));
+        
+        // Get the element and position from the user.
+        System.out.print("Enter the element to insert: ");
+        int elementToInsert = scanner.nextInt();
+        
+        System.out.print("Enter the position to insert at (0-based index): ");
+        int position = scanner.nextInt();
+
+        // Create a new array with one more space.
+        int[] newArray = new int[currentSize + 1];
+
+        // Copy elements from the original array to the new one up to the insertion point.
+        for(int i=0; i < position; i++){
+            newArray[i] = originalArray[i];
+        }
+
+        // Insert the new element at the specified position.
+        newArray[position] = elementToInsert;
+        
+        // Copy the remaining elements from the original array, shifting their positions.
+        for(int i=position; i < currentSize; i++){
+            newArray[i+1] = originalArray[i];
+        }
+        
+        System.out.println("New array: " + Arrays.toString(newArray));
+        scanner.close();
+    }
+}
+```
+</details>
+
+##### **3.11. Дубликаты в массиве целых** (**Лаба** 6, **Задание** 11)
+Найдите повторяющиеся значения.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+public class FindDuplicates {
+    public static void main(String[] args) {
+        int[] array = {1, 2, 5, 5, 6, 6, 7, 2};
+ 
+        System.out.println("Duplicate elements in the array are: ");
+        // Use nested loops to compare each element with every other element.
+        for (int i = 0; i < array.length - 1; i++) {
+            for (int j = i + 1; j < array.length; j++) {
+                // If two elements are the same and their indices are different, it's a duplicate.
+                if (array[i] == array[j]) {
+                    System.out.println(array[j]);
+                }
+            }
+        }
+    }
+}
+```
+</details>
+
+##### **3.12. Существует ли файл или каталог** (**Лаба** 6, **Задание** 12)
+Проверка пути.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.io.File;
+import java.util.Scanner;
+
+public class FileExistsChecker {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        
+        System.out.print("Enter a file or directory path: ");
+        String path = scanner.nextLine();
+        
+        // Create a File object from the path string.
+        File file = new File(path);
+        
+        // The exists() method returns true if the file or directory exists.
+        if (file.exists()) {
+            System.out.println("The file or directory at '" + path + "' exists.");
+        } else {
+            System.out.println("The file or directory at '" + path + "' does not exist.");
+        }
+        
+        scanner.close();
+    }
+}
+```
+</details>
+
+##### **3.13. Файл это или каталог** (**Лаба** 6, **Задание** 13)
+По пути определить тип, если объект существует.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.io.File;
+import java.util.Scanner;
+
+public class FileOrDirChecker {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("Enter a file or directory path: ");
+        String path = scanner.nextLine();
+        
+        File file = new File(path);
+        
+        if (file.exists()) {
+            // The isDirectory() method returns true if the path points to a directory.
+            if (file.isDirectory()) {
+                System.out.println("The path '" + path + "' points to a directory.");
+            } 
+            // The isFile() method returns true if the path points to a file.
+            else if (file.isFile()) {
+                System.out.println("The path '" + path + "' points to a file.");
+            }
+        } else {
+            System.out.println("The path '" + path + "' does not exist.");
+        }
+        
+        scanner.close();
+    }
+}
+```
+</details>
+
+##### **3.14. Копирование текстового файла** (**Лаба** 6, **Задание** 14)
+Чтение из одного текстового файла и запись в другой.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+
+public class FileCopier {
+    public static void main(String[] args) {
+        // Define file objects for the source and destination.
+        File sourceFile = new File("source.txt");
+        File destFile = new File("destination.txt");
+        
+        try {
+            // Create a FileReader to read from the source file.
+            FileReader reader = new FileReader(sourceFile);
+            // Create a FileWriter to write to the destination file.
+            FileWriter writer = new FileWriter(destFile);
+            
+            // A variable to hold one character at a time.
+            int character;
+            
+            System.out.println("Copying file...");
+            
+            // Read from the source file character by character.
+            // The read() method returns -1 when the end of the file is reached.
+            while ((character = reader.read()) != -1) {
+                // Write the character to the destination file.
+                writer.write(character);
+            }
+            
+            System.out.println("File copied successfully.");
+            
+            // Always close the streams to release resources.
+            reader.close();
+            writer.close();
+            
+        } catch (IOException e) {
+            // Handle potential errors, such as the source file not being found.
+            e.printStackTrace();
+        }
+    }
+}
+```
+</details>

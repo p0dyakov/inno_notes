@@ -1,0 +1,1786 @@
+---
+title: "W13. Дженерики Java, параметризация типов, вариантность, wildcard-типы"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2025-11-29
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Резюме**
+##### **1.1 Введение в дженерики**
+###### **1.1.1 Идея genericity**
+**Generics** (в C++ близко к **templates**, в функциональных языках — **parametric polymorphism**) позволяют писать код для разных типов с сохранением проверки типов. Суть — **parameterize** классы, интерфейсы и методы параметром типа и иметь одну реализацию для многих конкретных типов.
+
+Дженерики — это «шаблон», который потом заполняют конкретными типами: вместо `ListOfPersons`, `ListOfCars`, `ListOfBooks` с копипастой логики — один `List<T>`.
+
+Дженерики **orthogonal** к наследованию:
+
+- **Inheritance** — специализация и абстракция (`OrderedList` extends `List`);  
+- **Generics** — параметризация типа (`List<Person>` vs `List<Car>`).
+
+Их можно сочетать: обобщённый класс может стоять в иерархии наследования.
+
+###### **1.1.2 Зачем нужны дженерики**
+Без них типичны проблемы:
+
+- **Code duplication** — почти одинаковые классы на каждый тип;  
+- нарушение **DRY**;  
+- потеря **compile-time** проверки типов при использовании универсального `Object`.
+
+Дженерики распространены почти во всех современных языках:
+
+- **Generics**: Ada, Delphi, Eiffel, Java, Scala, C#, Swift, Rust  
+- **Templates**: C++, D  
+- **Parametric polymorphism**: ML, Scala, Haskell  
+
+##### **1.2 Жизнь без дженериков**
+###### **1.2.1 Дублирование кода**
+Раньше для «типобезопасных» коллекций писали отдельный класс под каждый тип:
+
+```java
+class ListOfPersons {
+    void extend(Person v) { ... }
+    void remove(Person v) { ... }
+}
+
+class ListOfCars {
+    void extend(Car v) { ... }
+    void remove(Car v) { ... }
+}
+```
+
+Алгоритмы `extend` и `remove` **одинаковы** — отличаются только типы; это ломает DRY и усложняет сопровождение.
+
+###### **1.2.2 Универсальный тип**
+Обходной путь — «универсальный» тип, куда можно класть что угодно.
+
+**C++ Approach: `void*`**
+
+```cpp
+class ListOfAnything {
+    void extend(void* v) { ... }
+    void remove(void* v) { ... }
+};
+```
+
+Любой указатель приводится к `void*`, но проверка типов исчезает:
+
+```cpp
+ListOfAnything lst;
+lst.extend(new Car());    // OK
+lst.extend(new Person()); // Compiles, but is this intended?
+lst.remove(new City());   // Also compiles — no type safety!
+```
+
+**Java: базовый тип `Object`**
+
+В Java `Object` — общий предок ссылочных типов:
+
+```java
+public class List {
+    public void extend(Object item) { ... }
+    public Object elem(int i) { ... }
+}
+```
+
+```java
+List lst = new List();
+lst.extend(new MyType());
+MyType v = (MyType)lst.elem(5); // Explicit cast required!
+```
+
+У такого подхода серьёзные **недостатки**:
+
+- нельзя зафиксировать тип элементов на этапе компиляции;
+- компилятор не проверяет согласованность типов;
+- нужны явные приведения при извлечении;
+- риск ошибок времени выполнения при неверном cast.
+
+##### **1.3 Boxing и unboxing**
+###### **1.3.1 Проблема примитивов**
+В Java два вида типов:
+
+- **Reference types**: классы, интерфейсы, массивы (наследники `Object`);
+- **Value types**: `int`, `double`, `boolean`, `char`, … (примитивы, не `Object`).
+
+Примитив нельзя положить в `List<Object>` без упаковки.
+
+###### **1.3.2 Wrapper-классы**
+Для каждого примитива в `java.lang` есть **wrapper**:
+
+| Тип значения | Wrapper |
+|:-----------|:--------------|
+| `byte`     | `Byte`        |
+| `short`    | `Short`       |
+| `int`      | `Integer`     |
+| `long`     | `Long`        |
+| `float`    | `Float`       |
+| `double`   | `Double`      |
+| `boolean`  | `Boolean`     |
+| `char`     | `Character`   |
+
+Каждый wrapper хранит одно значение соответствующего примитива:
+
+```java
+Integer i = new Integer(1);
+Double d = new Double(0.5);
+```
+
+###### **1.3.3 Операции boxing / unboxing**
+**Boxing** — автоматическое преобразование примитива в wrapper:
+
+```java
+List lst = new List();
+lst.extend(1); // int -> Integer (boxing)
+// Equivalent to: lst.extend(new Integer(1));
+```
+
+**Unboxing** — автоматическое извлечение примитива из wrapper:
+
+```java
+int i = (int)lst.elem(1); // Integer -> int (unboxing)
+```
+
+Без дженериков boxing/unboxing дороже и легче поймать runtime-ошибку:
+
+```java
+List lst3 = new List();
+lst3.extend(new MyType());
+int j = (int)lst3.elem(2); // Runtime error! MyType is not Integer
+```
+
+##### **1.4 Обобщённые (generic) классы**
+###### **1.4.1 Объявление generic-класса**
+**Generic class** объявляется с одним или несколькими **type parameters** в угловых скобках:
+
+```java
+class List<T> {
+    void extend(T v) { ... }
+    void remove(T v) { ... }
+    T elem(int i) { ... }
+}
+```
+
+Здесь `T` — **type parameter** (формальный / универсальный параметр типа), условно «любой тип». Класс `List<T>` — абстракция-шаблон.
+
+**Соглашения об именах** параметров типа — одна заглавная буква:
+
+- `T` — Type
+- `E` — Element
+- `K` — Key
+- `V` — Value
+- `N` — Number
+
+###### **1.4.2 Инстанцирование**
+Чтобы использовать generic-класс, подставьте **actual type argument**:
+
+```java
+List<Car> garage = new List<Car>();
+garage.extend(new Car());    // OK
+garage.extend(new Person()); // Compile-time error!
+```
+
+Компилятор подставляет `Car` вместо `T` и получается типобезопасный `List<Car>`.
+
+**Diamond operator `<>`** (JDK 7+): справа можно не повторять тип:
+
+```java
+List<Car> garage = new List<>(); // Diamond operator <>
+```
+
+**Вывод типа с `var`** (JDK 10+) для локальных переменных:
+
+```java
+var ints = new List<Integer>(); // Compiler infers List<Integer>
+```
+
+###### **1.4.3 Плюсы generic-классов**
+Дженерики устраняют перечисленные проблемы:
+
+```java
+List<MyType> lst1 = new List<MyType>();
+lst1.extend(new MyType());
+MyType v = lst1.elem(1); // No cast needed!
+
+List<Integer> lst2 = new List<>();
+lst2.extend(1);           // No explicit boxing needed
+int i = lst2.elem(1);     // No explicit unboxing needed
+lst2.extend(new MyType()); // Compile-time error!
+
+List<MyType> lst3 = new List<>();
+lst3.extend(new MyType());
+int j = (int)lst3.elem(3); // Compile-time error: illegal conversion
+```
+
+**Плюсы**:
+
+- **Type safety** — нельзя положить «чужой» тип в коллекцию;  
+- **No code duplication** — одна реализация на все типы;  
+- **Compile-time checking** — ошибки до запуска;  
+- **No explicit casting** — компилятор знает тип элементов;  
+- для ссылочных типов меньше лишнего boxing/unboxing.
+
+###### **1.4.4 Несколько параметров типа**
+У generic-класса может быть несколько параметров типа:
+
+```java
+public interface Pair<K, V> {
+    public K getKey();
+    public V getValue();
+}
+
+public class OrderedPair<K, V> implements Pair<K, V> {
+    private K key;
+    private V value;
+    
+    public OrderedPair(K key, V value) {
+        this.key = key;
+        this.value = value;
+    }
+    
+    public K getKey() { return key; }
+    public V getValue() { return value; }
+}
+```
+
+Инстанцирование:
+
+```java
+Pair<String, Integer> p1 = new OrderedPair<>("Even", 8);
+Pair<String, String> p2 = new OrderedPair<>("hello", "world");
+```
+
+В аргументах типа можно использовать уже параметризованные типы:
+
+```java
+OrderedPair<String, Box<Integer>> p = new OrderedPair<>("primes", new Box<>());
+```
+
+##### **1.5 Обобщённые методы**
+###### **1.5.1 Объявление**
+**Generic methods** вводят собственные параметры типа, независимые от класса; область видимости — метод:
+
+```java
+class Lists {
+    public static <T> T sort(List<T> lst) {
+        // ...
+    }
+}
+```
+
+`<T>` перед типом результата делает метод generic. Пишут `<T> T sort(...)`, а не `T sort<T>(...)` — иначе синтаксис Java ломается.
+
+Generic могут быть и статические, и методы экземпляра:
+
+```java
+public class Test {
+    static <T> void genericDisplay(T element) {
+        System.out.println(element.getClass().getName() + " = " + element);
+    }
+    
+    public static void main(String[] args) {
+        genericDisplay(11);           // T inferred as Integer
+        genericDisplay("data flair"); // T inferred as String
+        genericDisplay(1.0);          // T inferred as Double
+    }
+}
+```
+
+###### **1.5.2 Вызов**
+Можно явно указать аргументы типа:
+
+```java
+boolean same = Util.<Integer, String>compare(p1, p2);
+```
+
+Или положиться на вывод типов (чаще так):
+
+```java
+boolean same = Util.compare(p1, p2); // Types inferred from arguments
+```
+
+##### **1.6 Ограниченные (bounded) параметры типа**
+###### **1.6.1 Зачем ограничивать**
+Иногда нужно запретить произвольный аргумент типа. Пример:
+
+```java
+class Garage<T> {
+    void repair(T vehicle) { ... }
+}
+
+Garage<Personal> myCars = new Garage<Personal>(); // OK
+Garage<Bus> busStation = new Garage<Bus>();       // OK
+Garage<Frog> lake = new Garage<Frog>();           // Compiles, but makes no sense!
+```
+
+«Гараж лягушек» семантически бессмыслен, а `lake.repair()` может привести к ошибкам времени выполнения.
+
+###### **1.6.2 Верхняя граница `extends`**
+Ограничьте параметр типа сверху:
+
+```java
+class Garage<T extends Vehicle> {
+    void repair(T vehicle) { ... }
+}
+```
+
+Теперь `T` — только `Vehicle` или подкласс:
+
+```java
+Garage<Personal> myCars = new Garage<Personal>(); // OK
+Garage<Bus> busStation = new Garage<Bus>();       // OK
+Garage<Frog> lake = new Garage<Frog>();           // Compile-time error!
+```
+
+###### **1.6.3 Граница-интерфейс**
+`extends` работает и для интерфейсов:
+
+```java
+interface iAccount {
+    int getId();
+}
+
+class Bank<T extends iAccount> {
+    T[] accounts;
+    public Bank(T[] accs) { this.accounts = accs; }
+}
+```
+
+Теперь `T` должен реализовать `iAccount`.
+
+###### **1.6.4 Несколько границ**
+Несколько границ через `&`:
+
+```java
+class Bank<T1, T2 extends Person & iAccount> {
+    // T1 has no restrictions
+    // T2 must extend Person AND implement iAccount
+}
+```
+
+**Правила**:
+
+- You can specify multiple interfaces
+- You can specify at most ONE class
+- If there's a class, it must come first: `<T extends SomeClass & Interface1 & Interface2>`
+
+**C# Comparison**: C# uses `where` clauses for a similar effect:
+
+```csharp
+public class MyTemplate<Type1, Type2>
+    where Type1 : IComparable,
+    where Type2 : MyInterface, MyBaseClass
+{ ... }
+```
+
+##### **1.7 Реализация дженериков: C++ и Java**
+###### **1.7.1 Модель C++ (размножение кода)**
+В C++ для каждой инстанциации получается **отдельная копия** кода с подставленными типами:
+
+- `List<int>` generates one version of the code
+- `List<string>` generates another version
+
+**Плюсы**: лучше оптимизировать.
+**Минусы**: раздувание кода (больше объёма).
+
+###### **1.7.2 Модель Java (type erasure)**
+В Java для всех инстанциаций **один и тот же** байткод; информация о типах **стирается** на этапе компиляции, при необходимости добавляется boxing:
+
+- `List<Integer>` and `List<String>` use the same bytecode
+
+**Плюсы**: компактнее.
+**Минусы**: boxing/unboxing и потеря части информации о типах в runtime.
+
+##### **1.8 Принцип подстановки Лисков (LSP)**
+###### **1.8.1 Подтип**
+**Subtype** — если типы связаны `extends` или `implements`:
+
+- `Integer` is a subtype of `Number`
+- `Double` is a subtype of `Number`
+
+###### **1.8.2 Формулировка**
+**Liskov Substitution Principle (LSP)**:
+
+- переменной типа `T` можно присвоить значение любого подтипа `T`;
+- в параметр типа `T` можно передать аргумент любого подтипа `T`.
+
+Это связано с **dynamic types**: метод, ждущий `Animal`, примет `Lion`, `Frog`, …
+
+```java
+List<Number> nums = new List<Number>();
+nums.extend(2);      // Integer is a subtype of Number — OK
+nums.extend(3.14);   // Double is a subtype of Number — OK
+```
+
+##### **1.9 Вариантность**
+###### **1.9.1 Вопрос вариантности**
+Пусть есть два класса:
+
+```java
+class Base { ... }
+class Derived extends Base { ... }
+```
+
+And a generic collection:
+
+```java
+class Collection<T> { ... }
+```
+
+**Вопрос**: как связаны `Collection<Base>` и `Collection<Derived>`?
+
+###### **1.9.2 Три варианта**
+Возможны три отношения:
+
+1. **Invariance**: `Collection<Base>` and `Collection<Derived>` have **NO** relationship (typical for Java generics)
+2. **Covariance**: `Collection<Derived>` is a subtype of `Collection<Base>` (intuitive, but not always safe)
+3. **Contravariance**: `Collection<Base>` is a subtype of `Collection<Derived>` (counterintuitive, but useful in some cases)
+
+###### **1.9.3 Почему covariance опасна**
+Предположим covariance: `List<Integer>` — подтип `List<Number>`:
+
+```java
+List<Integer> ints = new List<Integer>();
+ints.extend(1);
+ints.extend(2);
+List<Number> nums = ints;  // If covariant, this would be legal
+nums.extend(3.14);         // Adding a Double to a List<Integer>!
+```
+
+**Проблема:** в список `Integer` попал `Double`.
+**Вывод:** `List<Integer>` **не** подтип `List<Number>`.
+
+###### **1.9.4 Почему contravariance опасна**
+Предположим contravariance: `List<Integer>` — супертип `List<Number>`:
+
+```java
+List<Number> nums = new List<Number>();
+nums.extend(2.78);
+nums.extend(3.14);
+List<Integer> ints = nums; // If contravariant, this would be legal
+Integer x = ints.elem(0);  // Getting a Double as Integer!
+```
+
+**Проблема:** `Double` читают как `Integer`.
+**Вывод:** `List<Integer>` **не** супертип `List<Number>`.
+
+###### **1.9.5 Инвариантность Java**
+`List<Integer>` и `List<Number>` **invariant** — между ними нет отношения подтипа, хотя `Integer` extends `Number`.
+
+**Важное исключение:** массивы — `Integer[]` **является** подтипом `Number[]`, что даёт `ArrayStoreException` в runtime.
+
+###### **1.9.6 Наследование между generic-классами**
+Наследование шаблонов классов при фиксированном аргументе типа по-прежнему работает:
+
+```java
+class Collection<T> { ... }
+class List<T> extends Collection<T> { ... }
+
+Collection<Integer> col;
+List<Integer> lst = new List<Integer>();
+col = lst; // OK! List<Integer> IS a subtype of Collection<Integer>
+```
+
+Инвариантность относится к **аргументу типа**, а не к иерархии `List` extends `Collection`.
+
+##### **1.10 Wildcard-типы**
+###### **1.10.1 Зачем `?`**
+Как написать метод для «любой коллекции»?
+
+**Без дженериков** (старый стиль):
+
+```java
+void printCollection(Collection c) {
+    Iterator i = c.iterator();
+    for (int k = 0; k < c.size(); k++) {
+        System.out.println(i.next());
+    }
+}
+```
+
+**Наивный дженерик** (не подходит):
+
+```java
+void printCollection(Collection<Object> c) {
+    for (Object e : c) {
+        System.out.println(e);
+    }
+}
+```
+
+Так принимается только `Collection<Object>`, а не `Collection<String>` / `Collection<Integer>` из-за инвариантности!
+
+###### **1.10.2 Неограниченный wildcard**
+**Wildcard** `?` — «неизвестный тип»:
+
+```java
+void printCollection(Collection<?> c) {
+    for (Object e : c) {
+        System.out.println(e);
+    }
+}
+```
+
+`Collection<?>` принимает любую коллекцию элементов; эквивалентно `Collection<? extends Object>`.
+
+###### **1.10.3 `? extends` (верхняя граница)**
+**Upper bounded wildcard** — неизвестный тип **не выше** заданного:
+
+```java
+public static double sumOfList(List<? extends Number> list) {
+    double s = 0.0;
+    for (Number n : list)
+        s += n.doubleValue();
+    return s;
+}
+```
+
+`<? extends Number>` подходит для `Number`, `Integer`, `Double`, `Long`, …:
+
+```java
+List<Integer> li = Arrays.asList(1, 2, 3);
+System.out.println("sum = " + sumOfList(li)); // sum = 6.0
+
+List<Double> ld = Arrays.asList(1.2, 2.3, 3.5);
+System.out.println("sum = " + sumOfList(ld)); // sum = 7.0
+```
+
+###### **1.10.4 `? super` (нижняя граница)**
+**Lower bounded wildcard** — неизвестный тип **не ниже** заданного:
+
+```java
+public static void addNumbers(List<? super Integer> list) {
+    for (int i = 1; i <= 10; i++) {
+        list.add(i);
+    }
+}
+```
+
+`<? super Integer>` — `Integer`, `Number` или `Object`.
+
+###### **1.10.5 Wildcards в сигнатурах**
+Wildcard помогает обойти инвариантность в API:
+
+```java
+class List<T> {
+    // Accept lists of T or any subtype of T
+    public void addAnotherList(List<? extends T> newLst) { ... }
+    
+    // Accept lists of T or any supertype of T
+    public void addAnotherList2(List<? super T> newLst) { ... }
+}
+```
+
+###### **1.10.6 PECS: Producer Extends, Consumer Super**
+**PECS** — памятка по выбору wildcard:
+
+- **Producer Extends**: только **чтение** из коллекции — `? extends T`;
+- **Consumer Super**: только **запись** в коллекцию — `? super T`.
+
+Пример:
+
+```java
+// Producer: we READ from source
+public void copy(List<? extends T> source, List<? super T> dest) {
+    for (T item : source) {  // Reading from source
+        dest.add(item);       // Writing to dest
+    }
+}
+```
+
+##### **1.11 Плюсы дженериков Java**
+Кратко:
+
+1. **Compile-time type safety** — ошибки ловятся при компиляции.
+2. **Elimination of casts** — не нужны лишние приведения при `get`.
+
+   ```java
+   // Without generics
+   List list = new ArrayList();
+   list.add("hello");
+   String s = (String) list.get(0); // Cast required
+   
+   // With generics
+   List<String> list = new ArrayList<String>();
+   list.add("hello");
+   String s = list.get(0); // No cast needed
+   ```
+3. **Code reuse** — одна реализация для многих типов.
+4. **Generic algorithms** — типобезопасные алгоритмы над коллекциями.
+
+***
+
+#### **2. Определения**
+*   **Generics**: возможность параметризовать классы, интерфейсы и методы типами и писать типобезопасный переиспользуемый код.
+*   **Type Parameter (Type Variable)**: формальный параметр типа (`T`, `E`, `K`, `V` и т.д.) в объявлении дженерика.
+*   **Actual Type Argument**: конкретный тип при инстанцировании или вызове (например `Integer` в `List<Integer>`).
+*   **Instantiation (of generics)**: получение конкретного типа из обобщённого при подстановке аргументов типа.
+*   **Boxing**: автоматическое упаковывание примитива в соответствующий wrapper (`int` → `Integer`).
+*   **Unboxing**: автоматическое извлечение примитива из wrapper (`Integer` → `int`).
+*   **Wrapper Classes**: классы в `java.lang`, оборачивающие примитивы (`Integer`, `Double`, `Boolean`, …).
+*   **Bounded Type Parameter**: ограничение параметра типа с помощью `extends` / `super`.
+*   **Upper Bound**: верхняя граница через `extends` — тип и его подтипы.
+*   **Lower Bound**: нижняя граница через `super` — тип и его супертипы.
+*   **Wildcard**: `?` — «неизвестный» тип в сочетании с границами.
+*   **Variance**: как связаны обобщённые типы `G<A>` и `G<B>` при связи `A` и `B`.
+*   **Invariance**: между `G<A>` и `G<B>` нет отношения подтипа, даже если `A` и `B` связаны (типично для Java-коллекций).
+*   **Covariance**: подтип аргумента «наследуется» вверх по конструктору типа (интуитивно, но не всегда безопасно).
+*   **Contravariance**: отношение подтипов «переворачивается» на уровне `G<·>`.
+*   **Type Erasure**: в JVM параметры типа стираются и заменяются `Object` или границами.
+*   **Diamond Operator**: синтаксис `<>` (JDK 7+), чтобы компилятор вывел аргументы типа.
+*   **Type Inference**: вывод аргументов типа компилятором из контекста.
+*   **Liskov Substitution Principle (LSP)**: подтип можно подставить вместо супертипа без нарушения контракта.
+*   **PECS**: «Producer Extends, Consumer Super» — эвристика выбора `? extends` / `? super` при чтении и записи.
+*   **Raw Type**: использование `List` без `<...>` — теряется статическая проверка типов.
+
+***
+
+#### **3. Примеры**
+##### **3.1. Ошибка компиляции generic-класса** (Лаба 12, Задание 1)
+Скомпилируется ли класс? Если нет — почему?
+
+```java
+public final class Algorithm {
+    public static <T> T max(T x, T y) {
+        return x > y ? x : y;
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** оператор `>` не определён для произвольного параметра типа `T`.
+
+1.  **Analysis of the code:**
+    *   The class declares a generic method `max` with type parameter `T`
+    *   The method attempts to compare `x` and `y` using the `>` operator
+2.  **The problem:**
+    *   The `>` operator only works with primitive numeric types (`int`, `double`, etc.)
+    *   Generic type `T` could be any reference type (e.g., `String`, `Person`)
+    *   You cannot use `>` to compare arbitrary objects
+3.  **The solution:**
+    *   To compare generic objects, use `Comparable` interface:
+
+```java
+public final class Algorithm {
+    public static <T extends Comparable<T>> T max(T x, T y) {
+        return x.compareTo(y) > 0 ? x : y;
+    }
+}
+```
+
+**Ответ:** нет, не скомпилируется: `>` нельзя применить к `T`. Ограничьте `T extends Comparable<T>` и используйте `compareTo()`.
+
+</details>
+
+##### **3.2. Медиатека с дженериками и без** (Лаба 12, Задание 1)
+Спроектируйте «библиотеку» для книги, видео и газеты: одна версия с дженериками и одна без. Для хранения можно использовать любые подходящие API.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** дженерики дают проверку типов и убирают лишние приведения.
+
+**Version WITHOUT Generics:**
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+// Media classes
+class Book {
+    private String title;
+    private String author;
+    
+    public Book(String title, String author) {
+        this.title = title;
+        this.author = author;
+    }
+    
+    @Override
+    public String toString() {
+        return "Book: " + title + " by " + author;
+    }
+}
+
+class Video {
+    private String title;
+    private int duration;
+    
+    public Video(String title, int duration) {
+        this.title = title;
+        this.duration = duration;
+    }
+    
+    @Override
+    public String toString() {
+        return "Video: " + title + " (" + duration + " min)";
+    }
+}
+
+class Newspaper {
+    private String name;
+    private String date;
+    
+    public Newspaper(String name, String date) {
+        this.name = name;
+        this.date = date;
+    }
+    
+    @Override
+    public String toString() {
+        return "Newspaper: " + name + " - " + date;
+    }
+}
+
+// Library WITHOUT generics
+class MediaLibrary {
+    private List items = new ArrayList(); // Raw type - no type safety
+    
+    public void addItem(Object item) {
+        items.add(item);
+    }
+    
+    public Object getItem(int index) {
+        return items.get(index);
+    }
+    
+    public void displayAll() {
+        for (Object item : items) {
+            System.out.println(item);
+        }
+    }
+    
+    public int size() {
+        return items.size();
+    }
+}
+```
+
+**Проблемы версии без дженериков:**
+
+- No type safety: can add any object type
+- Requires explicit casting when retrieving items
+- Runtime errors if wrong cast is used
+
+**Version WITH Generics:**
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+// Generic Library class
+class GenericMediaLibrary<T> {
+    private List<T> items = new ArrayList<>();
+    
+    public void addItem(T item) {
+        items.add(item);
+    }
+    
+    public T getItem(int index) {
+        return items.get(index);
+    }
+    
+    public void displayAll() {
+        for (T item : items) {
+            System.out.println(item);
+        }
+    }
+    
+    public int size() {
+        return items.size();
+    }
+}
+
+// Usage example
+public class Main {
+    public static void main(String[] args) {
+        // Without generics - no type safety
+        MediaLibrary oldLibrary = new MediaLibrary();
+        oldLibrary.addItem(new Book("1984", "George Orwell"));
+        oldLibrary.addItem(new Video("Matrix", 136));
+        oldLibrary.addItem("Random String"); // Compiles but wrong!
+        Book b = (Book) oldLibrary.getItem(0); // Cast required
+        
+        // With generics - type safe
+        GenericMediaLibrary<Book> bookLibrary = new GenericMediaLibrary<>();
+        bookLibrary.addItem(new Book("1984", "George Orwell"));
+        bookLibrary.addItem(new Book("Brave New World", "Aldous Huxley"));
+        // bookLibrary.addItem(new Video("Matrix", 136)); // Compile error!
+        Book book = bookLibrary.getItem(0); // No cast needed
+        
+        GenericMediaLibrary<Video> videoLibrary = new GenericMediaLibrary<>();
+        videoLibrary.addItem(new Video("Matrix", 136));
+        videoLibrary.addItem(new Video("Inception", 148));
+        
+        System.out.println("=== Book Library ===");
+        bookLibrary.displayAll();
+        
+        System.out.println("\n=== Video Library ===");
+        videoLibrary.displayAll();
+    }
+}
+```
+
+**Ответ:** `GenericMediaLibrary<T>` проверяет типы на этапе компиляции, убирает cast и не даст положить «чужой» тип.
+
+</details>
+
+##### **3.3. Метод с верхней границей wildcard** (Лаба 12, Задание 2)
+Скомпилируется ли метод? Если нет — почему?
+
+```java
+public static void print(List<? extends Number> list) {
+    for (Number n : list) {
+        System.out.print(n + " ");
+    }
+    System.out.println();
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `? extends` позволяет безопасно **читать** элементы как верхнюю границу.
+
+1.  **Analysis of the code:**
+    *   The method accepts `List<? extends Number>` — a list of `Number` or any subtype
+    *   The loop iterates using `Number n`, which is valid because all elements are guaranteed to be at least `Number`
+2.  **Why this works:**
+    *   `? extends Number` means the list contains elements of some type that extends `Number`
+    *   Since all subtypes of `Number` can be assigned to a `Number` variable, the iteration is type-safe
+    *   The loop can safely read elements as `Number`
+
+**Ответ:** да, метод корректен: `List<? extends Number>` читается как поток `Number`, все элементы — как минимум `Number`.
+
+</details>
+
+##### **3.4. Иерархия животных и PECS** (Лаба 12, Задание 2)
+Класс `Animal` с полем `nickname` и методом `voice()`. Классы `Cat` и `Dog` с полями `purLoudness` и `barkingLoudness`, переопределите `voice()`.
+
+Класс `Main` с методами `displayAnimals`, `makeTalk`, `addAnimals`. Отдельные множества животных, кошек и собак; вызовите методы.
+
+**Подсказка:** PECS (**producer extends**, **consumer super**); для `Set` корректно переопределите `hashCode()` и `equals()`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** PECS задаёт, `? extends` или `? super` — в зависимости от чтения или записи.
+
+```java
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+
+// Base Animal class
+class Animal {
+    protected String nickname;
+    
+    public Animal(String nickname) {
+        this.nickname = nickname;
+    }
+    
+    public String getNickname() {
+        return nickname;
+    }
+    
+    public void voice() {
+        System.out.println(nickname + " makes a sound");
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Animal animal = (Animal) o;
+        return Objects.equals(nickname, animal.nickname);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(nickname);
+    }
+}
+
+// Cat class
+class Cat extends Animal {
+    private int purLoudness;
+    
+    public Cat(String nickname, int purLoudness) {
+        super(nickname);
+        this.purLoudness = purLoudness;
+    }
+    
+    @Override
+    public void voice() {
+        System.out.println(nickname + " purrs with loudness " + purLoudness + ": Purrr~");
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        Cat cat = (Cat) o;
+        return purLoudness == cat.purLoudness;
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), purLoudness);
+    }
+}
+
+// Dog class
+class Dog extends Animal {
+    private int barkingLoudness;
+    
+    public Dog(String nickname, int barkingLoudness) {
+        super(nickname);
+        this.barkingLoudness = barkingLoudness;
+    }
+    
+    @Override
+    public void voice() {
+        System.out.println(nickname + " barks with loudness " + barkingLoudness + ": Woof!");
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        Dog dog = (Dog) o;
+        return barkingLoudness == dog.barkingLoudness;
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), barkingLoudness);
+    }
+}
+
+// Main class demonstrating PECS
+public class Main {
+    
+    // PRODUCER: reads from the set (extends)
+    // We only READ animals from the set to display them
+    public static void displayAnimals(Set<? extends Animal> animals) {
+        System.out.println("--- Displaying animals ---");
+        for (Animal animal : animals) {
+            System.out.println("Animal: " + animal.getNickname());
+        }
+    }
+    
+    // PRODUCER: reads from the set (extends)
+    // We only READ animals from the set to make them talk
+    public static void makeTalk(Set<? extends Animal> animals) {
+        System.out.println("--- Animals talking ---");
+        for (Animal animal : animals) {
+            animal.voice();
+        }
+    }
+    
+    // CONSUMER: writes to the set (super)
+    // We WRITE animals to the destination set
+    public static void addAnimals(Set<? super Cat> dest, Set<? extends Cat> source) {
+        System.out.println("--- Adding cats to collection ---");
+        for (Cat cat : source) {
+            dest.add(cat);
+            System.out.println("Added: " + cat.getNickname());
+        }
+    }
+    
+    public static void main(String[] args) {
+        // Create sets
+        Set<Animal> animals = new HashSet<>();
+        Set<Cat> cats = new HashSet<>();
+        Set<Dog> dogs = new HashSet<>();
+        
+        // Add elements to cats set
+        cats.add(new Cat("Whiskers", 3));
+        cats.add(new Cat("Mittens", 5));
+        cats.add(new Cat("Luna", 2));
+        
+        // Add elements to dogs set
+        dogs.add(new Dog("Rex", 8));
+        dogs.add(new Dog("Buddy", 6));
+        dogs.add(new Dog("Max", 9));
+        
+        // Add some animals directly
+        animals.add(new Animal("Generic Pet"));
+        
+        // Display different sets using displayAnimals
+        System.out.println("=== Cats ===");
+        displayAnimals(cats);  // Works: Set<Cat> matches Set<? extends Animal>
+        
+        System.out.println("\n=== Dogs ===");
+        displayAnimals(dogs);  // Works: Set<Dog> matches Set<? extends Animal>
+        
+        System.out.println("\n=== All Animals ===");
+        displayAnimals(animals);  // Works: Set<Animal> matches Set<? extends Animal>
+        
+        // Make animals talk
+        System.out.println("\n=== Cats talking ===");
+        makeTalk(cats);
+        
+        System.out.println("\n=== Dogs talking ===");
+        makeTalk(dogs);
+        
+        // Add cats to animals set using PECS
+        System.out.println("\n=== Adding cats to animals set ===");
+        addAnimals(animals, cats);  // animals accepts ? super Cat, cats produces ? extends Cat
+        
+        System.out.println("\n=== Updated Animals Set ===");
+        displayAnimals(animals);
+        makeTalk(animals);
+    }
+}
+```
+
+**Пояснение к использованию PECS:**
+
+1. **`displayAnimals(Set<? extends Animal>)`** — PRODUCER EXTENDS
+   - We only **read** from the set
+   - The set "produces" animals for us to display
+   - `? extends Animal` allows `Set<Cat>`, `Set<Dog>`, or `Set<Animal>`
+2. **`makeTalk(Set<? extends Animal>)`** — PRODUCER EXTENDS
+   - We only **read** animals to call their `voice()` method
+   - Same reasoning as above
+3. **`addAnimals(Set<? super Cat> dest, Set<? extends Cat> source)`** — BOTH
+   - `dest` is a CONSUMER (we **write** to it) → use `? super Cat`
+   - `source` is a PRODUCER (we **read** from it) → use `? extends Cat`
+
+**Ответ:** при чтении — `? extends`, при записи — `? super`; для `Set` переопределены `equals`/`hashCode`.
+
+</details>
+
+##### **3.5. Статические члены и дженерики** (Лаба 12, Задание 3)
+Скомпилируется ли метод? Если нет — почему?
+
+```java
+public class Singleton<T> {
+    private static T instance = null;
+    
+    public static T getInstance() {
+        if (instance == null) {
+            instance = new Singleton<T>();
+        }
+        return instance;
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** параметр типа класса нельзя использовать в `static`-полях и `static`-методах.
+
+1.  **The problem:**
+    *   `T` is a type parameter that belongs to **instances** of the class
+    *   Static members belong to the **class itself**, not to any particular instance
+    *   Different instances might have different type arguments (`Singleton<String>`, `Singleton<Integer>`)
+    *   But there's only one copy of static members shared by all instances
+2.  **Why this doesn't work:**
+    *   `private static T instance` — Cannot use `T` in a static field declaration
+    *   `public static T getInstance()` — Cannot use `T` as return type of a static method
+    *   `new Singleton<T>()` — Cannot create instance with type parameter in static context
+3.  **Additional error:**
+    *   Even if generics were allowed, `instance = new Singleton<T>()` would be wrong because `getInstance()` should return `T`, not `Singleton<T>`
+
+**Ответ:** нет: `T` в `static` недопустим — статика одна на все инстансы, а `T` разный. Для singleton с типом нужен другой шаблон (например `Class<T>`).
+
+</details>
+
+##### **3.6. Ветклиника с дженериками** (Лаба 12, Задание 3)
+Простая ветклиника: у питомца `id` (уникален), `nickname` и `owner` (не обязаны быть уникальны). Храните животных в `Map<Integer, Animal>`. Типы: кошки (`purLoudness`), змеи (`venomDanger`), кролики (`earLength`). Владелец: `name`, `surname`, `age`.
+
+Класс `VeterinaryClinic` с `displayPets`, `addPets`. Дважды вызовите `addPets`. Попробуйте разных животных с одинаковым `id` — что должно произойти?
+
+**Подсказка:** PECS (producer extends, consumer super)
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `Map` с дженериками и поведение при дублирующемся ключе.
+
+```java
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+
+// Owner class
+class Owner {
+    private String name;
+    private String surname;
+    private int age;
+    
+    public Owner(String name, String surname, int age) {
+        this.name = name;
+        this.surname = surname;
+        this.age = age;
+    }
+    
+    public String getName() { return name; }
+    public String getSurname() { return surname; }
+    public int getAge() { return age; }
+    
+    @Override
+    public String toString() {
+        return name + " " + surname + " (age: " + age + ")";
+    }
+}
+
+// Base Pet class
+abstract class Pet {
+    protected int id;
+    protected String nickname;
+    protected Owner owner;
+    
+    public Pet(int id, String nickname, Owner owner) {
+        this.id = id;
+        this.nickname = nickname;
+        this.owner = owner;
+    }
+    
+    public int getId() { return id; }
+    public String getNickname() { return nickname; }
+    public Owner getOwner() { return owner; }
+    
+    public abstract String getSpeciesInfo();
+    
+    @Override
+    public String toString() {
+        return String.format("ID: %d, Name: %s, Owner: %s, %s",
+            id, nickname, owner, getSpeciesInfo());
+    }
+}
+
+// Cat class
+class Cat extends Pet {
+    private int purLoudness;
+    
+    public Cat(int id, String nickname, Owner owner, int purLoudness) {
+        super(id, nickname, owner);
+        this.purLoudness = purLoudness;
+    }
+    
+    @Override
+    public String getSpeciesInfo() {
+        return "Cat (pur loudness: " + purLoudness + ")";
+    }
+}
+
+// Snake class
+class Snake extends Pet {
+    private int venomDanger;
+    
+    public Snake(int id, String nickname, Owner owner, int venomDanger) {
+        super(id, nickname, owner);
+        this.venomDanger = venomDanger;
+    }
+    
+    @Override
+    public String getSpeciesInfo() {
+        return "Snake (venom danger level: " + venomDanger + ")";
+    }
+}
+
+// Rabbit class
+class Rabbit extends Pet {
+    private double earLength;
+    
+    public Rabbit(int id, String nickname, Owner owner, double earLength) {
+        super(id, nickname, owner);
+        this.earLength = earLength;
+    }
+    
+    @Override
+    public String getSpeciesInfo() {
+        return "Rabbit (ear length: " + earLength + " cm)";
+    }
+}
+
+// Veterinary Clinic class
+class VeterinaryClinic {
+    private Map<Integer, Pet> pets = new HashMap<>();
+    
+    // PRODUCER: reads from the source map (extends)
+    public void displayPets(Map<Integer, ? extends Pet> petMap) {
+        System.out.println("=== Clinic Pets Registry ===");
+        if (petMap.isEmpty()) {
+            System.out.println("No pets registered.");
+            return;
+        }
+        for (Map.Entry<Integer, ? extends Pet> entry : petMap.entrySet()) {
+            System.out.println(entry.getValue());
+        }
+        System.out.println("Total pets: " + petMap.size());
+    }
+    
+    // CONSUMER for dest (super), PRODUCER for source (extends)
+    public void addPets(Map<Integer, ? super Pet> dest, 
+                        Map<Integer, ? extends Pet> source) {
+        System.out.println("\n--- Adding pets ---");
+        for (Map.Entry<Integer, ? extends Pet> entry : source.entrySet()) {
+            int id = entry.getKey();
+            Pet pet = entry.getValue();
+            
+            // Check if ID already exists
+            if (dest.containsKey(id)) {
+                System.out.println("WARNING: Pet with ID " + id + 
+                    " already exists! Replacing: " + dest.get(id).toString());
+            }
+            dest.put(id, pet);
+            System.out.println("Added: " + pet.getNickname() + " (ID: " + id + ")");
+        }
+    }
+    
+    // Convenience method to add to internal pets map
+    public void addPets(Map<Integer, ? extends Pet> source) {
+        addPets(this.pets, source);
+    }
+    
+    // Display internal pets
+    public void displayAllPets() {
+        displayPets(this.pets);
+    }
+    
+    public Map<Integer, Pet> getPets() {
+        return pets;
+    }
+}
+
+// Main class
+public class Main {
+    public static void main(String[] args) {
+        // Create owners
+        Owner alice = new Owner("Alice", "Smith", 28);
+        Owner bob = new Owner("Bob", "Johnson", 35);
+        Owner carol = new Owner("Carol", "Williams", 42);
+        
+        // Create veterinary clinic
+        VeterinaryClinic clinic = new VeterinaryClinic();
+        
+        // First batch of pets
+        Map<Integer, Pet> batch1 = new HashMap<>();
+        batch1.put(1, new Cat(1, "Whiskers", alice, 5));
+        batch1.put(2, new Snake(2, "Slinky", bob, 3));
+        batch1.put(3, new Rabbit(3, "Fluffy", carol, 12.5));
+        
+        System.out.println("===== FIRST BATCH =====");
+        clinic.addPets(batch1);
+        clinic.displayAllPets();
+        
+        // Second batch of pets - including duplicate ID!
+        Map<Integer, Pet> batch2 = new HashMap<>();
+        batch2.put(4, new Cat(4, "Mittens", alice, 3));
+        batch2.put(5, new Snake(5, "Viper", bob, 8));
+        batch2.put(3, new Rabbit(3, "Snowball", carol, 10.0)); // Duplicate ID!
+        
+        System.out.println("\n===== SECOND BATCH (with duplicate ID 3) =====");
+        clinic.addPets(batch2);
+        clinic.displayAllPets();
+        
+        // Demonstrate with specific pet type maps
+        System.out.println("\n===== Adding specific type maps =====");
+        Map<Integer, Cat> catMap = new HashMap<>();
+        catMap.put(6, new Cat(6, "Luna", alice, 4));
+        catMap.put(7, new Cat(7, "Simba", bob, 6));
+        
+        // This works because of ? extends Pet
+        clinic.addPets(catMap);
+        clinic.displayAllPets();
+    }
+}
+```
+
+**Вывод:**
+
+```
+===== FIRST BATCH =====
+
+--- Adding pets ---
+Added: Whiskers (ID: 1)
+Added: Slinky (ID: 2)
+Added: Fluffy (ID: 3)
+=== Clinic Pets Registry ===
+ID: 1, Name: Whiskers, Owner: Alice Smith (age: 28), Cat (pur loudness: 5)
+ID: 2, Name: Slinky, Owner: Bob Johnson (age: 35), Snake (venom danger level: 3)
+ID: 3, Name: Fluffy, Owner: Carol Williams (age: 42), Rabbit (ear length: 12.5 cm)
+Total pets: 3
+
+===== SECOND BATCH (with duplicate ID 3) =====
+
+--- Adding pets ---
+Added: Mittens (ID: 4)
+Added: Viper (ID: 5)
+WARNING: Pet with ID 3 already exists! Replacing: ID: 3, Name: Fluffy, Owner: Carol Williams (age: 42), Rabbit (ear length: 12.5 cm)
+Added: Snowball (ID: 3)
+=== Clinic Pets Registry ===
+...
+Total pets: 5
+```
+
+**Что происходит при повторе ID:**  
+если добавить питомца с ключом, который уже есть в `Map`, `Map.put()` **заменяет** старое значение новым. В показанной реализации выводится предупреждение и выполняется замена.
+
+**Ответ:** для чтения из `Map` — `? extends Pet`, для записи — `? super Pet`; при том же ключе `put` заменяет значение.
+
+</details>
+
+##### **3.7. Generic-класс и Comparable** (Лаба 12, Задание 4)
+Рассмотрите класс:
+
+```java
+class Node<T> implements Comparable<T> {
+    public int compareTo(T obj) { /* ... */ }
+    // ...
+}
+```
+
+Скомпилируется ли фрагмент? Если нет — почему?
+
+```java
+Node<String> node = new Node<>();
+Comparable<String> comp = node;
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** generic-класс может реализовать generic-интерфейс с согласованными параметрами; отношения подтипов сохраняются.
+
+1.  **Analysis:**
+    *   `Node<T>` implements `Comparable<T>`
+    *   When instantiated as `Node<String>`, it implements `Comparable<String>`
+    *   A variable of type `Comparable<String>` can hold any object that implements `Comparable<String>`
+2.  **Why this works:**
+    *   `Node<String>` IS-A `Comparable<String>` (by the `implements` clause)
+    *   The assignment `comp = node` is a standard upcast
+    *   This is Liskov Substitution Principle in action
+
+**Ответ:** да: `Node<String>` — подтип `Comparable<String>` по контракту `implements`.
+
+</details>
+
+##### **3.8. Реализация стека (generic)** (Лаба 12, Задание 4 — по желанию)
+Набросайте generic-стек (LIFO): сигнатуры `push`, `pop`, `isEmpty`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** стек — LIFO; параметризуется типом элемента.
+
+```java
+import java.util.ArrayList;
+import java.util.EmptyStackException;
+import java.util.List;
+
+/**
+ * A generic Stack implementation using LIFO (Last-In-First-Out) principle.
+ * @param <T> the type of elements in this stack
+ */
+public class Stack<T> {
+    private List<T> elements;
+    
+    /**
+     * Creates an empty stack.
+     */
+    public Stack() {
+        elements = new ArrayList<>();
+    }
+    
+    /**
+     * Pushes an element onto the top of this stack.
+     * @param item the element to push
+     */
+    public void push(T item) {
+        elements.add(item);
+    }
+    
+    /**
+     * Removes and returns the element at the top of this stack.
+     * @return the element at the top of this stack
+     * @throws EmptyStackException if this stack is empty
+     */
+    public T pop() {
+        if (isEmpty()) {
+            throw new EmptyStackException();
+        }
+        return elements.remove(elements.size() - 1);
+    }
+    
+    /**
+     * Returns the element at the top without removing it.
+     * @return the element at the top of this stack
+     * @throws EmptyStackException if this stack is empty
+     */
+    public T peek() {
+        if (isEmpty()) {
+            throw new EmptyStackException();
+        }
+        return elements.get(elements.size() - 1);
+    }
+    
+    /**
+     * Tests if this stack is empty.
+     * @return true if this stack contains no elements, false otherwise
+     */
+    public boolean isEmpty() {
+        return elements.isEmpty();
+    }
+    
+    /**
+     * Returns the number of elements in this stack.
+     * @return the number of elements
+     */
+    public int size() {
+        return elements.size();
+    }
+}
+
+// Usage example
+class Main {
+    public static void main(String[] args) {
+        Stack<Integer> intStack = new Stack<>();
+        intStack.push(1);
+        intStack.push(2);
+        intStack.push(3);
+        
+        while (!intStack.isEmpty()) {
+            System.out.println(intStack.pop()); // Prints: 3, 2, 1
+        }
+        
+        Stack<String> stringStack = new Stack<>();
+        stringStack.push("Hello");
+        stringStack.push("World");
+        System.out.println(stringStack.pop()); // Prints: World
+    }
+}
+```
+
+**Сводка сигнатур методов:**
+
+- `public void push(T item)` — adds element to the top
+- `public T pop()` — removes and returns top element
+- `public boolean isEmpty()` — checks if stack is empty
+
+**Ответ:** `Stack<T>` хранит элементы типа `T`; операции `push(T)`, `pop()` → `T`, `isEmpty()` → `boolean`.
+
+</details>
+
+##### **3.9. Словарь (generic)** (Лаба 12, Задание 5 — по желанию)
+Набросайте generic `Dictionary`: `get`, `put`, `isEmpty`, `keys`, `values`; последние два — параметризованные коллекции.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** словарь — пары ключ–значение как у `HashMap`, с параметрами `K` и `V`.
+
+```java
+import java.util.*;
+
+/**
+ * A generic Dictionary implementation for storing key-value pairs.
+ * @param <K> the type of keys maintained by this dictionary
+ * @param <V> the type of mapped values
+ */
+public class Dictionary<K, V> {
+    private Map<K, V> data;
+    
+    /**
+     * Creates an empty dictionary.
+     */
+    public Dictionary() {
+        data = new HashMap<>();
+    }
+    
+    /**
+     * Returns the value associated with the specified key.
+     * @param key the key whose associated value is to be returned
+     * @return the value associated with the key, or null if not found
+     */
+    public V get(K key) {
+        return data.get(key);
+    }
+    
+    /**
+     * Associates the specified value with the specified key.
+     * @param key the key with which the value is to be associated
+     * @param value the value to be associated with the key
+     * @return the previous value associated with the key, or null
+     */
+    public V put(K key, V value) {
+        return data.put(key, value);
+    }
+    
+    /**
+     * Removes the mapping for the specified key.
+     * @param key the key whose mapping is to be removed
+     * @return the previous value associated with the key, or null
+     */
+    public V remove(K key) {
+        return data.remove(key);
+    }
+    
+    /**
+     * Returns true if this dictionary contains no key-value mappings.
+     * @return true if empty, false otherwise
+     */
+    public boolean isEmpty() {
+        return data.isEmpty();
+    }
+    
+    /**
+     * Returns a collection view of the keys in this dictionary.
+     * @return a Set of keys
+     */
+    public Set<K> keys() {
+        return data.keySet();
+    }
+    
+    /**
+     * Returns a collection view of the values in this dictionary.
+     * @return a Collection of values
+     */
+    public Collection<V> values() {
+        return data.values();
+    }
+    
+    /**
+     * Returns the number of key-value mappings.
+     * @return the size of the dictionary
+     */
+    public int size() {
+        return data.size();
+    }
+    
+    /**
+     * Returns true if this dictionary contains the specified key.
+     * @param key the key to check
+     * @return true if the key exists, false otherwise
+     */
+    public boolean containsKey(K key) {
+        return data.containsKey(key);
+    }
+}
+
+// Usage example
+class Main {
+    public static void main(String[] args) {
+        // Dictionary of student names to grades
+        Dictionary<String, Integer> grades = new Dictionary<>();
+        
+        grades.put("Alice", 95);
+        grades.put("Bob", 87);
+        grades.put("Carol", 92);
+        
+        System.out.println("Alice's grade: " + grades.get("Alice")); // 95
+        System.out.println("Is empty: " + grades.isEmpty()); // false
+        
+        System.out.println("All students: " + grades.keys()); // [Alice, Bob, Carol]
+        System.out.println("All grades: " + grades.values()); // [95, 87, 92]
+        
+        // Dictionary of product IDs to prices
+        Dictionary<Integer, Double> prices = new Dictionary<>();
+        prices.put(1001, 29.99);
+        prices.put(1002, 49.99);
+        
+        for (Integer productId : prices.keys()) {
+            System.out.println("Product " + productId + ": $" + prices.get(productId));
+        }
+    }
+}
+```
+
+**Сводка сигнатур методов:**
+
+- `public V get(K key)` — retrieves value by key
+- `public V put(K key, V value)` — stores key-value pair
+- `public boolean isEmpty()` — checks if dictionary is empty
+- `public Set<K> keys()` — returns collection of all keys
+- `public Collection<V> values()` — returns collection of all values
+
+**Ответ:** `Dictionary<K,V>` разделяет тип ключа и значения; `keys()` → `Set<K>`, `values()` → `Collection<V>`.
+
+</details>
+
+##### **3.10. Generic-класс Box** (Туториал 12, Задание 1)
+Создайте generic `Box`, хранящий значение произвольного типа.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** перевод «сырого» класса на generic-версию ради типобезопасности.
+
+**Non-generic version (problematic):**
+
+```java
+public class Box {
+    private Object object;
+    
+    public void setObject(Object object) {
+        this.object = object;
+    }
+    
+    public Object getObject() {
+        return object;
+    }
+}
+
+// Usage - requires casting
+Box box = new Box();
+box.setObject("Hello");
+String s = (String) box.getObject(); // Cast required!
+box.setObject(123); // No compile error, but mixing types
+```
+
+**Generic version (type-safe):**
+
+```java
+/**
+ * Generic version of the Box class.
+ * @param <T> the type of the value being boxed
+ */
+public class Box<T> {
+    private T t;
+    
+    public void setObject(T t) {
+        this.t = t;
+    }
+    
+    public T getObject() {
+        return t;
+    }
+}
+
+// Usage - no casting needed
+Box<String> stringBox = new Box<>();
+stringBox.setObject("Hello");
+String s = stringBox.getObject(); // No cast!
+// stringBox.setObject(123); // Compile error! Type safety!
+
+Box<Integer> intBox = new Box<>();
+intBox.setObject(42);
+int value = intBox.getObject(); // Auto-unboxing
+```
+
+**Ответ:** `Box<T>` фиксирует тип хранимого значения и убирает ненужные cast.
+
+</details>
+
+##### **3.11. Generic-метод для сравнения Pair** (Туториал 12, Задание 2)
+Напишите generic-метод, сравнивающий два объекта `Pair`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** у generic-метода свои параметры типа, независимые от класса.
+
+```java
+public class Pair<K, V> {
+    private K key;
+    private V value;
+    
+    public Pair(K key, V value) {
+        this.key = key;
+        this.value = value;
+    }
+    
+    public void setKey(K key) { this.key = key; }
+    public void setValue(V value) { this.value = value; }
+    public K getKey() { return key; }
+    public V getValue() { return value; }
+}
+
+public class Util {
+    // Generic method with type parameters K and V
+    public static <K, V> boolean compare(Pair<K, V> p1, Pair<K, V> p2) {
+        return p1.getKey().equals(p2.getKey()) &&
+               p1.getValue().equals(p2.getValue());
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        Pair<Integer, String> p1 = new Pair<>(1, "apple");
+        Pair<Integer, String> p2 = new Pair<>(2, "pear");
+        Pair<Integer, String> p3 = new Pair<>(1, "apple");
+        
+        // Explicit type specification
+        boolean same1 = Util.<Integer, String>compare(p1, p2);
+        System.out.println("p1 equals p2: " + same1); // false
+        
+        // Type inference (compiler infers types from arguments)
+        boolean same2 = Util.compare(p1, p3);
+        System.out.println("p1 equals p3: " + same2); // true
+    }
+}
+```
+
+**Ответ:** метод `<K,V> boolean compare(...)` вводит собственные `K,V`; типы выводятся из аргументов или задаются явно.
+
+</details>
+
+##### **3.12. Ограниченные дженерики для чисел** (Туториал 12, Задание 3)
+Напишите метод, работающий только с числовыми типами.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** граница `extends` ограничивает множество типов и открывает методы границы.
+
+```java
+import java.util.Arrays;
+import java.util.List;
+
+public class NumberUtils {
+    
+    // Upper bounded: T must be Number or its subtype
+    public static <T extends Number> List<T> fromArrayToList(T[] a) {
+        return Arrays.asList(a);
+    }
+    
+    // Can use Number methods inside the method
+    public static <T extends Number> double sum(List<T> numbers) {
+        double total = 0.0;
+        for (T number : numbers) {
+            total += number.doubleValue(); // Can call Number methods!
+        }
+        return total;
+    }
+    
+    // Using wildcards instead
+    public static double sumOfList(List<? extends Number> list) {
+        double s = 0.0;
+        for (Number n : list) {
+            s += n.doubleValue();
+        }
+        return s;
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        Integer[] intArray = {1, 2, 3, 4, 5};
+        List<Integer> intList = NumberUtils.fromArrayToList(intArray);
+        System.out.println("Sum: " + NumberUtils.sum(intList)); // 15.0
+        
+        List<Double> doubleList = Arrays.asList(1.5, 2.5, 3.5);
+        System.out.println("Sum: " + NumberUtils.sumOfList(doubleList)); // 7.5
+        
+        // This would not compile:
+        // String[] strArray = {"a", "b"};
+        // NumberUtils.fromArrayToList(strArray); // Error: String doesn't extend Number
+    }
+}
+```
+
+**Ответ:** при `T extends Number` доступны числовые типы и методы вроде `doubleValue()`.
+
+</details>

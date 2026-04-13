@@ -1,0 +1,585 @@
+---
+title: "W9. Наследование (inheritance), полиморфизм (polymorphism), класс Object"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2025-11-02
+lang: ru
+format: html
+engine: knitr
+---
+
+{{< video 8.mp4 >}}
+
+[Quiz](https://notebooklm.google.com/notebook/d3b965a9-9eb3-424e-9198-4bcb1b4b4806?artifactId=ebb85b7a-9e08-40aa-8262-f73473fdfd37) | [Flashcards](https://notebooklm.google.com/notebook/d3b965a9-9eb3-424e-9198-4bcb1b4b4806?artifactId=4a3649c7-b9f4-44fb-b8bb-a341b593b1b4)
+
+#### **1. Краткое содержание**
+##### **1.1 Три опоры объектно-ориентированного программирования (OOP)**
+**OOP** опирается на три базовых понятия (**cornerstones**), которые помогают справляться со сложностью ПО.
+
+###### **1.1.1 Encapsulation**
+**Encapsulation** — объединение данных (**attributes**) и методов, работающих с ними, в одном **class**; внутреннее состояние скрыто, доступ через методы объекта. Первая опора; реализуется модификаторами `public` / `private` и т.д.
+
+###### **1.1.2 Inheritance**
+**Inheritance** — новый класс (**subclass** / *derived class*) получает свойства и поведение существующего (**superclass** / *base class*). Связь «**is a**»: `FamilyCar` *is a* `Personal` car *is a* `Car`. Повторное использование кода и иерархия. Вторая опора.
+
+###### **1.1.3 Polymorphism**
+**Polymorphism** («много форм») — способность объекта вести себя по-разному в общем интерфейсе: один вызов метода базового типа (`draw()`) для разных фигур выполняет нужную реализацию. Третья опора.
+
+##### **1.2 Наследование подробнее**
+
+###### **1.2.1 Taxonomy**
+Наследование отражает **taxonomy** (классификацию): как `Lion` — вид `Animal`, так и в коде `Lion extends Animal`. Общие черты (`hasEyes`) задаются в `Animal`, специфичные (`maneSize`) — в `Lion`.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.2 «is a» и «has a»**
+*   **Inheritance («is a»):** `PersonalCar` *is a* `Car` — ключевое слово `extends` в Java.
+*   **Delegation / aggregation («has a»):** `Car` *has an* `Engine` — поле типа `Engine`; у подклассов `Car` двигатель тоже доступен через композицию, а не как замена наследования.
+
+###### **1.2.3 Single vs. multiple inheritance**
+*   **Single inheritance:** один суперкласс — проще, нет «diamond problem»; **Java, C#, Scala**; множественное наследование типов частично заменяется **interfaces**.
+*   **Multiple inheritance:** несколько суперклассов — мощнее и сложнее (**C++, Eiffel, Python**).
+
+<!-- DIAGRAM HERE -->
+
+###### **1.2.4 Терминология Java**
+`class A extends B`:
+
+*   `A` **inherits** from `B`;
+*   `A` — **subclass** `B`, `B` — **superclass** для `A`;
+*   **child** / **parent** — разговорные синонимы.
+
+В Java стандартны **subclass** / **superclass**; в C++ чаще *derived* / *base class*.
+
+###### **1.2.5 Notion «subobject»**
+У экземпляра подкласса внутри есть полноценный **subobject** суперкласса: при `class Derived extends Base` в `new Derived()` входит и часть `Base` — отсюда доступ к полям базы.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.3 Доступ к членам при наследовании**
+
+###### **1.3.1 Правила модификаторов**
+*   `private` — только свой класс, в подклассах напрямую недоступно.
+*   `protected` — класс, пакет и **subclasses** (в т.ч. в других пакетах).
+*   *package-private* — без модификатора: весь пакет.
+*   `public` — откуда угодно.
+
+###### **1.3.2 Overriding vs. hiding**
+*   **Hiding (поля):** одноимённое поле подкласса **скрывает** поле базы; к полю базы — `super.myField`.
+*   **Method overriding:** та же сигнатура метода в подклассе — **переопределение**; при вызове на объекте подкласса выполняется версия подкласса (база полиморфизма).
+
+##### **1.4 Полиморфизм подробнее**
+
+###### **1.4.1 Static и dynamic type**
+*   **Static type** — тип ссылки в объявлении, фиксирован при компиляции.
+*   **Dynamic type** — фактический класс объекта в памяти, может меняться при присваивании.
+
+```java
+// Shape is the static type of the 'figure' variable
+Shape figure; 
+
+// The dynamic type of 'figure' is now Circle
+figure = new Circle(); 
+```
+
+Присвоение `Circle` ссылке типа `Shape` — **upcasting**.
+
+<!-- DIAGRAM HERE -->
+
+###### **1.4.2 Late binding и dynamic dispatch**
+Полиморфизм опирается на **late binding** / **dynamic dispatch**:
+
+> Вызов *virtual method* разрешается по **dynamic type** объекта.
+
+В Java виртуальными по умолчанию являются методы, не помеченные `final`, `static`, `private`. Вызов `figure.draw()` идёт в реализацию фактического класса (`Circle`, `Rectangle`, …).
+
+```java
+Shape[] figures = new Shape[] {
+    new Circle(),
+    new Rectangle()
+};
+
+for (Shape fig : figures) {
+    // Dynamic dispatch happens here!
+    // If fig is a Circle, Circle's draw() is called.
+    // If fig is a Rectangle, Rectangle's draw() is called.
+    fig.draw();
+}
+```
+
+###### **1.4.3 Зачем полиморфизм**
+Расширяемость: новый `Triangle` добавляется без изменения цикла отрисовки; библиотеки фигур и действий слабее связаны, чем в процедурном коде со `switch`.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.5 Класс `Object` в Java**
+
+###### **1.5.1 Корень иерархии**
+`Object` — корень иерархии классов; любой класс прямо или косвенно наследует `Object`. Если `extends` не указан, наследование от `Object` неявное.
+
+###### **1.5.2 Часто используемые методы `Object`**
+
+| Метод | Описание |
+| ----- | -------- |
+| `public final Class getClass()` | Объект `Class` — **runtime class** данного объекта. |
+| `public int hashCode()` | Хэш-код для хэш-таблиц и т.п. |
+| `public boolean equals(Object obj)` | Сравнение на равенство; по умолчанию — сравнение ссылок (`==`). |
+| `protected Object clone() throws CloneNotSupportedException` | Копия объекта (если поддерживается). |
+| `public String toString()` | Строковое представление; по умолчанию имя класса и хэш. |
+| `public final void notify()` | Пробудить один поток на мониторе объекта. |
+| `public final void notifyAll()` | Пробудить все ожидающие потоки. |
+| `public final void wait(...)` | Ожидание на мониторе до `notify` / `notifyAll`. |
+| `protected void finalize() throws Throwable` | Вызывался GC при уничтожении объекта; **устарел с JDK 9**. |
+
+***
+
+#### **2. Определения**
+*   **Class**: шаблон объекта: атрибуты и методы.
+*   **Object**: экземпляр класса.
+*   **Encapsulation**: данные и методы в классе + сокрытие состояния.
+*   **Inheritance**: подкласс наследует суперкласс; связь «is a».
+*   **Polymorphism**: разные классы по-разному отвечают на одно и то же сообщение (вызов метода).
+*   **Superclass**: класс-предок (**base** / **parent**).
+*   **Subclass**: класс-наследник (**derived** / **child**).
+*   **Method overriding**: та же сигнатура, новая реализация в подклассе.
+*   **Hiding**: поле подкласса скрывает одноимённое поле базы.
+*   **Static type**: тип ссылки в коде на этапе компиляции.
+*   **Dynamic type**: фактический класс объекта во время выполнения.
+*   **Upcasting**: трактовать объект подкласса как суперкласс.
+*   **Late binding (dynamic dispatch)**: выбор реализации метода по dynamic type во время выполнения.
+*   **`Object` class**: корень иерархии Java.
+*   **`protected`**: доступ в пакете и у наследников.
+*   **`super`**: доступ к членам непосредственного суперкласса.
+
+***
+
+#### **3. Примеры**
+##### **3.1. Класс Animal и наследники** (**Лаба** 1, **Пример** 1)
+Создайте класс `Animal` с полями `name`, `height`, `weight`, `color` и методами `eat`, `sleep`, `makeSound`. Добавьте классы `cow`, `cat`, `dog`, переопределяющие поведение. Используйте **inheritance**, чтобы не дублировать код.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+// Animal.java
+// The abstract Animal class defines common properties and behaviors for all animals.
+abstract class Animal {
+    // Basic properties of an animal
+    private String name;
+    private double height; // in meters
+    private double weight; // in kilograms
+    private String color;
+
+    // Constructor to initialize an Animal object
+    public Animal(String name, double height, double weight, String color) {
+        this.name = name;
+        this.height = height;
+        this.weight = weight;
+        this.color = color;
+    }
+
+    // Getters for properties
+    public String getName() {
+        return name;
+    }
+
+    public double getHeight() {
+        return height;
+    }
+
+    public double getWeight() {
+        return weight;
+    }
+
+    public String getColor() {
+        return color;
+    }
+
+    // Basic operations (methods) common to all animals
+    public void eat() {
+        System.out.println(name + " is eating.");
+    }
+
+    public void sleep() {
+        System.out.println(name + " is sleeping.");
+    }
+
+    // Abstract method for making sound, must be implemented by subclasses
+    public abstract void makeSound();
+
+    // toString method for easy printing of Animal details
+    @Override
+    public String toString() {
+        return "Name: " + name + ", Height: " + height + "m, Weight: " + weight + "kg, Color: " + color;
+    }
+}
+
+// Cow.java
+// The Cow class extends Animal, inheriting its properties and behaviors.
+class Cow extends Animal {
+    // Constructor for Cow, calling the superclass constructor
+    public Cow(String name, double height, double weight, String color) {
+        super(name, height, weight, color);
+    }
+
+    // Overriding the makeSound method for a Cow
+    @Override
+    public void makeSound() {
+        System.out.println(getName() + " says Moo!");
+    }
+
+    // Cows might have specific eating habits, overriding if needed
+    @Override
+    public void eat() {
+        System.out.println(getName() + " is grazing on grass.");
+    }
+}
+
+// Cat.java
+// The Cat class extends Animal, inheriting its properties and behaviors.
+class Cat extends Animal {
+    // Constructor for Cat, calling the superclass constructor
+    public Cat(String name, double height, double weight, String color) {
+        super(name, height, weight, color);
+    }
+
+    // Overriding the makeSound method for a Cat
+    @Override
+    public void makeSound() {
+        System.out.println(getName() + " says Meow!");
+    }
+
+    // Cats might have specific sleeping habits, overriding if needed
+    @Override
+    public void sleep() {
+        System.out.println(getName() + " is curled up and napping.");
+    }
+}
+
+// Dog.java
+// The Dog class extends Animal, inheriting its properties and behaviors.
+class Dog extends Animal {
+    // Constructor for Dog, calling the superclass constructor
+    public Dog(String name, double height, double weight, String color) {
+        super(name, height, weight, color);
+    }
+
+    // Overriding the makeSound method for a Dog
+    @Override
+    public void makeSound() {
+        System.out.println(getName() + " says Woof! Woof!");
+    }
+}
+
+// AnimalShelter.java
+// Main class to demonstrate the Animal hierarchy
+public class AnimalShelter {
+    public static void main(String[] args) {
+        // Creating instances of different animals
+        Cow bessy = new Cow("Bessy", 1.5, 800, "White and Black");
+        Cat whiskers = new Cat("Whiskers", 0.3, 4, "Ginger");
+        Dog buddy = new Dog("Buddy", 0.6, 25, "Golden");
+
+        // Demonstrating inherited and overridden methods
+        System.out.println("--- Animal Details ---");
+        System.out.println(bessy);
+        bessy.eat();
+        bessy.sleep();
+        bessy.makeSound();
+        System.out.println();
+
+        System.out.println(whiskers);
+        whiskers.eat();
+        whiskers.sleep();
+        whiskers.makeSound();
+        System.out.println();
+
+        System.out.println(buddy);
+        buddy.eat();
+        buddy.sleep();
+        buddy.makeSound();
+        System.out.println();
+    }
+}
+```
+</details>
+
+##### **3.2. Фигуры: площадь и периметр** (**Лаба** 2, **Пример** 1)
+Реализуйте классы `Circle`, `Rectangle`, `Triangle`, `Square`, `Ellipse` с расчётом площади и периметра. Используйте наследование, чтобы сократить дублирование.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```java
+import static java.lang.Math.PI; // Import PI for calculations
+import static java.lang.Math.sqrt; // Import sqrt for calculations
+
+// Shape.java
+// The abstract Shape class defines common methods for all shapes.
+abstract class Shape {
+    // All shapes will have a name, though not explicitly asked, it's good practice.
+    private String name;
+
+    public Shape(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    // Abstract methods for calculating area and perimeter,
+    // to be implemented by concrete shape subclasses.
+    public abstract double getArea();
+    public abstract double getPerimeter();
+
+    @Override
+    public String toString() {
+        return "Shape: " + name;
+    }
+}
+
+// Circle.java
+// Circle extends Shape and implements area and perimeter calculation for a circle.
+class Circle extends Shape {
+    private double radius;
+
+    public Circle(double radius) {
+        super("Circle"); // Set the name of the shape
+        if (radius <= 0) {
+            throw new IllegalArgumentException("Radius must be positive.");
+        }
+        this.radius = radius;
+    }
+
+    public double getRadius() {
+        return radius;
+    }
+
+    // Area of a circle: PI * r^2
+    @Override
+    public double getArea() {
+        return PI * radius * radius;
+    }
+
+    // Perimeter (circumference) of a circle: 2 * PI * r
+    @Override
+    public double getPerimeter() {
+        return 2 * PI * radius;
+    }
+
+    @Override
+    public String toString() {
+        return super.toString() + ", Radius: " + radius;
+    }
+}
+
+// Rectangle.java
+// Rectangle extends Shape and implements area and perimeter calculation for a rectangle.
+class Rectangle extends Shape {
+    private double length;
+    private double width;
+
+    public Rectangle(double length, double width) {
+        super("Rectangle"); // Set the name of the shape
+        if (length <= 0 || width <= 0) {
+            throw new IllegalArgumentException("Length and width must be positive.");
+        }
+        this.length = length;
+        this.width = width;
+    }
+
+    public double getLength() {
+        return length;
+    }
+
+    public double getWidth() {
+        return width;
+    }
+
+    // Area of a rectangle: length * width
+    @Override
+    public double getArea() {
+        return length * width;
+    }
+
+    // Perimeter of a rectangle: 2 * (length + width)
+    @Override
+    public double getPerimeter() {
+        return 2 * (length + width);
+    }
+
+    @Override
+    public String toString() {
+        return super.toString() + ", Length: " + length + ", Width: " + width;
+    }
+}
+
+// Square.java
+// Square extends Rectangle, demonstrating inheritance for specialized shapes.
+class Square extends Rectangle {
+    public Square(double side) {
+        // Call the Rectangle constructor with length and width being the same (side)
+        super(side, side);
+        super.name = "Square"; // Override the name from "Rectangle" to "Square"
+    }
+
+    // No need to override getArea() or getPerimeter() as Rectangle's methods work correctly.
+    // However, we can add a specific toString for Square.
+    @Override
+    public String toString() {
+        // Using getLength() from the parent Rectangle class which is the side.
+        return super.toString().replace("Length: " + getLength() + ", Width: " + getLength(), "Side: " + getLength());
+    }
+}
+
+// Triangle.java
+// Triangle extends Shape and implements area and perimeter calculation for a triangle.
+// For simplicity, area uses base and height, and perimeter uses three sides.
+class Triangle extends Shape {
+    private double sideA;
+    private double sideB;
+    private double sideC;
+    private double base; // For area calculation
+    private double height; // For area calculation
+
+    // Constructor for perimeter (given three sides)
+    public Triangle(double sideA, double sideB, double sideC) {
+        super("Triangle");
+        // Basic check for valid triangle (triangle inequality theorem)
+        if (sideA <= 0 || sideB <= 0 || sideC <= 0 ||
+            (sideA + sideB <= sideC) || (sideA + sideC <= sideB) || (sideB + sideC <= sideA)) {
+            throw new IllegalArgumentException("Invalid triangle sides.");
+        }
+        this.sideA = sideA;
+        this.sideB = sideB;
+        this.sideC = sideC;
+        // For area, we might need base and height or use Heron's formula if only sides are given.
+        // Let's assume for this constructor, area calculation would need additional info or Heron's.
+        // For simplicity, we'll make a second constructor for base/height for area,
+        // or a method to set base/height if they are not explicitly part of the constructor.
+    }
+
+    // Constructor for area (given base and height) and perimeter (given three sides)
+    public Triangle(double base, double height, double sideA, double sideB, double sideC) {
+        this(sideA, sideB, sideC); // Call the other constructor to validate sides
+        if (base <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Base and height must be positive.");
+        }
+        this.base = base;
+        this.height = height;
+    }
+
+    // Area of a triangle: 0.5 * base * height
+    // If only sides are known, Heron's formula would be used.
+    @Override
+    public double getArea() {
+        if (base > 0 && height > 0) {
+            return 0.5 * base * height;
+        } else {
+            // Using Heron's formula if base/height not provided, assuming sides are valid.
+            double s = (sideA + sideB + sideC) / 2; // semi-perimeter
+            return sqrt(s * (s - sideA) * (s - sideB) * (s - sideC));
+        }
+    }
+
+    // Perimeter of a triangle: sideA + sideB + sideC
+    @Override
+    public double getPerimeter() {
+        return sideA + sideB + sideC;
+    }
+
+    @Override
+    public String toString() {
+        return super.toString() + ", Sides: " + sideA + ", " + sideB + ", " + sideC +
+               (base > 0 && height > 0 ? ", Base: " + base + ", Height: " + height : "");
+    }
+}
+
+// Ellipse.java
+// Ellipse extends Shape and implements area and perimeter calculation for an ellipse.
+// Perimeter of an ellipse has no simple exact formula, using Ramanujan's approximation.
+class Ellipse extends Shape {
+    private double semiMajorAxis; // 'a'
+    private double semiMinorAxis; // 'b'
+
+    public Ellipse(double semiMajorAxis, double semiMinorAxis) {
+        super("Ellipse");
+        if (semiMajorAxis <= 0 || semiMinorAxis <= 0) {
+            throw new IllegalArgumentException("Semi-axes must be positive.");
+        }
+        this.semiMajorAxis = Math.max(semiMajorAxis, semiMinorAxis); // Ensure a >= b
+        this.semiMinorAxis = Math.min(semiMajorAxis, semiMinorAxis);
+    }
+
+    public double getSemiMajorAxis() {
+        return semiMajorAxis;
+    }
+
+    public double getSemiMinorAxis() {
+        return semiMinorAxis;
+    }
+
+    // Area of an ellipse: PI * a * b
+    @Override
+    public double getArea() {
+        return PI * semiMajorAxis * semiMinorAxis;
+    }
+
+    // Perimeter of an ellipse (Ramanujan's second approximation):
+    // PI * [3*(a+b) - sqrt((3a+b)*(a+3b))]
+    @Override
+    public double getPerimeter() {
+        double a = semiMajorAxis;
+        double b = semiMinorAxis;
+        return PI * (3 * (a + b) - sqrt((3 * a + b) * (a + 3 * b)));
+    }
+
+    @Override
+    public String toString() {
+        return super.toString() + ", Semi-major Axis: " + semiMajorAxis + ", Semi-minor Axis: " + semiMinorAxis;
+    }
+}
+
+// ShapeCalculator.java
+// Main class to demonstrate the Shape hierarchy and calculations.
+public class ShapeCalculator {
+    public static void main(String[] args) {
+        // Create an array of Shape objects
+        Shape[] shapes = new Shape[5];
+
+        shapes[0] = new Circle(5.0);
+        shapes[1] = new Rectangle(4.0, 6.0);
+        shapes[2] = new Square(5.0); // A square is a type of rectangle
+        shapes[3] = new Triangle(3.0, 4.0, 5.0); // Right-angled triangle (sides)
+        shapes[4] = new Ellipse(7.0, 4.0);
+
+        System.out.println("--- Shape Calculations ---");
+        for (Shape shape : shapes) {
+            System.out.println(shape);
+            System.out.printf("  Area: %.2f\n", shape.getArea());
+            System.out.printf("  Perimeter: %.2f\n", shape.getPerimeter());
+            System.out.println();
+        }
+
+        // Demonstrating a triangle with base and height
+        Triangle triangleWithBaseHeight = new Triangle(6.0, 4.0, 5.0, 6.0, 7.0);
+        System.out.println(triangleWithBaseHeight);
+        System.out.printf("  Area (using base/height): %.2f\n", triangleWithBaseHeight.getArea());
+        System.out.printf("  Perimeter: %.2f\n", triangleWithBaseHeight.getPerimeter());
+        System.out.println();
+
+        // Example of invalid input
+        try {
+            new Circle(-2.0);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Error creating Circle: " + e.getMessage());
+        }
+        try {
+            new Triangle(1.0, 2.0, 10.0); // Invalid triangle sides
+        } catch (IllegalArgumentException e) {
+            System.out.println("Error creating Triangle: " + e.getMessage());
+        }
+    }
+}
+```
+</details>

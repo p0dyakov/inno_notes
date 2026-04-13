@@ -1,0 +1,1543 @@
+---
+title: "W3. Введение в классы, наследование, полиморфизм, виртуальные функции, абстрактные классы"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2026-02-03
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Классы как пользовательские типы: продолжение базовых идей**
+
+На предыдущей лекции мы рассматривали классы как составные типы с **data members** (**полями данных**) и **member functions** (**функциями-членами**). Теперь расширим картину: как классы ведут себя при взаимодействии через **inheritance** (**наследование**) и **polymorphism** (**полиморфизм**). Эти механизмы — ядро **object-oriented programming** (**объектно-ориентированного программирования**, **OOP**).
+
+**Ключевые вопросы про типы объектов:**
+
+Хорошо спроектированный класс на **C++** должен явно или неявно ответить на ряд базовых операций:
+
+*   как **объявлять** (**declare**) объекты данного типа;
+*   как **создавать** (**create**) объекты данного типа;
+*   как **уничтожать** (**remove**) объекты данного типа;
+*   как **копировать** (**copy**) объекты данного типа;
+*   как **присваивать** (**assign**) значения объектам данного типа;
+*   как **перемещать** (**move**) значения объектов данного типа;
+*   как **преобразовывать** (**convert**) объекты данного типа в значения другого типа;
+*   как **работать** (**work**) с объектами данного типа в целом.
+
+###### **1.1.1 Три опорных принципа OOP**
+
+В **C++** «настоящая» объектная модель опирается на три механизма:
+
+1.  **Encapsulation** (**инкапсуляция**) — скрытие деталей реализации и контролируемый интерфейс (**private** данные, **public** методы).
+2.  **Inheritance** (**наследование**) — построение новых типов на основе существующих с расширением или изменением поведения.
+3.  **Polymorphism** (**полиморфизм**) — единообразная работа с объектами разных производных типов через интерфейс базового типа.
+
+##### **1.2 Члены экземпляра и члены класса (static)**
+
+При объявлении класса важно различать два вида членов:
+
+###### **1.2.1 Члены экземпляра (non-static)**
+
+**Instance members** (**члены экземпляра**) — «обычные» члены класса: у каждого объекта своя независимая копия таких полей.
+
+```cpp
+class C {
+    int m1;      // Instance member
+    float m2;    // Instance member
+};
+```
+
+Если создать два объекта класса `C`:
+
+```cpp
+C obj1, obj2;
+obj1.m1 = 5;   // Sets m1 in obj1
+obj2.m1 = 10;  // Sets m1 in obj2 (different from obj1.m1)
+```
+
+У каждого объекта свои `m1` и `m2` в отдельных областях памяти — так обычно устроены данные объектов.
+
+###### **1.2.2 Члены класса (static)**
+
+**Class members** (**члены класса**), объявленные с ключевым словом `static`, устроены иначе: для всего класса существует **ровно одна копия** члена, общая для всех экземпляров.
+
+```cpp
+class C {
+    int m1;           // Instance member (each object has its own)
+    static int m3;    // Class member (shared by all objects)
+};
+```
+
+**Ключевая мысль:** **class members** принадлежат самому *типу*, а не отдельным объектам — это общий ресурс для всех экземпляров.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Члены экземпляра живут внутри каждого объекта, а static-член общий для всего класса"
+%%| fig-width: 6.4
+%%| fig-height: 3.4
+flowchart LR
+    Obj1["obj1<br/>m1, m2"]
+    Obj2["obj2<br/>m1, m2"]
+    Static["C::m3<br/>общий static-член"]
+    Obj1 --> Static
+    Obj2 --> Static
+```
+
+###### **1.2.3 Доступ к членам класса**
+
+К **instance members** обращаются через объект или указатель на объект:
+
+```cpp
+C c1;
+c1.m1 = 5;     // Using dot notation
+
+C* c2 = new C();
+c2->m1 = 10;   // Using arrow notation
+```
+
+К **class members** обращаются через **scope resolution operator** (**оператор разрешения области видимости**) `::` с именем класса:
+
+```cpp
+int x = C::m3;       // Access class member by class name
+c1.m1 = 5;
+int y = c1.m3;       // Also valid, but less clear (accesses C::m3 through object)
+```
+
+**Практика:** для **static**-членов предпочтительно писать `C::m3` — так сразу видно, что это общий для типа ресурс.
+
+###### **1.2.4 Пример: static для счётчика экземпляров**
+
+Типичный приём — считать, сколько объектов класса уже создано:
+
+```cpp
+class Node {
+public:
+    int ownNumber;
+private:
+    static int count;  // Shared by all instances
+
+public:
+    Node() {
+        ownNumber = ++count;  // Increment shared counter, assign unique number
+    }
+};
+
+int Node::count = 0;  // Definition and initialization (required for static members)
+
+int main() {
+    Node n1;  // n1.ownNumber = 1
+    Node n2;  // n2.ownNumber = 2
+    Node n3;  // n3.ownNumber = 3
+
+    // Node::count is now 3 (shared across all instances)
+}
+```
+
+###### **1.2.5 Ещё пример: «математическая» утилита**
+
+**Static**-члены удобны для вспомогательных классов, которые не требуют отдельных экземпляров:
+
+```cpp
+class Math {
+public:
+    static double sin(double v) { /* ... */ }
+    static double cos(double v) { /* ... */ }
+    static double tan(double v) { /* ... */ }
+    static double sqrt(double v) { /* ... */ }
+};
+
+// Usage - no need to create Math objects
+double result = Math::sin(3.14159);
+```
+
+Такой приём встречается в старом **C++**-коде; в современном **C++** часто предпочитают свободные функции на уровне **namespace**.
+
+##### **1.3 Наследование: типы из типов**
+
+**Inheritance** (**наследование**) — механизм определения нового типа на основе существующего: производный тип **наследует** поля и функциональность базового и может добавлять своё.
+
+###### **1.3.1 Связь «is a»**
+
+Наследование выражает отношение **«is a»** (**«является»**):
+
+- «`Circle` **is a** `Shape`» — круг **является** фигурой;
+- «`Rectangle` **is a** `Shape`»;
+- «`Truck` **is a** `Vehicle`».
+
+```cpp
+class Shape {
+    // Common features of all shapes
+    Coords coords;
+    void Move() { }
+    void Rotate() { }
+    void Draw() { }
+};
+
+class Circle : public Shape {
+    // Inherits all features from Shape
+    double radius;
+    // Can override or add new features
+};
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Наследование выражает отношение «является» (is-a)"
+%%| fig-width: 6
+%%| fig-height: 3
+classDiagram
+    class Shape
+    class Circle
+    class Rectangle
+    Shape <|-- Circle
+    Shape <|-- Rectangle
+```
+
+###### **1.3.2 Подобъект (subobject)**
+
+Когда создаётся объект производного класса, в нём присутствует **subobject** (**подобъект**) — полное содержимое базового класса как вложенный компонент:
+
+```cpp
+class Base {
+    int m1, m2;
+};
+
+class Derived : public Base {
+    float m3;
+};
+
+// A Derived object's layout in memory:
+// [Base part (m1, m2) | Derived part (m3)]
+```
+
+Это не «наследование через ссылку», а фактическая композиция в памяти: объект `Derived` **содержит** **subobject** типа `Base`.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Объект Derived содержит базовый подобъект (base subobject) и собственные добавленные поля"
+%%| fig-width: 6.2
+%%| fig-height: 3
+flowchart LR
+    BasePart["подобъект Base<br/>m1, m2"]
+    DerivedPart["часть Derived<br/>m3"]
+    Whole["объект Derived"]
+    BasePart --> Whole
+    DerivedPart --> Whole
+```
+
+###### **1.3.3 Одинаковые имена полей**
+
+Если в производном классе объявить член с тем же именем, что и в базовом, член производного класса **скрывает** (**hides**) член базового:
+
+```cpp
+class Base {
+    int m1, m2;
+};
+
+class Derived : public Base {
+    float m1;  // This hides Base::m1
+};
+
+Derived d;
+d.m1 = 5.5;  // Which m1? Derived::m1 (the float)
+```
+
+**В C++:** используйте явную квалификацию, чтобы обратиться к скрытому полю базового класса:
+
+```cpp
+d.Base::m1 = 5;     // Access the hidden int m1 from Base
+d.m1 = 3.14;        // Access Derived's float m1
+```
+
+**В других языках иначе:** в **C#** для явного **hiding** рекомендуют ключевое слово `new`; в **Oberon** одинаковые имена у базы и наследника запрещены.
+
+###### **1.3.4 Управление доступом при наследовании**
+
+До наследования мы опирались на `public` и `private`; теперь добавляется **`protected`**:
+
+*   **`public` members:** доступны везде — внутри класса, в производных и снаружи;
+*   **`protected` members:** только внутри класса и в производных;
+*   **`private` members:** только внутри самого класса (в производных напрямую недоступны).
+
+```cpp
+class Base {
+private:    int m1;      // Not accessible in Derived
+protected:  int m2;      // Accessible in Derived
+public:     int m3;      // Accessible everywhere
+};
+
+class Derived : public Base {
+    void f() {
+        // m1 is not accessible here - private
+        m2 = 5;   // OK - protected, accessible in derived class
+        m3 = 10;  // OK - public
+    }
+};
+```
+
+**Важное правило:** производный класс может использовать **protected**-члены своей базы, но не **private**.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Уровни доступа при наследовании"
+%%| fig-width: 6.2
+%%| fig-height: 3.4
+classDiagram
+    class Base {
+      - private m1
+      # protected m2
+      + public m3
+    }
+    class Derived
+    Base <|-- Derived
+```
+
+###### **1.3.5 Спецификаторы наследования в объявлении**
+
+В **C++** в объявлении `class D : ... Base` задаётся, как унаследованные члены «видны» с точки зрения доступа в производном классе:
+
+```cpp
+class D1 : public Base { };      // public inheritance
+class D2 : protected Base { };   // protected inheritance
+class D3 : private Base { };     // private inheritance
+```
+
+От этого зависит доступность унаследованных членов снаружи производного класса:
+
+*   **`public` inheritance:** уровни доступа унаследованных членов сохраняются
+    - `public` базы → `public` в производном
+    - `protected` базы → `protected` в производном
+    - `private` базы → (из производного недоступны)
+*   **`protected` inheritance:** публичные члены базы становятся `protected` в производном
+    - `public` базы → `protected` в производном
+    - `protected` базы → `protected` в производном
+    - `private` базы → (недоступны)
+*   **`private` inheritance:** все доступные из производного члены базы становятся `private` в производном
+    - `public` базы → `private` в производном
+    - `protected` базы → `private` в производном
+    - `private` базы → (недоступны)
+
+**Чаще всего:** используйте **`public` inheritance**, если нет веской причины иначе — так лучше выражается связь **«is a»**.
+
+##### **1.4 Одиночное и множественное наследование**
+
+###### **1.4.1 Одиночное наследование (single inheritance)**
+
+**Single inheritance** (**одиночное наследование**) — у производного класса ровно одна база. Проще и меньше ловушек.
+
+Языки с одиночным наследованием: **C#, Java, Scala**.
+
+**Плюсы:**
+
+*   проще понимать;
+*   реализация обычно эффективнее;
+*   иерархии классов нагляднее.
+
+**Минусы:**
+
+*   меньше выразительности (иногда нужен **multiple inheritance**).
+
+```cpp
+class Car { /* base features */ };
+class Truck : public Car { /* truck-specific features */ };
+```
+
+###### **1.4.2 Множественное наследование (multiple inheritance)**
+
+**Multiple inheritance** (**множественное наследование**) позволяет производному классу иметь несколько баз. Мощнее, но сложнее.
+
+Языки с множественным наследованием: **C++, Eiffel**.
+
+```cpp
+class Building {
+    int floors;
+    void Maintain();
+};
+
+class Home {
+    int rooms;
+    void Live();
+};
+
+class Villa : public Building, public Home {
+    // Inherits features from both Building and Home
+};
+```
+
+`Villa` одновременно **является** (**is a**) и `Building`, и `Home`. В объекте есть **подобъект** (**subobject**) каждой из баз.
+
+**Раскладка в памяти:**
+```
+Объект Villa:
+[подобъект Building (floors, методы)]
+[подобъект Home (rooms, методы)]
+[собственные члены Villa]
+```
+
+###### **1.4.3 Обращение к нескольким базам**
+
+Если у нескольких баз есть члены с одним именем, возникает **неоднозначность** (**ambiguity**):
+
+```cpp
+class Base1 {
+public:
+    int m1;
+};
+
+class Base2 {
+public:
+    int m1;
+};
+
+class Derived : public Base1, public Base2 {
+    void f() {
+        m1 = 5;  // ERROR: ambiguous! Which m1?
+    }
+};
+```
+
+**Решение:** явная квалификация:
+
+```cpp
+Base1::m1 = 5;
+Base2::m1 = 10;
+```
+
+Или внутри метода производного класса:
+
+```cpp
+void f() {
+    this->Base1::m1 = 5;
+    this->Base2::m1 = 10;
+}
+```
+
+##### **1.5 Виртуальное наследование (virtual inheritance) и «ромб»**
+
+При **multiple inheritance** может получиться **ромбовидная** иерархия: одна и та же база достижима по разным путям наследования.
+
+###### **1.5.1 Проблема ромба (diamond problem)**
+
+Рассмотрим такую схему:
+
+```cpp
+class Vehicle { /* engine, wheels */ };
+class Car : public Vehicle { /* doors */ };
+class Plane : public Vehicle { /* wings */ };
+class SuperCar : public Car, public Plane { /* ... */ };
+```
+
+**Проблема:** в объекте `SuperCar` оказывается **две копии** `Vehicle`:
+
+- одна через ветку `Car`;
+- другая через ветку `Plane`.
+
+То есть:
+```cpp
+SuperCar sc;
+// sc contains TWO Vehicle subobjects!
+// Two separate engines, two sets of wheels!
+```
+
+Обычно это нежелательно.
+
+###### **1.5.2 Решение: virtual inheritance**
+
+**Virtual inheritance** гарантирует **одну** общую копию базового **subobject** для всех путей наследования:
+
+```cpp
+class Car : virtual public Vehicle { };
+class Plane : virtual public Vehicle { };
+class SuperCar : public Car, public Plane { };
+```
+
+Теперь в `SuperCar` — **один** **subobject** `Vehicle`, общий для частей `Car` и `Plane`.
+
+**Память при virtual inheritance:**
+```
+Объект SuperCar:
+[часть Car]
+[часть Plane]
+[часть Vehicle — общая!]
+```
+
+**Отличие от «обычного» MI:**
+
+- **обычный MI:** каждый путь наследования приносит свою копию базы;
+- **virtual inheritance:** все пути делят **одну** копию базы.
+
+**Практическое правило:** **virtual inheritance** — когда несколько путей ведут к одной и той же базе и нужна единственная копия **subobject**.
+
+##### **1.6 Переопределение методов**
+
+**Method overriding** (**переопределение метода**) — в производном классе объявлен метод с той же сигнатурой, что у базового; так настраивают поведение в иерархии.
+
+###### **1.6.1 Без virtual: hiding**
+
+Без ключевого слова `virtual` метод производного класса лишь **скрывает** (**hides**) метод базового:
+
+```cpp
+class Base {
+public:
+    void f(int x) { cout << "Base::f" << endl; }
+};
+
+class Derived : public Base {
+public:
+    void f(int x) { cout << "Derived::f" << endl; }  // Hides Base::f
+};
+
+Base b;
+b.f(7);      // Calls Base::f
+
+Derived d;
+d.f(7);      // Calls Derived::f
+             // Base::f is inaccessible through d
+```
+
+Проблема: если **Base pointer** указывает на объект **Derived**, вызов **non-virtual** метода всё равно идёт в **версию Base**:
+
+```cpp
+Base* bp = new Derived();
+bp->f(7);  // Calls Base::f, NOT Derived::f!
+```
+
+Вызов связывается с **static type** (`Base*`), а не с **dynamic type** (фактически `Derived`).
+
+###### **1.6.2 Переопределение виртуального метода (virtual method overriding)**
+
+С ключевым словом `virtual` метод производного класса действительно **переопределяет** (**overrides**) метод базового:
+
+```cpp
+class Base {
+public:
+    virtual void f(int x) { cout << "Base::f" << endl; }
+};
+
+class Derived : public Base {
+public:
+    void f(int x) override { cout << "Derived::f" << endl; }
+};
+
+Base* bp = new Derived();
+bp->f(7);  // Calls Derived::f (correct!)
+```
+
+Теперь выбор реализации идёт по **dynamic type** (что объект собой представляет), а не по объявленному типу указателя.
+
+**Спецификатор `override`:** в современном **C++** пишут `override`, чтобы явно пометить переопределение **virtual** метода:
+
+```cpp
+class Derived : public Base {
+public:
+    void f(int x) override { /* ... */ }  // Explicitly marks this as an override
+};
+```
+
+Компилятор ловит ошибки: опечатка в имени или неверная сигнатура — ошибка компиляции, а не «тихий» новый метод.
+
+##### **1.7 Статический и динамический тип (static type и dynamic type)**
+
+Это центрально для понимания **polymorphism**.
+
+###### **1.7.1 Определения**
+
+*   **Static type** (**статический тип**): тип, записанный в коде; фиксируется на этапе **compile time**.
+*   **Dynamic type** (**динамический тип**): фактический тип объекта в **runtime**.
+
+```cpp
+class Shape { };
+class Circle : public Shape { };
+
+Shape* shape = new Circle();  // Static type: Shape*
+                              // Dynamic type: Circle*
+```
+
+У указателя `shape` **static type** — `Shape*` (так написано в коде), а указывает он на `Circle` — это **dynamic type**.
+
+###### **1.7.2 Стандартное преобразование (standard conversion)**
+
+При присваивании указателю или ссылке на базу значения производного типа **C++** выполняет **standard conversion** (**стандартное преобразование**):
+
+```cpp
+Circle circle;
+Shape* s1 = &circle;       // Standard conversion: Circle* → Shape*
+Shape& s2 = circle;        // Standard conversion: Circle& → Shape&
+
+Shape* s3 = new Circle();  // Standard conversion: Derived to Base
+```
+
+Преобразование безопасно и неявно: `Circle` действительно **является** (**is a**) `Shape`.
+
+##### **1.8 Полиморфизм (polymorphism): главное правило**
+
+**Polymorphism** — третий столп **OOP** (рядом с **encapsulation** и **inheritance**): один и тот же код может единообразно работать с объектами разных конкретных типов.
+
+**Центральное правило** (ISO C++, п. 10.3.9):
+
+> Интерпретация вызова **virtual function** зависит от типа объекта, для которого он вызывается (**dynamic type**), тогда как интерпретация вызова **non-virtual member function** зависит только от типа указателя или ссылки, обозначающей объект (**static type**).
+
+**Коротко:**
+
+- **virtual methods:** выбираются по тому, чем объект *реально является* (**dynamic type**);
+- **non-virtual methods:** выбираются по тому, что *написано* у указателя/ссылки (**static type**).
+
+###### **1.8.1 Пример полиморфного дизайна**
+
+Коллекция геометрических фигур.
+
+**Без polymorphism** (процедурный стиль):
+
+```cpp
+void* shapes[20];
+// Array contains pointers to Circle, Rectangle, Triangle, etc.
+
+void DrawAllShapes() {
+    for (int i = 0; i < 20; i++) {
+        void* shape = shapes[i];
+        if ("shape is Circle")
+            ((Circle*)shape)->Draw();
+        else if ("shape is Rectangle")
+            ((Rectangle*)shape)->Draw();
+        else if ("shape is Triangle")
+            ((Triangle*)shape)->Draw();
+        // ...
+    }
+}
+```
+
+**Недостатки:**
+
+- легко ошибиться: проверки типов и приведения;
+- плохо сопровождать: новый вид фигуры тянет правки во всех функциях;
+- код жёстко завязан на полный перечень типов.
+
+**С polymorphism** (**OOP**-подход):
+
+```cpp
+class Shape {
+public:
+    virtual void Draw() = 0;  // Pure virtual - no implementation
+};
+
+class Circle : public Shape {
+public:
+    void Draw() override { /* Circle drawing code */ }
+};
+
+class Rectangle : public Shape {
+public:
+    void Draw() override { /* Rectangle drawing code */ }
+};
+
+void DrawAllShapes(Shape* shapes[], int count) {
+    for (int i = 0; i < count; i++) {
+        shapes[i]->Draw();  // Each calls the correct Draw() for its type!
+    }
+}
+```
+
+**Плюсы:**
+
+- короткий цикл: одна строка вызова;
+- расширяемость: новые фигуры без правок `DrawAllShapes()`;
+- слабая связность: `DrawAllShapes()` не перечисляет `Circle`, `Rectangle` и т.д.
+
+**Суть:** вызов `Draw()` **полиморфен** — какая именно `Draw()` выполнится, решается по **dynamic type** в **runtime**.
+
+###### **1.8.2 Как polymorphism устроен внутри**
+
+Если в классе есть **virtual functions**, компилятор строит **virtual function table** (**vtable**) для каждого полиморфного класса:
+
+```cpp
+class Base {
+    virtual void vf1();
+    virtual void vf2();
+};
+
+class Derived : public Base {
+    void vf1() override;  // Overrides vf1
+    void vf2();           // Overrides vf2
+};
+```
+
+В объекте есть скрытый указатель на **vtable** своего класса. При вызове **virtual** функции через указатель:
+
+1. читается указатель на **vtable** из объекта;
+2. по таблице находится нужная функция;
+3. вызывается реализация, соответствующая фактическому типу.
+
+Так достигается выбор реализации в **runtime**.
+
+##### **1.9 Абстрактные классы (abstract classes)**
+
+**Abstract class** (**абстрактный класс**) нельзя создать напрямую; это «чертёж» для производных классов.
+
+###### **1.9.1 Чисто виртуальные функции (pure virtual functions)**
+
+**Pure virtual function** — **virtual** функция без реализации в этом классе, только объявление:
+
+```cpp
+class Shape {
+public:
+    virtual void Draw() = 0;  // Pure virtual function
+};
+```
+
+Синтаксис `= 0` означает: в этом классе тела нет; в производных нужно предоставить реализацию.
+
+Если производный класс не переопределит **pure virtual**, он остаётся абстрактным и его тоже нельзя инстанцировать.
+
+###### **1.9.2 Когда класс abstract**
+
+Класс **abstract**, если есть хотя бы одна **pure virtual function**:
+
+```cpp
+class Shape {
+public:
+    virtual void Move() = 0;      // Pure virtual
+    virtual void Rotate() = 0;    // Pure virtual
+    virtual void Draw() = 0;      // Pure virtual
+};
+
+// Shape is abstract - cannot create instances
+Shape s;              // ERROR
+Shape* sp = new Shape();  // ERROR
+```
+
+**Concrete class** (**конкретный класс**) реализует все **pure virtual** функции:
+
+```cpp
+class Circle : public Shape {
+public:
+    void Move() override { /* ... */ }
+    void Rotate() override { /* ... */ }
+    void Draw() override { /* ... */ }
+};
+
+Circle c;              // OK - all pure virtuals implemented
+Shape* s = new Circle();  // OK
+```
+
+###### **1.9.3 Использование abstract classes**
+
+Абстрактный базовый класс задаёт контракт для производных:
+
+```cpp
+class Shape {
+public:
+    virtual ~Shape() { }  // Virtual destructor for base classes with virtual functions
+    virtual void Draw() = 0;
+    virtual void Move() = 0;
+};
+
+// Array of pointers to abstract base class
+Shape* shapes[10];
+shapes[0] = new Circle();
+shapes[1] = new Rectangle();
+// ...
+
+for (int i = 0; i < 10; i++) {
+    shapes[i]->Draw();  // Calls the correct Draw() for each shape
+}
+```
+
+**Плюсы:**
+
+- единообразие: у всех наследников `Shape` должны быть `Draw()` и `Move()`;
+- общий интерфейс: код работает с `Shape*`, не зная деталей;
+- нельзя случайно создать «голый» `Shape`.
+
+###### **1.9.4 Виртуальные деструкторы (virtual destructors)**
+
+Если в классе есть **virtual functions**, обычно нужен и **virtual destructor**:
+
+```cpp
+class Shape {
+public:
+    virtual void Draw() = 0;
+    virtual ~Shape() { }  // Virtual destructor
+};
+```
+
+Тогда при `delete` через указатель на базу вызывается и деструктор производного класса:
+
+```cpp
+Shape* shape = new Circle();
+delete shape;  // Calls Circle::~Circle() then Shape::~Shape()
+```
+
+Без **virtual destructor** вызвался бы только деструктор базы — риск утечек и некорректного освобождения ресурсов.
+
+##### **1.10 Термины: полиморфизм, позднее связывание, динамическая диспетчеризация (polymorphism, late binding, dynamic dispatch)**
+
+Их часто используют как синонимы одного механизма:
+
+*   **Polymorphism** — «много форм»; производные типы настраивают поведение базового интерфейса.
+*   **Late binding** — выбор метода в **runtime** (противопоставляют **compile time**).
+*   **Dynamic dispatch** — механизм **runtime**, который по **dynamic type** выбирает реализацию.
+
+Все три описывают опору работы **virtual functions**.
+
+***
+
+#### **2. Определения**
+
+*   **Inheritance** (**наследование**): механизм задания новых типов на основе существующих; производные классы получают члены и поведение базовых.
+*   **Derived class** (**производный класс**): класс, который наследует другой класс (**base class**).
+*   **Base class** (**базовый класс**): класс, от которого наследуют другие классы.
+*   **Instance member** (**член экземпляра**): поле класса, для которого у каждого объекта своя копия.
+*   **Class member (Static member)** (**член класса / static**): член, объявленный с `static`, принадлежит типу, а не отдельным экземплярам; все объекты делят одну копию.
+*   **Subobject** (**подобъект**): полное содержимое базового класса как вложенная часть объекта производного в раскладке памяти.
+*   **Method overriding** (**переопределение метода**): в производном классе метод с той же сигнатурой, что у базового.
+*   **Method hiding** (**скрытие метода**): совпадение имени (и иной сигнатуры) или повторное определение **non-virtual** метода; базовый метод становится недоступен обычным способом.
+*   **Access specifier** (**спецификатор доступа**): ключевые слова `public`, `private`, `protected`, задающие видимость членов.
+*   **Protected members** (**protected**-члены): доступны внутри класса и в производных, но не снаружи.
+*   **Public inheritance** (**public**-наследование): унаследованные `public`/`protected` базы сохраняют уровни доступа в производном.
+*   **Protected inheritance** (**protected**-наследование): `public` базы становятся `protected` в производном.
+*   **Private inheritance** (**private**-наследование): все доступные из производного члены базы становятся `private` в производном.
+*   **Single inheritance** (**одиночное наследование**): ровно одна база у производного класса.
+*   **Multiple inheritance** (**множественное наследование**): две и более базы у производного класса.
+*   **Virtual inheritance** (**виртуальное наследование**): при **multiple inheritance** гарантирует единственный **subobject** общей базы, если она достижима по нескольким путям.
+*   **Diamond problem** (**проблема ромба**): база унаследована по нескольким путям; без мер возникает неоднозначность и дублирование **subobject**.
+*   **Virtual function (Virtual method)** (**виртуальная функция / метод**): объявлена с `virtual`, переопределяется в производных; вызывается вариант по **dynamic type**.
+*   **Pure virtual function** (**чисто виртуальная функция**): **virtual** без реализации (`= 0`); должна быть переопределена в производных.
+*   **Static type** (**статический тип**): тип в исходном коде; фиксируется на **compile time**.
+*   **Dynamic type** (**динамический тип**): фактический тип объекта в **runtime**.
+*   **Standard conversion** (**стандартное преобразование**): неявное приведение производного типа к базовому (например `Circle*` → `Shape*`).
+*   **Polymorphism** (**полиморфизм**): производные типы меняют поведение базового интерфейса; вызовы идут по **dynamic type**, а не по **static type**.
+*   **Late binding** (**позднее связывание**): выбор метода в **runtime** по фактическому типу объекта.
+*   **Dynamic dispatch** (**динамическая диспетчеризация**): механизм **runtime**, выбирающий реализацию по **dynamic type**.
+*   **Abstract class** (**абстрактный класс**): нельзя создать напрямую, если есть хотя бы одна **pure virtual function**; задаёт «чертёж» для производных.
+*   **Concrete class** (**конкретный класс**): реализует все **pure virtual** и допускает создание экземпляров.
+*   **Virtual table (vtable)** (**виртуальная таблица**): внутренняя структура компилятора для классов с **virtual functions**; указатели на реализации методов.
+*   **Virtual destructor** (**виртуальный деструктор**): `virtual` деструктор — корректное уничтожение при `delete` через указатель на базу.
+*   **Override specifier** (**спецификатор `override`**): ключевое слово **C++11** для явной пометки переопределения **virtual** метода и проверки сигнатуры.
+*   **Scope resolution operator (`::`)** (**оператор `::`**): доступ к членам класса и именам в **namespace**.
+
+***
+
+#### **3. Примеры**
+
+##### **3.1. Пример «зоопарк» на OOP** (Лаба 3, Задание 1)
+
+Постройте иерархию животных зоопарка, демонстрирующую **inheritance**, **virtual functions**, **multiple inheritance** и **polymorphism**.
+
+**Требования:**
+
+1.  Базовый класс `Animal` с общими полями и **virtual** функциями
+2.  Промежуточные классы `LandAnimal` и `WaterAnimal`
+3.  Производные `Lion` и `Dolphin`
+4.  Класс `Frog` с наследованием от `LandAnimal` и `WaterAnimal` (**multiple inheritance**)
+5.  Коллекция, показывающая **polymorphism**
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** цельная **OOP**-модель с иерархией наследования, **virtual** функциями и полиморфным контейнером.
+
+```cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+
+// Base class: Animal
+class Animal {
+protected:
+    string name;
+    int age;
+public:
+    Animal(string n, int a) : name(n), age(a) { }
+
+    // Pure virtual function - all animals must make sounds
+    virtual void makeSound() const = 0;
+
+    // Virtual destructor
+    virtual ~Animal() {
+        cout << "Animal destructor for " << name << endl;
+    }
+
+    virtual void describe() const {
+        cout << "Animal: " << name << ", Age: " << age << endl;
+    }
+};
+
+// Intermediate class: LandAnimal
+class LandAnimal : virtual public Animal {
+public:
+    LandAnimal(string n, int a) : Animal(n, a) { }
+
+    virtual void walk() const {
+        cout << name << " is walking on land." << endl;
+    }
+
+    virtual ~LandAnimal() {
+        cout << "LandAnimal destructor for " << name << endl;
+    }
+};
+
+// Intermediate class: WaterAnimal
+class WaterAnimal : virtual public Animal {
+public:
+    WaterAnimal(string n, int a) : Animal(n, a) { }
+
+    virtual void swim() const {
+        cout << name << " is swimming in water." << endl;
+    }
+
+    virtual ~WaterAnimal() {
+        cout << "WaterAnimal destructor for " << name << endl;
+    }
+};
+
+// Derived class: Lion (land animal only)
+class Lion : public LandAnimal {
+public:
+    Lion(string n, int a) : Animal(n, a), LandAnimal(n, a) { }
+
+    void makeSound() const override {
+        cout << name << " roars: ROARRRR!" << endl;
+    }
+
+    void walk() const override {
+        cout << name << " walks majestically on the savanna." << endl;
+    }
+
+    ~Lion() {
+        cout << "Lion destructor for " << name << endl;
+    }
+};
+
+// Derived class: Dolphin (water animal only)
+class Dolphin : public WaterAnimal {
+public:
+    Dolphin(string n, int a) : Animal(n, a), WaterAnimal(n, a) { }
+
+    void makeSound() const override {
+        cout << name << " clicks: Click-click-click!" << endl;
+    }
+
+    void swim() const override {
+        cout << name << " swims gracefully through the ocean." << endl;
+    }
+
+    ~Dolphin() {
+        cout << "Dolphin destructor for " << name << endl;
+    }
+};
+
+// Derived class: Frog (multiple inheritance - both land and water)
+class Frog : public LandAnimal, public WaterAnimal {
+public:
+    Frog(string n, int a)
+        : Animal(n, a), LandAnimal(n, a), WaterAnimal(n, a) { }
+
+    void makeSound() const override {
+        cout << name << " croaks: Ribbit ribbit!" << endl;
+    }
+
+    void walk() const override {
+        cout << name << " hops on the ground." << endl;
+    }
+
+    void swim() const override {
+        cout << name << " swims in the pond." << endl;
+    }
+
+    ~Frog() {
+        cout << "Frog destructor for " << name << endl;
+    }
+};
+
+int main() {
+    cout << "=== Creating Zoo Animals ===" << endl;
+
+    // Create a vector of Animal pointers (polymorphic container)
+    vector<Animal*> zoo;
+
+    // Add various animals
+    zoo.push_back(new Lion("Leo", 5));
+    zoo.push_back(new Dolphin("Flipper", 3));
+    zoo.push_back(new Frog("Kermit", 1));
+    zoo.push_back(new Lion("Simba", 2));
+    zoo.push_back(new Dolphin("Moby", 8));
+    zoo.push_back(new Frog("Fredrick", 2));
+
+    cout << "\n=== All Animals Make Sounds ===" << endl;
+    for (Animal* animal : zoo) {
+        animal->makeSound();
+    }
+
+    cout << "\n=== Land Animals Walking ===" << endl;
+    Lion* lion = dynamic_cast<Lion*>(zoo[0]);
+    if (lion) lion->walk();
+
+    Frog* frog = dynamic_cast<Frog*>(zoo[2]);
+    if (frog) frog->walk();
+
+    cout << "\n=== Water Animals Swimming ===" << endl;
+    Dolphin* dolphin = dynamic_cast<Dolphin*>(zoo[1]);
+    if (dolphin) dolphin->swim();
+
+    if (frog) frog->swim();  // Frog can also swim!
+
+    cout << "\n=== Cleanup ===" << endl;
+    for (Animal* animal : zoo) {
+        delete animal;
+    }
+    zoo.clear();
+
+    cout << "Zoo cleaned up!" << endl;
+
+    return 0;
+}
+```
+
+**Вывод:**
+```
+=== Creating Zoo Animals ===
+
+=== All Animals Make Sounds ===
+Leo roars: ROARRRR!
+Flipper clicks: Click-click-click!
+Kermit croaks: Ribbit ribbit!
+Simba roars: ROARRRR!
+Moby clicks: Click-click-click!
+Fredrick croaks: Ribbit ribbit!
+
+=== Land Animals Walking ===
+Leo walks majestically on the savanna.
+Kermit hops on the ground.
+
+=== Water Animals Swimming ===
+Flipper swims gracefully through the ocean.
+Fredrick swims in the pond.
+
+=== Cleanup ===
+Lion destructor for Leo
+LandAnimal destructor for Leo
+Animal destructor for Leo
+... (аналогично для остальных животных)
+Zoo cleaned up!
+```
+
+**Пояснение:**
+
+1.  **Base class:** у `Animal` **pure virtual** `makeSound()` — все животные обязаны реализовать звук
+2.  **Single inheritance:** `Lion` ← `LandAnimal`; `Dolphin` ← `WaterAnimal`
+3.  **Multiple inheritance:** `Frog` ← `LandAnimal` и `WaterAnimal` — и ходьба, и плавание
+4.  **Polymorphic collection:** `vector<Animal*>` хранит любые производные типы; вызовы разрешаются полиморфно
+5.  **Virtual destructors:** корректный порядок уничтожения при `delete` через указатель на базу
+6.  **Dynamic casting:** `dynamic_cast` проверяет конкретный тип перед вызовом специфичных методов
+
+**Про дизайн:**
+
+*   **Abstraction layer:** интерфейс `Animal` задаёт контракт
+*   **Extensibility:** новые виды животных без правок существующего кода
+*   **Reusability:** `LandAnimal` и `WaterAnimal` можно использовать отдельно
+*   **Flexibility:** `Frog` показывает наследование от нескольких промежуточных классов
+
+**Ответ:** полная иерархия зоопарка с **inheritance**, **virtual functions**, **multiple inheritance**, **polymorphism** и аккуратным освобождением ресурсов.
+
+</details>
+
+##### **3.2. Правила доступа при наследовании: public, protected, private** (Туториал 3, Пример 1)
+
+Напишите программу, показывающую доступность членов базового класса при разных видах наследования.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** как спецификаторы наследования `public`, `protected`, `private` меняют доступ к членам в производном классе и снаружи.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    int m1;           // Public member
+protected:
+    int m2;           // Protected member
+private:
+    int m3;           // Private member
+};
+
+class DerivedPublic : public Base {
+public:
+    void f() {
+        Base::m1 = 1;      // OK: m1 is public
+        Base::m2 = 1;      // OK: m2 is protected, accessible in derived
+        // Base::m3 = 1;    // ERROR: m3 is private
+        cout << "DerivedPublic: " << m1 << " " << Base::m2 << endl;
+    }
+};
+
+class DerivedProtected : protected Base {
+public:
+    void f() {
+        Base::m1 = 1;      // OK: m1 is public in Base
+        Base::m2 = 1;      // OK: m2 is protected in Base
+        // Base::m3 = 1;    // ERROR: m3 is private
+        cout << "DerivedProtected: " << Base::m1 << " " << Base::m2 << endl;
+    }
+};
+
+class DerivedPrivate : private Base {
+public:
+    void f() {
+        Base::m1 = 1;      // OK: m1 is public in Base, accessible internally
+        Base::m2 = 1;      // OK: m2 is protected in Base, accessible internally
+        // Base::m3 = 1;    // ERROR: m3 is private
+        cout << "DerivedPrivate: " << Base::m1 << " " << Base::m2 << endl;
+    }
+};
+
+int main() {
+    DerivedPublic dPublic;
+    DerivedProtected dProtected;
+    DerivedPrivate dPrivate;
+
+    dPublic.f();
+    dPublic.m1 = 0;        // OK: m1 is public in DerivedPublic (public inheritance)
+    // dPublic.m2 = 0;      // ERROR: m2 is protected
+    // dPublic.m3 = 0;      // ERROR: m3 is private
+
+    dProtected.f();
+    // dProtected.m1 = 0;   // ERROR: m1 is protected in DerivedProtected (protected inheritance)
+    // dProtected.m2 = 0;   // ERROR: m2 is protected
+    // dProtected.m3 = 0;   // ERROR: m3 is private
+
+    dPrivate.f();
+    // dPrivate.m1 = 0;     // ERROR: m1 is private in DerivedPrivate (private inheritance)
+    // dPrivate.m2 = 0;     // ERROR: m2 is private
+    // dPrivate.m3 = 0;     // ERROR: m3 is private
+
+    return 0;
+}
+```
+
+**Пояснение:**
+
+1.  **Base class:** три члена с разными уровнями доступа
+    *   `m1`: `public` (везде)
+    *   `m2`: `protected` (в производных)
+    *   `m3`: `private` (в производных недоступен)
+2.  **DerivedPublic** (**public** inheritance):
+    *   внутри доступны `m1` и `m2`
+    *   снаружи: `m1` остаётся `public`, `m2` — `protected`
+    *   `m3` по-прежнему недоступен (**private** в базе)
+3.  **DerivedProtected** (**protected** inheritance):
+    *   внутри — `m1` и `m2`
+    *   снаружи: и `m1`, и `m2` становятся `protected` (снаружи недоступны)
+    *   `m3` недоступен
+4.  **DerivedPrivate** (**private** inheritance):
+    *   внутри — `m1` и `m2`
+    *   снаружи: и `m1`, и `m2` — `private`
+    *   `m3` недоступен
+
+**Ключевое правило:** **private**-члены базы **никогда** не становятся доступны в производном классе, при любом виде наследования.
+
+**Ответ:** см. код выше — какие правила доступа действуют для каждого режима наследования.
+
+</details>
+
+##### **3.3. Виртуальное наследование и общая база в «ромбе»** (Туториал 3, Пример 2)
+
+Напишите программу, где **virtual inheritance** даёт **один** общий **subobject** базового класса в **diamond**-иерархии.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** при **virtual inheritance** база, достижимая по нескольким путям, представлена в объекте **один** раз.
+
+```cpp
+#include<iostream>
+using namespace std;
+
+class Person {
+public:
+    Person(int x) {
+        cout << "Person::Person(int) called" << endl;
+    }
+
+    Person() {
+        cout << "Person::Person() called" << endl;
+    }
+};
+
+class Faculty : virtual public Person {
+public:
+    Faculty(int x) : Person(x) {
+        cout << "Faculty::Faculty(int) called" << endl;
+    }
+};
+
+class Student : virtual public Person {
+public:
+    Student(int x) : Person(x) {
+        cout << "Student::Student(int) called" << endl;
+    }
+};
+
+class TA : public Faculty, public Student {
+public:
+    TA(int x) : Student(x), Faculty(x) {
+        cout << "TA::TA(int) called" << endl;
+    }
+};
+
+int main() {
+    TA ta(80);
+    return 0;
+}
+```
+
+**Вывод:**
+```
+Person::Person(int) called
+Faculty::Faculty(int) called
+Student::Student(int) called
+TA::TA(int) called
+```
+
+**Пояснение:**
+
+1.  **Diamond inheritance** — структура:
+    ```
+         Person
+        /      \
+    Faculty   Student
+        \      /
+          TA
+    ```
+2.  **Без virtual inheritance:** при создании `TA` конструктор `Person` вызывался бы дважды (через `Faculty` и через `Student`) — два **subobject** `Person`.
+3.  **С virtual inheritance:** у `Faculty` и `Student` — `virtual public Person`, в итоговом объекте `TA` — один **subobject** `Person`.
+4.  **Порядок конструкторов:**
+    *   сначала `Person` (общая **virtual** база);
+    *   затем `Faculty`;
+    *   затем `Student`;
+    *   затем `TA`.
+
+**Зачем нужен virtual inheritance:**
+
+```cpp
+// Without virtual inheritance:
+class Faculty : public Person { };    // Each has own Person
+class Student : public Person { };    // Each has own Person
+class TA : public Faculty, public Student { };  // TA has TWO Person subobjects!
+
+// With virtual inheritance:
+class Faculty : virtual public Person { };
+class Student : virtual public Person { };
+class TA : public Faculty, public Student { };  // TA has ONE shared Person
+```
+
+**Ответ:** **virtual inheritance** даёт **одну** общую копию базы в **diamond**-иерархии.
+
+</details>
+
+##### **3.4. Override и hiding: в чём разница** (Туториал 3, Пример 3)
+
+Напишите программу, показывающую разницу между **overriding** с **virtual** и **hiding** без `virtual`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **non-virtual** методы выбираются по **static type** (объявленный тип указателя), **virtual** — по **dynamic type** (фактический тип объекта).
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Base {
+public:
+    void f(int x) {
+        cout << "Base::f called with x = " << x << endl;
+    }
+};
+
+class Derived : public Base {
+public:
+    void f(int x) {
+        x++;
+        cout << "Derived::f called with x = " << x << endl;
+        // Base::f(x);  // Could call base version if needed
+    }
+};
+
+int main() {
+    Base b;
+    b.f(7);  // Calls Base::f(7), outputs: "Base::f called with x = 7"
+
+    Derived d;
+    d.f(7);  // Calls Derived::f(7), outputs: "Derived::f called with x = 8"
+
+    // The critical difference:
+    Base* bp = &d;  // Base pointer to Derived object
+    bp->f(7);       // Calls Base::f (static type is Base*)
+                    // Outputs: "Base::f called with x = 7"
+                    // NOT "Derived::f called..."
+
+    return 0;
+}
+```
+
+**Вывод:**
+```
+Base::f called with x = 7
+Derived::f called with x = 8
+Base::f called with x = 7
+```
+
+**Пояснение:**
+
+1.  **Non-virtual methods:** выбор на **compile time** по **static type**
+    *   `b.f(7)` — версия `Base` (`b` имеет тип `Base`)
+    *   `d.f(7)` — версия `Derived`
+    *   `bp->f(7)` — версия `Base` (тип `bp` — `Base*`, хотя объект — `Derived`)
+2.  **Проблема:** **hiding** без `virtual` не даёт полиморфного поведения через указатель на базу.
+3.  **Сравнение с virtual:**
+    ```cpp
+    class Base {
+    public:
+        virtual void f(int x) { /* ... */ }  // Virtual!
+    };
+
+    // With virtual, bp->f(7) would call Derived::f
+    ```
+
+**Почему важно:** без **virtual functions** нельзя получить настоящий **polymorphism** для кода с указателями на базу.
+
+**Ответ:** **non-virtual** → выбор по **static type** (**hiding**); **virtual** → по **dynamic type** (**polymorphism**).
+
+</details>
+
+##### **3.5. Полиморфизм, виртуальные функции и деструкторы** (Туториал 3, Пример 4)
+
+Напишите программу с полиморфным вызовом **virtual** методов и покажите роль **virtual destructor**.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **virtual functions** дают **polymorphism** — вызывается реализация по фактическому типу объекта; **virtual destructor** — корректное уничтожение.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Shape {
+public:
+    // Virtual function - can be overridden
+    virtual void calculateArea() {
+        cout << "Area of your Shape: " << endl;
+    }
+
+    // Virtual destructor recommended when virtual functions present
+    virtual ~Shape() {
+        cout << "Shape Destructor called\n";
+    }
+};
+
+// Derived class: Rectangle
+class Rectangle : public Shape {
+public:
+    void calculateArea() override {  // Override the virtual function
+        width = 5;
+        height = 10;
+        area = height * width;
+        cout << "Area of Rectangle: " << area << endl;
+    }
+
+    ~Rectangle() {
+        cout << "Rectangle Destructor called\n";
+    }
+private:
+    int width, height, area;
+};
+
+// Derived class: Square
+class Square : public Shape {
+public:
+    void calculateArea() override {  // Override the virtual function
+        side = 7;
+        area = side * side;
+        cout << "Area of Square: " << area << endl;
+    }
+
+    ~Square() {
+        cout << "Square Destructor called\n";
+    }
+private:
+    int side, area;
+};
+
+int main() {
+    Shape* S;
+
+    Rectangle r;
+    S = &r;
+    S->calculateArea();  // Calls Rectangle::calculateArea (polymorphic!)
+
+    Square sq;
+    S = &sq;
+    S->calculateArea();  // Calls Square::calculateArea (polymorphic!)
+    S->Shape::calculateArea();  // Can explicitly call base version if needed
+
+    return 0;
+    // Destructors called in order: ~Square, ~Shape, ~Rectangle, ~Shape
+}
+```
+
+**Вывод:**
+```
+Area of Rectangle: 50
+Area of Square: 49
+Area of your Shape:
+Rectangle Destructor called
+Shape Destructor called
+Square Destructor called
+Shape Destructor called
+```
+
+**Пояснение:**
+
+1.  **Polymorphic behavior:**
+    *   `S` — указатель `Shape*` (**static type**)
+    *   если `S` указывает на `Rectangle`, вызывается `Rectangle::calculateArea()`
+    *   если на `Square` — `Square::calculateArea()`
+    *   выбор по **dynamic type**
+2.  **Virtual destructors:**
+    *   у `Shape` объявлен `virtual ~Shape()` — это критично для иерархий
+    *   при `delete S`, где `S` указывает на `Rectangle`, вызываются оба деструктора в нужном порядке
+    *   без **virtual destructor** при `delete` через базу мог бы вызваться только `~Shape()` — риск утечек
+3.  **`override`:**
+    *   явно помечает переопределение **virtual** метода
+    *   при несовпадении сигнатуры — ошибка компиляции
+4.  **Явный вызов базы:**
+    *   `S->Shape::calculateArea()` — версия базы
+    *   иногда удобно для отладки или особых случаев
+
+**Правило:** в классах с **virtual functions** деструктор базы обычно делают **virtual**.
+
+**Ответ:** **virtual functions** обеспечивают **polymorphism** — в **runtime** выбирается реализация по фактическому типу объекта.
+
+</details>
+
+##### **3.6. Абстрактные классы и pure virtual** (Туториал 3, Пример 5)
+
+Напишите программу с **abstract class** и требованием реализовать все **pure virtual** в производных.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** **abstract class** задаёт контракт (**interface**); **pure virtual** (`= 0`) заставляет производные предоставить реализации.
+
+```cpp
+#include <iostream>
+using namespace std;
+
+class Animal {
+public:
+    // Pure virtual function - no implementation
+    virtual void makeSound() = 0;
+    virtual ~Animal() { }  // Virtual destructor
+};
+
+class Cat : public Animal {
+public:
+    void makeSound() override {
+        cout << "Meow" << endl;
+    }
+};
+
+class Dog : public Animal {
+public:
+    void makeSound() override {
+        cout << "Woof" << endl;
+    }
+};
+
+class Cow : public Animal {
+public:
+    void makeSound() override {
+        cout << "Moo" << endl;
+    }
+};
+
+int main() {
+    // Animal a;  // ERROR: Cannot instantiate abstract class
+    // Animal* ap = new Animal();  // ERROR: Cannot instantiate abstract class
+
+    const int animalAmount = 6;
+    Animal* animals[animalAmount];
+
+    // Create instances of concrete derived classes
+    animals[0] = new Cow();
+    animals[1] = new Cat();
+    animals[2] = new Dog();
+    animals[3] = new Cow();
+    animals[4] = new Cat();
+    animals[5] = new Dog();
+
+    // Polymorphic calls - each animal makes its own sound
+    for (int i = 0; i < animalAmount; i++) {
+        animals[i]->makeSound();
+    }
+
+    // Cleanup
+    for (int i = 0; i < animalAmount; i++) {
+        delete animals[i];  // Calls correct destructor via virtual
+    }
+
+    return 0;
+}
+```
+
+**Вывод:**
+```
+Moo
+Meow
+Woof
+Moo
+Meow
+Woof
+```
+
+**Пояснение:**
+
+1.  **Abstract class:** `Animal` нельзя создать из-за **pure virtual** `makeSound() = 0`
+2.  **Concrete classes:** `Cat`, `Dog`, `Cow` реализуют `makeSound()` — классы конкретны и создаются
+3.  **Polymorphic container:** массив `Animal*` хранит указатели на любые производные типы
+4.  **Dynamic dispatch:** при `animals[i]->makeSound()`:
+    *   вызывается нужная реализация для фактического типа
+    *   без ручных проверок типа и приведений
+    *   поведение следует из **dynamic type**
+5.  **Плюсы abstract classes:**
+    *   фиксируют интерфейс: у всех животных есть `makeSound()`
+    *   не дают создать «пустой» `Animal`
+    *   код опирается на `Animal*`, не зная конкретный тип
+
+**Зачем это нужно:**
+
+Без **abstract class** остаётся стиль с проверками и приведениями:
+
+```cpp
+// BAD: Without abstract classes
+for (int i = 0; i < animalAmount; i++) {
+    if (animals[i] is Cat)
+        ((Cat*)animals[i])->makeSound();
+    else if (animals[i] is Dog)
+        ((Dog*)animals[i])->makeSound();
+    else if (animals[i] is Cow)
+        ((Cow*)animals[i])->makeSound();
+}
+```
+
+Подход с **abstract class** проще, безопаснее и проще сопровождать.
+
+**Ответ:** **abstract classes** задают контракт через **pure virtual**; все производные обязаны реализовать требуемое — это основа аккуратного **polymorphism**.
+
+</details>

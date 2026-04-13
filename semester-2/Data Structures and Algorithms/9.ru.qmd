@@ -1,0 +1,361 @@
+---
+title: "W11. Очереди с приоритетом, бинарные кучи, heapsort, кучи Фибоначчи"
+author: "Nikolai Kudasov"
+date: 2026-03-31
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Очереди с приоритетом**
+
+###### **1.1.1 Мотивация**
+
+Во многих системах задачи обрабатываются по **важности (priority)**, а не строго в порядке поступления: планировщик ОС, маршрутизатор с приоритетными пакетами и т.д. Если все элементы известны заранее (*static*), достаточно один раз отсортировать. В *динамической* постановке сортировка после каждой вставки слишком дорога.
+
+Абстрактный тип данных **priority queue** поддерживает быструю вставку и выборку (с удалением) элемента с максимальным или минимальным приоритетом.
+
+###### **1.1.2 ADT очереди с приоритетом**
+
+**Max-priority queue** поддерживает:
+
+- **`INSERT(x, p)`** — вставить $x$ с приоритетом $p$.
+- **`MAXIMUM()`** — вернуть элемент с максимальным приоритетом (без удаления).
+- **`EXTRACT-MAX()`** — удалить и вернуть максимум.
+- **`INCREASE-KEY(x, p')`** — повысить ключ $x$ до $p'$ ($p' \ge x.\text{key}$); нужна в **Dijkstra's** и **Prim's** для переприоритизации вершин.
+- **`UNION(Q_1, Q_2)`** *(опционально)* — объединение двух очередей.
+
+**Min-priority queue** симметрична: `MINIMUM()`, `EXTRACT-MIN()`, `DECREASE-KEY()`.
+
+###### **1.1.3 Варианты реализации**
+
+| Structure | `INSERT` | `EXTRACT-MAX` | `INCREASE-KEY` | `UNION` |
+| :--- | :--- | :--- | :--- | :--- |
+| Unsorted list | $O(1)$ | $O(n)$ | $O(1)$ | $O(1)$ |
+| Sorted list | $O(n)$ | $O(1)$ | $O(n)$ | $O(n)$ |
+| Binary search tree | $O(\log n)$ | $O(\log n)$ | $O(\log n)$ | — |
+| Binary heap | $O(\log n)$ | $O(\log n)$ | $O(\log n)$ | — |
+| Binomial heap | $O(1)$ amort. | $O(\log n)$ | $O(\log n)$ | $O(\log n)$ |
+| Fibonacci heap | $O(1)$ | $O(\log n)$ amort. | $O(1)$ amort. | $O(1)$ |
+
+**Binary heap** — практичный стандарт: $O(\log n)$ на основные операции, компактное представление массивом, основа **heapsort**. **Fibonacci heap** даёт лучшие амортизированные оценки теории графов, но большие константы на практике.
+
+##### **1.2 Полные бинарные деревья**
+
+###### **1.2.1 Определение**
+
+**Complete binary tree:** все уровни, кроме последнего, заполнены полностью; на последнем уровне узлы «прижаты» **влево** без пропусков. Высота $\Theta(\log n)$. Не путать с *perfect* и *full*.
+
+###### **1.2.2 Представление массивом**
+
+**Level-order numbering**, индексация с 0:
+
+$$\text{left}(i) = 2i + 1, \qquad \text{right}(i) = 2i + 2, \qquad \text{parent}(i) = \left\lfloor \frac{i-1}{2} \right\rfloor$$
+
+Листья — индексы от $\lfloor n/2 \rfloor$ до $n-1$.
+
+**Пример.** Дерево из 12 узлов, индексы 0–11:
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 99 | 19 | 36 | 17 | 6 | 25 | 18 | 2 | 7 | 4 | 5 | 1 |
+
+Узел 4 (значение 6): левый ребёнок — индекс 9 (значение 4), правый — индекс 10 (значение 5). У узла 11 родитель — индекс 5 (значение 25).
+
+##### **1.3 Бинарные кучи**
+
+###### **1.3.1 Heap property**
+
+**Binary max-heap** — полное бинарное дерево с **max-heap property**: $\text{parent.key} \ge \text{child.key}$. В массиве: $A[\lfloor(i-1)/2\rfloor] \ge A[i]$ для $i>0$. Корень — глобальный максимум. **Min-heap** — с $\le$ и минимумом в корне.
+
+###### **1.3.2 MAX-HEAPIFY**
+
+Базовая процедура «просеивания вниз» (Cormen et al. 2022, §6.2):
+
+```text
+MAX-HEAPIFY(A, i)
+1  l = LEFT(i)           // 2i + 1
+2  r = RIGHT(i)          // 2i + 2
+3  if l <= A.heap-size and A[l] > A[i]
+4      largest = l
+5  else largest = i
+6  if r <= A.heap-size and A[r] > A[largest]
+7      largest = r
+8  if largest != i
+9      exchange A[i] with A[largest]
+10     MAX-HEAPIFY(A, largest)
+```
+
+Время — $O(\log n)$ по высоте поддерева.
+
+###### **1.3.3 BUILD-MAX-HEAP**
+
+```text
+BUILD-MAX-HEAP(A, n)
+1  A.heap-size = n
+2  for i = floor(n/2) - 1 downto 0
+3      MAX-HEAPIFY(A, i)
+```
+
+Точный анализ даёт **$\Theta(n)$** (сумма по высотам уровней с весом $h/2^{h+1}$).
+
+###### **1.3.4 EXTRACT-MAX**
+
+```text
+MAX-HEAP-EXTRACT-MAX(A)
+1  max = MAX-HEAP-MAXIMUM(A)      // save root value
+2  A[1] = A[A.heap-size]          // move last element to root (1-based indexing)
+3  A.heap-size = A.heap-size - 1
+4  MAX-HEAPIFY(A, 1)              // restore heap property
+5  return max
+```
+
+###### **1.3.5 INCREASE-KEY и INSERT**
+
+```text
+MAX-HEAP-INCREASE-KEY(A, x, k)
+1  if k < x.key
+2      error "new key is smaller than current key"
+3  x.key = k
+4  find the index i in array A where object x occurs
+5  while i > 1 and A[PARENT(i)].key < A[i].key
+6      exchange A[i] with A[PARENT(i)]
+7      i = PARENT(i)
+```
+
+```text
+MAX-HEAP-INSERT(A, x, n)
+1  if A.heap-size == n
+2      error "heap overflow"
+3  A.heap-size = A.heap-size + 1
+4  k = x.key
+5  x.key = -∞             // ensures heap property is not violated yet
+6  A[A.heap-size] = x
+7  MAX-HEAP-INCREASE-KEY(A, x, k)
+```
+
+##### **1.4 Heapsort**
+
+```text
+HEAPSORT(A, n)
+1  BUILD-MAX-HEAP(A, n)
+2  for i = n downto 2
+3      exchange A[1] with A[i]     // move current max to its final sorted position
+4      A.heap-size = A.heap-size - 1
+5      MAX-HEAPIFY(A, 1)
+```
+
+| Property | Value |
+| :--- | :--- |
+| **Time complexity (worst case)** | $\Theta(n \log n)$ |
+| **Extra space** | $\Theta(1)$ |
+| **Stable?** | No |
+| **Deterministic?** | Yes |
+
+По сравнению с **merge sort**: память $\Theta(1)$ против $\Theta(n)$, но доступы `MAX-HEAPIFY` менее cache-friendly.
+
+##### **1.5 Кучи Фибоначчи**
+
+(Cormen et al. 2009, §19.) Лес **min-heap-ordered trees**, **root list**, указатель **`H.min`**, счётчик **`H.n`**, поля `degree`, `mark`, соседи в кольцевых списках. Вставка и `UNION` — $O(1)$; тяжёлая работа в **`EXTRACT-MIN`** (**CONSOLIDATE**); **`DECREASE-KEY`** с **cascading cut** — амортизированно $O(1)$.
+
+```text
+FIB-HEAP-INSERT(H, x)
+1  x.degree = 0; x.p = NIL; x.child = NIL; x.mark = FALSE
+2  if H.min == NIL
+3      create root list for H containing just x; H.min = x
+4  else insert x into H's root list
+5      if x.key < H.min.key then H.min = x
+6  H.n = H.n + 1
+```
+
+```text
+FIB-HEAP-UNION(H1, H2)
+1  H = MAKE-FIB-HEAP()
+2  H.min = H1.min
+3  concatenate root list of H2 with root list of H
+4  if H1.min == NIL or (H2.min != NIL and H2.min.key < H1.min.key)
+5      H.min = H2.min
+6  H.n = H1.n + H2.n
+7  return H
+```
+
+```text
+FIB-HEAP-EXTRACT-MIN(H)
+1  z = H.min
+2  if z != NIL
+3      for each child x of z: add x to root list, x.p = NIL
+4      remove z from root list
+5      if z == z.right then H.min = NIL
+6      else H.min = z.right; CONSOLIDATE(H)
+7      H.n = H.n - 1
+8  return z
+```
+
+`DECREASE-KEY`, `CUT`, `CASCADING-CUT` — псевдокод в том же виде, что в Cormen et al. 2009, §19 (сохраняем канонические имена процедур).
+
+| Operation | Amortized time |
+| :--- | :--- |
+| `FIB-HEAP-INSERT` | $O(1)$ |
+| `FIB-HEAP-MINIMUM` | $O(1)$ |
+| `FIB-HEAP-UNION` | $O(1)$ |
+| `FIB-HEAP-EXTRACT-MIN` | $O(\log n)$ |
+| `FIB-HEAP-DECREASE-KEY` | $O(1)$ |
+| `FIB-HEAP-DELETE` | $O(\log n)$ |
+
+---
+
+#### **2. Определения**
+
+- **Priority queue:** ADT с приоритетами; быстрая вставка и извлечение min/max.
+- **Max-priority queue / Min-priority queue:** операции над максимумом или минимумом.
+- **Complete binary tree:** полные уровни; последний уровень заполнен слева.
+- **Binary max-heap / min-heap:** полное дерево с соответствующим heap property.
+- **Heap property:** инвариант сравнения родителя с детьми.
+- **Heap-size:** число элементов в активной части массива.
+- **MAX-HEAPIFY:** восстановление max-heap вниз от индекса $i$.
+- **BUILD-MAX-HEAP:** построение max-heap за $\Theta(n)$.
+- **EXTRACT-MAX:** извлечение корня за $\Theta(\log n)$.
+- **INCREASE-KEY:** подъём ключа вверх за $\Theta(\log n)$.
+- **Heapsort:** сортировка на месте за $\Theta(n\log n)$.
+- **Fibonacci heap:** mergeable priority queue с ленивой консолидацией; амортизированные оценки как в таблице выше.
+- **Root list, degree, mark, CUT, CASCADING-CUT, CONSOLIDATE** — как в учебнике (термины сохранены).
+
+---
+
+#### **3. Формулы**
+
+- **Индексация (0-based):** $\text{left}(i)=2i+1$, $\text{right}(i)=2i+2$, $\text{parent}(i)=\lfloor(i-1)/2\rfloor$
+- **Листья:** индексы $\lfloor n/2 \rfloor,\dots,n-1$
+- **Высота:** $h=\lfloor\log_2 n\rfloor=\Theta(\log n)$
+- **Узлов на высоте $h$:** $\le \lceil n/2^{h+1}\rceil$
+- **BUILD-MAX-HEAP:** сумма даёт $O(n)$
+- **Heapsort:** $\Theta(n\log n)$ время, $\Theta(1)$ память
+
+---
+
+#### **4. Примеры и задания**
+
+##### **4.1. Анализ и опровержение WeirdMedian** (**Набор задач** 9, **Задание** 1)
+
+Алгоритм `WEIRD-MEDIAN`: два `BUILD-MAX-HEAP` на подмассивах, возврат `A[s]`. (a)–(d) — асимптотика, корректность медианы, модификации с сортировкой.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**(a)** Время $\Theta(n)$: два вызова `BUILD-MAX-HEAP` на размерах $n$ и $\lceil n/2\rceil$.
+
+**(b)** Не всегда медиана; контрпример $[1,2,4,3,5]$ возвращает $4$.
+
+**(c)** После возрастающей сортировки медиана не гарантируется; контрпример $1..9$.
+
+**(d)** После убывающей сортировки — **да**: первый `BUILD-MAX-HEAP` не меняет массив; второй на «меньшей половине» ставит в $A[s]$ медиану (нижнюю для чётного $n$).
+
+</details>
+
+
+##### **4.2. $d$-ичная min-куча** (**Набор задач** 9, **Задание** 2)
+
+Формулы родителя/ребёнка, `MIN-HEAPIFY`$_d$, анализ `INSERT`/`EXTRACT-MIN`, дети узла 5 при $d=4$, число узлов высоты $h$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+Родитель: $\lfloor(i-1)/d\rfloor$; $j$-й ребёнок: $di+j$. `MIN-HEAPIFY`$_d$ — перебор $d$ детей. Вставка $\Theta(\log_d n)$; извлечение минимума $\Theta(d\log_d n)$. Дети узла 5: $21,22,23,24$. Число узлов $\Theta(d^h)$.
+
+</details>
+
+
+##### **4.3. Фильтр на Fibonacci heap по частоте** (**Набор задач** 9, **Задание** 3)
+
+Ключ $-\mathsf{freq}(x)$, при $|H|>k$ — `EXTRACT-MIN`. Псевдокод с `node_map`, оценка $\Theta(n\log k)$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+Хеш-таблица `x -> (freq, ptr)` + `DECREASE-KEY` при повторениях; извлечения не более $n$ раз по $O(\log k)$ амортизированно.
+
+</details>
+
+
+##### **4.4. Построить max-heap из массива** (**Лекция** 9, **Задание** 1)
+
+Исходный массив (индексация с 0):
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 4 | 1 | 3 | 2 | 16 | 9 | 10 | 14 | 8 | 7 | 5 | 6 | 11 | 13 | 12 | 17 |
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Идея:** `BUILD-MAX-HEAP` вызывает `MAX-HEAPIFY` для всех внутренних вершин от индекса $\lfloor n/2\rfloor-1=7$ до $0$.
+
+Выполняются шаги `MAX-HEAPIFY` для индексов $7,6,5,4,3,2,1,0$ с обменами, как в стандартной трассировке для этого массива (сначала «поднимается» 17 к позиции 7 и т.д.).
+
+**Итоговый max-heap:**
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 17 | 16 | 13 | 14 | 7 | 11 | 12 | 2 | 8 | 4 | 5 | 9 | 11 | 10 | 3 | 1 |
+
+Корень (17) — максимум; для каждого родителя ключ $\ge$ ключей детей.
+
+</details>
+
+
+##### **4.5. Повторное извлечение максимума** (**Лекция** 9, **Задание** 2)
+
+Исходный max-heap (0-based):
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 15 | 13 | 9 | 5 | 12 | 8 | 7 | 4 | 0 | 6 | 2 | 1 |
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+На каждом шаге сохраняем корень, переносим последний элемент массива кучи в корень, уменьшаем `heap-size`, вызываем `MAX-HEAPIFY(A,0)`.
+
+Последовательность извлечённых максимумов:
+
+**15, 13, 12, 9, 8, 7, 6, 5, 4, 2, 1, 0**
+
+(подробные обмены на каждом шаге — как в полной трассировке курса: корни после `MAX-HEAPIFY` идут 13, 12, 9, 8, 7, 6, 5, 4, 2, 1, 0).
+
+</details>
+
+
+##### **4.6. Извлечь минимум из кучи Фибоначчи** (**Лекция** 9, **Задание** 3)
+
+Корневой список $23,7,3,17,24$, `H.min` у узла 3; дети 3 — $18,52,38$ (у 18 ребёнок 39, у 38 — 41); у 17 ребёнок 30; у 24 дети 26 и 46, у 26 — ребёнок 35.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+После `FIB-HEAP-EXTRACT-MIN`: удаляется минимум **3**, дети 3 становятся корнями, затем **CONSOLIDATE** связывает деревья одинаковой степени. В результате в корневом списке остаётся узел **7** как новый минимум; счётчик узлов уменьшается на 1.
+
+</details>
+
+
+##### **4.7. Операции Decrease-Key** (**Лекция** 9, **Задание** 4)
+
+Состояние до извлечения из **4.6**; затем по порядку: $46\to15$, затем $35\to5$.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+При $46\to15$ узел отрезается от 24 и попадает в корневой список (каскад останавливается у корня 24). При $35\to5$ нарушается порядок с родителем 26 — выполняется `CUT`, затем у 26 выставляется `mark=TRUE` (второй каскадный срез не поднимается выше в этом примере). `H.min` остаётся **3**.
+
+</details>
+
+
+##### **4.8. Куча Фибоначчи высоты $\Theta(n)$** (**Лекция** 9, **Задание** 5)
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+Да: при специально подобранной последовательности вставок, `EXTRACT-MIN` и `DECREASE-KEY` с **cascading cut** можно получить одно дерево — длинную цепь высоты порядка $n-1$. Это показывает, что амортизированный анализ необходим: худший случай одной операции может быть $\Theta(n)$.
+
+</details>

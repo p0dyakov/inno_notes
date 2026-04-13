@@ -1,0 +1,1644 @@
+---
+title: "W7–W8. Итераторы C++ STL и принципы SOLID"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "2026-03-05"
+lang: ru
+format: html
+engine: knitr
+---
+
+#### **1. Краткое содержание**
+
+##### **1.1 Обобщённое программирование и STL (generic programming и STL)**
+
+###### **1.1.1 Что такое generic programming?**
+
+**Generic programming (GP)** — парадигма, в которой алгоритмы и структуры данных записываются в **максимально общем** виде — независимо от конкретного типа. Два базовых принципа GP: **generality** (алгоритмы работают для любого типа) и **efficiency** (нет лишних накладных расходов в runtime по сравнению с рукописным кодом под конкретный тип).
+
+**Standard Template Library (STL)** — наиболее удачная реализация GP для C++. Её развивали Alexander Stepanov, Meng Lee и David Musser в начале 1990‑х; в стандарт C++ она вошла в **1994**, а к **1998** была формально закреплена в главах 20, 22, 23 и 25 стандарта ISO C++.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "STL как точка пересечения generic containers, generic algorithms и iterators"
+%%| fig-width: 6.2
+%%| fig-height: 3.2
+flowchart TB
+    STL["STL"]
+    C["Containers"]
+    A["Algorithms"]
+    I["Iterators"]
+    F["Function Objects"]
+    Ad["Adapters"]
+    Al["Allocators"]
+    T["Traits"]
+    STL --> C
+    STL --> A
+    STL --> I
+    STL --> F
+    STL --> Ad
+    STL --> Al
+    STL --> T
+```
+
+###### **1.1.2 GP vs OOP — важное различие**
+
+STL *не* строится на объектно‑ориентированном программировании (OOP). Это *ортогональные* парадигмы — они решают разные задачи:
+
+*   **OOP** связывает данные и алгоритмы над ними внутри одного **class**. Класс одновременно и контейнер, и набор алгоритмов.
+*   **GP** полностью разделяет контейнеры и алгоритмы:
+    *   **Generic Containers** — структуры данных, ничего не знающие о конкретном алгоритме.
+    *   **Generic Algorithms** — функции, ничего не знающие о конкретном контейнере.
+
+Ключевая мысль: между контейнерами и алгоритмами в GP не нужны инкапсуляция и наследование как «склейка» модели. Две половины **слабо связаны** и общаются через узкий интерфейс — **iterators**.
+
+###### **1.1.3 Компоненты STL**
+
+В STL семь видов компонентов, разбитых на две группы:
+
+**Компоненты первого порядка** (ядро):
+
+*   **Containers** — обобщённые структуры данных: `vector`, `list`, `deque`, `set`, `map`, `multiset`, `multimap` и варианты.
+*   **Algorithms** — обобщённые операции над последовательностями: поиск, сортировка, копирование, преобразование, слияние и др.
+*   **Iterators** — «клей» между контейнерами и алгоритмами (подробно ниже).
+
+**Компоненты второго порядка** (инфраструктура):
+
+*   **Functional Objects** (functors) — вызываемые объекты, которые алгоритмы используют как **customization points**.
+*   **Adaptors** — обёртки, подстраивающие контейнеры, итераторы или функторы под другой интерфейс.
+*   **Allocators** — объекты политики, управляющие выделением памяти.
+*   **Traits** — compile‑time информация о типах.
+
+##### **1.2 Итераторы (iterators) — мост между контейнерами и алгоритмами**
+
+###### **1.2.1 Зачем нужны итераторы: вывод с нуля**
+
+Понять, *зачем* существуют **iterators**, проще всего, выведя их «с нуля». Начнём с конкретной функции поиска значения в массиве целых:
+
+```cpp
+const int* find0(const int* array, int n, int x)
+{
+    const int* p = array;
+    for (int i = 0; i < n; i++)
+    {
+        if (*p == x) return p;  // success
+        p++;
+    }
+    return 0;  // fail
+}
+```
+
+Она работает, но в ней четыре жёстких ограничения:
+
+1.  обрабатываются только значения типа `int`;
+2.  поиск только в *массиве* (непрерывный блок памяти);
+3.  нужен *адрес* первого элемента;
+4.  нужен *размер* массива.
+
+Снимем ограничения по одному.
+
+**Шаг 1 — обобщить тип элемента:**
+
+```cpp
+template <typename T>
+T* find1(T* array, int n, const T& x)
+{
+    T* p = array;
+    for (int i = 0; i < n; i++)
+    {
+        if (*p == x) return p;
+        p++;
+    }
+    return 0;
+}
+```
+
+Теперь подходит любой тип `T`, если у него есть `operator==`. Аргумент `x` передаём по ссылке, чтобы не плодить дорогие копии.
+
+**Шаг 2 — вместо размера указатель *past-the-end*:**
+
+Вместо `n` передаём указатель `beyond` на ячейку памяти *сразу после* последнего элемента — зависимость от «знать размер массива» исчезает:
+
+```cpp
+template <typename T>
+T* find2(T* array, T* beyond, const T& x)
+{
+    T* p = array;
+    while (p != beyond)
+    {
+        if (*p == x) return p;
+        p++;
+    }
+    return 0;
+}
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Корректный полуоткрытый диапазон указателей: first на первый элемент, beyond — на позицию за концом"
+%%| fig-width: 6.2
+%%| fig-height: 2.8
+flowchart LR
+    F["first"]
+    E1["a[0]"]
+    E2["a[1]"]
+    E3["a[2]"]
+    B["beyond<br/>(позиция после конца)"]
+    F --> E1 --> E2 --> E3 --> B
+```
+
+Стандарт ISO C++ гарантирует: указатель на позицию *на один элемент после* последнего элемента массива остаётся корректным *для сравнения*, хотя разыменовывать его нельзя.
+
+**Шаг 3 — при неудаче возвращать `beyond`, а не `0`:**
+
+Возврат нулевого указателя (`0`) привязывает контракт к указателям. Обобщение: возвращать `beyond` как сигнал «не найдено» — тогда сбой выражается в терминах *любого* типа **iterator**, не только указателя:
+
+```cpp
+template <typename T>
+T* find3(T* array, T* beyond, const T& x)
+{
+    T* p = array;
+    while (p != beyond)
+    {
+        if (*p == x) return p;
+        p++;
+    }
+    return beyond;  // "not found" — valid for any iterator type
+}
+```
+
+**Шаг 4 — упростить и слить условия цикла:**
+
+Объединяем условия цикла в одно и переименовываем `array` в `first` — алгоритм больше не предполагает конкретную структуру «массив»:
+
+```cpp
+template <typename T>
+T* find4(T* first, T* beyond, const T& x)
+{
+    T* p = first;
+    while (p != beyond && *p != x)
+        p++;
+    return p;
+}
+```
+
+**Шаг 5 — убрать указатели из сигнатуры (финальный шаблон):**
+
+Заменяем тип указателя `T*` на абстрактный параметр типа `P`. Это может быть любой тип, который «ведёт себя как указатель», в том числе пользовательский класс для контейнеров, отличных от массива:
+
+```cpp
+template <typename T, typename P>
+P find5(P first, P beyond, const T& x)
+{
+    P p = first;
+    while (p != beyond && *p != x)
+        p++;
+    return p;
+}
+```
+
+Тип `P` — это **iterator type**. Тип `T` — **value type** (тип элементов в контейнере). Алгоритму от `P` нужны только три операции: разыменование (`operator*`), инкремент (`operator++`) и сравнение на неравенство (`operator!=`).
+
+###### **1.2.2 Вызов `find5` и соглашение о полуоткрытом диапазоне**
+
+Шаблон вызова `find5(first, beyond, x)` задаёт соглашение о **half-open range** — полуоткрытом диапазоне `[first, beyond)`:
+
+*   `first` указывает на первый элемент;
+*   `beyond` указывает *на позицию после* последнего (её **нельзя** разыменовывать);
+*   в диапазон входят все элементы от `first` до позиции *перед* `beyond`, сам `beyond` не включается.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Полуоткрытый диапазон: запись [first, beyond)"
+%%| fig-width: 6
+%%| fig-height: 2.6
+flowchart LR
+    First["first<br/>входит"]
+    Mid["элементы диапазона"]
+    Beyond["beyond<br/>не входит"]
+    First --> Mid --> Beyond
+```
+
+Для обычного массива в C++ это выглядит так:
+
+```cpp
+int A[100];
+// ... initialize A ...
+int* result = find5(A, &A[100], 7);
+// T = int, P = int* (вывод типов компилятором)
+```
+
+`&A[100]` — канонический указатель **past-the-end** для массива из 100 элементов.
+
+###### **1.2.3 Итератор как формальное понятие**
+
+Из вывода получаются два базовых понятия:
+
+*   **Value type** (`T`): тип элементов в контейнере. Требование: должен поддерживать `operator!=` (в связке с использованием в условии `*p != x`).
+*   **Iterator type** (`P`): тип, дающий доступ к последовательности элементов. Требования: `operator*` (чтение значения типа **value type**), `operator++` (переход к следующему), `operator!=`.
+
+**Iterator** — любой объект, тип которого удовлетворяет этим требованиям. «Голые» указатели C++ (`T*`) удовлетворяют им автоматически — поэтому для массивов они и есть **iterators**.
+
+##### **1.3 Свой **iterator**: от массива к односвязному списку**
+
+Сила **iterators** видна, когда применить `find5` к контейнеру *не массивного* вида — например, к односвязному списку.
+
+###### **1.3.1 Простой узел односвязного списка**
+
+Минимальный класс `NODE` для списка целых:
+
+```cpp
+class NODE {
+    int value;   // the node's data
+    NODE* next;  // pointer to the next node
+public:
+    NODE(int v) : value(v), next(0) { }
+    void add(NODE* n) {
+        n->next = this->next;
+        this->next = n;
+    }
+};
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Итератор как обёртка вокруг узла связного списка"
+%%| fig-width: 6.2
+%%| fig-height: 2.8
+flowchart LR
+    It["NODE::iterator"]
+    N1["node(3)"]
+    N2["node(5)"]
+    N3["node(7)"]
+    Nil["0 / null"]
+    It --> N1 --> N2 --> N3 --> Nil
+```
+
+Чтобы вызвать `find5` для такого списка, нужно:
+
+1.  чтобы `NODE` удовлетворял требованиям **value type** (в частности, имел `operator!=`);
+2.  отдельный класс **iterator**, удовлетворяющий требованиям к типу **iterator**.
+
+###### **1.3.2 Требования **value type** для `NODE`**
+
+В `find5` элементы сравниваются через `operator!=`. Добавим его в `NODE`:
+
+```cpp
+class NODE {
+    int value;
+    NODE* next;
+public:
+    NODE(int v) : value(v), next(0) { }
+    void add(NODE* n) {
+        n->next = this->next;
+        this->next = n;
+    }
+
+    // Value type requirement: compare by value
+    bool operator!=(NODE& n) { return this->value != n.value; }
+    // Conversion to int for convenient value access
+    operator int() { return value; }
+};
+```
+
+###### **1.3.3 Класс **iterator** для `NODE`**
+
+Итератор по `NODE` должен поддерживать `operator*`, `operator++` и `operator!=`. Его можно вынести в отдельный класс или сделать **вложенным (inner) классом** внутри `NODE`. Вложенный вариант обычно удобнее: у **iterator** прямой доступ к private‑членам `NODE`.
+
+```cpp
+class NODE {
+    int value;
+    NODE* next;
+public:
+    NODE(int v)  : value(v), next(0) { }
+    void add(NODE* n) { n->next = this->next; this->next = n; }
+    bool operator!=(NODE& n) { return this->value != n.value; }
+    operator int() { return value; }
+
+    class iterator;
+    friend class iterator;   // give iterator access to private members
+
+    class iterator {
+        NODE* p;             // current position
+    public:
+        iterator(NODE* node) : p(node) { }
+
+        int operator*()  { return p->value; }   // dereference: get value
+        void operator++() { p = p->next; }      // advance to next node
+        bool operator!=(const iterator& other) const {
+            return p != other.p;
+        }
+        operator NODE*() { return p; }          // conversion to raw pointer
+    };
+};
+```
+
+Теперь `find5` можно вызывать и для связного списка:
+
+```cpp
+NODE* list = new NODE(1);
+// ... add more nodes ...
+NODE::iterator it = find5(NODE::iterator(list), NODE::iterator(0), 7);
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Generic programming отделяет **algorithms** от **containers** через **iterators**"
+%%| fig-width: 6.4
+%%| fig-height: 3
+flowchart LR
+    Alg1["find"]
+    Alg2["sort"]
+    It["iterators"]
+    Vec["vector"]
+    List["list"]
+    Set["set"]
+    Alg1 --> It
+    Alg2 --> It
+    It --> Vec
+    It --> List
+    It --> Set
+```
+
+###### **1.3.4 Общая картина: разделение ответственности**
+
+Почему это сильный дизайн:
+
+*   **контейнер‑массив** и **контейнер‑список** ничего не знают об алгоритме `find5`;
+*   сам **`find5`** ничего не знает ни о массивах, ни о списках;
+*   стороны сходятся только на общем контракте — требованиях к **iterator** — и каждая выполняет свою часть самостоятельно.
+
+Новые **algorithms** можно добавлять, не трогая **containers**, и наоборот. Число сочетаний растёт *линейно* (контейнеры плюс алгоритмы), а не *квадратично* (каждый с каждым).
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "`reverse` двигается с двух концов: `++` с начала и `--` с конца"
+%%| fig-width: 6.2
+%%| fig-height: 2.8
+flowchart LR
+    First["first ++"]
+    Mid["обмен парами к центру"]
+    Last["-- last"]
+    First --> Mid --> Last
+```
+
+##### **1.4 Алгоритм `reverse`: новые требования к iterator**
+
+Рассмотрим алгоритм `reverse`, который переворачивает порядок элементов в контейнере:
+
+```cpp
+template <typename P, typename T>
+void reverse(P start, P beyond)
+{
+    while (start != beyond)
+    {
+        --beyond;
+        if (start != beyond)
+        {
+            T t = *start;
+            *start = *beyond;
+            *beyond = t;
+            ++start;
+        }
+    }
+}
+```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Иерархия категорий **iterator** (упрощённо)"
+%%| fig-width: 5.5
+%%| fig-height: 4
+flowchart TB
+    In["Input"]
+    Out["Output"]
+    Fwd["Forward"]
+    Bi["Bidirectional"]
+    Rand["Random Access"]
+    In --> Fwd --> Bi --> Rand
+    Out --> Fwd
+```
+
+От **iterator** здесь требуется *больше*, чем в `find5`:
+
+*   `operator++` — как раньше;
+*   `operator!=` — как раньше;
+*   `operator--` — **новое**: нужно уметь шагать *назад*;
+*   `operator*`, возвращающий **ссылку** (а не только значение) — **новое**: нужна *запись* через **iterator**, не только чтение.
+
+Отсюда и формальная классификация категорий **iterator**.
+
+##### **1.5 Категории итераторов (iterator categories)**
+
+Разные алгоритмы предъявляют к **iterators** разные возможности. **STL** оформляет это как **иерархию категорий итераторов** (**hierarchy of iterator categories**): на каждом уровне поверх предыдущего добавляются новые операции.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "SRP (**Single Responsibility**): навигация и вывод — разные ответственности"
+%%| fig-width: 6.2
+%%| fig-height: 3
+flowchart LR
+    Report["Report"]
+    Nav["навигация"]
+    Out["IOut / вывод"]
+    Report --> Nav
+    Report --> Out
+```
+
+```{mermaid}
+%%| fig-cap: "Иерархия категорий **iterator**"
+%%| fig-width: 6
+%%| fig-height: 3.8
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+flowchart TB
+    Input["Input Iterator<br/>(x = *i; ++i; i++)"]
+    Output["Output Iterator<br/>(*i = x; ++i; i++)"]
+    Forward["Forward Iterator<br/>(Input + Output)"]
+    Bidir["Bidirectional Iterator<br/>(Forward + --i; i--)"]
+    Random["Random Access Iterator<br/>(Bidir + i+n, i-n, i[n], i&lt;j, ...)"]
+    Pointer(("C++ Raw Pointer (T*)"))
+
+    Input --> Forward
+    Output --> Forward
+    Forward --> Bidir
+    Bidir --> Random
+    Random -->|"подтип / subsumes"| Pointer
+```
+
+*   **Input Iterator** — только чтение и шаг вперёд по одному элементу за раз; удобен для однопроходных алгоритмов вроде `find`. Операции: `x = *i`, `++i`, `i++`, `i == j`, `i != j`.
+*   **Output Iterator** — только запись и шаг вперёд. Операции: `*i = x`, `++i`, `i++`.
+*   **Forward Iterator** — сочетает **Input** и **Output**; допускает несколько проходов по одному и тому же диапазону. Используется в `forward_list`.
+*   **Bidirectional Iterator** — **Forward Iterator** плюс движение назад (`--i`, `i--`). Для `list`, `set`, `map`; требуется для `reverse`.
+*   **Random Access Iterator** — **Bidirectional Iterator** плюс произвольные скачки (`i + n`, `i - n`, `i += n`, `i[n]`) и сравнения (`i < j`, `i <= j` и т.д.). Для `vector`, `deque`, сырых массивов; нужен для `sort`.
+
+Все категории поддерживают `operator==`, `operator!=` и присваивание (`=`).
+
+**Ключевая мысль:** «голые» указатели **C++** (`T*`) удовлетворяют всем требованиям **Random Access Iterator** — это «идеальный» итератор. Любой алгоритм **STL**, работающий с **iterators**, работает и с сырыми указателями.
+
+##### **1.6 Поведение итераторов у разных контейнеров**
+
+У разных контейнеров разные категории **iterator**, а порядок обхода зависит от внутренней структуры контейнера:
+
+```cpp
+int main() {
+    std::map<int, std::string> orderedMap;
+    std::unordered_map<int, std::string> unorderedMap;
+
+    orderedMap.insert({3, "Three"}); unorderedMap.insert({3, "Three"});
+    orderedMap.insert({1, "One"});   unorderedMap.insert({1, "One"});
+    orderedMap.insert({2, "Two"});   unorderedMap.insert({2, "Two"});
+
+    // std::map iterates in sorted key order: 1, 2, 3
+    for (auto it = orderedMap.begin(); it != orderedMap.end(); ++it)
+        std::cout << it->first << ": " << it->second << "\n";
+
+    // std::unordered_map iterates in hash-bucket order (unpredictable)
+    for (auto it = unorderedMap.begin(); it != unorderedMap.end(); ++it)
+        std::cout << it->first << ": " << it->second << "\n";
+}
+```
+
+*   `std::map` даёт **Bidirectional Iterator** и всегда обходит элементы в *отсортированном порядке ключей*.
+*   `std::unordered_map` даёт **Forward Iterator** и обходит элементы в *порядке, задаваемом реализацией* (**implementation-defined**).
+
+##### **1.7 Итераторы: построение одного контейнера из другого**
+
+Сильная сторона **iterators** — строить один контейнер из другого. Многие контейнеры **STL** в конструкторе принимают пару итераторов и копируют заданный диапазон:
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <set>
+
+int main() {
+    std::vector<int> nums = {1, 2, 2, 3, 4, 4, 5, 6, 7, 8, 9, 9};
+
+    // std::multiset: sorted, duplicates allowed
+    std::multiset<int> multiSetNums(nums.begin(), nums.end());
+
+    // std::set: sorted, duplicates removed automatically
+    std::set<int> uniqueNums(nums.begin(), nums.end());
+
+    for (int num : uniqueNums)
+        std::cout << num << " ";   // 1 2 3 4 5 6 7 8 9
+    std::cout << std::endl;
+
+    for (int num : multiSetNums)
+        std::cout << num << " ";   // 1 2 2 3 4 4 5 6 7 8 9 9
+}
+```
+
+Здесь `nums.begin()` и `nums.end()` — итераторы `vector`, но конструкторы `set` и `multiset` принимают *любой* **Input Iterator**. Это **GP** в действии: алгоритм конструктора слабо связан с типом исходного контейнера.
+
+##### **1.8 Пользовательский iterator как inner class внутри контейнера**
+
+Рекомендуемый приём — объявить **iterator** как **inner class** (вложенный класс) с доступом к внутренностям контейнера через `friend`:
+
+```cpp
+template<typename T, typename K /*, ... */>
+class MyContainer {
+    /* ... internal storage ... */
+public:
+    /* constructors, destructors, member functions */
+
+    class iterator;
+    friend class iterator;
+
+    class iterator {
+        /* ... */
+    public:
+        using pointer   = T*;
+        using reference = T&;
+
+        iterator& operator++();   // advance
+        reference operator*();    // dereference
+        bool operator!=(const iterator&) const;
+
+    private:
+        pointer ptr_;    // current position
+        pointer end_;    // one past end
+        pointer begin_;  // start of storage
+        bool last_;      // sentinel flag
+    };
+
+    iterator begin();
+    iterator end();
+    /* ... */
+};
+```
+
+Объявление `friend class iterator` даёт вложенному классу `iterator` полный доступ к **private**‑членам `MyContainer` — это нужно для эффективной реализации.
+
+##### **1.9 Принципы SOLID**
+
+Перед **SOLID** полезно вспомнить ещё несколько распространённых аббревиатур из индустрии:
+
+*   **KISS** — *Keep It Simple Stupid*: предпочитать простые решения сложным.
+*   **DRY** — *Don't Repeat Yourself*: не дублировать логику.
+*   **RAII** — *Resource Acquisition Is Initialization*: связывать время жизни ресурса с временем жизни объекта (базовая идиома **C++**).
+*   **SFINAE** — *Substitution Failure Is Not An Error*: механизм шаблонов **C++**.
+
+**SOLID** — пять принципов проектирования **ООП**‑кода, ориентированных на *гибкость*, *сопровождаемость* и *расширяемость*. Их систематизировал **Robert C. Martin** («Uncle Bob»); они широко используются во всех **ООП**‑языках.
+
+Пять букв означают:
+
+```{mermaid}
+%%| fig-cap: "Обзор принципов SOLID"
+%%| fig-width: 6
+%%| fig-height: 3.2
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+flowchart LR
+    S["S — Single Responsibility<br/>один класс — одна причина меняться"]
+    O["O — Open/Closed<br/>открыт для расширения, закрыт для правок"]
+    L["L — Liskov Substitution<br/>подтипы заменяют базовый тип без сюрпризов"]
+    I["I — Interface Segregation<br/>клиенты не зависят от лишних методов"]
+    D["D — Dependency Inversion<br/>зависимость от абстракций, не от деталей"]
+
+    S --> O --> L --> I --> D
+```
+
+###### **1.9.1 S — Single Responsibility Principle (SRP)**
+
+**У класса должна быть только одна причина для изменений.**
+
+На практике класс должен выполнять *один вид задач* — иметь *одну зону ответственности*. Если класс совмещает навигацию *и* печать, то любое изменение логики печати тянет правки класса даже тогда, когда навигация не менялась (и наоборот).
+
+**Проблема — нарушение SRP:**
+
+```csharp
+class Report
+{
+    public string text;
+
+    public void GoToFirstPage() { ... }  // навигация
+    public void GoToLastPage()  { ... }
+    public void GoToPage(int n) { ... }
+
+    public void Print() { /* print text */ }  // печать — другая ответственность
+}
+```
+
+У `Report` две независимые причины меняться: изменилась навигация или появился новый формат вывода (XML, RTF, принтер, консоль). Класс становится хрупким и плохо переиспользуемым.
+
+**Решение — вынести ответственность за печать:**
+
+```csharp
+interface IOut {
+    void print(string text);
+}
+
+class ToConsole : IOut {
+    public void print(string text) { /* print to console */ }
+}
+
+class ToPrinter : IOut {
+    public void print(string text) { /* send to printer */ }
+}
+
+// Report now has ONE responsibility: navigation
+class Report
+{
+    public string text;
+
+    public void GoToFirstPage() { ... }
+    public void GoToLastPage()  { ... }
+    public void GoToPage(int n) { ... }
+
+    // печать делегируется внедрённому IOut
+    public void Print(IOut p) {
+        p.print(this.text);
+    }
+}
+```
+
+Теперь у `Report` одна причина меняться — навигация. Иерархия `IOut` развивается независимо.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "OCP (**Open/Closed**): **Cook** зависит от абстракции **IMeal**, а не от конкретных блюд"
+%%| fig-width: 6.2
+%%| fig-height: 3
+classDiagram
+    class Cook
+    class IMeal
+    class Soup
+    class Salad
+    Cook --> IMeal : uses
+    IMeal <|.. Soup
+    IMeal <|.. Salad
+```
+
+###### **1.9.2 O — Open/Closed Principle (OCP)**
+
+**Компоненты открыты для расширения новым поведением и закрыты для правок уже проверенного кода.**
+
+То есть новое поведение добавляют *без редактирования* существующих, протестированных фрагментов. Типичное нарушение — класс, который приходится *менять* при каждом новом варианте.
+
+**Проблема — нарушение OCP:**
+
+```csharp
+class Cook
+{
+    public string name;
+
+    public void MakeSoup()   { ... }
+    // Need a salad? Must modify this class → VIOLATION
+    // Need a dessert? Must modify this class → VIOLATION
+}
+```
+
+Каждое новое блюдо требует правок в `Cook`: растёт риск сломать уже работающее поведение и приходится заново прогонять тесты.
+
+**Решение 1 — наследование:**
+
+```csharp
+class Cook
+{
+    public string name;
+    public void MakeSoup() { ... }  // closed for modification
+}
+
+class SmarterCook : Cook
+{
+    public void MakeSalad() { ... }  // extension without modification
+}
+```
+
+**Решение 2 — отделить алгоритм от сущности (паттерн **Strategy**):**
+
+```csharp
+interface IMeal
+{
+    void Make();
+}
+
+class Soup   : IMeal { void Make() { /* making soup */   } }
+class Salad  : IMeal { void Make() { /* making salad */  } }
+class Dessert: IMeal { void Make() { /* making dessert */} }
+
+class Cook
+{
+    public string name;
+
+    // Cook is CLOSED for modification: this method never changes
+    public void Make(IMeal meal) {
+        meal.Make();
+    }
+}
+```
+
+Новое блюдо добавляют новым классом, реализующим `IMeal`, — сам `Cook` не трогают.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Нарушение LSP: подкласс должен сохранять ожидаемое от базового типа поведение"
+%%| fig-width: 6.2
+%%| fig-height: 3
+classDiagram
+    class Document {
+      +setData()
+    }
+    class SpecialDocument {
+      +setData()
+    }
+    Document <|-- SpecialDocument
+```
+
+###### **1.9.3 L — Liskov Substitution Principle (LSP)**
+
+**Переменной данного типа можно присвоить значение любого подтипа, а метод с параметром типа `T` можно вызвать с аргументом подтипа — без потери корректности программы.**
+
+Принцип сформулировала **Barbara Liskov**; это по сути условие корректности наследования. Он *сильнее*, чем совпадение сигнатур: подтип должен *вести себя* так, как ожидается при подстановке вместо супертипа.
+
+**Формулировка:** если `S` — подтип `T`, то объекты типа `S` можно подставлять вместо объектов типа `T`, не ломая нужных свойств программы.
+
+**Пример, где LSP выполняется:**
+
+```java
+Number n = new Integer(5);   // Integer is a subtype of Number — OK
+Number m = new Double(3.14); // Double is a subtype of Number — OK
+```
+
+Любой код, рассчитанный на `Number`, остаётся корректным для `Integer` и `Double`.
+
+**Проблема — нарушение LSP:**
+
+```java
+// Base class
+public class Document {
+    private String title;
+    private int pages;
+
+    public void setData(String title) {
+        this.title = title;   // Only changes the title
+    }
+}
+
+// Subclass that VIOLATES LSP
+public class SpecialDocument extends Document {
+    @Override
+    public void setData(String title) {
+        super.setData(title);
+        setPages(20);   // Secretly changes pages too! Unexpected side effect.
+    }
+}
+```
+
+Вызов `Document doc = new SpecialDocument(...)` и затем `doc.setData("NewTitle")` *неожиданно* меняет число страниц. Подкласс тихо ломает контракт базового класса.
+
+**Демонстрация:**
+
+```java
+Document doc1 = new Document("MyDoc", 10);
+Document doc2 = new SpecialDocument("MySpecialDoc", 10);
+
+doc2.setData("MyDoc");
+// doc1: pages = 10 (expected)
+// doc2: pages = 20 (SURPRISE — LSP violation!)
+```
+
+Исправление: добиться у `SpecialDocument.setData` *того же наблюдаемого эффекта*, что у `Document.setData`, — или отказаться от наследования, если подтип не может это гарантировать.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "ISP (**Interface Segregation**): дробить крупный интерфейс на узкие"
+%%| fig-width: 6.4
+%%| fig-height: 3.4
+classDiagram
+    class IMessage
+    class ITextMessage
+    class IEmailMessage
+    class SmsMessage
+    class EmailMessage
+    IMessage <|-- ITextMessage
+    ITextMessage <|-- IEmailMessage
+    ITextMessage <|.. SmsMessage
+    IEmailMessage <|.. EmailMessage
+```
+
+###### **1.9.4 I — Interface Segregation Principle (ISP)**
+
+**Клиенты не должны зависеть от методов, которые им не нужны.**
+
+«Толстый» монолитный интерфейс заставляет каждую реализацию поддерживать методы, которые ей не к месту — отсюда пустые заглушки или искусственные ограничения дизайна.
+
+**Проблема — нарушение ISP:**
+
+```csharp
+interface IMessage
+{
+    void Send();
+    string Text    { get; set; }
+    string Subject { get; set; }
+    string ToAddress   { get; set; }
+    string FromAddress { get; set; }
+    // byte[] Voice { get; set; }  ← may also be needed for voice messages
+}
+
+class SmsMessage : IMessage
+{
+    public void Send() { ... }
+    public string Text    { get { ... } set { ... } }
+    public string Subject { ... }  // SMS has no Subject — forced to implement it anyway!
+    public string ToAddress   { get { ... } set { ... } }
+    public string FromAddress { get { ... } set { ... } }
+}
+
+class VoiceMessage : IMessage
+{
+    public void Send() { ... }
+    public string Text    { ... }  // Voice has no text — forced to implement it anyway!
+    public string Subject { ... }  // Voice has no subject — forced to implement it anyway!
+    public string ToAddress   { get { ... } set { ... } }
+    public string FromAddress { get { ... } set { ... } }
+}
+```
+
+**Решение — разбить «толстый» интерфейс на узкие:**
+
+```csharp
+interface IMessage
+{
+    void Send();
+    string ToAddress   { get; set; }
+    string FromAddress { get; set; }
+}
+
+interface IVoiceMessage : IMessage
+{
+    byte[] Voice { get; set; }
+}
+
+interface ITextMessage : IMessage
+{
+    string Text { get; set; }
+}
+
+interface IEmailMessage : ITextMessage
+{
+    string Subject { get; set; }
+}
+```
+
+Теперь каждая реализация зависит только от тех интерфейсов, которые ей реально нужны:
+
+*   `VoiceMessage implements IVoiceMessage` — `Send`, `ToAddress`, `FromAddress`, `Voice`.
+*   `SmsMessage implements ITextMessage` — `Send`, `ToAddress`, `FromAddress`, `Text`.
+*   `EmailMessage implements IEmailMessage` — всё вышеперечисленное плюс `Subject`.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "DIP (**Dependency Inversion**): высокий уровень зависит от абстракций; конкретика их реализует"
+%%| fig-width: 6.4
+%%| fig-height: 3.2
+classDiagram
+    class DocumentProcessor
+    class IDocumentSaver {
+      <<interface>>
+      +save(name, doc)
+    }
+    class SaveDocumentToPdf
+    class SaveDocumentToHtml
+    DocumentProcessor --> IDocumentSaver : depends on
+    IDocumentSaver <|.. SaveDocumentToPdf
+    IDocumentSaver <|.. SaveDocumentToHtml
+```
+
+###### **1.9.5 D — Dependency Inversion Principle (DIP)**
+
+**Высокоуровневые модули не должны зависеть от низкоуровневых: оба зависят от абстракций. Абстракции не должны зависеть от деталей; детали зависят от абстракций.**
+
+На практике класс не должен напрямую создавать конкретные реализации (`new SaveDocumentToPdf()` и т.п.): он работает с *абстракциями* (интерфейсами), а конкретику *внедряют* снаружи.
+
+**Решение 2** для OCP выше (пример `Cook` / `IMeal`) — тот же **DIP**: `Cook` зависит от абстракции `IMeal`, а не от конкретных `Soup` / `Salad`.
+
+Типичный приём — **Dependency Injection (DI)**: зависимости передают в класс (конструктор, параметр метода, **DI**‑фреймворк), а не создают внутри:
+
+```java
+// Without DI — high-level depends on low-level concrete class
+public class DocumentProcessor {
+    private SaveDocumentToPdf saver = new SaveDocumentToPdf(); // tightly coupled!
+    public void process(Document doc) { saver.save("output", doc); }
+}
+
+// With DI — depends on abstraction (Saver interface)
+public class DocumentProcessor {
+    private final Saver saver;
+    public DocumentProcessor(Saver saver) { this.saver = saver; } // injected!
+    public void process(Document doc) { saver.save("output", doc); }
+}
+```
+
+Во втором варианте удобно подставлять mock `Saver`, можно сменить PDF на DOCX без правок кода класса — соблюдены и **OCP**, и **DIP**.
+
+***
+
+#### **2. Определения**
+
+*   **Generic Programming (GP)**: парадигма, в которой алгоритмы и структуры данных задаются в самом общем виде (параметризация типами), сочетая **generality** и **efficiency** без лишних накладных расходов в runtime.
+*   **STL (Standard Template Library)**: реализация GP в C++ — **containers**, **algorithms** и **iterators** как слабо связанные переиспользуемые компоненты; в стандарте C++ с 1994 года.
+*   **Container**: структура данных STL (например, `vector`, `list`, `set`, `map`), хранящая элементы и не знающая алгоритмов, которые по ней проходят.
+*   **Algorithm**: шаблон функции STL (например, `find`, `sort`, `reverse`), работающий с последовательностью элементов и не знающий конкретного типа контейнера.
+*   **Iterator**: объект (или указатель), дающий единый интерфейс доступа и обхода элементов контейнера — «мост» между **containers** и **algorithms**.
+*   **Value type**: тип элементов контейнера. В `find5<T, P>` тип `T` — это **value type**.
+*   **Iterator type**: тип самого итератора. В `find5<T, P>` тип `P` — это **iterator type**.
+*   **Half-open range**: соглашение STL `[first, beyond)`: `first` — на первый элемент, `beyond` — на позицию *после* последнего; `beyond` можно хранить и сравнивать, но **нельзя разыменовывать**.
+*   **Input Iterator**: однопроходный обход вперёд только на чтение (`x = *i; ++i`); например, для `find`.
+*   **Output Iterator**: однопроходный обход вперёд только на запись (`*i = x; ++i`); например, выход `copy`.
+*   **Forward Iterator**: сочетает **Input** и **Output**; допускает несколько проходов; используется в `forward_list`.
+*   **Bidirectional Iterator**: **Forward Iterator** плюс движение назад (`--i`); для `list`, `set`, `map`; нужен для `reverse`.
+*   **Random Access Iterator**: **Bidirectional Iterator** плюс произвольные сдвиги (`i + n`, `i[n]`, `i < j`); для `vector`, массивов; нужен для `sort`.
+*   **Inner (nested) class**: класс, объявленный внутри другого; **iterator** как inner class может обращаться к private контейнера через `friend`.
+*   **SOLID**: акроним пяти принципов ООП: **SRP**, **OCP**, **LSP**, **ISP**, **DIP**.
+*   **Single Responsibility Principle (SRP)**: у класса должна быть одна причина для изменений — одна зона ответственности.
+*   **Open/Closed Principle (OCP)**: компоненты открыты для расширения новым поведением и закрыты для правок уже работающего кода.
+*   **Liskov Substitution Principle (LSP)**: объекты подтипа можно подставлять вместо супертипа, не ломая корректность программы.
+*   **Interface Segregation Principle (ISP)**: клиенты не должны зависеть от методов, которые не используют; «толстые» интерфейсы дробят на более узкие.
+*   **Dependency Inversion Principle (DIP)**: высокоуровневые модули зависят от абстракций, а не от конкретики; детали подключаются снаружи (**dependency injection**).
+*   **Dependency Injection (DI)**: приём реализации **DIP**: зависимости передают в класс извне, а не создают внутри `new`‑ами.
+
+***
+
+#### **3. Примеры**
+
+##### **3.1. Категории итераторов для контейнеров STL** (Лаба 7, **Задание** 1)
+
+Для каждого перечисленного контейнера **STL** укажите категорию предоставляемого **iterator** и приведите один алгоритм, который с ним работает, но *не* работает с **более слабой** категорией.
+
+**(a)** `std::vector<int>`
+**(b)** `std::list<int>`
+**(c)** `std::forward_list<int>`
+**(d)** `std::istream_iterator<int>`
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**(a) `std::vector<int>`:**
+
+*   Категория **iterator**: **Random Access Iterator**
+*   Пример алгоритма: `std::sort` (нужен **random access** для эффективного разбиения: `i + n`, `i[n]`, `i < j`).
+
+**(b) `std::list<int>`:**
+
+*   Категория **iterator**: **Bidirectional Iterator**
+*   Пример алгоритма: `std::reverse` (нужен `--i`, движение назад).
+
+**(c) `std::forward_list<int>`:**
+
+*   Категория **iterator**: **Forward Iterator**
+*   Пример алгоритма: `std::find` (достаточно `++i` и `*i`); `std::sort` напрямую к `forward_list` не применить.
+
+**(d) `std::istream_iterator<int>`:**
+
+*   Категория **iterator**: **Input Iterator**
+*   Пример алгоритма: `std::find` (только чтение, один проход). С `std::reverse` (нужен **bidirectional**) и `std::sort` (нужен **random access**) не сочетается.
+
+**Ответ:**
+
+| Контейнер | Категория **iterator** | Алгоритм «выше» по категории |
+|-----------|------------------------|------------------------------|
+| `vector` | Random Access | `sort` |
+| `list` | Bidirectional | `reverse` |
+| `forward_list` | Forward | `find` |
+| `istream_iterator` | Input | `find` (однопроходное чтение) |
+
+</details>
+
+##### **3.2. Кольцевой буфер и пользовательский forward iterator** (Лаба 7, **Задание** 2)
+
+Соберите **кольцевой буфер** (**circular buffer**) как шаблон класса с пользовательским **forward iterator**.
+
+**Требования:**
+
+*   Класс поддерживает: `push(value)`, `pop()` (возвращает значение), `empty()`, `size()`.
+*   Внутреннее хранилище — `std::vector`.
+*   **Iterator** обходит элементы **по кольцу**: после последнего снова идёт к первому.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** индексы «закольцовываются» через остаток по модулю (`%`). **Forward iterator** ведёт счётчик посещённых элементов, чтобы понять, когда полный круг завершён.
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <stdexcept>
+
+template <typename T>
+class CircularBuffer {
+    std::vector<T> data_;   // underlying storage
+    size_t head_;           // index of the oldest element (front)
+    size_t tail_;           // index where the next push will go
+    size_t count_;          // number of elements currently stored
+    size_t capacity_;       // total capacity
+
+public:
+    CircularBuffer(size_t capacity)
+        : data_(capacity), head_(0), tail_(0),
+          count_(0), capacity_(capacity) { }
+
+    // Add an element at the back
+    void push(const T& value) {
+        if (count_ == capacity_)
+            throw std::overflow_error("Buffer is full");
+        data_[tail_] = value;
+        tail_ = (tail_ + 1) % capacity_;
+        ++count_;
+    }
+
+    // Remove and return the front element
+    T pop() {
+        if (count_ == 0)
+            throw std::underflow_error("Buffer is empty");
+        T value = data_[head_];
+        head_ = (head_ + 1) % capacity_;
+        --count_;
+        return value;
+    }
+
+    bool   empty()    const { return count_ == 0; }
+    size_t size()     const { return count_; }
+    size_t capacity() const { return capacity_; }
+
+    // ---- Forward Iterator ----
+    class iterator {
+        const CircularBuffer* buf_;   // the buffer being iterated
+        size_t index_;                // physical index in data_
+        size_t visited_;              // how many elements we have visited
+
+    public:
+        iterator(const CircularBuffer* buf, size_t start, size_t visited)
+            : buf_(buf), index_(start), visited_(visited) { }
+
+        T operator*() const {
+            return buf_->data_[index_];
+        }
+
+        iterator& operator++() {
+            index_ = (index_ + 1) % buf_->capacity_;
+            ++visited_;
+            return *this;
+        }
+
+        bool operator!=(const iterator& other) const {
+            return visited_ != other.visited_;
+        }
+    };
+
+    // begin(): start at head, 0 elements visited
+    iterator begin() const {
+        return iterator(this, head_, 0);
+    }
+
+    // end(): same position, count_ elements visited (signals "done")
+    iterator end() const {
+        return iterator(this, head_, count_);
+    }
+};
+
+int main() {
+    CircularBuffer<int> buf(5);
+    buf.push(10);
+    buf.push(20);
+    buf.push(30);
+    buf.push(40);
+    buf.push(50);
+
+    std::cout << "Forward pass: ";
+    for (auto it = buf.begin(); it != buf.end(); ++it)
+        std::cout << *it << " ";   // 10 20 30 40 50
+    std::cout << std::endl;
+
+    buf.pop();  // removes 10
+    buf.push(60);
+
+    std::cout << "After pop + push: ";
+    for (int val : buf)
+        std::cout << val << " ";   // 20 30 40 50 60
+    std::cout << std::endl;
+
+    return 0;
+}
+```
+
+**Как работает «кольцо»:**
+
+*   `push` пишет в `tail_`, затем `tail_ = (tail_ + 1) % capacity_`.
+*   `pop` читает из `head_`, затем `head_ = (head_ + 1) % capacity_`.
+*   **Iterator** двигается как `index_ = (index_ + 1) % capacity_`, а завершение сравнивает по `visited_`, а не по физическому индексу: у полного буфера физические позиции **begin** и **end** могут совпасть.
+
+**Ответ:** итератор считает посещённые элементы от 0 до `count_`, чтобы остановиться, и использует `%`, чтобы «ходить по кругу» по массиву `data_`.
+
+</details>
+
+##### **3.3. Пять шагов обобщения: от `find0` к `find5`** (Лекция 7, **Пример** 1)
+
+Исходя из конкретной `find0` ниже, опишите пять шагов обобщения к шаблонной `find5`: на каждом шаге скажите, *что* меняется и *зачем*.
+
+```cpp
+const int* find0(const int* array, int n, int x) {
+    const int* p = array;
+    for (int i = 0; i < n; i++) {
+        if (*p == x) return p;
+        p++;
+    }
+    return 0;
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** каждый шаг снимает одну жёстко зашитую зависимость, делая алгоритм всё более общим.
+
+1.  **Шаг 1 — тип элемента:** заменить `int` на параметр типа `T`; нужен `operator==`. Размер `n` пока остаётся `int`. Получаем `find1<T>(T* array, int n, const T& x)`.
+2.  **Шаг 2 — вместо размера указатель *past-the-end*:** вместо `int n` принять `T* beyond` сразу за последним элементом; цикл `p != beyond`. Получаем `find2<T>(T* array, T* beyond, const T& x)` — не нужно «знать размер».
+3.  **Шаг 3 — «не найдено» как `beyond`:** при неудаче возвращать `beyond`, а не `0` — контракт не привязан к нулевому указателю; так можно выразить провал для любого **iterator**. Получаем `find3`.
+4.  **Шаг 4 — упростить и переименовать:** слить условия (`p != beyond && *p != x`), убрать лишний `return`; `array` → `first`, потому что это уже не обязательно массив. Получаем `find4<T>(T* first, T* beyond, const T& x)`.
+5.  **Шаг 5 — убрать указатели из сигнатуры:** заменить `T*` на абстрактный `P` — сырой указатель *или* пользовательский класс. Получаем `find5<T, P>(P first, P beyond, const T& x)`; здесь `P` — **iterator type**, `T` — **value type**.
+
+**Ответ:** пять шагов убирают зависимости от (1) типа элемента, (2) размера массива, (3) нулевого указателя как сигнала «не найдено», (4) лишней ветвистости, (5) «только указатель». Итоговая `find5` работает для любого контейнера, где **iterator** даёт `operator*`, `operator++`, `operator!=`.
+
+</details>
+
+##### **3.4. Требования к итератору в `find5` и `reverse`** (Лекция 7, **Пример** 2)
+
+Для двух алгоритмов ниже перечислите требования к типу итератора `P` и назовите **минимальную** категорию **iterator** в терминах **STL**.
+
+**Алгоритм A** (`find5`):
+```cpp
+template <typename T, typename P>
+P find5(P first, P beyond, const T& x) {
+    P p = first;
+    while (p != beyond && *p != x)
+        p++;
+    return p;
+}
+```
+
+**Алгоритм B** (`reverse`):
+```cpp
+template <typename P, typename T>
+void reverse(P start, P beyond) {
+    while (start != beyond) {
+        --beyond;
+        if (start != beyond) {
+            T t = *start;
+            *start = *beyond;
+            *beyond = t;
+            ++start;
+        }
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Алгоритм A — требования `find5`:**
+
+*   `operator!=` — сравнить `p != beyond` и `*p != x`.
+*   `operator*` — прочитать значение по `*p` (чтение).
+*   `operator++` — перейти к следующему (`p++`).
+
+**Минимум:** **Input Iterator** (чтение, только вперёд).
+
+**Алгоритм B — требования `reverse`:**
+
+*   `operator!=` — сравнить `start != beyond`.
+*   `operator++` — сдвинуть `start` вперёд (`++start`).
+*   `operator--` — сдвинуть `beyond` назад (`--beyond`). **Новое требование.**
+*   `operator*`, возвращающий **ссылку** — присваивание через итератор (`*start = *beyond`). **Новое требование.**
+
+**Минимум:** **Bidirectional Iterator** (вперёд и назад, чтение и запись).
+
+**Ответ:**
+
+*   для `find5` достаточно **Input Iterator**;
+*   для `reverse` нужен **Bidirectional Iterator** (к требованиям `find5` добавляются `--` и запись через `*`).
+
+</details>
+
+##### **3.5. Реализовать `iterator` для `NODE`** (Лекция 7, **Пример** 3)
+
+По заготовке класса `NODE` ниже допишите вложенный класс `iterator`, чтобы `find5` мог искать в односвязном списке.
+
+```cpp
+class NODE {
+    int value;
+    NODE* next;
+public:
+    NODE(int v) : value(v), next(0) { }
+    void add(NODE* n) { n->next = this->next; this->next = n; }
+    bool operator!=(NODE& n) { return this->value != n.value; }
+    operator int() { return value; }
+
+    class iterator;
+    friend class iterator;
+
+    class iterator {
+        NODE* p;
+    public:
+        // TODO: implement iterator(NODE*), operator*(), operator++(), operator!=()
+    };
+};
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** итератор оборачивает `NODE*` и реализует три нужные операции через поля `next` списка.
+
+```cpp
+class iterator {
+    NODE* p;   // current node (nullptr = "past the end")
+public:
+    // Constructor: point to the given node
+    iterator(NODE* node) : p(node) { }
+
+    // operator*: return the value of the current node
+    int operator*() { return p->value; }
+
+    // operator++: advance to the next node in the list
+    void operator++() { p = p->next; }
+
+    // operator!=: compare by pointer identity (address of current node)
+    bool operator!=(const iterator& other) const {
+        return p != other.p;
+    }
+
+    // Conversion to NODE* (used when passing to find5 as the "beyond" sentinel)
+    operator NODE*() { return p; }
+};
+```
+
+**Использование:**
+
+```cpp
+NODE* list = new NODE(1);
+NODE* n7 = new NODE(7); list->add(n7);
+NODE* n3 = new NODE(3); list->add(n3);
+
+// Search for value 7 in the list
+NODE::iterator result = find5<int>(
+    NODE::iterator(list),  // first: head of the list
+    NODE::iterator(0),     // beyond: past-the-end sentinel (nullptr)
+    7
+);
+```
+
+**Ответ:** `operator++` идёт по `next`; `nullptr` в виде `NODE*(0)` играет роль **past-the-end** — по смыслу как `&A[100]` у массива.
+
+</details>
+
+##### **3.6. Нарушение SRP: найти и исправить** (Туториал 7, **Пример** 1)
+
+Код на **Java** ниже нарушает **Single Responsibility Principle (SRP)**. Укажите нарушение и отрефакторьте под **SRP**.
+
+```java
+// ssad.srp.problem.Document
+public class Document {
+    private String title;
+    private int pages;
+
+    public Document(String title, int pages) {
+        this.title = title;
+        this.pages = pages;
+    }
+
+    public void save() {
+        System.out.println("The document is saved to .docx file");
+    }
+
+    public void load() {
+        System.out.println("The document is loaded from .docx file");
+    }
+}
+```
+
+```java
+// ssad.srp.problem.Main
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new Document("MyDoc", 10);
+        doc.save();
+        doc.load();
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** `Document` смешивает (1) хранение данных и (2) ввод‑вывод (**save** / **load**). По **SRP** это разносят по классам.
+
+**Нарушение:** у `Document` минимум две причины меняться — меняется модель данных (title, pages) *или* форматы файлов (например, добавили PDF). Это разные ответственности.
+
+**Решение после рефакторинга:**
+
+```java
+// Document: only stores data
+public class Document {
+    private String title;
+    private int pages;
+
+    public Document(String title, int pages) {
+        this.title = title;
+        this.pages = pages;
+    }
+
+    @Override
+    public String toString() {
+        return "Document{title='" + title + "', pages=" + pages + "}";
+    }
+}
+```
+
+```java
+// SaveDocument: responsible only for saving
+public class SaveDocument {
+    public void saveToDocx(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".docx file");
+        System.out.println(doc);
+    }
+
+    public void saveToPdf(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".pdf file");
+        System.out.println(doc);
+    }
+}
+```
+
+```java
+// LoadDocument: responsible only for loading
+public class LoadDocument {
+    public Document loadFromDocx(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".docx file");
+        return new Document(path + ".docx", 10);
+    }
+
+    public Document loadFromPdf(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".pdf file");
+        return new Document(path + ".pdf", 10);
+    }
+}
+```
+
+```java
+// Main: uses the separated classes
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new Document("MyDoc", 10);
+
+        SaveDocument docSaver = new SaveDocument();
+        docSaver.saveToPdf("MyDoc", doc);
+
+        System.out.println();
+
+        LoadDocument docLoader = new LoadDocument();
+        Document anotherDoc = docLoader.loadFromPdf("AnotherDoc", doc);
+    }
+}
+```
+
+**Ответ:** вынести `save()` и `load()` в `SaveDocument` и `LoadDocument`. У `Document` остаётся одна зона ответственности — состояние документа. Новый формат добавляют методами в классах ввода‑вывода, не ломая `Document`.
+
+</details>
+
+##### **3.7. Нарушение OCP: найти и исправить** (Туториал 7, **Пример** 2)
+
+Код на **Java** ниже нарушает **Open/Closed Principle (OCP)**. Укажите нарушение и отрефакторьте под **OCP**.
+
+```java
+// ssad.ocp.problem.SaveDocument
+// TODO: OCP is violated — adding new types will require changes here
+public class SaveDocument {
+    public void saveToDocx(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".docx file");
+        System.out.println(doc);
+    }
+
+    public void saveToPdf(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".pdf file");
+        System.out.println(doc);
+    }
+}
+```
+
+```java
+// ssad.ocp.problem.LoadDocument
+public class LoadDocument {
+    public Document loadFromDocx(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".docx file");
+        return new Document(path + ".docx", 10);
+    }
+
+    public Document loadFromPdf(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".pdf file");
+        return new Document(path + ".pdf", 10);
+    }
+}
+```
+
+```java
+// ssad.ocp.problem.Main
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new Document("MyDoc", 10);
+        SaveDocument docSaver = new SaveDocument();
+        docSaver.saveToPdf("MyDoc", doc);
+
+        LoadDocument docLoader = new LoadDocument();
+        Document anotherDoc = docLoader.loadFromPdf("AnotherDoc", doc);
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** при каждом новом формате (например `.txt`, `.xml`) приходится *править* `SaveDocument` и `LoadDocument`. По **OCP** систему *расширяют* новыми классами, реализующими абстракцию, а не открывают старые файлы.
+
+**Нарушение:** новый способ **save** требует правок в `SaveDocument.java` — классический **OCP**‑антипаттерн; с **load** то же.
+
+**Решение — интерфейсы `Saver` и `Loader`:**
+
+```java
+// Saver interface: closed for modification, open for extension
+public interface Saver {
+    void save(String path, Document doc);
+}
+```
+
+```java
+// Loader interface
+public interface Loader {
+    Document load(String path, Document doc);
+}
+```
+
+```java
+// Concrete saver for DOCX
+public class SaveDocumentToDocx implements Saver {
+    @Override
+    public void save(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".docx file");
+        System.out.println(doc);
+    }
+}
+```
+
+```java
+// Concrete saver for PDF
+public class SaveDocumentToPdf implements Saver {
+    @Override
+    public void save(String path, Document doc) {
+        System.out.println("The document is saved to " + path + ".pdf file");
+        System.out.println(doc);
+    }
+}
+```
+
+```java
+// Concrete loader from DOCX
+public class LoadDocumentFromDocx implements Loader {
+    public Document load(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".docx file");
+        return new Document(path + ".docx", 10);
+    }
+}
+```
+
+```java
+// Concrete loader from PDF
+public class LoadDocumentFromPdf implements Loader {
+    public Document load(String path, Document doc) {
+        System.out.println("The document is loaded from " + path + ".pdf file");
+        return new Document(path + ".pdf", 10);
+    }
+}
+```
+
+```java
+// Main: depends on abstractions (Saver, Loader)
+public class Main {
+    public static void main(String[] args) {
+        Document doc = new Document("MyDoc", 10);
+
+        Saver docSaver = new SaveDocumentToDocx();
+        docSaver.save("MyDoc", doc);
+
+        System.out.println();
+
+        Loader docLoader = new LoadDocumentFromDocx();
+        Document anotherDoc = docLoader.load("AnotherDoc", doc);
+    }
+}
+```
+
+**Ответ:** ввести `Saver` и `Loader`; каждый формат — отдельный класс. Для `.txt` добавляют `SaveDocumentToTxt implements Saver`, не меняя существующий код.
+
+</details>
+
+##### **3.8. Нарушение LSP: найти и исправить** (Туториал 7, **Пример** 3)
+
+Код на **Java** ниже нарушает **Liskov Substitution Principle (LSP)**. Укажите нарушение и объясните последствия.
+
+```java
+// ssad.lsp.problem.Document
+public class Document {
+    private String title;
+    private int pages;
+
+    public Document(String title, int pages) {
+        this.title = title;
+        this.pages = pages;
+    }
+
+    public void setData(String title) {
+        this.title = title;  // sets only the title
+    }
+
+    public String getTitle() { return title; }
+    public int getPages()    { return pages; }
+    public void setPages(int pages) { this.pages = pages; }
+
+    @Override
+    public String toString() {
+        return "Document{title='" + title + "', pages=" + pages + "}";
+    }
+}
+
+// ssad.lsp.problem.SpecialDocument
+// TODO: LSP is violated — setData() has changed behaviour
+public class SpecialDocument extends Document {
+    public SpecialDocument(String title, int pages) {
+        super(title, pages);
+    }
+
+    @Override
+    public void setData(String title) {
+        super.setData(title);
+        setPages(20);  // unexpected side effect!
+    }
+}
+
+// ssad.lsp.problem.Main
+public class Main {
+    public static void main(String[] args) {
+        Document doc1 = new Document("MyDoc", 10);
+        Document doc2 = new SpecialDocument("MySpecialDoc", 10);
+
+        doc2.setData("MyDoc");
+
+        System.out.println("doc1: " + doc1);
+        System.out.println("doc2: " + doc2);
+    }
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Ключевая идея:** подкласс должен подставляться вместо базового *без сюрпризов для вызывающего кода*; переопределение сохраняет наблюдаемый контракт.
+
+**Нарушение:** у `Document.setData(title)` контракт ясен: *меняем заголовок, остальное не трогаем*. `SpecialDocument.setData` *ещё* выставляет `pages = 20`. При `Document doc2 = new SpecialDocument(...)` вызов `doc2.setData("MyDoc")` неожиданно меняет число страниц.
+
+**Демонстрация:**
+
+```java
+Document doc1 = new Document("MyDoc", 10);
+Document doc2 = new SpecialDocument("MySpecialDoc", 10);
+
+doc2.setData("MyDoc");
+
+System.out.println("doc1: " + doc1);
+// Output: Document{title='MyDoc', pages=10}   ← expected
+
+System.out.println("doc2: " + doc2);
+// Output: Document{title='MyDoc', pages=20}   ← SURPRISE! Pages changed!
+```
+
+**Исправление — сохранить контракт базового класса:**
+
+```java
+public class SpecialDocument extends Document {
+    public SpecialDocument(String title, int pages) {
+        super(title, pages);
+    }
+
+    // Additional behaviour is added as a NEW method, not by overriding setData
+    public void method() {
+        System.out.println("Special document method");
+    }
+
+    // If setData MUST do something extra, it should not change observable state
+    // that callers of Document.setData don't expect.
+    // Best practice: do NOT override setData if you cannot preserve its contract.
+}
+```
+
+Или пересмотреть иерархию: если при каждом обновлении заголовка *обязательно* нужно менять `pages`, наследование от `Document` может быть неверным — лучше композиция.
+
+**Ответ:** нарушение — побочный эффект `setPages(20)` в `SpecialDocument.setData`. Либо убрать его и соблюдать контракт `Document.setData`, либо не наследовать `setData` с другим смыслом.
+
+</details>

@@ -1,0 +1,793 @@
+---
+title: "W3. Указатели, объявления, препроцессор и файловый ввод-вывод в C"
+author: "Eugene Zouev, Munir Makhmutov"
+date: 2025-09-18
+lang: ru
+format: html
+engine: knitr
+---
+
+{{< video 3.mp4 >}}
+
+[Quiz](https://notebooklm.google.com/notebook/75225fb6-1a48-403e-9915-9d6a13e235e8?artifactId=fa65ba46-1add-46ba-a3bf-cd41d72dbd71) | [Flashcards](https://notebooklm.google.com/notebook/75225fb6-1a48-403e-9915-9d6a13e235e8?artifactId=fd8509c1-a167-4239-8e93-88ca1e684017)
+
+#### **1. Краткое содержание**
+##### **1.1 Модель памяти C: стек, куча и глобальная память**
+
+Чтобы понимать указатели и переменные в C, важно знать, как программа раскладывает память. Обычно выделяют три основные области:
+
+1.  **Global (or Static) Storage Area** (**глобальная/статическая память**): **global variables** (объявленные вне функций) и **static variables** (с ключевым словом `static`). Объекты создаются при старте программы и существуют всё время её выполнения; у них фиксированный, заранее известный адрес в адресном пространстве процесса.
+2.  **Stack** (**стек**): область памяти под вызовы функций. При вызове создаётся *stack frame* с **local variables** (ещё их называют *automatic variables*), параметрами и **return address**. Стек работает по принципу **Last-In, First-Out (LIFO)**: при возврате из функции кадр уничтожается вместе со всеми локальными переменными — это происходит автоматически, его управляет компилятор/рантайм.
+3.  **Heap** (**куча**): большой пул памяти на время выполнения. В отличие от стека, **dynamic memory allocation** не автоматическая: нужно явно запрашивать и явно освобождать, когда размер/время жизни не заданы на этапе компиляции.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.2 Указатели: основа**
+
+**Pointer** — переменная, которая хранит не «данные напрямую», а *адрес памяти* другого объекта; она «указывает» на место, где лежат фактические данные. Такой механизм даёт динамическое управление памятью и эффективную работу с массивами и структурами данных. Два ключевых оператора:
+
+*   **Address-of** (`&`): адрес переменной (`&my_var`).
+*   **Dereference** (`*`): значение по адресу, записанному в указателе (если `p` указывает на `my_var`, то `*p` — это значение `my_var`).
+
+##### **1.3 Арифметика указателей и массивы**
+
+В C массивы и указатели тесно связаны: имя массива в выражении ведёт себя как *константный указатель* на первый элемент: `array` эквивалентно `&array[0]`.
+
+**Pointer arithmetic**: `p + n` сдвигает адрес на `n * sizeof(*p)` байт (в элементах типа). Полезные тождества:
+
+*   `p + i` указывает на элемент со смещением `i`.
+*   `*(p + i)` эквивалентно `p[i]`.
+*   `p++` сдвигает указатель к следующему элементу.
+
+Стандарт задаёт эквивалентность `E1[E2]` и `(*((E1)+(E2)))`; из-за коммутативности `+` получаются «шуточные» но валидные записи вроде `5[arr]`.
+
+##### **1.4 Динамическое управление памятью**
+
+Память на **heap** выделяют функциями из `<stdlib.h>`.
+
+1.  **`malloc`**: резервирует блок; аргумент — число байт (часто через `sizeof`, например `malloc(10 * sizeof(int))`). Возвращает `void*` или `NULL`. Для использования обычно нужен **cast** к целевому типу указателя, чтобы компилятор знал семантику и масштаб арифметики.
+2.  **`free`**: возвращает ранее выделенный блок памяти куче. **Абсолютная ответственность** программиста — вызвать `free` для каждого успешного `malloc`; иначе возникает **memory leak**. Опасны также **double free** и дальнейшее использование **dangling pointer**.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.5 Типичные ловушки указателей**
+
+Указатели мощные, но рискованные. Скотт Мейерс выделял классы проблем:
+
+*   **Ownership** и уничтожение: указатель не несёт явной «владельческой» метки → утечки или повторные `free` и порча кучи.
+*   **Dangling pointers**: после `free` адрес недействителен; разыменование — **undefined behavior**.
+*   **Pointer vs. array**: по одному `T*` не видно, указывает ли он на один объект или на начало массива и каков размер.
+*   **Uninitialized pointers**: мусорный адрес → почти наверняка падение при разыменовании.
+
+##### **1.6 Объявления в C**
+
+**Declaration** вводит идентификатор и задаёт свойства; в общем случае в декларации могут участвовать **storage class** (`static`), **type specifier** (`int`), имя сущности и **initializer**.
+
+Синтаксис деклараций в C известен правилом «declaration reflects use»: запись повторяет способ *использования* имени в выражении.
+
+*   `int *p;` читается как «`*p` имеет тип `int`» → `p` — указатель на `int`.
+*   `int arr[10];` — «`arr[i]` — `int`» → массив из 10 `int`.
+*   `void (*f)(int);` — «`*f`, вызванный с `int`, даёт `void`» → **pointer to function**.
+
+`typedef` задаёт псевдоним типа и упрощает сложные декларации, например `typedef int (*MathFunc)(int, int);`.
+
+<!-- DIAGRAM HERE -->
+
+##### **1.7 Препроцессор C**
+
+Препроцессор — текстовая фаза *до* компиляции; обрабатывает строки с `#` — **preprocessor directives**.
+
+*   `#include <...>` / `#include "..."`: подстановка заголовка.
+*   `#define MACRO value`: **macro**; подстановка текста; function-like macros требуют аккуратных скобок вокруг параметров и тела.
+*   **Conditional compilation**: `#if`, `#ifdef`, `#ifndef`, `#else`, `#endif` — включение/исключение кусков. Частый паттерн — **include guards**:
+    ```c
+    #ifndef MY_HEADER_H
+    #define MY_HEADER_H
+    // ... header content ...
+    #endif
+    ```
+
+<!-- DIAGRAM HERE -->
+
+##### **1.8 File I/O в C**
+
+Ввод-вывод через `<stdio.h>` идёт по **streams**; дескриптор потока — `FILE*` (**file handle**).
+
+Типичный цикл:
+
+1.  **Open**: `fopen("filename", "mode")`. Режимы: `"r"`, `"w"`, `"a"`, бинарные `"rb"`, `"wb"`, `"ab"`, режимы обновления `"r+"`, `"w+"`, `"a+"`. Всегда проверяйте `NULL`.
+2.  **Read/Write**: `fprintf`, `fscanf`, `fgetc`, `fputc`, `fgets`, `fputs`, `fread`, `fwrite`, …
+3.  **Close**: `fclose` сбрасывает буферы на диск и освобождает ресурсы ОС; если не закрыть файл, возможна **потеря данных**.
+
+***
+
+#### **2. Определения**
+*   **Pointer**: переменная с адресом другого объекта.
+*   **Dereferencing**: доступ к значению по адресу из указателя через `*`.
+*   **Pointer Arithmetic**: арифметика указателей с масштабом `sizeof` целевого типа.
+*   **Dynamic Memory Allocation**: запрос/освобождение памяти на куче (`malloc` / `free`).
+*   **Heap**: область для динамического выделения.
+*   **Stack**: LIFO-область для локальных переменных и кадров вызовов.
+*   **Memory Leak**: динамически выделенная память уже не нужна, но не освобождена через `free()` и остаётся недоступной до конца работы программы.
+*   **Dangling Pointer**: указатель на уже освобождённую или иначе недействительную память.
+*   **Preprocessor**: программа предобработки исходника до компиляции.
+*   **Macro**: имя из `#define`, заменяемое препроцессором.
+*   **Include Guard**: конструкция в заголовке против повторного включения.
+*   **Typedef**: псевдоним типа.
+*   **File Handle**: `FILE*` — открытый поток и связанное состояние.
+
+***
+
+#### **3. Примеры**
+##### **3.1. Сильные числа на отрезке** (**Лаба** 3, **Задание** 1)
+Напишите программу, находящую **strong numbers** на отрезке: на вход два целых — начало и конец диапазона. **Strong number** — число, равное сумме факториалов своих цифр.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+
+// Function to calculate the factorial of a single digit.
+// Factorials are pre-calculated for efficiency since we only need 0! to 9!.
+long long factorial(int n) {
+    long long facts[] = {1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880};
+    return facts[n];
+}
+
+// Function to check if a number is a Strong Number.
+int isStrong(int num) {
+    // A quick check: single-digit numbers 1 and 2 are strong. 0 is not.
+    if (num < 0) return 0;
+    if (num == 0) return 0;
+
+    int originalNum = num;
+    long long sumOfFacts = 0;
+
+    // Loop through each digit of the number.
+    while (num > 0) {
+        // Extract the last digit.
+        int digit = num % 10;
+        // Add its factorial to the sum.
+        sumOfFacts += factorial(digit);
+        // Remove the last digit.
+        num /= 10;
+    }
+
+    // A number is strong if the sum of factorials of its digits is equal to itself.
+    if (sumOfFacts == originalNum) {
+        return 1; // True
+    } else {
+        return 0; // False
+    }
+}
+
+int main() {
+    int start, end;
+
+    // Get the start and end of the range from the user.
+    printf("Input:\n");
+    scanf("%d", &start);
+    scanf("%d", &end);
+
+    printf("\nOutput:\n");
+    printf("The strong numbers are: ");
+
+    // Iterate through each number in the specified range.
+    for (int i = start; i <= end; i++) {
+        // If the current number is a strong number, print it.
+        if (isStrong(i)) {
+            printf("%d ", i);
+        }
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+</details>
+
+##### **3.2. Вертикальная гистограмма частот символов** (**Лаба** 3, **Задание** 2)
+Напишите программу, печатающую вертикальную гистограмму частот символов, упорядоченных по частоте. Вход — строка из строчных латинских букв.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    char input[256];
+    // Array to store the frequency of each character ('a' to 'z').
+    int frequencies[26] = {0};
+
+    printf("Input: ");
+    fgets(input, sizeof(input), stdin);
+
+    // --- Step 1: Calculate character frequencies ---
+    for (int i = 0; input[i] != '\0'; i++) {
+        char c = input[i];
+        // Check if the character is a lowercase letter.
+        if (c >= 'a' && c <= 'z') {
+            // Increment the count for that letter.
+            // (c - 'a') gives an index from 0 to 25.
+            frequencies[c - 'a']++;
+        }
+    }
+
+    // --- Step 2: Find the maximum frequency for the histogram height ---
+    int maxFreq = 0;
+    for (int i = 0; i < 26; i++) {
+        if (frequencies[i] > maxFreq) {
+            maxFreq = frequencies[i];
+        }
+    }
+
+    printf("\nOutput:\n");
+
+    // --- Step 3: Print the histogram from top to bottom ---
+    // Loop for each level of frequency, from the highest to the lowest.
+    for (int level = maxFreq; level > 0; level--) {
+        // Loop through all possible characters.
+        for (int i = 0; i < 26; i++) {
+            // Only consider characters that actually appeared in the text.
+            if (frequencies[i] > 0) {
+                 // If the frequency of this character is at least the current level, print a dot.
+                if (frequencies[i] >= level) {
+                    printf(". ");
+                } else {
+                    // Otherwise, print empty space to maintain alignment.
+                    printf("  ");
+                }
+            }
+        }
+        // Go to the next line for the next level of the histogram.
+        printf("\n");
+    }
+
+    // --- Step 4: Print the character labels at the bottom ---
+    for (int i = 0; i < 26; i++) {
+        if (frequencies[i] > 0) {
+            printf("%c ", 'a' + i);
+        }
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+</details>
+
+##### **3.3. Перебор пароля (brute force)** (**Лаба** 3, **Задание** 3)
+Напишите программу, подбирающую пароль пользователя перебором. Длина пароля от 1 до 3 символов; допустимы ASCII-символы с кодами от 32 до 126.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    // Array to store the password to find. Max length is 3 + 1 for null terminator.
+    char password[4];
+    // Array to build our guesses.
+    char guess[4];
+    // Counter for the number of attempts.
+    long long attempts = 0;
+
+    // Prompt the user and read the password.
+    printf("Input:\n");
+    scanf("%3s", password); // Read at most 3 characters.
+
+    // --- Brute-force for length 1 ---
+    for (char c1 = 32; c1 <= 126; c1++) {
+        guess[0] = c1;
+        guess[1] = '\0'; // Null-terminate for a 1-char string.
+        attempts++;
+        // strcmp returns 0 if the strings are identical.
+        if (strcmp(password, guess) == 0) {
+            printf("found = %s!\n", guess);
+            printf("number of attempts = %lld\n", attempts);
+            return 0; // Exit after finding the password.
+        }
+    }
+
+    // --- Brute-force for length 2 ---
+    for (char c1 = 32; c1 <= 126; c1++) {
+        for (char c2 = 32; c2 <= 126; c2++) {
+            guess[0] = c1;
+            guess[1] = c2;
+            guess[2] = '\0'; // Null-terminate for a 2-char string.
+            attempts++;
+            if (strcmp(password, guess) == 0) {
+                printf("found = %s!\n", guess);
+                printf("number of attempts = %lld\n", attempts);
+                return 0;
+            }
+        }
+    }
+
+    // --- Brute-force for length 3 ---
+    for (char c1 = 32; c1 <= 126; c1++) {
+        for (char c2 = 32; c2 <= 126; c2++) {
+            for (char c3 = 32; c3 <= 126; c3++) {
+                guess[0] = c1;
+                guess[1] = c2;
+                guess[2] = c3;
+                guess[3] = '\0'; // Null-terminate for a 3-char string.
+                attempts++;
+                if (strcmp(password, guess) == 0) {
+                    printf("found = %s!\n", guess);
+                    printf("number of attempts = %lld\n", attempts);
+                    return 0;
+                }
+            }
+        }
+    }
+
+    printf("Password not found (it might be longer than 3 characters or use other characters).\n");
+    return 0;
+}
+```
+</details>
+
+##### **3.4. Разбор вывода: указатели и swap** (**Лаба** 3, **Задание** 4)
+Каков будет вывод программ?
+
+```c
+// Case A
+#include <stdio.h>
+void swap(int *ap, int *bp) {
+    int temp = *ap;
+    *ap = *bp;
+    *bp = temp;
+}
+int main() {
+    int a = 1, *ap = &a;
+    int b = 2, *bp = &b;
+    swap(ap, bp);
+    printf("%d %d\n", a, b);
+    return 0;
+}
+```
+
+```c
+// Case B
+#include <stdio.h>
+void swap(int *ap, int *bp) {
+    int *temp = ap;
+    ap = bp;
+    bp = temp;
+}
+int main() {
+    int a = 1, *ap = &a;
+    int b = 2, *bp = &b;
+    swap(ap, bp);
+    printf("%d %d\n", a, b);
+    return 0;
+}
+```
+
+```c
+// Case C
+#include <stdio.h>
+int main() {
+    int a = 1, *ap = &a;
+    int b = 2, *bp = &b;
+    int *temp = ap;
+    ap = bp;
+    bp = temp;
+    printf("%d %d\n", a, b);
+    return 0;
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+**Случай A** — корректный обмен через функцию в C.
+
+1. В `main` создаются `a=1`, `b=2`; `ap` и `bp` хранят их адреса.
+2. `swap(ap, bp)` передаёт адреса в функцию.
+3. Внутри `swap` разыменование `*ap` и `*bp` меняет сами `a` и `b` в `main`.
+4. `printf` в `main` печатает уже обменянные значения.
+
+Вывод A: `2 1`
+
+**Случай B** — классический **pass-by-value** даже для указателей.
+
+1. В `swap` копируются значения указателей-параметров; локальные `ap`, `bp` в функции — *другие переменные*.
+2. Обмениваются только локальные копии адресов; `a` и `b` в `main` не трогаются.
+
+Вывод B: `1 2`
+
+**Случай C** — обмен адресов внутри `main` у локальных `ap` и `bp`.
+
+1. После обмена `ap` указывает на `b`, `bp` на `a`, но `printf("%d %d\n", a, b)` печатает именно `a` и `b`, а не `*ap`/`*bp`.
+
+Вывод C: `1 2`
+</details>
+
+##### **3.5. Разбор вывода: указатели и массив** (**Лаба** 3, **Задание** 5)
+Каков будет вывод программы?
+
+```c
+#include <stdio.h>
+
+int main() {
+    int array[] = {10, 20, 30};
+    int *pointer = array;
+
+    printf("%d\n", *pointer);
+    printf("%p\n", pointer);
+    printf("%d\n", *array);
+    printf("%p\n", array);
+
+    printf("%d\n", ++*pointer);
+    printf("%d\n", *++pointer);
+    
+    int *pointer1 = array;
+    int *pointer2 = array;
+    printf("%d\n", *pointer1++ + ++*++pointer2);
+    return 0;
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+Ниже предполагается, что `int` занимает 4 байта; конкретные адреса иллюстративны.
+
+Начальное состояние: `array` (условно с адреса 1000) содержит `{10, 20, 30}`; `pointer` указывает на начало.
+
+1. `printf("%d\n", *pointer);` → `10`
+2. `printf("%p\n", pointer);` → адрес начала массива
+3. `printf("%d\n", *array);` → `10` (имя массива к первому элементу)
+4. `printf("%p\n", array);` → тот же адрес, что в п.2
+5. `printf("%d\n", ++*pointer);` → префиксный `++` к значению по `pointer`: `array[0]` становится `11`, печатается `11`
+6. `printf("%d\n", *++pointer);` → `pointer` сдвигается к `array[1]`, печатается `20`
+7. `printf("%d\n", *pointer1++ + ++*++pointer2);` — несколько побочных эффектов; порядок вычисления операндов `+` не специфицирован. Ниже приведён один из допустимых пошаговых сценариев, который для многих компиляторов даёт итог `32`: сначала через `pointer2` увеличивается `array[1]` до `21`, затем берётся `array[0]` как `11`, сумма `11+21=32`.
+
+Вывод по шагам 1–6: `10`, адрес, `10`, тот же адрес, `11`, `20`; последняя строка — `32`.
+</details>
+
+##### **3.6. Какой оператор меняет `i` на 75?** (**Лаба** 3, **Задание** 6)
+Рассмотрите фрагмент:
+
+```c
+int *p;
+int i;
+int k;
+i = 42;
+k = i;
+p = &i;
+```
+
+Какой из вариантов приводит к тому, что значение `i` станет `75`?
+
+A) `k = 75;`  
+B) `*k = 75;`  
+C) `p = 75;`  
+D) `*p = 75;`
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+После исходного фрагмента: `i = 42`, `k = 42` (копия), `p` указывает на `i`.
+
+A) Меняет только `k`, `i` остаётся `42`.  
+B) Ошибка компиляции: `k` не указатель, к `*` неприменимо.  
+C) Меняет адрес в `p`, не значение `i` в памяти по прежнему адресу `i`.  
+D) `*p = 75` записывает `75` по адресу `i` — верный ответ.
+</details>
+
+##### **3.7. Разбор вывода: строки и `strcpy`** (**Лаба** 3, **Задание** 7)
+Каков будет вывод программы?
+
+```c
+#include <stdio.h>
+#include <string.h>
+int main() {
+    char buf1[100] = "Hello";
+    char buf2[100] = "World";
+    char *ptr1 = buf1 + 2;
+    char *ptr2 = buf2 + 3;
+    strcpy(ptr1, buf2);
+    strcpy(ptr2, buf1);
+    printf("%s\n", buf1);
+    printf("%s\n", ptr1);
+    printf("%s\n", buf2);
+    printf("%s\n", ptr2);
+    return 0;
+}
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+Пошагово (строки завершаются `\0`):
+
+1. После указателей: `ptr1` на третий символ `buf1`, `ptr2` на четвёртый символ `buf2`.
+2. `strcpy(ptr1, buf2)` перезаписывает `buf1` с позиции `ptr1`, получается `HeWorld`.
+3. `strcpy(ptr2, buf1)` копирует текущий `buf1` в позицию `ptr2` внутри `buf2` → `WorHeWorld`.
+
+Печать:
+
+- `buf1` → `HeWorld`
+- `ptr1` → хвост с `W` → `World`
+- `buf2` → `WorHeWorld`
+- `ptr2` → с позиции `H` → `HeWorld`
+</details>
+
+##### **3.8. Длина строки через указатель (без `strlen`)** (**Лаба** 3, **Задание** 8)
+Напишите программу, находящую длину строки с помощью указателя. Не используйте `strlen()`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+
+// Function that takes a pointer to the beginning of a string.
+int stringLength(char *startPtr) {
+    // Create a second pointer to traverse the string.
+    char *endPtr = startPtr;
+
+    // Loop until the traversing pointer finds the null terminator character '\0',
+    // which marks the end of the string.
+    while (*endPtr != '\0') {
+        // Increment the pointer to move to the next character's memory address.
+        endPtr++;
+    }
+
+    // The length of the string is the difference between the final address (endPtr)
+    // and the starting address (startPtr). In C, subtracting pointers gives the
+    // number of elements between them.
+    return endPtr - startPtr;
+}
+
+int main() {
+    char myString[100];
+
+    printf("Enter a string: ");
+    // Read a line of input from the user, including spaces.
+    fgets(myString, sizeof(myString), stdin);
+
+    // fgets includes the newline character ('\n') in the string.
+    // We need to find and remove it before calculating the length.
+    char *newline = myString;
+    while(*newline != '\n' && *newline != '\0') {
+        newline++;
+    }
+    *newline = '\0'; // Replace newline with null terminator.
+
+
+    // The array name `myString` automatically acts as a pointer to its first element.
+    int length = stringLength(myString);
+
+    printf("The length of the string is: %d\n", length);
+
+    return 0;
+}
+```
+</details>
+
+##### **3.9. Числовая пирамида** (**Домашнее задание** 1, **Задание** 1)
+Напишите программу, печатающую «пирамиду» чисел с шагом +1. Для входа `4` вывод:
+
+```
+1
+23
+456
+78910
+```
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    int rows;
+    // Initialize a counter for the numbers to be printed.
+    int currentNumber = 1;
+
+    // Get the desired number of rows from the user.
+    printf("Input: ");
+    scanf("%d", &rows);
+
+    printf("Output:\n");
+
+    // The outer loop controls the number of rows.
+    for (int i = 1; i <= rows; i++) {
+        // The inner loop controls the number of elements printed in each row.
+        // Row 'i' has 'i' numbers.
+        for (int j = 1; j <= i; j++) {
+            // Print the current number.
+            printf("%d", currentNumber);
+            // Increment the number for the next position.
+            currentNumber++;
+        }
+        // After printing all numbers in a row, move to the next line.
+        printf("\n");
+    }
+
+    return 0;
+}
+```
+</details>
+
+##### **3.10. Удаление дубликатов из массива** (**Домашнее задание** 2, **Задание** 2)
+Напишите программу, удаляющую дубликаты из массива целых.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+
+int main() {
+    int n; // Number of elements in the original array.
+    int arr[1000]; // The original array.
+
+    // Read the size of the array.
+    printf("Input:\n");
+    scanf("%d", &n);
+
+    // Read the n elements into the array.
+    for (int i = 0; i < n; i++) {
+        scanf("%d", &arr[i]);
+    }
+
+    // --- In-place removal of duplicates ---
+    // If the array is empty or has one element, there are no duplicates.
+    if (n == 0 || n == 1) {
+        // The size of the unique array is just n.
+        // The printing loop below will handle this.
+    } else {
+        // Sort the array first. This makes finding duplicates much easier,
+        // as they will all be adjacent to each other.
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = i + 1; j < n; j++) {
+                if (arr[i] > arr[j]) {
+                    int temp = arr[i];
+                    arr[i] = arr[j];
+                    arr[j] = temp;
+                }
+            }
+        }
+        
+        int uniqueIndex = 0; // Index for the next unique element.
+        // Traverse the sorted array.
+        for (int i = 0; i < n - 1; i++) {
+            // If the current element is different from the next element,
+            // it's a unique value (or the last of a group of duplicates).
+            if (arr[i] != arr[i+1]) {
+                arr[uniqueIndex++] = arr[i];
+            }
+        }
+        // Add the very last element of the sorted array.
+        arr[uniqueIndex++] = arr[n-1];
+        
+        // The new size of the array (number of unique elements) is uniqueIndex.
+        n = uniqueIndex;
+    }
+
+    // Print the modified array, which now contains only unique elements.
+    printf("\nOutput:\n");
+    for (int i = 0; i < n; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+```
+</details>
+
+##### **3.11. Копирование строки указателями (без `strcpy`)** (**Домашнее задание** 3, **Задание** 3)
+Напишите программу, копирующую одну строку в другую с помощью указателей. Не используйте `strcpy()`.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+
+// Function that takes a pointer to the destination and a pointer to the source string.
+void copyString(char *destination, const char *source) {
+    // The loop continues as long as the character pointed to by 'source' is not
+    // the null terminator ('\0').
+    while (*source != '\0') {
+        // Copy the character from the source to the destination,
+        // then increment both pointers to move to the next character.
+        *destination++ = *source++;
+    }
+    // After the loop finishes, the null terminator from the source has not been copied.
+    // We must add it to the end of the destination string to make it a valid string.
+    *destination = '\0';
+}
+
+int main() {
+    char sourceString[] = "Copy this string using pointers!";
+    // Make sure the destination buffer is large enough to hold the source string.
+    char destinationString[100];
+
+    printf("Source:      '%s'\n", sourceString);
+
+    // Call the copy function. The array names automatically act as pointers
+    // to their first elements.
+    copyString(destinationString, sourceString);
+
+    printf("Destination: '%s'\n", destinationString);
+
+    return 0;
+}
+```
+</details>
+
+##### **3.12. Ввод и печать 2D-массива через указатели и функции** (**Домашнее задание** 4, **Задание** 4)
+Напишите программу для ввода и печати элементов двумерного массива с использованием указателей и функций.
+
+<details>
+<summary>Нажмите, чтобы увидеть решение</summary>
+
+```c
+#include <stdio.h>
+
+// Define constants for the dimensions of the array for clarity and easy modification.
+#define ROWS 3
+#define COLS 4
+
+// Function to input elements into a 2D array.
+// The parameter `int (*arr)[COLS]` declares `arr` as a pointer to an array of `COLS` integers.
+// This allows us to pass a 2D array and maintain its column information.
+void inputMatrix(int (*arr)[COLS], int rows) {
+    printf("Enter the elements of the %d x %d matrix:\n", rows, COLS);
+    
+    // Loop through each row.
+    for (int i = 0; i < rows; i++) {
+        // Loop through each column in the current row.
+        for (int j = 0; j < COLS; j++) {
+            // `(*(arr + i) + j)` is the pointer arithmetic equivalent of `&arr[i][j]`.
+            // `arr + i` points to the start of the i-th row.
+            // `*(arr + i)` gives the address of the first element in the i-th row.
+            // `(*(arr + i) + j)` then gives the address of the j-th element in that row.
+            printf("Enter element [%d][%d]: ", i, j);
+            scanf("%d", (*(arr + i) + j));
+        }
+    }
+}
+
+// Function to print the elements of a 2D array.
+void printMatrix(const int (*arr)[COLS], int rows) {
+    printf("\nThe matrix you entered is:\n");
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < COLS; j++) {
+            // `*(*(arr + i) + j)` dereferences the pointer to get the value,
+            // equivalent to `arr[i][j]`.
+            printf("%-5d", *(*(arr + i) + j)); // Use %-5d for aligned output.
+        }
+        printf("\n"); // Print a newline at the end of each row.
+    }
+}
+
+int main() {
+    // Declare the 2D array.
+    int matrix[ROWS][COLS];
+
+    // Call the function to get user input for the matrix.
+    // The array name 'matrix' decays into a pointer to its first element (the first row).
+    inputMatrix(matrix, ROWS);
+
+    // Call the function to print the matrix.
+    printMatrix(matrix, ROWS);
+
+    return 0;
+}
+```
+</details>
+
