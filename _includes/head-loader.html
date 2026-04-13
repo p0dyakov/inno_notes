@@ -1,0 +1,122 @@
+<script>
+(function () {
+	var KEY = "inn-color-mode";
+	function stored() {
+		try {
+			return localStorage.getItem(KEY);
+		} catch {
+			return null;
+		}
+	}
+	function computeDark() {
+		var s = stored();
+		if (s === "light") return false;
+		if (s === "dark") return true;
+		try {
+			return window.matchMedia("(prefers-color-scheme: dark)").matches;
+		} catch {
+			return false;
+		}
+	}
+	function apply() {
+		var dark = computeDark();
+		document.documentElement.classList.toggle("inn-dark", dark);
+		try {
+			document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+		} catch {
+			/* ignore */
+		}
+		try {
+			window.dispatchEvent(new CustomEvent("inn-color-mode-change"));
+		} catch {
+			/* ignore */
+		}
+	}
+	apply();
+	try {
+		window.__innColorMode = {
+			get: function () {
+				return stored() || "auto";
+			},
+			set: function (mode) {
+				if (mode === "auto") {
+					try {
+						localStorage.removeItem(KEY);
+					} catch {
+						/* ignore */
+					}
+				} else {
+					try {
+						localStorage.setItem(KEY, mode);
+					} catch {
+						/* ignore */
+					}
+				}
+				apply();
+			},
+			apply: apply,
+		};
+		window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+			if (!stored()) apply();
+		});
+	} catch {
+		/* ignore */
+	}
+	document.documentElement.classList.add("inn-ui-booting");
+})();
+</script>
+
+<style>
+	@keyframes inn-head-loader-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	html.inn-ui-booting {
+		background: #ffffff;
+		overflow: hidden;
+	}
+
+	html.inn-dark.inn-ui-booting {
+		background: #000000;
+	}
+
+	html.inn-ui-booting body {
+		opacity: 0;
+	}
+
+	html.inn-ui-booting::before {
+		content: "";
+		position: fixed;
+		inset: 0;
+		background: #ffffff;
+		z-index: 2147483646;
+		pointer-events: none;
+	}
+
+	html.inn-dark.inn-ui-booting::before {
+		background: #000000;
+	}
+
+	html.inn-ui-booting::after {
+		content: "";
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		width: 44px;
+		height: 44px;
+		margin: -22px 0 0 -22px;
+		border-radius: 50%;
+		border: 3px solid rgba(13, 110, 253, 0.18);
+		border-top-color: #0d6efd;
+		animation: inn-head-loader-spin 0.72s linear infinite;
+		z-index: 2147483647;
+		pointer-events: none;
+	}
+
+	html.inn-dark.inn-ui-booting::after {
+		border-color: rgba(255, 255, 255, 0.22);
+		border-top-color: #ffffff;
+	}
+</style>
