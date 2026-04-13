@@ -1349,6 +1349,18 @@ window.Quarto = {
 // onclose (socket disconnect) is also suppressed to prevent spurious reload.
 (function () {
 	if (!window.WebSocket) return;
+	document.documentElement.classList.add('inn-ui-booting');
+	if (document.body) document.body.classList.add('inn-ui-booting');
+	if (!document.getElementById('inn-page-loader') && document.body) {
+		var bootLoader = document.createElement('div');
+		bootLoader.id = 'inn-page-loader';
+		bootLoader.className = 'is-active is-booting';
+		bootLoader.setAttribute('aria-hidden', 'true');
+		bootLoader.innerHTML = '' +
+			'<div class="inn-page-loader__backdrop"></div>' +
+			'<div class="inn-page-loader__spinner"></div>';
+		document.body.appendChild(bootLoader);
+	}
 	var Orig = window.WebSocket;
 	function InnWS(url, proto) {
 		var ws = proto !== undefined ? new Orig(url, proto) : new Orig(url);
@@ -2001,13 +2013,21 @@ window.Quarto = {
 
 		body.inn-custom-nav #quarto-content {
 			display: block;
+			width: 100%;
+			max-width: none;
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+			overflow-x: clip;
 		}
 
 		body.inn-custom-nav main#quarto-document-content {
 			margin-left: var(--inn-nav-width);
+			width: calc(100% - var(--inn-nav-width));
 			max-width: calc(100% - var(--inn-nav-width));
 			padding: 1.4rem 2.15rem 3rem;
 			box-sizing: border-box;
+			overflow-x: clip;
 			view-transition-name: inn-main-content;
 		}
 
@@ -2340,36 +2360,88 @@ window.Quarto = {
 
 	#inn-page-loader {
 		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100vw;
-		height: 3px;
+		inset: 0;
 		z-index: 9999;
 		pointer-events: none;
 		opacity: 0;
-		transition: opacity 180ms ease;
+		visibility: hidden;
+		transition:
+			opacity 180ms ease,
+			visibility 180ms ease;
 	}
 
 	#inn-page-loader.is-active {
 		opacity: 1;
+		visibility: visible;
 	}
 
-	#inn-page-loader::before {
-		content: "";
-		position: absolute;
-		inset: 0;
-		background: rgba(13, 110, 253, 0.08);
+	html.inn-ui-booting,
+	body.inn-ui-booting {
+		overflow: hidden;
 	}
 
-	#inn-page-loader::after {
-		content: "";
+	body.inn-ui-booting #quarto-content,
+	body.inn-ui-booting #quarto-document-content,
+	body.inn-ui-booting #quarto-header,
+	body.inn-ui-booting #quarto-sidebar,
+	body.inn-ui-booting #TOC,
+	body.inn-ui-booting main,
+	body.inn-ui-booting .page-layout-article,
+	body.inn-ui-booting .page-layout-full,
+	body.inn-ui-booting .quarto-title-block {
+		opacity: 0;
+		transition: opacity 180ms ease;
+	}
+
+	#inn-page-loader .inn-page-loader__backdrop {
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(90deg, rgba(13, 110, 253, 0.74), rgba(88, 154, 255, 0.96));
-		border-radius: 999px;
-		transform-origin: left center;
-		transform: scaleX(calc(var(--inn-loader-progress, 0) / 100));
-		transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+		background: #ffffff;
+		opacity: 0;
+		transition: opacity 220ms ease;
+	}
+
+	#inn-page-loader .inn-page-loader__spinner {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 44px;
+		height: 44px;
+		margin: -22px 0 0 -22px;
+		border-radius: 50%;
+		border: 3px solid rgba(23, 48, 66, 0.14);
+		border-top-color: #173042;
+		opacity: 0;
+		animation: inn-page-loader-spin 0.72s linear infinite;
+		transition:
+			opacity 220ms ease,
+			transform 220ms ease;
+		transform: scale(0.96);
+	}
+
+	#inn-page-loader.is-booting .inn-page-loader__backdrop,
+	#inn-page-loader.is-booting .inn-page-loader__spinner {
+		opacity: 1;
+	}
+
+	#inn-page-loader.is-booting .inn-page-loader__spinner {
+		transform: scale(1);
+	}
+
+	@keyframes inn-page-loader-spin {
+		0% { transform: scale(1) rotate(0deg); }
+		100% { transform: scale(1) rotate(360deg); }
+	}
+
+	@media (prefers-color-scheme: dark) {
+		#inn-page-loader .inn-page-loader__backdrop {
+			background: #ffffff;
+		}
+
+		#inn-page-loader .inn-page-loader__spinner {
+			border-color: rgba(23, 48, 66, 0.14);
+			border-top-color: #173042;
+		}
 	}
 
 	.inn-site-nav__header {
@@ -2382,7 +2454,11 @@ window.Quarto = {
 	.inn-site-nav__tools {
 		display: flex;
 		align-items: center;
+		flex-wrap: wrap;
 		gap: 0.18rem;
+		row-gap: 0.28rem;
+		min-width: 0;
+		width: 100%;
 	}
 
 	.inn-site-nav__tools .quarto-navigation-tool {
@@ -2390,6 +2466,46 @@ window.Quarto = {
 		font-size: 0.94rem;
 		color: var(--inn-icon-idle);
 		text-decoration: none;
+	}
+
+	.inn-lang-toggle-wrap {
+		display: flex;
+		align-items: center;
+		margin-left: auto;
+		flex: 0 0 auto;
+	}
+
+	.inn-lang-toggle {
+		display: inline-flex;
+		border: 1px solid var(--inn-border);
+		border-radius: 8px;
+		overflow: hidden;
+		background: var(--inn-bg);
+	}
+
+	.inn-lang-toggle__btn {
+		appearance: none;
+		border: 0;
+		margin: 0;
+		padding: 0.24rem 0.48rem;
+		font: 650 0.68rem/1 "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+		letter-spacing: 0.04em;
+		color: var(--inn-text-muted);
+		background: transparent;
+		cursor: pointer;
+		transition:
+			background-color 0.16s ease,
+			color 0.16s ease;
+	}
+
+	.inn-lang-toggle__btn.is-active {
+		background: var(--inn-accent-soft);
+		color: var(--inn-text);
+	}
+
+	.inn-lang-toggle__btn:not(.is-active):hover {
+		color: var(--inn-text);
+		background: var(--inn-bg-strong);
 	}
 
 	.inn-site-nav__search {
@@ -2893,8 +3009,28 @@ window.Quarto = {
 </style>
 
 <script>
-	const initializeInnoNotesUI = () => {
-		const basePath = '/inno_notes/';
+	const initializeInnoNotesUI = async () => {
+		/**
+		 * Site root prefix (GitHub Pages: /inno_notes/, local Quarto preview: /).
+		 * Must match how article paths appear in location.pathname.
+		 */
+		const computeSiteBasePath = () => {
+			const raw = window.location.pathname.replace(/\/index\.html?$/i, '');
+			const nested = raw.match(/^(.*\/)(semester-[12]\/)/);
+			if (nested) {
+				const prefix = nested[1];
+				return prefix === '/' ? '/' : prefix;
+			}
+			const singleSeg = raw.match(/^(\/[^/]+)\/?$/);
+			if (singleSeg) {
+				const seg = singleSeg[1];
+				if (!/^\/semester-[12]$/.test(seg)) {
+					return seg.endsWith('/') ? seg : `${seg}/`;
+				}
+			}
+			return '/';
+		};
+		const basePath = computeSiteBasePath();
 		let loaderEl = document.getElementById('inn-page-loader');
 		if (!loaderEl) {
 			loaderEl = document.createElement('div');
@@ -2921,12 +3057,35 @@ window.Quarto = {
 			setLoaderProgress(100);
 			window.setTimeout(() => {
 				loaderEl.classList.remove('is-active');
+				loaderEl.classList.remove('is-booting');
 				setLoaderProgress(0);
 			}, 180);
+		};
+		const finishInitialBoot = () => {
+			advanceLoader(100);
+			window.requestAnimationFrame(() => {
+				window.requestAnimationFrame(() => {
+					document.documentElement.classList.remove('inn-ui-booting');
+					document.body?.classList.remove('inn-ui-booting');
+					hideLoader();
+				});
+			});
 		};
 
 		const getPathKey = () => window.location.pathname.replace(/index\.html$/, '');
 		const getRelativePath = () => getPathKey().replace(basePath, '');
+		const innSitePathFromRel = (rel) => {
+			const r = String(rel || '').replace(/^\/+/, '');
+			const b = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+			return `${b}/${r}`.replace(/\/+/g, '/');
+		};
+		const innPathToRel = (pathname) => {
+			const p = normalizePath(pathname);
+			const prefix = basePath.replace(/\/?$/, '');
+			if (!p || p === prefix) return '';
+			if (p.startsWith(`${prefix}/`)) return p.slice(prefix.length + 1);
+			return p.replace(/^\//, '');
+		};
 		const getIsHome = () => {
 			const relativePath = getRelativePath();
 			return !relativePath || relativePath === '/' || /(^|\/)index\/?$/.test(relativePath);
@@ -3138,9 +3297,177 @@ window.Quarto = {
 			return `${offsetBase}${href}`.replace(/\/{2,}/g, '/').replace(/^(\w+:)\//, '$1//');
 		};
 
+		const INN_LANG_STORAGE_KEY = 'inn_lang_preference';
+		const innNormRelPath = (p) => {
+			let s = String(p || '').trim().replace(/\\/g, '/');
+			try {
+				s = decodeURIComponent(s);
+			} catch {
+				/* keep s */
+			}
+			return s.replace(/^\/+/, '');
+		};
+		/** English article path: `foo.ru.html` → `foo.html`. */
+		const innCanonicalArticleEnRel = (rel) => {
+			const r = innNormRelPath(rel);
+			if (/\.ru\.html$/i.test(r)) return r.replace(/\.ru\.html$/i, '.html');
+			return r;
+		};
+		/** Sibling Russian URL path: `path.html` → `path.ru.html`. */
+		const innEnToRuRel = (enRel) => {
+			const r = innNormRelPath(enRel);
+			if (!/\.html$/i.test(r) || /\.ru\.html$/i.test(r)) return null;
+			return r.replace(/\.html$/i, '.ru.html');
+		};
+		let innRuEnHas = new Set();
+		let innRuTitleByEnRel = new Map();
+		let innEnTitleByEnRel = new Map();
+		let innRuManifestPromise = null;
+		const innFetchRuPageExists = async (ruRel) => {
+			if (!ruRel) return false;
+			try {
+				const url = new URL(innSitePathFromRel(ruRel), window.location.origin);
+				const response = await fetch(url.href, {
+					method: 'GET',
+					credentials: 'same-origin',
+					cache: 'no-store',
+				});
+				return response.ok;
+			} catch {
+				return false;
+			}
+		};
+		/**
+		 * Build the EN→RU availability map from Quarto's generated search index.
+		 * This avoids probing many non-existent `*.ru.html` files in preview mode.
+		 */
+		const innLoadRuManifest = async () => {
+			if (innRuManifestPromise) return innRuManifestPromise;
+			innRuManifestPromise = (async () => {
+				const next = new Set();
+				const ruTitles = new Map();
+				const enTitles = new Map();
+				const note = (relRaw) => {
+					const rel = innNormRelPath(relRaw);
+					if (!/\.ru\.html$/i.test(rel)) return;
+					next.add(innCanonicalArticleEnRel(rel));
+				};
+				const noteTitle = (relRaw, titleRaw) => {
+					const rel = innNormRelPath(relRaw);
+					const title = String(titleRaw || '').trim();
+					if (!/\.html$/i.test(rel) || !title) return;
+					const canon = innCanonicalArticleEnRel(rel);
+					if (/\.ru\.html$/i.test(rel)) {
+						ruTitles.set(canon, title);
+						next.add(canon);
+					} else {
+						enTitles.set(canon, title);
+					}
+				};
+				try {
+					const response = await fetch(innSitePathFromRel('search.json'), {
+						credentials: 'same-origin',
+						cache: 'no-store',
+					});
+					if (response.ok) {
+						const items = await response.json();
+						if (Array.isArray(items)) {
+							items.forEach((item) => {
+								note(item?.href);
+								note(item?.objectID);
+								noteTitle(item?.href, item?.title);
+								noteTitle(item?.objectID, item?.title);
+							});
+						}
+					}
+				} catch {
+					/* fallback below */
+				}
+				const currentRel = innPathToRel(window.location.pathname);
+				if (/\.ru\.html$/i.test(currentRel)) {
+					next.add(innCanonicalArticleEnRel(currentRel));
+				}
+				innRuEnHas = next;
+				innRuTitleByEnRel = ruTitles;
+				innEnTitleByEnRel = enTitles;
+				return innRuEnHas;
+			})();
+			return innRuManifestPromise;
+		};
+		const innEnsureCurrentRuAvailability = async (pathname = window.location.pathname) => {
+			const rel = innPathToRel(pathname);
+			const enRel = innCanonicalArticleEnRel(rel);
+			const ruRel = innEnToRuRel(enRel);
+			if (!ruRel) return false;
+			if (innRuEnHas.has(enRel)) return true;
+			if (/\.ru\.html$/i.test(rel)) {
+				innRuEnHas.add(enRel);
+				return true;
+			}
+			if (await innFetchRuPageExists(ruRel)) {
+				innRuEnHas.add(enRel);
+				return true;
+			}
+			return false;
+		};
+		const innGetLangPreference = () => {
+			try {
+				const v = localStorage.getItem(INN_LANG_STORAGE_KEY);
+				return v === 'ru' ? 'ru' : 'en';
+			} catch {
+				return 'en';
+			}
+		};
+		const innSetLangPreference = (lang) => {
+			try {
+				if (lang === 'ru') {
+					localStorage.setItem(INN_LANG_STORAGE_KEY, 'ru');
+				} else {
+					localStorage.setItem(INN_LANG_STORAGE_KEY, 'en');
+				}
+			} catch {
+				/* ignore */
+			}
+		};
+		const innInitNavLangData = (navRoot) => {
+			navRoot.querySelectorAll('.inn-site-nav__menu .sidebar-link[href]').forEach((link) => {
+				if (link.dataset.navSectionToggle === 'true') return;
+				const raw = link.getAttribute('href');
+				if (!raw || raw === '#') return;
+				try {
+					const u = new URL(raw, window.location.href);
+					if (u.origin !== window.location.origin) return;
+					const rel = innPathToRel(u.pathname);
+					if (!/\.html?$/i.test(rel)) return;
+					link.dataset.innNavEnRel = innCanonicalArticleEnRel(rel);
+				} catch {
+					/* ignore */
+				}
+			});
+		};
+		const innApplyNavLangPreference = (navRoot) => {
+			const pref = innGetLangPreference();
+			navRoot.querySelectorAll('.inn-site-nav__menu .sidebar-link[href]').forEach((link) => {
+				if (link.dataset.navSectionToggle === 'true') return;
+				const stored = link.dataset.innNavEnRel;
+				if (!stored) return;
+				const canon = innCanonicalArticleEnRel(stored);
+				let targetRel = canon;
+				if (pref === 'ru') {
+					const ru = innEnToRuRel(canon);
+					if (ru && innRuEnHas.has(canon)) targetRel = ru;
+				}
+				const abs = innSitePathFromRel(targetRel);
+				link.setAttribute('href', abs);
+				if (link.hasAttribute('data-original-href')) {
+					link.setAttribute('data-original-href', abs);
+				}
+			});
+		};
+
 		const createSearchUrl = (href, query) => {
 			const [base, hash = ''] = href.split('#');
-			const url = new URL(withOffset(base), window.location.href);
+			const url = new URL(innSitePathFromRel(innNormRelPath(base)), window.location.origin);
 			if (query) url.searchParams.set('q', query);
 			return `${url.pathname}${url.search}${hash ? `#${hash}` : ''}`;
 		};
@@ -3230,12 +3557,14 @@ window.Quarto = {
 		const applyArticleUI = () => {
 			const pathKey = normalizePath(getPathKey());
 			const isHome = getIsHome();
+			const is404Page = /^\/404(?:\.html)?$/.test(pathKey)
+				|| /404\s*[—-]\s*page not found/i.test((document.title || '').trim());
 			document.querySelectorAll('.inn-article-actions').forEach((el) => el.remove());
 
 			if (!isHome) {
 				const pageTitle = document.querySelector('main.content h1, main h1');
 				const isFormulaPage = (pageTitle?.textContent || '').trim().toLowerCase() === 'formulas';
-				if (pageTitle && !isFormulaPage) {
+				if (pageTitle && !isFormulaPage && !is404Page) {
 					const actions = document.createElement('div');
 					actions.className = 'inn-article-actions';
 
@@ -3325,6 +3654,8 @@ window.Quarto = {
 			if (innPageFullyLoaded) {
 				ensureMermaidRendered(document.querySelector('main#quarto-document-content'));
 			}
+
+			innFixTcsBreadcrumbs();
 		};
 
 		rememberPage(getPageCacheKey(window.location.href), {
@@ -3332,7 +3663,105 @@ window.Quarto = {
 			main: document.querySelector('main#quarto-document-content')?.cloneNode(true),
 		});
 
-		const initializeCustomNav = (sidebar, { mobile = false } = {}) => {
+		function innNormalizePathForLang(pathname) {
+			let p = (pathname || '').split('?')[0];
+			try {
+				p = decodeURIComponent(p);
+			} catch {
+				/* keep p */
+			}
+			return p.replace(/\+/g, ' ');
+		}
+
+		/** EN/RU siblings: same path with `.html` ↔ `.ru.html` when the Russian build exists (see innRuEnHas). */
+		function innGetTranslationPair(pathname) {
+			const rel = innPathToRel(pathname);
+			const enRel = innCanonicalArticleEnRel(rel);
+			if (!/\.html$/i.test(enRel)) return null;
+			const ruRel = innEnToRuRel(enRel);
+			if (!ruRel) return null;
+			const onRu = /\.ru\.html$/i.test(rel);
+			if (!onRu && !innRuEnHas.has(enRel)) return null;
+			return {
+				isRu: onRu,
+				enHref: innSitePathFromRel(enRel),
+				ruHref: innSitePathFromRel(ruRel),
+			};
+		}
+
+		function innSameArticlePath(pathA, pathB) {
+			const a = normalizePath(pathA);
+			const b = normalizePath(pathB);
+			if (a === b) return true;
+			const ea = innCanonicalArticleEnRel(innPathToRel(a));
+			const eb = innCanonicalArticleEnRel(innPathToRel(b));
+			return ea === eb && /\.html$/i.test(ea);
+		}
+
+		/** Max scrollTop for the document (EN/RU pages differ in height; use fraction, not pixels). */
+		function innScrollMaxY() {
+			const doc = document.documentElement;
+			const body = document.body;
+			const height = Math.max(
+				doc.scrollHeight,
+				body.scrollHeight,
+				doc.clientHeight,
+				body.clientHeight
+			);
+			return Math.max(0, height - window.innerHeight);
+		}
+
+		function innGetScrollFraction() {
+			const maxY = innScrollMaxY();
+			if (maxY <= 0) return 0;
+			return Math.min(1, Math.max(0, window.scrollY / maxY));
+		}
+
+		function innApplyScrollFraction(fraction) {
+			const f = typeof fraction === 'number' && Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
+			window.scrollTo({ top: f * innScrollMaxY(), left: 0, behavior: 'auto' });
+		}
+
+		/**
+		 * TCS *.ru.html pages are not listed in _quarto.yml sidebar, so Quarto omits full breadcrumbs.
+		 * Rebuild Semester II > Theoretical Computer Science (EN) > current title; folder labels stay English.
+		 * Also refreshes #quarto-header crumbs after SPA navigations (main-only swap).
+		 */
+		function innFixTcsBreadcrumbs() {
+			const path = innNormalizePathForLang(window.location.pathname);
+			const inTcsRu = /Theoretical Computer Science\/\d+\.ru\.html$/.test(path);
+			const inTcsEn = /Theoretical Computer Science\/\d+\.html$/.test(path) && !/\.ru\.html$/.test(path);
+			if (!inTcsRu && !inTcsEn) return;
+
+			const h1 = document.querySelector(
+				'main#quarto-document-content header#title-block-header h1.title, main#quarto-document-content h1.title, main#quarto-document-content h1',
+			);
+			const title = (h1?.textContent || document.title || '').trim();
+			if (!title) return;
+
+			const fileName = path.split('/').pop() || '';
+			const selfHref = fileName + (window.location.search || '');
+			const sectionHref = '1.html';
+			const olInner = `<ol class="breadcrumb"><li class="breadcrumb-item">Semester II</li><li class="breadcrumb-item"><a href="${sectionHref}">Theoretical Computer Science</a></li><li class="breadcrumb-item"><a href="${selfHref.replace(/"/g, '&quot;')}">${escapeHtml(title)}</a></li></ol>`;
+
+			document.querySelectorAll('#quarto-header .quarto-page-breadcrumbs').forEach((navTop) => {
+				navTop.innerHTML = olInner;
+			});
+
+			const titleBlock = document.querySelector('main#quarto-document-content header#title-block-header');
+			if (titleBlock) {
+				let navTitle = titleBlock.querySelector('.quarto-title-breadcrumbs');
+				if (!navTitle) {
+					navTitle = document.createElement('nav');
+					navTitle.className = 'quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block';
+					navTitle.setAttribute('aria-label', 'breadcrumb');
+					titleBlock.insertBefore(navTitle, titleBlock.firstChild);
+				}
+				navTitle.innerHTML = olInner;
+			}
+		}
+
+		const initializeCustomNav = async (sidebar, { mobile = false } = {}) => {
 			document.body.classList.add(mobile ? 'inn-custom-nav-mobile' : 'inn-custom-nav');
 
 			const nav = document.createElement('aside');
@@ -3373,6 +3802,26 @@ window.Quarto = {
 			if (tools) nav.querySelector('.inn-site-nav__tools')?.append(...tools.childNodes);
 			if (menu) nav.querySelector('.inn-site-nav__menu')?.appendChild(menu);
 			document.body.appendChild(nav);
+			innInitNavLangData(nav);
+			await innLoadRuManifest();
+			innApplyNavLangPreference(nav);
+
+			const syncLangSwitcher = () => {
+				const row = nav.querySelector('.inn-site-nav__tools');
+				if (!row) return;
+				row.querySelectorAll('.inn-lang-toggle-wrap').forEach((el) => el.remove());
+				const prefRu = innGetLangPreference() === 'ru';
+				const wrap = document.createElement('div');
+				wrap.className = 'inn-lang-toggle-wrap';
+				wrap.innerHTML = `
+					<div class="inn-lang-toggle" role="group" aria-label="Язык лекции / Lecture language">
+						<button type="button" class="inn-lang-toggle__btn${prefRu ? '' : ' is-active'}" data-inn-lang="en" aria-pressed="${prefRu ? 'false' : 'true'}">EN</button>
+						<button type="button" class="inn-lang-toggle__btn${prefRu ? ' is-active' : ''}" data-inn-lang="ru" aria-pressed="${prefRu ? 'true' : 'false'}">RU</button>
+					</div>
+				`;
+				row.appendChild(wrap);
+			};
+			syncLangSwitcher();
 
 			let mobileTopbar = null;
 			let mobileOverlay = null;
@@ -3496,7 +3945,7 @@ window.Quarto = {
 				nav.querySelectorAll('.sidebar-link.active').forEach((link) => link.classList.remove('active'));
 				nav.querySelectorAll('.inn-site-nav__menu .sidebar-link[href]').forEach((link) => {
 					const href = normalizePath(link.getAttribute('data-original-href') || link.getAttribute('href') || '');
-					if (href === currentPath) {
+					if (href === currentPath || innSameArticlePath(href, currentPath)) {
 						link.classList.add('active');
 						let section = link.closest('li.sidebar-item-section');
 						while (section) {
@@ -3517,9 +3966,97 @@ window.Quarto = {
 					const titleEl = mobileTopbar.querySelector('.inn-mobile-topbar__title');
 					if (titleEl) titleEl.textContent = getMobileTitle();
 				}
+				syncLangSwitcher();
+				syncTranslatedSidebarMenuTitle();
 			};
 
-			const navigateInternal = async (href, { replace = false } = {}) => {
+			const syncTranslatedSidebarMenuTitle = () => {
+				if (!innRuEnHas.size) return;
+				const pref = innGetLangPreference();
+				const curPath = normalizePath(window.location.pathname);
+				const pair = innGetTranslationPair(window.location.pathname);
+				const h1 = document.querySelector('main#quarto-document-content header#title-block-header h1.title')
+					|| document.querySelector('main#quarto-document-content h1.title')
+					|| document.querySelector('main#quarto-document-content h1');
+				const t = (h1?.textContent || '').trim();
+				nav.querySelectorAll('.inn-site-nav__menu .sidebar-link[href]').forEach((link) => {
+					if (link.dataset.navSectionToggle === 'true') return;
+					const span = link.querySelector('.menu-text');
+					if (!span) return;
+					if (link.dataset.innTcsMenuOrig == null || link.dataset.innTcsMenuOrig === '') {
+						link.dataset.innTcsMenuOrig = span.textContent.trim();
+					}
+					const h = normalizePath(link.getAttribute('data-original-href') || link.getAttribute('href') || '');
+					const rel = innPathToRel(h);
+					const canon = innCanonicalArticleEnRel(rel);
+					const hasRuSibling = innRuEnHas.has(canon);
+					if (!hasRuSibling) return;
+					const currentPageTitle = pair && t && innSameArticlePath(h, curPath);
+					if (currentPageTitle) {
+						span.textContent = t;
+					} else if (pref === 'ru') {
+						span.textContent = innRuTitleByEnRel.get(canon) || link.dataset.innTcsMenuOrig;
+					} else {
+						span.textContent = innEnTitleByEnRel.get(canon) || link.dataset.innTcsMenuOrig;
+					}
+				});
+			};
+
+			const rewriteMainRelativeUrls = (root, pageHref) => {
+				if (!root || !pageHref) return;
+				const selectors = [
+					['a[href]', 'href'],
+					['img[src]', 'src'],
+					['source[src]', 'src'],
+					['source[srcset]', 'srcset'],
+					['img[srcset]', 'srcset'],
+					['video[poster]', 'poster'],
+					['audio[src]', 'src'],
+					['iframe[src]', 'src'],
+				];
+				const rewriteUrlAttr = (node, attr) => {
+					const raw = node.getAttribute(attr);
+					if (!raw || raw.startsWith('#') || /^(?:[a-z]+:|\/\/)/i.test(raw)) return;
+					try {
+						node.setAttribute(attr, new URL(raw, pageHref).href);
+					} catch {
+						/* ignore */
+					}
+				};
+				const rewriteSrcSet = (node, attr) => {
+					const raw = node.getAttribute(attr);
+					if (!raw) return;
+					const rewritten = raw
+						.split(',')
+						.map((part) => {
+							const trimmed = part.trim();
+							if (!trimmed) return trimmed;
+							const [urlPart, descriptor] = trimmed.split(/\s+/, 2);
+							if (!urlPart || /^(?:[a-z]+:|\/\/)/i.test(urlPart) || urlPart.startsWith('#')) {
+								return trimmed;
+							}
+							try {
+								const abs = new URL(urlPart, pageHref).href;
+								return descriptor ? `${abs} ${descriptor}` : abs;
+							} catch {
+								return trimmed;
+							}
+						})
+						.join(', ');
+					node.setAttribute(attr, rewritten);
+				};
+				selectors.forEach(([selector, attr]) => {
+					root.querySelectorAll(selector).forEach((node) => {
+						if (attr === 'srcset') {
+							rewriteSrcSet(node, attr);
+						} else {
+							rewriteUrlAttr(node, attr);
+						}
+					});
+				});
+			};
+
+			const navigateInternal = async (href, { replace = false, restoreScrollFraction = null } = {}) => {
 				window._innNavigating = true;
 				const url = new URL(href, window.location.href);
 				closeMobileNav();
@@ -3539,6 +4076,7 @@ window.Quarto = {
 				await ensurePageAssets(payload.assets);
 				advanceLoader(54);
 				const nextMain = payload.main;
+				rewriteMainRelativeUrls(nextMain, url.href);
 
 				const applySwap = () => {
 					const currentMain = document.querySelector('main#quarto-document-content');
@@ -3546,6 +4084,10 @@ window.Quarto = {
 						window.location.assign(url.href);
 						return;
 					}
+					const savedF =
+						typeof restoreScrollFraction === 'number' && Number.isFinite(restoreScrollFraction)
+							? Math.min(1, Math.max(0, restoreScrollFraction))
+							: null;
 					currentMain.replaceWith(nextMain);
 					document.title = payload.title;
 					if (replace) {
@@ -3558,14 +4100,25 @@ window.Quarto = {
 					updateActiveNavState();
 					advanceLoader(92);
 					const swappedMain = document.querySelector('main#quarto-document-content');
+					const applyScrollRestore = () => {
+						if (savedF == null) return;
+						innApplyScrollFraction(savedF);
+					};
 					window.requestAnimationFrame(async () => {
 						await typesetMathContent(swappedMain);
 						await ensureMermaidRendered(swappedMain);
 						scheduleFitDisplayMath(swappedMain);
+						if (savedF != null) {
+							applyScrollRestore();
+							window.requestAnimationFrame(applyScrollRestore);
+						}
 					});
 					if (url.hash) {
 						const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
 						target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+					} else if (savedF != null) {
+						applyScrollRestore();
+						window.requestAnimationFrame(applyScrollRestore);
 					} else {
 						window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 					}
@@ -3595,7 +4148,7 @@ window.Quarto = {
 			let searchDataPromise = null;
 			const getSearchData = () => {
 				if (!searchDataPromise) {
-					searchDataPromise = fetch(withOffset('search.json'))
+					searchDataPromise = fetch(innSitePathFromRel('search.json'))
 						.then((response) => response.json())
 						.then((items) => items.map((item) => {
 							const crumbs = Array.isArray(item.crumbs) ? item.crumbs : [];
@@ -3737,7 +4290,40 @@ window.Quarto = {
 					updateSearchButtonState();
 				}
 			});
-			nav.addEventListener('click', (event) => {
+			nav.addEventListener('click', async (event) => {
+				const langBtn = event.target.closest('.inn-lang-toggle button[data-inn-lang]');
+				if (langBtn) {
+					event.preventDefault();
+					const want = langBtn.getAttribute('data-inn-lang');
+					innSetLangPreference(want === 'ru' ? 'ru' : 'en');
+					if (want === 'ru') {
+						await innEnsureCurrentRuAvailability(window.location.pathname);
+					}
+					innApplyNavLangPreference(nav);
+					syncLangSwitcher();
+					const pair = innGetTranslationPair(window.location.pathname);
+					if (pair) {
+						const targetPath = want === 'ru' ? pair.ruHref : pair.enHref;
+						if (normalizePath(targetPath) !== normalizePath(getPathKey())) {
+							closeMobileNav();
+							closeMobileSearch();
+							results.classList.remove('is-open');
+							results.classList.remove('is-empty');
+							updateSearchButtonState();
+							navigateInternal(new URL(targetPath, window.location.origin).href, {
+								restoreScrollFraction: innGetScrollFraction(),
+							});
+						}
+					} else {
+						closeMobileNav();
+						closeMobileSearch();
+						results.classList.remove('is-open');
+						results.classList.remove('is-empty');
+						updateSearchButtonState();
+						updateActiveNavState();
+					}
+					return;
+				}
 				const link = event.target.closest('.inn-site-nav__menu a[href], .inn-site-nav__results a[href]');
 				if (!link) return;
 				if (link.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -3918,8 +4504,28 @@ window.Quarto = {
 			}
 
 			updateActiveNavState();
+			(() => {
+				const pref = innGetLangPreference();
+				const syncInitialLanguage = async () => {
+					if (pref === 'ru') {
+						await innEnsureCurrentRuAvailability(window.location.pathname);
+						innApplyNavLangPreference(nav);
+						syncLangSwitcher();
+					}
+					const pair = innGetTranslationPair(window.location.pathname);
+					if (!pair) return;
+					const cur = normalizePath(getPathKey());
+					if (pref === 'ru' && !pair.isRu && cur === normalizePath(pair.enHref)) {
+						void navigateInternal(new URL(pair.ruHref, window.location.origin).href, { replace: true });
+					} else if (pref === 'en' && pair.isRu && cur === normalizePath(pair.ruHref)) {
+						void navigateInternal(new URL(pair.enHref, window.location.origin).href, { replace: true });
+					}
+				};
+				void syncInitialLanguage();
+			})();
 			collectPrefetchCandidates();
 			updateSearchButtonState();
+			finishInitialBoot();
 			return true;
 		};
 		applyArticleUI();
@@ -3946,7 +4552,7 @@ window.Quarto = {
 
 		const sidebar = document.querySelector('#quarto-sidebar');
 		if (!sidebar) return;
-		if (initializeCustomNav(sidebar, { mobile: window.innerWidth <= 991 })) {
+		if (await initializeCustomNav(sidebar, { mobile: window.innerWidth <= 991 })) {
 			return;
 		}
 
@@ -4094,10 +4700,22 @@ window.Quarto = {
 			localStorage.setItem(scrollKey, sidebar.scrollTop);
 		});
 	};
+	const bootUI = async () => {
+		try {
+			await initializeInnoNotesUI();
+		} catch (error) {
+			console.error('InnoNotes UI init failed', error);
+			document.documentElement.classList.remove('inn-ui-booting');
+			document.body?.classList.remove('inn-ui-booting');
+			const existingLoader = document.getElementById('inn-page-loader');
+			existingLoader?.classList.remove('is-active');
+			existingLoader?.classList.remove('is-booting');
+		}
+	};
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', initializeInnoNotesUI, { once: true });
+		document.addEventListener('DOMContentLoaded', () => void bootUI(), { once: true });
 	} else {
-		initializeInnoNotesUI();
+		void bootUI();
 	}
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
