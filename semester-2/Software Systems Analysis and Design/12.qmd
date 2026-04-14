@@ -1,0 +1,1163 @@
+---
+title: "W13. Design Patterns: Interpreter, Iterator, Visitor"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "April 14, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Design Patterns in Context**
+
+This week concludes the study of three closely related behavioral patterns from the Gang of Four catalogue: **Interpreter**, **Iterator**, and **Visitor**. All three are **behavioral patterns** — they are concerned with the assignment of responsibilities between objects, or with encapsulating behavior in an object and delegating requests to it.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "This week's three patterns within the GoF behavioral category"
+%%| fig-width: 6.2
+%%| fig-height: 3.0
+flowchart TB
+    Patterns["Design Patterns"]
+    B["Behavioral"]
+    I["Interpreter"]
+    It["Iterator"]
+    V["Visitor"]
+    Patterns --> B
+    B --> I
+    B --> It
+    B --> V
+```
+
+What makes these three patterns special is that they all typically operate on the same kind of underlying data structure: a **hierarchical (tree-like) structure** built with the **Composite** pattern. This is why they are best studied together. Composite builds the structure; Interpreter, Iterator, and Visitor each provide a different way to act on it.
+
+##### **1.2 Composite Pattern — Brief Recap**
+
+Before the new patterns can be understood, it is important to recall the Composite pattern that underpins them.
+
+**Composite** solves the problem of treating atomic objects (*leaves*) and composite objects (*composites*) uniformly. It defines three participants:
+
+*   A **common base class** (`Component`) — provides a unified interface for all hierarchy elements and stores an optional reference to a parent.
+*   **Leaf classes** — terminal nodes; they define atomic behavior.
+*   **Composite classes** — internal nodes; they store a list of child `Component` objects and delegate operations down the tree.
+
+```cpp
+class Component {
+public:
+    Component parent;
+    virtual Component& get() = 0;
+    virtual void add(Component c) = 0;
+    virtual Component remove() = 0;
+};
+
+class Composite : public Component {
+public:
+    Component& get() override { ... }
+    void add(Component c) override { ... }
+    Component remove() override { ... }
+private:
+    list<Component> components;
+};
+
+class Leaf : public Component {
+public:
+    Component& get() override { return *this; }
+    void add(Component c) override { }
+    Component remove() override { }
+};
+```
+
+The `Composite` pattern is the *structural backbone*; the three patterns this week each add a different kind of *behavior* on top of it.
+
+##### **1.3 Interpreter**
+
+###### **1.3.1 Definition and Motivation**
+
+> *Given a language, defines a representation for its grammar along with an interpreter that uses the representation to interpret sentences in the language.* — E. Gamma et al.
+
+More generally: the **Interpreter** pattern performs an algorithm on a hierarchical structure. The key insight is that a grammar is itself a tree-like (hierarchical) structure, and an **Abstract Syntax Tree (AST)** is a Composite. The Interpreter pattern extends Composite by adding a virtual function that executes an algorithm at each node, propagating results up the tree.
+
+Canonical examples of Interpreter applications:
+
+| Hierarchical structure | Algorithm performed |
+|:---|:---|
+| Company organization chart | Print the company structure |
+| IDE widget tree | Redraw the current state |
+| AST of a boolean expression | Evaluate the expression |
+| AST of a program | Generate machine code |
+
+###### **1.3.2 Running Example: Boolean Expression Evaluator**
+
+Consider the formal grammar for boolean expressions:
+
+```text
+BooleanExp ::= Variable | Constant | OrExp | AndExp | NotExp
+             | '(' BooleanExp ')'
+AndExp     ::= BooleanExp 'and' BooleanExp
+OrExp      ::= BooleanExp 'or' BooleanExp
+NotExp     ::= 'not' BooleanExp
+Constant   ::= 'true' | 'false'
+Variable   ::= 'A' | 'B' | ... | 'X' | 'Y' | 'Z'
+```
+
+The concrete expression `(A or B) and (not C or D)` maps to the AST:
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "AST for (A or B) and (not C or D)"
+%%| fig-width: 6
+%%| fig-height: 4
+graph TD
+    AND["and"] --> OR1["or"]
+    AND --> OR2["or"]
+    OR1 --> A["A"]
+    OR1 --> B["B"]
+    OR2 --> NOT["not"]
+    OR2 --> D["D"]
+    NOT --> C["C"]
+```
+
+###### **1.3.3 Implementation Steps**
+
+The implementation follows a four-step process that builds directly on Composite.
+
+**Step 1 — Extend Composite with `evaluate()`.**
+Add a single pure virtual function `evaluate()` to the base `Component` class. This is the only addition needed to transform a plain Composite into an Interpreter base:
+
+```cpp
+class Component {
+public:
+    virtual Component& get() = 0;
+    virtual void add(Component c) = 0;
+    virtual Component remove() = 0;
+    virtual bool evaluate() = 0;   // NEW
+};
+```
+
+**Step 2 — Map grammar symbols to classes.**
+Each grammar rule becomes a class. Terminal rules (symbols with no sub-expressions) become subclasses of `Leaf`. Non-terminal rules (compound expressions) become subclasses of `Composite`:
+
+```cpp
+class BooleanExp : public Composite   // root of non-terminal hierarchy
+class OrExp      : public BooleanExp  // non-terminal
+class AndExp     : public BooleanExp  // non-terminal
+class NotExp     : public BooleanExp  // non-terminal
+
+class Operand    : public Leaf        // root of terminal hierarchy
+class Constant   : public Operand     // terminal
+class Variable   : public Operand     // terminal
+```
+
+**Step 3 — Implement terminal classes.**
+Terminal classes hold an atomic value and return it directly from `evaluate()`. `Variable` additionally stores a name to distinguish which variable it represents:
+
+```cpp
+class Operand : public Leaf {
+    bool value;  // the concrete truth-value
+};
+
+class Variable : public Operand {
+public:
+    std::string name;
+    bool evaluate() override { return value; }
+};
+
+class Constant : public Operand {
+public:
+    bool evaluate() override { return value; }
+};
+```
+
+**Step 4 — Implement non-terminal classes.**
+Non-terminal classes delegate evaluation to their children by calling `get().evaluate()`. The `get()` method (inherited from `Composite`) returns a reference to the next child component:
+
+```cpp
+class OrExp : public BooleanExp {
+public:
+    bool evaluate() override {
+        return get().evaluate() || get().evaluate();
+    }
+};
+
+class AndExp : public BooleanExp {
+public:
+    bool evaluate() override {
+        return get().evaluate() && get().evaluate();
+    }
+};
+
+class NotExp : public BooleanExp {
+public:
+    bool evaluate() override {
+        return !get().evaluate();
+    }
+};
+```
+
+**The complete program** creates the AST from a string (the parsing/construction is assumed to happen inside `BooleanExp`'s constructor) and then calls `evaluate()` on the root:
+
+```cpp
+void main() {
+    BooleanExp* expression =
+        new BooleanExp("(A or B) and (not C or D)");
+
+    bool result = expression->evaluate();
+}
+```
+
+###### **1.3.4 Key Conclusions**
+
+*   Composite provides *structure* and the machinery to traverse it (`get()`). Interpreter adds a single virtual function that defines the *algorithm* applied at each node.
+*   The Composite class hierarchy remains unchanged; only the new `evaluate()` method is added to the base.
+*   The "connector" between the structural hierarchy and the behavioral algorithm is the `evaluate()` virtual function.
+
+##### **1.4 Iterator**
+
+###### **1.4.1 Definition and Motivation**
+
+> *Provides a way to access the elements of an aggregate object sequentially without exposing its underlying representation.* — E. Gamma et al. (Other name: **Cursor**)
+
+**Iterator** is a behavioral pattern that solves the following problem: given a complex data structure such as a Composite tree, how should a client traverse its elements without depending on the internal implementation details of the structure?
+
+The word "sequentially" hides significant complexity for tree-structured aggregates. Even for a simple flat aggregate, traversal may need multiple strategies: first-to-last, last-to-first, filtered by a predicate, or in random order. For a tree aggregate the choices are even richer: depth-first, breadth-first, left-subtree-first, and so on.
+
+###### **1.4.2 The Naive Solution and Its Problem**
+
+The straightforward approach embeds traversal methods directly inside `Composite`:
+
+```cpp
+class Composite : public Component {
+public:
+    void first() { ... }      // set to first element
+    void next()  { ... }      // advance to next element
+    bool done()  { ... }      // true when no more elements
+    Component& current() { ... }  // access current element
+private:
+    std::list<Component> components;
+};
+```
+
+This works for one traversal order but immediately raises two questions:
+
+1.  How do you define *additional* traversal algorithms (e.g., reverse, filtered)?
+2.  How do you switch algorithms at runtime?
+
+Embedding all variants inside `Composite` violates the **Single Responsibility Principle** — structural and behavioral concerns are tangled together — and makes the class hard to maintain.
+
+###### **1.4.3 The Iterator Solution**
+
+The key insight (borrowed from the **Strategy** pattern) is to *separate* structure from behavior: let `Composite` be responsible for the structure, and a separate class `Iterator` be responsible for traversal.
+
+> *The key idea in this pattern is to take the responsibility for access and traversal out of the list object and put it into an iterator object. The Iterator class defines an interface for accessing the list's elements. An iterator object is responsible for keeping track of the current element; that is, it knows which elements have been traversed already.* — E. Gamma et al.
+
+The redesigned `Composite` exposes only the minimal interface needed to retrieve an element by index:
+
+```cpp
+class Composite : public Component {
+public:
+    Component& get(long i) { ... }   // access element at position i
+    long count() { ... }             // total number of direct children
+private:
+    std::list<Component> components;
+};
+```
+
+`Composite` no longer knows who will traverse it or how. Traversal logic lives entirely in concrete `Iterator` classes:
+
+```cpp
+class Iterator {
+public:
+    virtual void first() = 0;         // move to the first element
+    virtual void next() = 0;          // advance one step
+    virtual bool done() = 0;          // true if end is reached
+    virtual Component& current() = 0; // access the current element
+};
+
+class ForwardIterator : public Iterator {
+public:
+    void first() override { position = 0; }
+    void next()  override { position++; }
+    bool done()  override { return position >= aggregate->count(); }
+    Component& current() override { return aggregate->get(position); }
+
+    ForwardIterator(Composite* c) : aggregate(c), position(0) { }
+private:
+    Composite* aggregate;
+    long position;
+};
+```
+
+The client uses the iterator in a canonical loop:
+
+```cpp
+void main() {
+    Composite myStructure;
+    ForwardIterator iter(&myStructure);
+
+    for (iter.first(); !iter.done(); iter.next()) {
+        Component& c = iter.current();
+        // process c
+    }
+}
+```
+
+Any number of additional traversal strategies can now be added by creating new `Iterator` subclasses — `ReverseIterator`, `PredicateIterator`, `RandomIterator`, `DFSIterator`, `BFSIterator` — without touching `Composite` at all.
+
+###### **1.4.4 UML Structure**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Iterator pattern UML structure"
+%%| fig-width: 9
+%%| fig-height: 5.5
+classDiagram
+    class Client
+    class Iterator {
+        <<interface>>
+        +getNext()
+        +hasMore() bool
+    }
+    class IterableCollection {
+        <<interface>>
+        +createIterator() Iterator
+    }
+    class ConcreteIterator {
+        -collection: ConcreteCollection
+        -iterationState
+        +ConcreteIterator(c: ConcreteCollection)
+        +getNext()
+        +hasMore() bool
+    }
+    class ConcreteCollection {
+        +createIterator() Iterator
+    }
+    Client --> Iterator
+    Client --> IterableCollection
+    Iterator <|.. ConcreteIterator
+    IterableCollection <|.. ConcreteCollection
+    ConcreteIterator --> ConcreteCollection
+    ConcreteCollection ..> ConcreteIterator : creates
+```
+
+Key participants:
+
+*   **Iterator** interface — declares `getNext()` and `hasMore()`. Optionally includes `reset()` to restart traversal.
+*   **IterableCollection** interface — declares `createIterator()`, which returns an `Iterator` configured for this collection.
+*   **ConcreteIterator** — implements the traversal algorithm; stores a reference to the collection and tracks current position.
+*   **ConcreteCollection** — implements `createIterator()` by instantiating the appropriate `ConcreteIterator` and passing `this` to its constructor.
+*   **Client** — works only through the `Iterator` and `IterableCollection` interfaces; never touches the collection's internals.
+
+###### **1.4.5 How to Apply Iterator**
+
+1.  Declare the **Iterator interface** with at minimum `getNext()` and `hasMore()`. Add `reset()` or other convenience methods as needed.
+2.  Declare the **Collection interface** with `createIterator()` returning `Iterator`.
+3.  Implement **ConcreteIterator** classes — one per traversal algorithm. Link each to its collection via the constructor.
+4.  Implement the **Collection interface** in collection classes. `createIterator()` instantiates the concrete iterator, passing `this`.
+5.  Replace all traversal loops in client code with iterator-based loops.
+
+###### **1.4.6 Pros and Cons**
+
+*   **Pros**
+    *   *Single Responsibility Principle*: bulky traversal algorithms are extracted from the collection into dedicated classes.
+    *   *Open/Closed Principle*: new traversal strategies can be added without modifying existing collections.
+    *   Multiple iterators can be active simultaneously over the same collection; each carries its own state independently.
+    *   An iteration can be paused and resumed at any time.
+*   **Cons**
+    *   For simple collections, the pattern may be unnecessary overhead.
+    *   For highly specialized collections, a direct access pattern may be more efficient than going through an iterator.
+
+##### **1.5 Visitor**
+
+###### **1.5.1 Definition and Motivation**
+
+> *Represents an operation to be performed on the elements of an object structure. Visitor lets you define a new operation without changing the classes of the elements on which it operates.* — E. Gamma et al.
+
+Recall the boolean expression AST from the Interpreter example. Using the Interpreter pattern, one algorithm — `evaluate()` — was added to the hierarchy. But real applications often need *many* operations on the same structure: optimization, verification, pretty-printing, code generation, and others. Adding each operation as a virtual function to every class in the hierarchy is the direct but problematic approach.
+
+###### **1.5.2 Why the Direct Solution Fails**
+
+```cpp
+class BooleanExp : public Composite {
+public:
+    virtual bool evaluate()    = 0;
+    virtual void optimize()    = 0;
+    virtual void verify()      = 0;
+    virtual void prettyPrint() = 0;
+    virtual void generate()    = 0;
+};
+```
+
+This approach has three serious problems:
+
+1.  **Structural and behavioral concerns are mixed.** Classes that should only describe a grammar rule now also implement multiple unrelated algorithms.
+2.  **Classes become bloated.** Each class grows with every new operation, making it hard to understand and maintain.
+3.  **Adding a new operation forces recompiling all classes.** Any new behavior touches every class in the hierarchy, breaking the Open/Closed Principle.
+
+As E. Gamma noted: *"It would be better if each new operation could be added separately, and the node classes were independent of the operations that apply to them."*
+
+###### **1.5.3 The Visitor Solution: Two Class Hierarchies**
+
+The Visitor pattern resolves this by introducing a *second* class hierarchy dedicated to operations:
+
+1.  **Element hierarchy** (`BooleanExp` and its subclasses) — unchanged; each class adds only a single `accept(Visitor*)` method.
+2.  **Visitor hierarchy** (`Visitor` and its concrete subclasses) — each concrete visitor implements all operations for all element types.
+
+The communication between the two hierarchies uses a simple protocol:
+
+*   Each **element** accepts a visitor by calling back the appropriate method on it: `v->visitAddExp(this)`.
+*   Each **concrete visitor** implements one method per element type, implementing the algorithm for that specific type.
+
+```cpp
+// Abstract visitor: one visit method per concrete element class
+class Visitor {
+public:
+    virtual void visitAddExp(AddExp* v) = 0;
+    virtual void visitOrExp(OrExp* v)   = 0;
+    virtual void visitNotExp(NotExp* v) = 0;
+    // ...
+};
+
+// Base element: single accept method; does not change
+virtual void accept(Visitor* v) = 0;  // added to Component
+
+// Concrete element: delegates to the matching visit method
+void AddExp::accept(Visitor* v) override {
+    v->visitAddExp(this);
+}
+
+// Concrete visitor implementing code generation
+class Generator : public Visitor {
+public:
+    void visitAddExp(AddExp* v) override { /* generate code for AND */ }
+    void visitOrExp(OrExp* v)   override { /* generate code for OR  */ }
+    void visitNotExp(NotExp* v) override { /* generate code for NOT */ }
+};
+```
+
+The complete program dispatches multiple behaviors to the same structure without modifying it:
+
+```cpp
+void main() {
+    BooleanExp* expression =
+        new BooleanExp("(A or B) and (not C or D)");
+
+    Generator*    generator = new Generator();
+    PrettyPrinter* printer  = new PrettyPrinter();
+    Verifier*     verifier  = new Verifier();
+
+    expression->accept(generator);
+    expression->accept(printer);
+    expression->accept(verifier);
+}
+```
+
+To add a new operation, you create one new `ConcreteVisitor` subclass. You do not touch `BooleanExp`, `OrExp`, `AndExp`, or any other element class.
+
+###### **1.5.4 Single Dispatch vs. Double Dispatch**
+
+A common question is: why use distinct method names (`visitAddExp`, `visitOrExp`) instead of a single overloaded `visit()` method?
+
+**The dispatch problem in C++:**
+C++ resolves overloaded method calls at *compile time* based on the static type of the argument. If you write `v->visit(this)` inside the base class `BooleanExp`, the compiler sees `this` as `BooleanExp*` — not the concrete subtype — and picks the wrong overload. Achieving the correct behavior would require **double dispatch**: one dynamic dispatch on the *visitor type* and a second on the *element type*. C++ does not support double dispatch natively.
+
+Using distinct method names sidesteps this: `v->visitAddExp(this)` is placed inside `AddExp::accept()`, where `this` is statically typed as `AddExp*`. Only one virtual dispatch is needed — on the visitor — and the correct overload is already resolved by name at compile time.
+
+**The Java approach (used in Tutorial examples):**
+Java achieves double dispatch through *method overloading combined with virtual dispatch*. Inside `Circle.accept(ShapeVisitor v)`, `this` has the static type `Circle`. Calling `v.visit(this)` resolves the overload to `visit(Circle)` at compile time; the correct `v` implementation is selected at runtime. This works correctly in Java because the `accept` method is defined in the concrete class, so the static type of `this` is always the concrete type.
+
+```java
+// Java: works correctly — overloading resolves in concrete accept()
+public interface Shape {
+    void accept(ShapeVisitor visitor);
+}
+
+public class Circle implements Shape {
+    @Override
+    public void accept(ShapeVisitor visitor) {
+        visitor.visit(this);  // 'this' is statically Circle here
+    }
+}
+
+public interface ShapeVisitor {
+    void visit(Circle circle);
+    void visit(Rectangle rectangle);
+    void visit(Square square);
+}
+```
+
+Both approaches are valid; the choice depends on the language's dispatch mechanism.
+
+###### **1.5.5 UML Structure**
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Visitor pattern UML structure"
+%%| fig-width: 10
+%%| fig-height: 6
+classDiagram
+    class Visitor {
+        <<interface>>
+        +visit(e: ElementA)
+        +visit(e: ElementB)
+    }
+    class Element {
+        <<interface>>
+        +accept(v: Visitor)
+    }
+    class ConcreteVisitor {
+        +visit(e: ElementA)
+        +visit(e: ElementB)
+    }
+    class ConcreteElementA {
+        +featureA()
+        +accept(v: Visitor)
+    }
+    class ConcreteElementB {
+        +featureB()
+        +accept(v: Visitor)
+    }
+    class Client
+    Visitor <|.. ConcreteVisitor
+    Element <|.. ConcreteElementA
+    Element <|.. ConcreteElementB
+    Client --> ConcreteVisitor
+    Client --> Element
+    ConcreteVisitor ..> ConcreteElementA
+    ConcreteVisitor ..> ConcreteElementB
+```
+
+###### **1.5.6 How to Apply Visitor**
+
+1.  Declare the **Visitor interface** with one visiting method per concrete element class.
+2.  Declare the **Element interface** (or add `accept(Visitor*)` as an abstract method to the existing base class).
+3.  Implement `accept()` in each **concrete element** class: the body simply calls the corresponding visiting method on the incoming visitor.
+4.  **Elements** work with visitors only through the `Visitor` interface. **Visitors**, however, must reference all concrete element types as parameter types — this is the fundamental trade-off.
+5.  For each new behavior, create a new **ConcreteVisitor** class implementing all visiting methods.
+6.  The **client** creates visitor objects and passes them into elements via `accept()`.
+
+###### **1.5.7 Pros and Cons**
+
+*   **Pros**
+    *   *Open/Closed Principle*: new behaviors are added without modifying element classes.
+    *   *Single Responsibility Principle*: each visitor bundles a coherent set of related operations.
+    *   A visitor can accumulate state as it traverses the structure (e.g., counting nodes, summing values).
+*   **Cons**
+    *   Whenever an element class is added to or removed from the hierarchy, *all* concrete visitors must be updated.
+    *   Visitors may lack access to the private fields and methods of element classes. The element must either expose those fields publicly, or nest the visitor class inside the element — both options involve trade-offs.
+
+---
+
+#### **2. Definitions**
+
+*   **Abstract Syntax Tree (AST)**: A tree structure that represents the syntactic structure of an expression or program according to its grammar. Internal nodes are non-terminal symbols (operators, compound expressions); leaves are terminal symbols (literals, variables).
+*   **Behavioral pattern**: A GoF design pattern category concerned with algorithms and the assignment of responsibilities between objects.
+*   **Composite pattern**: A structural pattern that lets clients treat individual objects and compositions of objects uniformly by defining a shared interface for leaves and composites.
+*   **Double dispatch**: A mechanism that resolves a method call based on the runtime types of *both* the receiver and one argument. C++ does not support it natively; it can be simulated using the Visitor pattern with either distinct method names (single dispatch on visitor) or Java-style overloading in concrete `accept()` methods.
+*   **Interpreter pattern**: A behavioral pattern that performs an algorithm on a hierarchical structure by adding a virtual operation (`evaluate`) to each node of a Composite hierarchy, mapping grammar symbols to classes.
+*   **Iterator pattern**: A behavioral pattern that provides a way to access elements of an aggregate object sequentially without exposing the aggregate's internal representation. Also called *Cursor*.
+*   **Visitor pattern**: A behavioral pattern that represents an operation to be performed on elements of an object structure. It lets new operations be defined without changing the element classes.
+*   **ConcreteIterator**: An iterator class that implements a specific traversal algorithm and holds a reference to the collection plus the current traversal state (position).
+*   **IterableCollection**: An interface that declares the `createIterator()` factory method, allowing the collection to produce the appropriate iterator for itself.
+*   **accept(Visitor\*)**: A method added to each element class in the Visitor pattern. Its body calls the appropriate visiting method on the passed visitor, establishing the double-dispatch mechanism.
+*   **visit(Element\*)**: A method declared in the Visitor interface (one per concrete element type). Concrete visitors override these methods to implement the desired algorithm for each element type.
+*   **Single dispatch**: Standard virtual function dispatch: the method to call is resolved at runtime based on the runtime type of the *receiver object* only. Available natively in C++ and Java.
+*   **Terminal symbol**: A grammar symbol that cannot be expanded further; corresponds to a `Leaf` node in the Composite hierarchy.
+*   **Non-terminal symbol**: A grammar symbol defined in terms of other symbols; corresponds to a `Composite` node in the hierarchy.
+
+---
+
+#### **3. Examples**
+
+##### **4.1. Build a Mathematical Expression Interpreter** (Lab 12, Task 1)
+
+Build an interpreter for mathematical expressions using the Interpreter design pattern. Create the following classes: a numerical expression (leaf), a multiplication expression, an addition expression, and a subtraction expression (all non-terminal). Assume the parser is already built. Demonstrate usage in `main`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** Each grammar construct maps to a class. Leaves hold literal numbers; non-terminals hold children and implement `evaluate()` by combining children's values.
+
+**Step 1 — Define the grammar:**
+
+```
+Expr    ::= Number | AddExpr | SubExpr | MulExpr
+AddExpr ::= Expr '+' Expr
+SubExpr ::= Expr '-' Expr
+MulExpr ::= Expr '*' Expr
+Number  ::= [0-9]+
+```
+
+**Step 2 — Create the base `Expression` interface:**
+
+```java
+public interface Expression {
+    double evaluate();
+}
+```
+
+**Step 3 — Implement the terminal class `NumberExpression`:**
+
+This is the leaf. It holds a literal double value and returns it directly.
+
+```java
+public class NumberExpression implements Expression {
+    private final double value;
+
+    public NumberExpression(double value) {
+        this.value = value;
+    }
+
+    @Override
+    public double evaluate() {
+        return value;
+    }
+}
+```
+
+**Step 4 — Implement non-terminal classes:**
+
+Each non-terminal holds two child `Expression` objects (`left` and `right`) and evaluates them recursively.
+
+```java
+public class AddExpression implements Expression {
+    private final Expression left;
+    private final Expression right;
+
+    public AddExpression(Expression left, Expression right) {
+        this.left = left;
+        this.right = right;
+    }
+
+    @Override
+    public double evaluate() {
+        return left.evaluate() + right.evaluate();
+    }
+}
+
+public class SubtractExpression implements Expression {
+    private final Expression left;
+    private final Expression right;
+
+    public SubtractExpression(Expression left, Expression right) {
+        this.left = left;
+        this.right = right;
+    }
+
+    @Override
+    public double evaluate() {
+        return left.evaluate() - right.evaluate();
+    }
+}
+
+public class MultiplyExpression implements Expression {
+    private final Expression left;
+    private final Expression right;
+
+    public MultiplyExpression(Expression left, Expression right) {
+        this.left = left;
+        this.right = right;
+    }
+
+    @Override
+    public double evaluate() {
+        return left.evaluate() * right.evaluate();
+    }
+}
+```
+
+**Step 5 — Demonstrate in `main`:**
+
+We manually construct the AST for the expression `(3 + 5) * (10 - 2)`, which should evaluate to `64.0`.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        // Build AST for: (3 + 5) * (10 - 2)
+        Expression three   = new NumberExpression(3);
+        Expression five    = new NumberExpression(5);
+        Expression ten     = new NumberExpression(10);
+        Expression two     = new NumberExpression(2);
+
+        Expression sum     = new AddExpression(three, five);       // 3 + 5 = 8
+        Expression diff    = new SubtractExpression(ten, two);     // 10 - 2 = 8
+        Expression product = new MultiplyExpression(sum, diff);    // 8 * 8 = 64
+
+        System.out.println("Result: " + product.evaluate());  // prints: Result: 64.0
+    }
+}
+```
+
+**How the evaluation works:**
+
+1.  `product.evaluate()` calls `sum.evaluate() * diff.evaluate()`.
+2.  `sum.evaluate()` calls `three.evaluate() + five.evaluate()` = `3.0 + 5.0` = `8.0`.
+3.  `diff.evaluate()` calls `ten.evaluate() - two.evaluate()` = `10.0 - 2.0` = `8.0`.
+4.  `product.evaluate()` = `8.0 * 8.0` = `64.0`.
+
+Each recursive call descends the AST, computes a sub-result, and returns it to the parent. This is the Interpreter pattern: the tree structure (built with Composite) is traversed, and `evaluate()` is the algorithm.
+
+**Answer:** `Result: 64.0`
+
+</details>
+
+##### **4.2. Implement a DFS Iterator for a Directed Tree** (Lab 12, Task 2)
+
+Build a class representing a directed tree where each node has a list of neighbors (nodes it has a direct edge to). Build an iterator that traverses the tree in depth-first search (DFS) order. Hint: use a stack.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The Iterator pattern separates traversal logic from the data structure. A DFS traversal uses an explicit stack: push the start node, then repeatedly pop a node, process it, and push its neighbors.
+
+**Step 1 — Define the `TreeNode` class:**
+
+Each node has a value and a list of child nodes.
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class TreeNode {
+    private final int value;
+    private final List<TreeNode> neighbors;
+
+    public TreeNode(int value) {
+        this.value = value;
+        this.neighbors = new ArrayList<>();
+    }
+
+    public void addNeighbor(TreeNode node) {
+        neighbors.add(node);
+    }
+
+    public int getValue() {
+        return value;
+    }
+
+    public List<TreeNode> getNeighbors() {
+        return neighbors;
+    }
+}
+```
+
+**Step 2 — Define the `Iterator` interface:**
+
+```java
+public interface Iterator<T> {
+    boolean hasNext();
+    T getNext();
+}
+```
+
+**Step 3 — Implement `DFSIterator`:**
+
+The iterator holds a `Deque<TreeNode>` acting as a stack. The constructor pushes the root node. Each call to `getNext()` pops a node and pushes its neighbors in *reverse* order so that the first neighbor is processed first (preserving left-to-right DFS order).
+
+```java
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+
+public class DFSIterator implements Iterator<TreeNode> {
+    private final Deque<TreeNode> stack = new ArrayDeque<>();
+
+    public DFSIterator(TreeNode root) {
+        if (root != null) {
+            stack.push(root);
+        }
+    }
+
+    @Override
+    public boolean hasNext() {
+        return !stack.isEmpty();
+    }
+
+    @Override
+    public TreeNode getNext() {
+        if (!hasNext()) {
+            return null;
+        }
+        TreeNode current = stack.pop();
+
+        // Push neighbors in reverse order so the first neighbor
+        // is processed first (standard DFS left-to-right order)
+        List<TreeNode> neighbors = current.getNeighbors();
+        for (int i = neighbors.size() - 1; i >= 0; i--) {
+            stack.push(neighbors.get(i));
+        }
+
+        return current;
+    }
+}
+```
+
+**Step 4 — Demonstrate in `main`:**
+
+Build a small tree:
+```
+        1
+       / \
+      2   3
+     / \
+    4   5
+```
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        TreeNode root = new TreeNode(1);
+        TreeNode n2   = new TreeNode(2);
+        TreeNode n3   = new TreeNode(3);
+        TreeNode n4   = new TreeNode(4);
+        TreeNode n5   = new TreeNode(5);
+
+        root.addNeighbor(n2);
+        root.addNeighbor(n3);
+        n2.addNeighbor(n4);
+        n2.addNeighbor(n5);
+
+        DFSIterator iter = new DFSIterator(root);
+        System.out.print("DFS order: ");
+        while (iter.hasNext()) {
+            System.out.print(iter.getNext().getValue() + " ");
+        }
+        // Output: DFS order: 1 2 4 5 3
+    }
+}
+```
+
+**Trace of the execution:**
+
+| Step | Stack (top → bottom) | Popped | Output so far |
+|:----:|:---|:---|:---|
+| init | `[1]` | — | — |
+| 1 | `[2, 3]` | 1 | 1 |
+| 2 | `[4, 5, 3]` | 2 | 1 2 |
+| 3 | `[5, 3]` | 4 | 1 2 4 |
+| 4 | `[3]` | 5 | 1 2 4 5 |
+| 5 | `[]` | 3 | 1 2 4 5 3 |
+
+**Answer:** DFS traversal visits nodes in order: `1 2 4 5 3`.
+
+</details>
+
+##### **4.3. Refactor Shape Calculator with Visitor Pattern** (Lab 12, Task 3)
+
+The starter code computes the total area of shapes using `instanceof` checks:
+
+```java
+for (Shape s : shapes) {
+    if (s instanceof Circle)
+        totalArea += Math.PI * Math.pow(((Circle) s).getRadius(), 2);
+    if (s instanceof Rectangle)
+        totalArea += ((Rectangle) s).getWidth() * ((Rectangle) s).getHeight();
+    if (s instanceof Square)
+        totalArea += Math.pow(((Square) s).getSide(), 2);
+}
+```
+
+Refactor this using the Visitor design pattern to also support computing the total perimeter without modifying the shape classes.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** Replace `instanceof` chains with double dispatch. Each shape class gains an `accept(ShapeVisitor)` method that calls the matching `visit()` overload on the visitor. Each new computation (area, perimeter, …) becomes a new `ConcreteVisitor` class.
+
+**Step 1 — Define the `ShapeVisitor` interface:**
+
+One `visit` overload per concrete shape type.
+
+```java
+public interface ShapeVisitor {
+    void visit(Circle circle);
+    void visit(Rectangle rectangle);
+    void visit(Square square);
+}
+```
+
+**Step 2 — Add `accept(ShapeVisitor)` to the `Shape` interface:**
+
+```java
+public interface Shape {
+    void accept(ShapeVisitor visitor);
+}
+```
+
+**Step 3 — Implement `accept` in each concrete shape:**
+
+Each `accept` method simply calls `visitor.visit(this)`. Because `accept` is defined inside the concrete class, `this` has the concrete static type, so Java's overload resolution correctly selects the matching `visit` overload.
+
+```java
+public class Circle implements Shape {
+    private final double radius;
+    public Circle(double radius) { this.radius = radius; }
+    public double getRadius() { return radius; }
+
+    @Override
+    public void accept(ShapeVisitor visitor) { visitor.visit(this); }
+}
+
+public class Rectangle implements Shape {
+    private final double width, height;
+    public Rectangle(double width, double height) {
+        this.width = width; this.height = height;
+    }
+    public double getWidth()  { return width;  }
+    public double getHeight() { return height; }
+
+    @Override
+    public void accept(ShapeVisitor visitor) { visitor.visit(this); }
+}
+
+public class Square implements Shape {
+    private final double side;
+    public Square(double side) { this.side = side; }
+    public double getSide() { return side; }
+
+    @Override
+    public void accept(ShapeVisitor visitor) { visitor.visit(this); }
+}
+```
+
+**Step 4 — Implement `AreaVisitor`:**
+
+```java
+public class AreaVisitor implements ShapeVisitor {
+    private double totalArea;
+
+    @Override
+    public void visit(Circle circle) {
+        totalArea += Math.PI * Math.pow(circle.getRadius(), 2);
+    }
+
+    @Override
+    public void visit(Rectangle rectangle) {
+        totalArea += rectangle.getWidth() * rectangle.getHeight();
+    }
+
+    @Override
+    public void visit(Square square) {
+        totalArea += Math.pow(square.getSide(), 2);
+    }
+
+    public double getTotalArea() { return totalArea; }
+}
+```
+
+**Step 5 — Implement `PerimeterVisitor`:**
+
+A second concrete visitor, added *without modifying any shape class*.
+
+```java
+public class PerimeterVisitor implements ShapeVisitor {
+    private double totalPerimeter;
+
+    @Override
+    public void visit(Circle circle) {
+        totalPerimeter += 2 * Math.PI * circle.getRadius();
+    }
+
+    @Override
+    public void visit(Rectangle rectangle) {
+        totalPerimeter += 2 * (rectangle.getWidth() + rectangle.getHeight());
+    }
+
+    @Override
+    public void visit(Square square) {
+        totalPerimeter += 4 * square.getSide();
+    }
+
+    public double getTotalPerimeter() { return totalPerimeter; }
+}
+```
+
+**Step 6 — Refactored `main`:**
+
+```java
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+public class Main {
+    public static void main(String[] args) {
+        Shape[] shapes = {
+            new Circle(3),
+            new Rectangle(2, 4),
+            new Circle(2.5),
+            new Rectangle(3, 3),
+            new Square(4),
+            new Square(5),
+        };
+
+        calculateArea(shapes);
+        calculatePerimeter(shapes);
+    }
+
+    private static void calculateArea(Shape[] shapes) {
+        AreaVisitor visitor = new AreaVisitor();
+        for (Shape s : shapes) s.accept(visitor);
+        double total = round(visitor.getTotalArea());
+        System.out.println("Total Area: " + total);
+    }
+
+    private static void calculatePerimeter(Shape[] shapes) {
+        PerimeterVisitor visitor = new PerimeterVisitor();
+        for (Shape s : shapes) s.accept(visitor);
+        double total = round(visitor.getTotalPerimeter());
+        System.out.println("Total Perimeter: " + total);
+    }
+
+    private static double round(double v) {
+        return BigDecimal.valueOf(v).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+}
+```
+
+**Why this is better than `instanceof`:**
+
+| Concern | `instanceof` approach | Visitor approach |
+|:---|:---|:---|
+| Adding a new operation | Duplicate the `instanceof` chain | One new `ConcreteVisitor` class |
+| Adding a new shape | Automatically handled | Must update all visitors |
+| Type safety | Cast errors at runtime | Compile-time type resolution |
+| Open/Closed | Violated on every new op | Satisfied for new operations |
+
+**Answer:** The `instanceof` chain is replaced by `accept`/`visit` dispatch. `AreaVisitor` computes the total area; `PerimeterVisitor` computes the total perimeter.
+
+</details>
+
+##### **4.4. Social Network Iterator** (Tutorial 12, Example 1)
+
+The following Java example demonstrates the Iterator pattern applied to social networks. Two concrete networks — **VK** and **OK** — expose different internal APIs but present a uniform `ProfileIterator` interface to a `SocialSpammer` client that sends messages to a user's friends or coworkers.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The `SocialNetwork` interface acts as `IterableCollection`; it declares factory methods for creating friend and coworker iterators. Concrete networks implement their own iterator (`VkIterator`, `OkIterator`) that lazily fetches profiles from the network API. The `SocialSpammer` client works through the `ProfileIterator` interface and never depends on VK or OK internals.
+
+**`ProfileIterator` interface (the Iterator interface):**
+
+```java
+public interface ProfileIterator {
+    boolean hasNext();
+    Profile getNext();
+    void reset();
+}
+```
+
+**`SocialNetwork` interface (the IterableCollection interface):**
+
+```java
+public interface SocialNetwork {
+    ProfileIterator createFriendsIterator(String profileEmail);
+    ProfileIterator createCoworkersIterator(String profileEmail);
+}
+```
+
+**`VkIterator` (ConcreteIterator for VK):**
+
+Uses lazy loading — it only calls the VK API when iteration begins (`lazyLoad()`). Profiles are cached to avoid redundant network requests.
+
+```java
+public class VkIterator implements ProfileIterator {
+    private Vk vk;
+    private String type;
+    private String email;
+    private int currentPosition = 0;
+    private List<String> emails = new ArrayList<>();
+    private List<Profile> profiles = new ArrayList<>();
+
+    public VkIterator(Vk vk, String type, String email) {
+        this.vk = vk; this.type = type; this.email = email;
+    }
+
+    private void lazyLoad() {
+        if (emails.isEmpty()) {
+            List<String> fetched = vk.requestProfileFriendsFromVk(email, type);
+            for (String e : fetched) { emails.add(e); profiles.add(null); }
+        }
+    }
+
+    @Override public boolean hasNext() { lazyLoad(); return currentPosition < emails.size(); }
+
+    @Override public Profile getNext() {
+        if (!hasNext()) return null;
+        Profile p = profiles.get(currentPosition);
+        if (p == null) {
+            p = vk.requestProfileFromVk(emails.get(currentPosition));
+            profiles.set(currentPosition, p);
+        }
+        currentPosition++;
+        return p;
+    }
+
+    @Override public void reset() { currentPosition = 0; }
+}
+```
+
+**`SocialSpammer` (the Client):**
+
+Knows only about `SocialNetwork` and `ProfileIterator`. It can spam friends or coworkers on *any* social network without changing its own code.
+
+```java
+public class SocialSpammer {
+    private SocialNetwork network;
+
+    public SocialSpammer(SocialNetwork network) { this.network = network; }
+
+    public void sendSpamToFriends(String profileEmail, String message) {
+        ProfileIterator it = network.createFriendsIterator(profileEmail);
+        while (it.hasNext()) sendMessage(it.getNext().getEmail(), message);
+    }
+
+    public void sendSpamToCoworkers(String profileEmail, String message) {
+        ProfileIterator it = network.createCoworkersIterator(profileEmail);
+        while (it.hasNext()) sendMessage(it.getNext().getEmail(), message);
+    }
+
+    private void sendMessage(String email, String message) {
+        System.out.println("Sent to: " + email + ". Message: " + message);
+    }
+}
+```
+
+**Pattern roles mapping:**
+
+| Pattern role | Class in example |
+|:---|:---|
+| `Iterator` | `ProfileIterator` |
+| `IterableCollection` | `SocialNetwork` |
+| `ConcreteIterator` | `VkIterator`, `OkIterator` |
+| `ConcreteCollection` | `Vk`, `Ok` |
+| `Client` | `SocialSpammer` |
+
+**Key insight:** `SocialSpammer` does not depend on `Vk` or `Ok` at all. Swapping networks at runtime requires only passing a different `SocialNetwork` to the constructor — no changes to the spammer.
+
+</details>
+
+##### **4.5. Shape Area and Perimeter with Visitor** (Tutorial 12, Example 2)
+
+The tutorial demonstrates the Visitor pattern with the shape hierarchy. The problem version (starter code) uses `instanceof` chains. The solution version uses a `ShapeVisitor` interface so that area and perimeter computations are separate, reusable visitors. This is the same example as Task 3.3 above — the tutorial provides the reference implementation shown below.
+
+<details>
+<summary>Click to see the solution</summary>
+
+The complete solution structure from the tutorial:
+
+```
+visitor/
+  solution/
+    shapes/
+      Shape.java           — interface with accept(ShapeVisitor)
+      Circle.java          — calls visitor.visit(this)
+      Rectangle.java       — calls visitor.visit(this)
+      Square.java          — calls visitor.visit(this)
+    visitors/
+      ShapeVisitor.java    — interface: visit(Circle), visit(Rectangle), visit(Square)
+      AreaVisitor.java     — accumulates total area
+      PerimeterVisitor.java— accumulates total perimeter
+    Main.java              — creates shapes[], calls calculateArea() and calculatePerimeter()
+```
+
+The key structural insight visible in the solution is that `Shape.accept()` delegates to `visitor.visit(this)`, and because `accept` is overridden in each concrete class (e.g., inside `Circle.accept()`, `this` is statically `Circle`), Java's overload resolution correctly dispatches to `visit(Circle)` without any `instanceof` check. See Task 3.3 for the full implementation.
+
+</details>
