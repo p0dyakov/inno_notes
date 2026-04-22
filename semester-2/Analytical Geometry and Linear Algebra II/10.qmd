@@ -1,0 +1,1411 @@
+---
+title: "W13. Matrix Methods for Differential Equations and Stability"
+author: "Salman Ahmadi-Asl"
+date: "April 17, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Ordinary Differential Equations and Dynamic Systems**
+
+An **ordinary differential equation (ODE)** is an equation involving an unknown function of a single independent variable together with one or more of its derivatives. If the unknown is $y = y(t)$, then examples include:
+
+$$\frac{dy}{dt} = ay, \qquad y'' - 4y' + 4y = 0, \qquad \frac{dy}{dt} = y^2 + t.$$
+
+The **order** of an ODE is the highest derivative appearing in it. The equation is **linear** if the unknown function and its derivatives appear only to the first power, are not multiplied together, and are not placed inside nonlinear functions such as $\sin(y)$ or $\sqrt{1 + (y')^2}$.
+
+ODEs are the mathematical language of change. Population growth, cooling, radioactive decay, mechanical vibration, electrical circuits, and chemical reactions are all modeled by differential equations. In each case, the rate of change of the current state determines the future evolution of the system.
+
+A **continuous-time dynamic system** has the form
+
+$$\dot{\mathbf{x}} = \mathbf{f}(\mathbf{x}, t),$$
+
+where $\mathbf{x}(t)$ is the **state vector**. The state contains enough information to determine the future of the system once the initial condition $\mathbf{x}(0)$ is known.
+
+##### **1.2 Linear Systems and Matrix Form**
+
+Many important models involve several dependent variables, so we study systems of first-order ODEs:
+
+$$
+\begin{cases}
+\dot{x}_1 = a_{11}x_1 + a_{12}x_2 + \cdots + a_{1n}x_n, \\
+\dot{x}_2 = a_{21}x_1 + a_{22}x_2 + \cdots + a_{2n}x_n, \\
+\vdots \\
+\dot{x}_n = a_{n1}x_1 + a_{n2}x_2 + \cdots + a_{nn}x_n.
+\end{cases}
+$$
+
+In compact form this becomes
+
+$$\dot{\mathbf{x}} = A\mathbf{x}, \qquad \mathbf{x}(0) = \mathbf{x}_0,$$
+
+where $A \in \mathbb{R}^{n \times n}$ is a constant matrix.
+
+This matrix formulation is powerful because it lets us use the entire machinery of linear algebra: eigenvalues, eigenvectors, diagonalization, matrix exponentials, and invariant subspaces. The long-term behavior of the system is encoded in the spectrum of $A$.
+
+##### **1.3 Solving $\dot{\mathbf{x}} = A\mathbf{x}$ by Eigenvalues and Diagonalization**
+
+To solve
+
+$$\dot{\mathbf{x}} = A\mathbf{x},$$
+
+we look for solutions of the form
+
+$$\mathbf{x}(t) = \mathbf{v}e^{\lambda t},$$
+
+where $\mathbf{v}$ is a constant vector and $\lambda$ is a scalar. Substituting into the equation gives
+
+$$\lambda \mathbf{v}e^{\lambda t} = A\mathbf{v}e^{\lambda t} \implies A\mathbf{v} = \lambda \mathbf{v}.$$
+
+Thus solving the ODE reduces to solving the **eigenvalue problem** for $A$.
+
+If $A$ has $n$ linearly independent eigenvectors $\mathbf{v}_1, \dots, \mathbf{v}_n$ with eigenvalues $\lambda_1, \dots, \lambda_n$, then the general solution is
+
+$$\mathbf{x}(t) = c_1 \mathbf{v}_1 e^{\lambda_1 t} + \cdots + c_n \mathbf{v}_n e^{\lambda_n t}.$$
+
+Equivalently, if $A$ is diagonalizable,
+
+$$A = PDP^{-1},$$
+
+where $P$ contains eigenvectors as its columns and $D = \operatorname{diag}(\lambda_1, \dots, \lambda_n)$, then with the change of variables $\mathbf{x} = P\mathbf{y}$ we obtain
+
+$$\dot{\mathbf{y}} = D\mathbf{y}.$$
+
+This system is completely decoupled:
+
+$$\dot{y}_i = \lambda_i y_i, \qquad i = 1, \dots, n,$$
+
+so each component is solved by a scalar exponential:
+
+$$y_i(t) = c_i e^{\lambda_i t}.$$
+
+Diagonalization therefore turns a coupled linear system into independent first-order ODEs.
+
+##### **1.4 Matrix Exponential**
+
+The most general and elegant solution formula uses the **matrix exponential**:
+
+$$e^{At} = I + At + \frac{A^2 t^2}{2!} + \frac{A^3 t^3}{3!} + \cdots = \sum_{k=0}^{\infty} \frac{A^k t^k}{k!}.$$
+
+For every square matrix $A$, the solution of the initial value problem
+
+$$\dot{\mathbf{x}} = A\mathbf{x}, \qquad \mathbf{x}(0) = \mathbf{x}_0,$$
+
+is
+
+$$\mathbf{x}(t) = e^{At}\mathbf{x}_0.$$
+
+The matrix exponential behaves like the scalar exponential in all the ways we need:
+
+- $e^{A \cdot 0} = I$
+- $\dfrac{d}{dt} e^{At} = Ae^{At} = e^{At}A$
+- $e^{A(t+s)} = e^{At} e^{As}$
+- $(e^{At})^{-1} = e^{-At}$
+
+In particular, $e^{At}$ is always invertible and never singular.
+
+If $A = PDP^{-1}$ is diagonalizable, then
+
+$$e^{At} = Pe^{Dt}P^{-1},$$
+
+and since $D$ is diagonal,
+
+$$e^{Dt} = \operatorname{diag}(e^{\lambda_1 t}, \dots, e^{\lambda_n t}).$$
+
+This gives a practical way to compute $e^{At}$ using diagonalization.
+
+##### **1.5 Higher-Order ODEs as First-Order Systems**
+
+A higher-order linear ODE can always be rewritten as a first-order system. For a second-order equation
+
+$$y'' + py' + qy = 0,$$
+
+define
+
+$$y_1 = y, \qquad y_2 = y'.$$
+
+Then
+
+$$
+\begin{cases}
+\dot{y}_1 = y_2, \\
+\dot{y}_2 = -qy_1 - py_2,
+\end{cases}
+$$
+
+or in matrix form
+
+$$
+\frac{d}{dt}
+\begin{bmatrix}
+y_1 \\ y_2
+\end{bmatrix}
+=
+\begin{bmatrix}
+0 & 1 \\
+-q & -p
+\end{bmatrix}
+\begin{bmatrix}
+y_1 \\ y_2
+\end{bmatrix}.
+$$
+
+The same idea works for any order. For
+
+$$y^{(n)} + a_{n-1}y^{(n-1)} + \cdots + a_1 y' + a_0 y = 0,$$
+
+set
+
+$$x_1 = y, \quad x_2 = y', \quad \dots, \quad x_n = y^{(n-1)}.$$
+
+Then
+
+$$
+\dot{\mathbf{x}} =
+\begin{bmatrix}
+0 & 1 & 0 & \cdots & 0 \\
+0 & 0 & 1 & \cdots & 0 \\
+\vdots & \vdots & \vdots & \ddots & \vdots \\
+0 & 0 & 0 & \cdots & 1 \\
+-a_0 & -a_1 & -a_2 & \cdots & -a_{n-1}
+\end{bmatrix}
+\mathbf{x}.
+$$
+
+So higher-order equations can be solved with the same matrix methods developed for first-order systems.
+
+##### **1.6 Linearization Around an Equilibrium**
+
+Many physical systems are nonlinear:
+
+$$\dot{\mathbf{x}} = \mathbf{f}(\mathbf{x}, t) \qquad \text{or} \qquad \dot{\mathbf{x}} = \mathbf{f}(\mathbf{x}, \mathbf{u}).$$
+
+An **equilibrium point** is a constant state $\mathbf{c}$ such that
+
+$$\mathbf{f}(\mathbf{c}) = \mathbf{0}.$$
+
+Near an equilibrium, a nonlinear system can be approximated by a linear one using the first-order Taylor expansion. If $\mathbf{x} = \mathbf{c} + \boldsymbol{\eta}$, then
+
+$$\dot{\boldsymbol{\eta}} \approx J_{\mathbf{f}}(\mathbf{c}) \, \boldsymbol{\eta},$$
+
+where $J_{\mathbf{f}}(\mathbf{c})$ is the **Jacobian matrix** of partial derivatives evaluated at the equilibrium.
+
+If an input $\mathbf{u}$ is also present, then linearization near $(\bar{\mathbf{x}}, \bar{\mathbf{u}})$ gives
+
+$$\dot{\boldsymbol{\eta}} \approx A\boldsymbol{\eta} + B\boldsymbol{\nu},$$
+
+with
+
+$$A = \left.\frac{\partial \mathbf{f}}{\partial \mathbf{x}}\right|_{(\bar{\mathbf{x}}, \bar{\mathbf{u}})}, \qquad
+B = \left.\frac{\partial \mathbf{f}}{\partial \mathbf{u}}\right|_{(\bar{\mathbf{x}}, \bar{\mathbf{u}})}.$$
+
+This is why linear systems are so important: they describe the local behavior of nonlinear systems near equilibrium.
+
+##### **1.7 Stability and the Real Parts of Eigenvalues**
+
+For the linear system
+
+$$\dot{\mathbf{x}} = A\mathbf{x},$$
+
+the behavior of solutions as $t \to \infty$ is determined by the eigenvalues of $A$. If $\lambda = \alpha + i\beta$, then
+
+$$e^{\lambda t} = e^{\alpha t}(\cos \beta t + i \sin \beta t).$$
+
+Its magnitude is
+
+$$|e^{\lambda t}| = e^{\alpha t} = e^{\operatorname{Re}(\lambda)t}.$$
+
+Therefore, **only the real part of the eigenvalue controls growth or decay**:
+
+- If $\operatorname{Re}(\lambda_i) < 0$ for all $i$, then every mode decays exponentially and the equilibrium is **asymptotically stable**.
+- If at least one eigenvalue has $\operatorname{Re}(\lambda_i) > 0$, then some mode grows exponentially and the equilibrium is **unstable**.
+- If all eigenvalues satisfy $\operatorname{Re}(\lambda_i) \le 0$ and the eigenvalues on the imaginary axis are simple (equivalently, no growing Jordan blocks appear), then solutions remain bounded and the equilibrium is **neutrally stable**.
+
+Typical geometric behaviors in the phase plane are:
+
+- **Sink / stable node**: both eigenvalues real and negative.
+- **Source / unstable node**: both eigenvalues real and positive.
+- **Saddle**: eigenvalues of opposite signs.
+- **Spiral sink**: complex conjugate eigenvalues with negative real part.
+- **Spiral source**: complex conjugate eigenvalues with positive real part.
+- **Center**: purely imaginary eigenvalues in the simple $2 \times 2$ case.
+
+##### **1.8 The $2 \times 2$ Trace-Determinant Test**
+
+For
+
+$$A =
+\begin{bmatrix}
+a & b \\
+c & d
+\end{bmatrix},
+$$
+
+the characteristic polynomial is
+
+$$\lambda^2 - (\operatorname{tr} A)\lambda + \det(A) = 0,$$
+
+where
+
+$$\operatorname{tr} A = a + d, \qquad \det(A) = ad - bc.$$
+
+For a $2 \times 2$ system, asymptotic stability is easy to test:
+
+$$\dot{\mathbf{x}} = A\mathbf{x} \text{ is asymptotically stable } \iff \operatorname{tr} A < 0 \text{ and } \det(A) > 0.$$
+
+The discriminant
+
+$$\Delta = (\operatorname{tr} A)^2 - 4\det(A)$$
+
+distinguishes real eigenvalues from complex ones:
+
+- $\Delta > 0$: two distinct real eigenvalues.
+- $\Delta = 0$: repeated real eigenvalue.
+- $\Delta < 0$: complex conjugate pair.
+
+Combined with the signs of $\operatorname{tr} A$ and $\det(A)$, this gives the full phase-plane classification.
+
+---
+
+#### **2. Definitions**
+
+*   **Ordinary differential equation (ODE)**: An equation involving an unknown function of one independent variable and its derivatives.
+*   **Order of an ODE**: The highest derivative appearing in the equation.
+*   **Linear ODE**: An ODE in which the unknown function and its derivatives appear linearly, with coefficients depending only on the independent variable.
+*   **Dynamic system**: A rule describing how a state vector changes over time, typically written as $\dot{\mathbf{x}} = \mathbf{f}(\mathbf{x}, t)$.
+*   **State vector**: The vector of variables that completely describes the system at a given time.
+*   **Homogeneous linear system**: A system of the form $\dot{\mathbf{x}} = A\mathbf{x}$ with no forcing term.
+*   **Equilibrium point**: A constant state $\mathbf{c}$ such that $\mathbf{f}(\mathbf{c}) = \mathbf{0}$.
+*   **Diagonalizable matrix**: A matrix $A$ for which there exists an invertible matrix $P$ and diagonal matrix $D$ such that $A = PDP^{-1}$.
+*   **Matrix exponential**: The matrix-valued series $e^{At} = \sum_{k=0}^{\infty} \dfrac{A^k t^k}{k!}$.
+*   **Linearization**: The first-order Taylor approximation of a nonlinear system near an equilibrium or operating point.
+*   **Jacobian matrix**: The matrix of first partial derivatives of a vector-valued function.
+*   **Asymptotic stability**: Every solution starting near the equilibrium converges to it as $t \to \infty$.
+*   **Neutral (marginal) stability**: Nearby solutions remain bounded for all future time but do not necessarily converge to the equilibrium.
+*   **Unstable equilibrium**: An equilibrium for which some nearby solutions move away from it.
+*   **Trace**: For a square matrix $A$, the sum of its diagonal entries, denoted $\operatorname{tr} A$.
+*   **Phase plane**: The plane whose coordinates are the state variables in a two-dimensional dynamical system; trajectories in this plane visualize the system's behavior.
+
+---
+
+#### **3. Formulas**
+
+*   **Scalar exponential-growth/decay model**: $\dfrac{dy}{dt} = ay \implies y(t) = y_0 e^{at}$.
+*   **Linear system in matrix form**: $\dot{\mathbf{x}} = A\mathbf{x}$.
+*   **Eigenvector trial solution**: $\mathbf{x}(t) = \mathbf{v}e^{\lambda t}$ with $A\mathbf{v} = \lambda \mathbf{v}$.
+*   **General solution for diagonalizable $A$**: $\mathbf{x}(t) = \sum_{i=1}^n c_i \mathbf{v}_i e^{\lambda_i t}$.
+*   **Diagonalization**: $A = PDP^{-1}$.
+*   **Decoupled system after change of variables**: $\mathbf{x} = P\mathbf{y}$ gives $\dot{\mathbf{y}} = D\mathbf{y}$.
+*   **Matrix exponential**: $e^{At} = I + At + \dfrac{A^2 t^2}{2!} + \dfrac{A^3 t^3}{3!} + \cdots$.
+*   **Solution of the initial value problem**: $\mathbf{x}(t) = e^{At}\mathbf{x}_0$.
+*   **Matrix exponential of a diagonalizable matrix**: $e^{At} = Pe^{Dt}P^{-1}$.
+*   **Matrix exponential of a diagonal matrix**: If $D = \operatorname{diag}(\lambda_1, \dots, \lambda_n)$, then $e^{Dt} = \operatorname{diag}(e^{\lambda_1 t}, \dots, e^{\lambda_n t})$.
+*   **Second-order to first-order conversion**: $y'' + py' + qy = 0 \implies \dfrac{d}{dt}\begin{bmatrix} y \\ y' \end{bmatrix} = \begin{bmatrix} 0 & 1 \\ -q & -p \end{bmatrix}\begin{bmatrix} y \\ y' \end{bmatrix}$.
+*   **Linearization near equilibrium**: $\dot{\boldsymbol{\eta}} \approx J_{\mathbf{f}}(\mathbf{c})\boldsymbol{\eta}$ when $\mathbf{x} = \mathbf{c} + \boldsymbol{\eta}$ and $\mathbf{f}(\mathbf{c}) = \mathbf{0}$.
+*   **Complex exponential magnitude**: If $\lambda = \alpha + i\beta$, then $|e^{\lambda t}| = e^{\alpha t}$.
+*   **Characteristic polynomial of a $2 \times 2$ matrix**: $\lambda^2 - (\operatorname{tr} A)\lambda + \det(A) = 0$.
+*   **Trace and determinant**: For $A = \begin{bmatrix} a & b \\ c & d \end{bmatrix}$, $\operatorname{tr} A = a + d$ and $\det(A) = ad - bc$.
+*   **$2 \times 2$ asymptotic stability test**: $\operatorname{tr} A < 0$ and $\det(A) > 0$.
+*   **Discriminant for phase-plane classification**: $\Delta = (\operatorname{tr} A)^2 - 4\det(A)$.
+
+---
+
+#### **4. Examples**
+
+##### **4.1. Solve a $2 \times 2$ System with Initial Conditions** (Lab 10, Task 1)
+
+Solve
+
+$$
+\begin{cases}
+\dot{x} = 3x + y, \\
+\dot{y} = 2x + 4y,
+\end{cases}
+\qquad
+x(0) = 1, \quad y(0) = 0.
+$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Once eigenvalues and eigenvectors are found, the initial condition determines the coefficients uniquely.
+
+Write the system as
+
+$$
+\dot{\mathbf{z}} =
+\begin{bmatrix}
+3 & 1 \\
+2 & 4
+\end{bmatrix}
+\mathbf{z},
+\qquad
+\mathbf{z}(0) =
+\begin{bmatrix}
+1 \\ 0
+\end{bmatrix}.
+$$
+
+Let
+
+$$
+A =
+\begin{bmatrix}
+3 & 1 \\
+2 & 4
+\end{bmatrix}.
+$$
+
+The characteristic polynomial is
+
+$$
+\det(A - \lambda I)
+=
+\det
+\begin{bmatrix}
+3-\lambda & 1 \\
+2 & 4-\lambda
+\end{bmatrix}
+= (3-\lambda)(4-\lambda) - 2.
+$$
+
+Thus
+
+$$\lambda^2 - 7\lambda + 10 = 0 = (\lambda - 2)(\lambda - 5),$$
+
+so
+
+$$\lambda_1 = 2, \qquad \lambda_2 = 5.$$
+
+For $\lambda_1 = 2$:
+
+$$
+A - 2I =
+\begin{bmatrix}
+1 & 1 \\
+2 & 2
+\end{bmatrix},
+$$
+
+so $v_1 + v_2 = 0$, and we may take
+
+$$\mathbf{v}_1 = \begin{bmatrix} 1 \\ -1 \end{bmatrix}.$$
+
+For $\lambda_2 = 5$:
+
+$$
+A - 5I =
+\begin{bmatrix}
+-2 & 1 \\
+2 & -1
+\end{bmatrix},
+$$
+
+so $-2v_1 + v_2 = 0$, and we may take
+
+$$\mathbf{v}_2 = \begin{bmatrix} 1 \\ 2 \end{bmatrix}.$$
+
+Therefore
+
+$$
+\begin{bmatrix}
+x(t) \\ y(t)
+\end{bmatrix}
+=
+c_1
+\begin{bmatrix}
+1 \\ -1
+\end{bmatrix}
+e^{2t}
++
+c_2
+\begin{bmatrix}
+1 \\ 2
+\end{bmatrix}
+e^{5t}.
+$$
+
+Use the initial condition:
+
+$$
+\begin{bmatrix}
+1 \\ 0
+\end{bmatrix}
+=
+c_1
+\begin{bmatrix}
+1 \\ -1
+\end{bmatrix}
++
+c_2
+\begin{bmatrix}
+1 \\ 2
+\end{bmatrix}.
+$$
+
+This gives
+
+$$c_1 + c_2 = 1, \qquad -c_1 + 2c_2 = 0.$$
+
+From the second equation, $c_1 = 2c_2$. Substituting into the first gives $3c_2 = 1$, so
+
+$$c_2 = \frac{1}{3}, \qquad c_1 = \frac{2}{3}.$$
+
+Hence
+
+$$x(t) = \frac{2}{3}e^{2t} + \frac{1}{3}e^{5t},$$
+
+and
+
+$$y(t) = -\frac{2}{3}e^{2t} + \frac{2}{3}e^{5t}.$$
+
+**Answer:** $\displaystyle x(t) = \frac{2}{3}e^{2t} + \frac{1}{3}e^{5t}$ and $\displaystyle y(t) = -\frac{2}{3}e^{2t} + \frac{2}{3}e^{5t}$.
+
+</details>
+
+##### **4.2. Convert a Damped Second-Order ODE and Decide Stability** (Lab 10, Task 2)
+
+Convert
+
+$$x'' + 4x' + 13x = 0$$
+
+to a first-order system and determine its stability.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Converting to first-order gives a matrix whose eigenvalues immediately reveal stability.
+
+Let
+
+$$y = x'.$$
+
+Then
+
+$$
+\begin{cases}
+\dot{x} = y, \\
+\dot{y} = -13x - 4y.
+\end{cases}
+$$
+
+In matrix form,
+
+$$
+\frac{d}{dt}
+\begin{bmatrix}
+x \\ y
+\end{bmatrix}
+=
+\begin{bmatrix}
+0 & 1 \\
+-13 & -4
+\end{bmatrix}
+\begin{bmatrix}
+x \\ y
+\end{bmatrix}.
+$$
+
+The characteristic polynomial is
+
+$$
+\det
+\begin{bmatrix}
+-\lambda & 1 \\
+-13 & -4-\lambda
+\end{bmatrix}
+= \lambda^2 + 4\lambda + 13.
+$$
+
+Solve:
+
+$$
+\lambda = \frac{-4 \pm \sqrt{16 - 52}}{2} = -2 \pm 3i.
+$$
+
+Both eigenvalues have real part $-2 < 0$, so the equilibrium is **asymptotically stable**. Geometrically, trajectories spiral toward the origin.
+
+**Answer:** The associated first-order system is $\dot{\mathbf{z}} = \begin{bmatrix} 0 & 1 \\ -13 & -4 \end{bmatrix}\mathbf{z}$, and it is asymptotically stable because $\lambda = -2 \pm 3i$.
+
+</details>
+
+##### **4.3. Find All Parameters That Make a System Asymptotically Stable** (Lab 10, Task 3)
+
+Find all real values of $a$ such that
+
+$$
+\dot{\mathbf{x}} =
+\begin{bmatrix}
+-1 & a \\
+-a & -2
+\end{bmatrix}
+\mathbf{x}
+$$
+
+is asymptotically stable.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For a $2 \times 2$ system, asymptotic stability is equivalent to negative trace and positive determinant.
+
+Let
+
+$$
+A =
+\begin{bmatrix}
+-1 & a \\
+-a & -2
+\end{bmatrix}.
+$$
+
+Compute the trace:
+
+$$\operatorname{tr} A = -1 + (-2) = -3 < 0.$$
+
+Compute the determinant:
+
+$$\det(A) = (-1)(-2) - a(-a) = 2 + a^2 > 0 \qquad \text{for all } a \in \mathbb{R}.$$
+
+Since both conditions
+
+$$\operatorname{tr} A < 0, \qquad \det(A) > 0$$
+
+hold for every real $a$, the system is asymptotically stable for all $a$.
+
+If desired, we can also see this from the characteristic equation:
+
+$$\lambda^2 + 3\lambda + (2 + a^2) = 0.$$
+
+Its roots always have negative real part because the sum is $-3$ and the product is $2 + a^2 > 0$.
+
+**Answer:** The system is asymptotically stable for **all real values** of $a$.
+
+</details>
+
+##### **4.4. Classify ODEs by Order and Linearity** (Lecture 10, Example 1)
+
+Classify the following differential equations by order and determine whether each one is linear or nonlinear:
+
+**(a)** $$\frac{d^2 y}{dx^2} = \sqrt{1 + \left(\frac{dy}{dx}\right)^2}$$
+
+**(b)** $$t\frac{dy}{dt} - y = t^2 \sin t$$
+
+**(c)** $$\frac{d^3 y}{dt^3} + 4\frac{d^2 y}{dt^2} - 6y = e^t \cos t$$
+
+**(d)** $$y' + y^2 = 0$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The order is determined by the highest derivative. Linearity fails whenever the unknown or its derivatives appear multiplied together, raised to powers other than 1, or inside nonlinear functions.
+
+**(1)** $\dfrac{d^2 y}{dx^2} = \sqrt{1 + \left(\dfrac{dy}{dx}\right)^2}$.
+
+- Highest derivative: $y''$, so the equation is **second order**.
+- The derivative $y'$ appears squared inside a square root, so the equation is **nonlinear**.
+
+**(2)** $t\dfrac{dy}{dt} - y = t^2 \sin t$.
+
+- Highest derivative: $y'$, so the equation is **first order**.
+- $y$ and $y'$ appear only linearly, and the coefficients depend only on $t$, so the equation is **linear**.
+
+**(3)** $\dfrac{d^3 y}{dt^3} + 4\dfrac{d^2 y}{dt^2} - 6y = e^t \cos t$.
+
+- Highest derivative: $y^{(3)}$, so the equation is **third order**.
+- All appearances of $y$ and its derivatives are linear, so the equation is **linear**.
+
+**(4)** $y' + y^2 = 0$.
+
+- Highest derivative: $y'$, so the equation is **first order**.
+- The term $y^2$ makes it **nonlinear**.
+
+**Answer:** (1) second-order nonlinear, (2) first-order linear, (3) third-order linear, (4) first-order nonlinear.
+
+</details>
+
+##### **4.5. Solve the Simplest Linear ODE and Interpret the Parameter** (Lecture 10, Example 2)
+
+Solve the initial value problem
+
+$$\frac{dy}{dt} = ay, \qquad y(0) = y_0,$$
+
+and describe the behavior for $a > 0$, $a = 0$, and $a < 0$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** This is the basic exponential model. The sign of $a$ determines whether the solution grows, stays constant, or decays.
+
+Separate variables:
+
+$$\frac{1}{y}\frac{dy}{dt} = a.$$
+
+Integrate:
+
+$$\int \frac{1}{y}\,dy = \int a\,dt \implies \ln |y| = at + C.$$
+
+Exponentiating gives
+
+$$y(t) = Ke^{at}.$$
+
+Use the initial condition:
+
+$$y(0) = K = y_0,$$
+
+so
+
+$$y(t) = y_0 e^{at}.$$
+
+**Behavior:**
+
+- If $a > 0$, then $e^{at}$ grows and the solution shows **exponential growth**.
+- If $a = 0$, then $y(t) = y_0$ is **constant**.
+- If $a < 0$, then $e^{at} \to 0$ as $t \to \infty$, so the solution shows **exponential decay**.
+
+This same structure appears in population growth, cooling, and radioactive decay models.
+
+**Answer:** $y(t) = y_0 e^{at}$; growth for $a > 0$, constant solution for $a = 0$, decay for $a < 0$.
+
+</details>
+
+##### **4.6. Solve a $2 \times 2$ Linear System by Eigenvalues and Eigenvectors** (Lecture 10, Example 3)
+
+Find the general solution of
+
+$$
+\begin{cases}
+\dot{x}_1 = x_1 + x_2, \\
+\dot{x}_2 = 4x_1 + x_2.
+\end{cases}
+$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For $\dot{\mathbf{x}} = A\mathbf{x}$, trial solutions of the form $\mathbf{x}(t) = \mathbf{v}e^{\lambda t}$ reduce the problem to the eigenvalue problem $A\mathbf{v} = \lambda \mathbf{v}$.
+
+Write the system in matrix form:
+
+$$
+\dot{\mathbf{x}} =
+\begin{bmatrix}
+1 & 1 \\
+4 & 1
+\end{bmatrix}
+\mathbf{x}
+= A\mathbf{x}.
+$$
+
+Compute the characteristic polynomial:
+
+$$
+\det(A - \lambda I) =
+\det
+\begin{bmatrix}
+1 - \lambda & 1 \\
+4 & 1 - \lambda
+\end{bmatrix}
+= (1 - \lambda)^2 - 4.
+$$
+
+So
+
+$$\lambda^2 - 2\lambda - 3 = 0 = (\lambda - 3)(\lambda + 1).$$
+
+Hence the eigenvalues are
+
+$$\lambda_1 = 3, \qquad \lambda_2 = -1.$$
+
+For $\lambda_1 = 3$:
+
+$$
+A - 3I =
+\begin{bmatrix}
+-2 & 1 \\
+4 & -2
+\end{bmatrix},
+$$
+
+which gives the relation $-2v_1 + v_2 = 0$, so one eigenvector is
+
+$$\mathbf{v}_1 = \begin{bmatrix} 1 \\ 2 \end{bmatrix}.$$
+
+For $\lambda_2 = -1$:
+
+$$
+A + I =
+\begin{bmatrix}
+2 & 1 \\
+4 & 2
+\end{bmatrix},
+$$
+
+which gives $2v_1 + v_2 = 0$, so one eigenvector is
+
+$$\mathbf{v}_2 = \begin{bmatrix} 1 \\ -2 \end{bmatrix}.$$
+
+Therefore the general solution is
+
+$$
+\mathbf{x}(t) =
+c_1
+\begin{bmatrix}
+1 \\ 2
+\end{bmatrix}
+e^{3t}
++
+c_2
+\begin{bmatrix}
+1 \\ -2
+\end{bmatrix}
+e^{-t}.
+$$
+
+In component form,
+
+$$
+\begin{cases}
+x_1(t) = c_1 e^{3t} + c_2 e^{-t}, \\
+x_2(t) = 2c_1 e^{3t} - 2c_2 e^{-t}.
+\end{cases}
+$$
+
+**Answer:** $\mathbf{x}(t) = c_1(1,2)^T e^{3t} + c_2(1,-2)^T e^{-t}$.
+
+</details>
+
+##### **4.7. Solve the Same System by Diagonalization and Matrix Exponential** (Lecture 10, Example 4)
+
+For
+
+$$
+A =
+\begin{bmatrix}
+1 & 1 \\
+4 & 1
+\end{bmatrix},
+$$
+
+use diagonalization to compute $e^{At}$ and write the solution for a general initial condition $\mathbf{x}(0) = \begin{bmatrix} x_1(0) \\ x_2(0) \end{bmatrix}$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** If $A = PDP^{-1}$, then $e^{At} = Pe^{Dt}P^{-1}$. This gives the full initial-value solution directly.
+
+From the previous example, we may choose
+
+$$
+P =
+\begin{bmatrix}
+1 & 1 \\
+2 & -2
+\end{bmatrix},
+\qquad
+D =
+\begin{bmatrix}
+3 & 0 \\
+0 & -1
+\end{bmatrix}.
+$$
+
+Compute the inverse:
+
+$$
+P^{-1} = \frac{1}{4}
+\begin{bmatrix}
+2 & 1 \\
+2 & -1
+\end{bmatrix}.
+$$
+
+Then
+
+$$
+e^{Dt} =
+\begin{bmatrix}
+e^{3t} & 0 \\
+0 & e^{-t}
+\end{bmatrix},
+$$
+
+so
+
+$$
+e^{At} = Pe^{Dt}P^{-1}
+=
+\frac{1}{4}
+\begin{bmatrix}
+1 & 1 \\
+2 & -2
+\end{bmatrix}
+\begin{bmatrix}
+e^{3t} & 0 \\
+0 & e^{-t}
+\end{bmatrix}
+\begin{bmatrix}
+2 & 1 \\
+2 & -1
+\end{bmatrix}.
+$$
+
+Therefore
+
+$$
+\mathbf{x}(t) = e^{At}\mathbf{x}(0).
+$$
+
+Multiplying out gives
+
+$$
+\begin{cases}
+x_1(t) = \dfrac{1}{4}\bigl(2x_1(0) + x_2(0)\bigr)e^{3t}
+       + \dfrac{1}{4}\bigl(2x_1(0) - x_2(0)\bigr)e^{-t}, \\
+x_2(t) = \dfrac{1}{2}\bigl(2x_1(0) + x_2(0)\bigr)e^{3t}
+       - \dfrac{1}{2}\bigl(2x_1(0) - x_2(0)\bigr)e^{-t}.
+\end{cases}
+$$
+
+This is the same family of solutions as in Example 4.3, but now the constants are written explicitly in terms of the initial data.
+
+**Answer:** $\mathbf{x}(t) = Pe^{Dt}P^{-1}\mathbf{x}(0)$ with the formula above.
+
+</details>
+
+##### **4.8. Compute the Matrix Exponential of a Diagonal Matrix** (Lecture 10, Example 5)
+
+Find $e^{At}$ for
+
+$$
+A =
+\begin{bmatrix}
+1 & 0 \\
+0 & 2
+\end{bmatrix}.
+$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Powers of a diagonal matrix are computed entrywise, so the matrix exponential is also diagonal with scalar exponentials on the diagonal.
+
+First compute powers of $A$:
+
+$$
+A^k =
+\begin{bmatrix}
+1^k & 0 \\
+0 & 2^k
+\end{bmatrix}
+=
+\begin{bmatrix}
+1 & 0 \\
+0 & 2^k
+\end{bmatrix}.
+$$
+
+Substitute into the series:
+
+$$
+e^{At}
+=
+\sum_{k=0}^{\infty} \frac{A^k t^k}{k!}
+=
+\begin{bmatrix}
+\sum_{k=0}^{\infty} \dfrac{t^k}{k!} & 0 \\
+0 & \sum_{k=0}^{\infty} \dfrac{(2t)^k}{k!}
+\end{bmatrix}.
+$$
+
+Each sum is an ordinary exponential:
+
+$$
+e^{At} =
+\begin{bmatrix}
+e^t & 0 \\
+0 & e^{2t}
+\end{bmatrix}.
+$$
+
+More generally, if $D = \operatorname{diag}(\lambda_1, \dots, \lambda_n)$, then
+
+$$e^{Dt} = \operatorname{diag}(e^{\lambda_1 t}, \dots, e^{\lambda_n t}).$$
+
+**Answer:** $e^{At} = \begin{bmatrix} e^t & 0 \\ 0 & e^{2t} \end{bmatrix}$.
+
+</details>
+
+##### **4.9. Solve an Upper-Triangular System with an Initial Condition** (Lecture 10, Example 6)
+
+Solve
+
+$$
+\dot{\mathbf{y}} =
+\begin{bmatrix}
+3 & 1 \\
+0 & 2
+\end{bmatrix}
+\mathbf{y},
+\qquad
+\mathbf{y}(0) =
+\begin{bmatrix}
+1 \\ 1
+\end{bmatrix}.
+$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A triangular matrix reveals its eigenvalues immediately. Once the eigenvectors are found, the initial condition determines the constants in the eigenbasis expansion.
+
+Let
+
+$$
+A =
+\begin{bmatrix}
+3 & 1 \\
+0 & 2
+\end{bmatrix}.
+$$
+
+Because $A$ is upper triangular, its eigenvalues are the diagonal entries:
+
+$$\lambda_1 = 3, \qquad \lambda_2 = 2.$$
+
+For $\lambda_1 = 3$:
+
+$$
+A - 3I =
+\begin{bmatrix}
+0 & 1 \\
+0 & -1
+\end{bmatrix},
+$$
+
+so $v_2 = 0$. We may take
+
+$$\mathbf{v}_1 = \begin{bmatrix} 1 \\ 0 \end{bmatrix}.$$
+
+For $\lambda_2 = 2$:
+
+$$
+A - 2I =
+\begin{bmatrix}
+1 & 1 \\
+0 & 0
+\end{bmatrix},
+$$
+
+so $v_1 + v_2 = 0$. We may take
+
+$$\mathbf{v}_2 = \begin{bmatrix} 1 \\ -1 \end{bmatrix}.$$
+
+Hence
+
+$$
+\mathbf{y}(t) =
+c_1
+\begin{bmatrix}
+1 \\ 0
+\end{bmatrix}
+e^{3t}
++
+c_2
+\begin{bmatrix}
+1 \\ -1
+\end{bmatrix}
+e^{2t}.
+$$
+
+Use the initial condition:
+
+$$
+\begin{bmatrix}
+1 \\ 1
+\end{bmatrix}
+=
+c_1
+\begin{bmatrix}
+1 \\ 0
+\end{bmatrix}
++
+c_2
+\begin{bmatrix}
+1 \\ -1
+\end{bmatrix}.
+$$
+
+This gives
+
+$$c_1 + c_2 = 1, \qquad -c_2 = 1,$$
+
+so
+
+$$c_2 = -1, \qquad c_1 = 2.$$
+
+Therefore
+
+$$
+\mathbf{y}(t) =
+2
+\begin{bmatrix}
+1 \\ 0
+\end{bmatrix}
+e^{3t}
+-
+\begin{bmatrix}
+1 \\ -1
+\end{bmatrix}
+e^{2t}
+=
+\begin{bmatrix}
+2e^{3t} - e^{2t} \\
+e^{2t}
+\end{bmatrix}.
+$$
+
+**Answer:** $\mathbf{y}(t) = \begin{bmatrix} 2e^{3t} - e^{2t} \\ e^{2t} \end{bmatrix}$.
+
+</details>
+
+##### **4.10. Convert a Second-Order ODE to a First-Order System and Solve It** (Lecture 10, Example 7)
+
+Convert
+
+$$y'' + 3y' + 2y = 0$$
+
+to a first-order system and solve it.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Introduce new variables for successive derivatives. The resulting matrix system can then be solved using eigenvalues and eigenvectors.
+
+Set
+
+$$y_1 = y, \qquad y_2 = y_1' = y'.$$
+
+Then
+
+$$y_2' = y'' = -3y' - 2y = -2y_1 - 3y_2.$$
+
+So the first-order system is
+
+$$
+\begin{cases}
+\dot{y}_1 = y_2, \\
+\dot{y}_2 = -2y_1 - 3y_2.
+\end{cases}
+$$
+
+In matrix form,
+
+$$
+\frac{d}{dt}
+\begin{bmatrix}
+y_1 \\ y_2
+\end{bmatrix}
+=
+\begin{bmatrix}
+0 & 1 \\
+-2 & -3
+\end{bmatrix}
+\begin{bmatrix}
+y_1 \\ y_2
+\end{bmatrix}.
+$$
+
+Let
+
+$$
+A =
+\begin{bmatrix}
+0 & 1 \\
+-2 & -3
+\end{bmatrix}.
+$$
+
+Compute the characteristic polynomial:
+
+$$
+\det(A - \lambda I) =
+\det
+\begin{bmatrix}
+-\lambda & 1 \\
+-2 & -3 - \lambda
+\end{bmatrix}
+= \lambda^2 + 3\lambda + 2.
+$$
+
+Thus
+
+$$\lambda^2 + 3\lambda + 2 = (\lambda + 1)(\lambda + 2),$$
+
+so the eigenvalues are
+
+$$\lambda_1 = -1, \qquad \lambda_2 = -2.$$
+
+For $\lambda_1 = -1$:
+
+$$
+A + I =
+\begin{bmatrix}
+1 & 1 \\
+-2 & -2
+\end{bmatrix},
+$$
+
+so $v_1 + v_2 = 0$ and we may take
+
+$$\mathbf{v}_1 = \begin{bmatrix} 1 \\ -1 \end{bmatrix}.$$
+
+For $\lambda_2 = -2$:
+
+$$
+A + 2I =
+\begin{bmatrix}
+2 & 1 \\
+-2 & -1
+\end{bmatrix},
+$$
+
+so $2v_1 + v_2 = 0$ and we may take
+
+$$\mathbf{v}_2 = \begin{bmatrix} 1 \\ -2 \end{bmatrix}.$$
+
+Hence
+
+$$
+\begin{bmatrix}
+y_1 \\ y_2
+\end{bmatrix}
+=
+c_1
+\begin{bmatrix}
+1 \\ -1
+\end{bmatrix}
+e^{-t}
++
+c_2
+\begin{bmatrix}
+1 \\ -2
+\end{bmatrix}
+e^{-2t}.
+$$
+
+Since $y = y_1$, the original solution is
+
+$$y(t) = c_1 e^{-t} + c_2 e^{-2t}.$$
+
+**Answer:** First-order system as above, and $y(t) = c_1 e^{-t} + c_2 e^{-2t}$.
+
+</details>
+
+##### **4.11. Convert a Fourth-Order ODE to a First-Order System** (Lecture 10, Example 8)
+
+Rewrite the fourth-order ODE
+
+$$y^{(4)} - 2y''' + 7y'' - 4y = 0$$
+
+as a first-order system.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For an $n$th-order ODE, each new variable stores one derivative of $y$ up to order $n-1$.
+
+Introduce the variables
+
+$$y_1 = y, \qquad y_2 = y', \qquad y_3 = y'', \qquad y_4 = y'''.$$
+
+Then
+
+$$y_1' = y_2, \qquad y_2' = y_3, \qquad y_3' = y_4.$$
+
+From the ODE,
+
+$$y^{(4)} = 2y''' - 7y'' + 4y,$$
+
+so
+
+$$y_4' = 4y_1 + 0y_2 - 7y_3 + 2y_4.$$
+
+Therefore,
+
+$$
+\begin{cases}
+\dot{y}_1 = y_2, \\
+\dot{y}_2 = y_3, \\
+\dot{y}_3 = y_4, \\
+\dot{y}_4 = 4y_1 - 7y_3 + 2y_4.
+\end{cases}
+$$
+
+In matrix form,
+
+$$
+\frac{d}{dt}
+\begin{bmatrix}
+y_1 \\ y_2 \\ y_3 \\ y_4
+\end{bmatrix}
+=
+\begin{bmatrix}
+0 & 1 & 0 & 0 \\
+0 & 0 & 1 & 0 \\
+0 & 0 & 0 & 1 \\
+4 & 0 & -7 & 2
+\end{bmatrix}
+\begin{bmatrix}
+y_1 \\ y_2 \\ y_3 \\ y_4
+\end{bmatrix}.
+$$
+
+This system can then be analyzed by eigenvalues, diagonalization, or the matrix exponential.
+
+**Answer:** The companion-form system is the one displayed above.
+
+</details>
+
+##### **4.12. Use Eigenvalues to Classify Stability in Several Systems** (Lecture 10, Example 9)
+
+Determine the stability type of each system:
+
+**(a)** $$\dot{\mathbf{x}} = \begin{bmatrix} -2 & 1 \\ 0 & -3 \end{bmatrix}\mathbf{x}$$
+
+**(b)** $$\dot{\mathbf{x}} = \begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}\mathbf{x}$$
+
+**(c)** $$\dot{\mathbf{x}} = \begin{bmatrix} -1 & 2 \\ -2 & -1 \end{bmatrix}\mathbf{x}$$
+
+**(d)** $$x'' + 4x = 0$$
+
+**(e)** $$x'' - 2x' + 5x = 0$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Stability depends on the real parts of the eigenvalues. Negative real parts give decay, positive real parts give growth, and purely imaginary eigenvalues lead to bounded oscillation in the simple case.
+
+**(1)** $A = \begin{bmatrix} -2 & 1 \\ 0 & -3 \end{bmatrix}$.
+
+This matrix is upper triangular, so the eigenvalues are
+
+$$\lambda_1 = -2, \qquad \lambda_2 = -3.$$
+
+Both are negative, so the system is **asymptotically stable**.
+
+**(2)** $A = \begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}$.
+
+Its characteristic polynomial is
+
+$$\lambda^2 - 5\lambda - 2 = 0,$$
+
+so the eigenvalues are
+
+$$\lambda = \frac{5 \pm \sqrt{33}}{2}.$$
+
+One eigenvalue is positive, so the system is **unstable**.
+
+**(3)** $A = \begin{bmatrix} -1 & 2 \\ -2 & -1 \end{bmatrix}$.
+
+The characteristic polynomial is
+
+$$(-1 - \lambda)^2 + 4 = 0,$$
+
+so
+
+$$\lambda = -1 \pm 2i.$$
+
+The real part is $-1$, so the system is **asymptotically stable**; geometrically it is a spiral sink.
+
+**(4)** $x'' + 4x = 0$.
+
+The characteristic equation is
+
+$$\lambda^2 + 4 = 0,$$
+
+so
+
+$$\lambda = \pm 2i.$$
+
+The real part is zero, so the motion is oscillatory and bounded. This system is **neutrally stable**.
+
+**(5)** $x'' - 2x' + 5x = 0$.
+
+The characteristic equation is
+
+$$\lambda^2 - 2\lambda + 5 = 0,$$
+
+so
+
+$$\lambda = 1 \pm 2i.$$
+
+The real part is positive, so the solution grows like $e^t$ times an oscillation. The system is **unstable**.
+
+**Answer:** (1) asymptotically stable, (2) unstable, (3) asymptotically stable, (4) neutrally stable, (5) unstable.
+
+</details>
+
+##### **4.13. Use the Trace-Determinant Test for a $2 \times 2$ System** (Lecture 10, Example 10)
+
+Consider
+
+$$
+\dot{\mathbf{u}} =
+\begin{bmatrix}
+a & b \\
+c & d
+\end{bmatrix}
+\mathbf{u}.
+$$
+
+Explain why the conditions
+
+$$a + d < 0, \qquad ad - bc > 0$$
+
+guarantee asymptotic stability.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For a $2 \times 2$ matrix, the sum and product of eigenvalues are the trace and determinant. If the trace is negative and the determinant is positive, both eigenvalues must have negative real parts.
+
+The characteristic polynomial is
+
+$$\lambda^2 - (a+d)\lambda + (ad-bc) = 0.$$
+
+So if the eigenvalues are $\lambda_1$ and $\lambda_2$, then
+
+$$\lambda_1 + \lambda_2 = a+d = \operatorname{tr} A,$$
+
+and
+
+$$\lambda_1 \lambda_2 = ad - bc = \det(A).$$
+
+Assume
+
+$$\operatorname{tr} A = a+d < 0, \qquad \det(A) = ad-bc > 0.$$
+
+There are two cases:
+
+**Case 1: The eigenvalues are real.**
+
+If their product is positive, they have the same sign. Since their sum is negative, both must be negative.
+
+**Case 2: The eigenvalues are complex conjugates.**
+
+Then
+
+$$\lambda_{1,2} = \alpha \pm i\beta,$$
+
+and their sum is $2\alpha = \operatorname{tr} A < 0$. Hence
+
+$$\alpha < 0.$$
+
+So in either case, both eigenvalues have negative real parts. Therefore every mode decays exponentially and the system is asymptotically stable.
+
+**Answer:** The conditions $\operatorname{tr} A < 0$ and $\det(A) > 0$ force both eigenvalues to have negative real parts, so the system is asymptotically stable.
+
+</details>

@@ -1,0 +1,2065 @@
+---
+title: "W14. Design Patterns: Command, Chain of Responsibility, Observer"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "April 21, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Design Patterns in Context**
+
+###### **1.1.1 Important Remarks and Informal Definition**
+
+This week studies three **behavioral design patterns**: **Command**, **Chain of Responsibility**, and **Observer**. Three general remarks are important for the whole topic.
+
+First, **all design patterns exploit the object-oriented programming paradigm**. The exact syntax may vary between Java, C++, and C#, but the underlying design ideas are the same. Second, there is **no strong formal theory** behind design patterns in the mathematical sense. Patterns summarize broad practical experience gained from building real object-oriented systems. Third, a pattern is not a rigid template to be copied blindly. It is an architectural scheme: a reusable arrangement of classes, objects, and methods that solves a recurring design problem.
+
+An informal GoF-style definition is:
+
+> A design pattern is a standardized solution to a problem that occurs over and over again in software design, but can still be applied in many concrete ways.
+
+This is why patterns matter in software engineering education. They teach how to recognize families of design problems and how to reuse an established structure instead of inventing an ad hoc solution every time.
+
+###### **1.1.2 Taxonomy and This Week's Agenda**
+
+The GoF catalogue classifies patterns into three families:
+
+*   **Creational patterns** deal with the best way to create object instances.
+*   **Structural patterns** describe how classes and objects are combined into larger structures.
+*   **Behavioral patterns** are concerned with the assignment of responsibilities between objects and with encapsulating behavior in objects and delegating requests to them.
+
+This week covers three behavioral patterns from that catalogue:
+
+*   **Command**
+*   **Chain of Responsibility**
+*   **Observer**
+
+This sequence is the natural order in which the three patterns are introduced.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "This week's three patterns inside the GoF behavioral category"
+%%| fig-width: 6.3
+%%| fig-height: 3.0
+flowchart TB
+    Patterns["Design Patterns"]
+    Behavioral["Behavioral"]
+    C["Command"]
+    R["Chain of Responsibility"]
+    O["Observer"]
+    Patterns --> Behavioral
+    Behavioral --> C
+    Behavioral --> R
+    Behavioral --> O
+```
+
+These three patterns solve different but related decoupling problems:
+
+| Pattern | Main question it answers | Main abstraction |
+|:---|:---|:---|
+| **Command** | How can an action be represented and manipulated as data? | command object |
+| **Chain of Responsibility** | How can one request be offered to several candidate handlers? | handler chain |
+| **Observer** | How can one source notify many dependents automatically? | subscription list |
+
+##### **1.2 Command**
+
+###### **1.2.1 Definition and Main Purpose**
+
+**Command** is a behavioral pattern that **turns a request into a stand-alone object** containing all information about that request. In the classic GoF formulation, Command **encapsulates a request as an object**, thereby letting the program parameterize clients with requests, queue or log requests, and support undoable operations. Alternative names sometimes used for this idea are **Action** and **Transaction**.
+
+Once a request is represented as an object, it can be:
+
+*   stored in a field,
+*   passed as a method argument,
+*   queued or scheduled,
+*   logged,
+*   undone or redone,
+*   combined with other commands into a macro command.
+
+The pattern separates two responsibilities that are often mixed:
+
+*   the code that **triggers** the action,
+*   the code that **performs** the action.
+
+The sender no longer calls a receiver directly. It simply invokes a unified command interface.
+
+###### **1.2.2 Motivation: The Universal Remote Control**
+
+A standard running example is a **programmable universal remote control**. The problem is straightforward: a remote control has several programmable buttons, but the devices it controls have completely different interfaces.
+
+For example:
+
+*   a `Light` may have only `on()` and `off()`,
+*   an `AirCond` may have `on()`, `off()`, and `setSpeed(int)`,
+*   a `HomeMusicCenter` may have `on()`, `off()`, `selectRadio()`, and `setVolume(int)`.
+
+The remote should control all these devices **uniformly**, but the device APIs are not uniform at all. If the remote knew each concrete API directly, every new device type would force changes inside the remote class. That is exactly the coupling the pattern is meant to remove.
+
+The first step is therefore to define one common command interface:
+
+```java
+public interface Command {
+    void execute();
+}
+```
+
+Now each button can store a `Command` object instead of a device reference. Pressing a button means only one thing: call `execute()`.
+
+###### **1.2.3 Participants and Structure**
+
+The standard Command structure contains five roles:
+
+*   **Client**: creates receivers, commands, and invokers; wires them together.
+*   **Command**: the common interface, usually declaring `execute()`.
+*   **ConcreteCommand**: stores a receiver and the data needed to perform one request.
+*   **Receiver**: knows how to do the real work.
+*   **Invoker**: stores commands and triggers them later.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Command pattern: invoker, command, and receiver are decoupled"
+%%| fig-width: 8
+%%| fig-height: 5.2
+classDiagram
+    class Client
+    class Invoker {
+        -command: Command
+        +setCommand(c)
+        +trigger()
+    }
+    class Command {
+        <<interface>>
+        +execute()
+    }
+    class ConcreteCommand {
+        -receiver: Receiver
+        -params
+        +execute()
+    }
+    class Receiver {
+        +operation(params)
+    }
+    Client --> Invoker
+    Client --> ConcreteCommand
+    ConcreteCommand ..|> Command
+    Invoker --> Command
+    ConcreteCommand --> Receiver
+```
+
+The key structural fact is this: the **invoker knows only the command interface**, not the receiver's concrete API.
+
+###### **1.2.4 Step-by-Step Implementation**
+
+The implementation sequence is as follows.
+
+**Step 1 — Declare the command interface.**  
+Create a common execution method. In the simplest version it is just `execute()`.
+
+**Step 2 — Extract requests into concrete command classes.**  
+Each concrete command stores:
+
+*   the **receiver** object,
+*   the request parameters,
+*   optionally the old state needed for undo.
+
+**Step 3 — Identify the senders/invokers.**  
+These are objects such as buttons, menu items, keyboard shortcuts, or controllers. They should store commands through the interface type, not through concrete command classes.
+
+**Step 4 — Replace direct receiver calls with command execution.**  
+The invoker no longer says "turn on the light" or "set speed to 20." It only says `execute()`.
+
+**Step 5 — Initialize objects in client code.**  
+The recommended initialization order is:
+
+1.  create receivers,
+2.  create commands and connect them to receivers,
+3.  create invokers and assign commands to them.
+
+At runtime the flow is simple:
+
+1.  the invoker is triggered,
+2.  it calls `command.execute()`,
+3.  the concrete command delegates to the receiver,
+4.  the receiver performs the actual work.
+
+###### **1.2.5 Applicability**
+
+Command is especially applicable:
+
+*   when you want to **parameterize objects with operations**,
+*   when you want to **queue, schedule, or execute operations remotely**,
+*   when you want to **implement reversible operations**.
+
+These are strong hints that Command is about making behavior manipulable in the same way that ordinary objects are manipulable.
+
+###### **1.2.6 Universal Remote Example in Stages**
+
+The universal remote control example can be developed gradually.
+
+**Stage 1 — Remote with a unified button API.**  
+The remote stores an array of commands, one per slot.
+
+```cpp
+class RemoteControl {
+    Command* slots[5];
+public:
+    RemoteControl() {
+        for (int i = 0; i < 5; i++)
+            slots[i] = nullptr;
+    }
+    void set(int i, Command* cmd) { slots[i] = cmd; }
+    void buttonWasPressed(int i) { slots[i]->execute(); }
+};
+```
+
+This is already the core idea: the remote does not know what any command actually does.
+
+**Stage 2 — Concrete commands adapt device APIs to the button interface.**  
+For a light:
+
+```cpp
+class Light {
+    void on()  { ... }
+    void off() { ... }
+};
+
+class cmdLight : public Command {
+    Light* light;
+public:
+    cmdLight(Light* l) { light = l; }
+    void execute() override { light->on(); }
+};
+```
+
+For an air conditioner:
+
+```cpp
+class AirCond {
+    void on() { ... }
+    void off() { ... }
+    void setSpeed(int) { ... }
+};
+
+class cmdAirCond : public Command {
+    AirCond* cond;
+public:
+    cmdAirCond(AirCond* c) { cond = c; }
+    void execute() override {
+        cond->on();
+        cond->setSpeed(20);
+    }
+};
+```
+
+For a home music center:
+
+```cpp
+class cmdRadio : public Command {
+    HomeMusicCenter* center;
+public:
+    cmdRadio(HomeMusicCenter* c) { center = c; }
+    void execute() override {
+        center->on();
+        center->selectRadio();
+        center->setVolume(20);
+    }
+};
+```
+
+Notice the architectural value: very different device protocols are hidden behind one small interface.
+
+**Stage 3 — Program the remote.**  
+The client chooses which command is assigned to which button:
+
+```cpp
+auto remote = new RemoteControl();
+remote->set(0, new cmdLight(new Light()));
+remote->set(1, new cmdAirCond(new AirCond()));
+remote->set(2, new cmdRadio(new HomeMusicCenter()));
+```
+
+Pressing button `1` triggers only this call chain:
+
+```cpp
+slots[1]->execute();
+```
+
+which then expands inside the concrete command into:
+
+```cpp
+cond->on();
+cond->setSpeed(20);
+```
+
+**Stage 4 — Unused buttons.**  
+An important practical issue is what to do with unused buttons. The standard improvement is a **do-nothing command**:
+
+```cpp
+class cmdNothing : public Command {
+public:
+    void execute() override { }
+};
+```
+
+This is a clean alternative to storing `nullptr`, because the remote can then call `execute()` safely on every slot without null checks.
+
+**Stage 5 — Add off buttons.**  
+The next improvement is to introduce corresponding "off" commands such as `cmdLightOff`, `cmdAirCondOff`, and `cmdRadioOff`.
+
+This makes the interface more realistic and prepares the design for undo.
+
+###### **1.2.7 Undo, Redo, Null Commands, and Macro Commands**
+
+The pattern is then extended in the most important practical direction: **undoable operations**.
+
+The command interface becomes:
+
+```java
+public interface Command {
+    void execute();
+    void undo();
+}
+```
+
+For example:
+
+```cpp
+class cmdLight : public Command {
+public:
+    void execute() override { light->on(); }
+    void undo() override    { light->off(); }
+};
+
+class cmdLightOff : public Command {
+public:
+    void execute() override { light->off(); }
+    void undo() override    { light->on(); }
+};
+```
+
+The remote is then upgraded so that it stores:
+
+*   one set of commands for **switch on**,
+*   one set of commands for **switch off**,
+*   one special field for the **latest undo action**.
+
+If the user presses an "on" button, the remote saves the corresponding "off" command as the current undo action. If the user presses an "off" button, the remote saves the corresponding "on" command. Pressing the UNDO button simply executes the stored reverse command.
+
+This is still only **single-step undo**. A natural next step is to improve it further by implementing:
+
+*   **undo with history**,
+*   **redo**.
+
+Another important extension is a **macro command**: a command object that contains several commands and executes them in sequence. This works because the macro still implements the same `Command` interface as ordinary commands.
+
+###### **1.2.8 Text Editor Example**
+
+A second standard Command scenario is a **text editor** that supports **copy**, **paste**, and **undo**.
+
+This example highlights another important side of the pattern:
+
+*   commands can be triggered from several UI elements,
+*   commands may need to **save previous state** for undo,
+*   command history is often managed by a dedicated object such as `CommandHistory`.
+
+This is the same design idea as the remote control, but in a more typical software application domain.
+
+###### **1.2.9 Pros and Cons**
+
+The main advantages are:
+
+*   **Single Responsibility Principle**: the class that invokes an operation is decoupled from the class that performs it,
+*   **Open/Closed Principle**: new commands can be introduced without changing existing client code,
+*   undo/redo can be implemented naturally,
+*   deferred execution can be implemented,
+*   simple commands can be assembled into complex ones.
+
+The main disadvantage is also explicit:
+
+*   the code may become more complicated because you introduce an extra abstraction layer between sender and receiver.
+
+##### **1.3 Chain of Responsibility**
+
+###### **1.3.1 Definition and Main Purpose**
+
+**Chain of Responsibility** is a behavioral pattern that lets you **pass requests along a chain of handlers**. When a handler receives a request, it decides whether to:
+
+*   process it,
+*   pass it further,
+*   or do both, depending on the design.
+
+The official GoF intent is: **avoid coupling the sender of a request to its receiver by giving more than one object a chance to handle the request**.
+
+The central idea is therefore not just delegation, but **ordered delegation through several candidates**.
+
+###### **1.3.2 Motivation: Unknown Responsibility**
+
+Use this pattern when the sender knows **what request exists**, but should not need to know **which concrete object is responsible** for it.
+
+Two concrete families of examples are especially helpful:
+
+*   an **answering system / call center**,
+*   a **help system of a multi-window editor**.
+
+In the call-center example:
+
+*   simple requests are solved at low responsibility levels,
+*   harder requests are escalated upward,
+*   the hardest requests reach the top level.
+
+In the editor help example:
+
+*   `Ctrl-F1` should show **context-specific help**,
+*   `F1` should show **general help**,
+*   the active component may or may not know how to answer,
+*   if it cannot, it forwards the request to its owner.
+
+This is a perfect case where the sender should not be tightly bound to one receiver.
+
+###### **1.3.3 Applicability**
+
+Chain of Responsibility should be used:
+
+*   when different kinds of requests are processed in different ways, but the exact types and processing order are not known beforehand,
+*   when it is important to execute several handlers in a particular order,
+*   when the set of handlers and their order should be changeable at runtime.
+
+These points are important because the pattern is about **flexible runtime routing**, not just about "if-else" branching.
+
+###### **1.3.4 Participants and Structure**
+
+The standard structure contains:
+
+*   a **Handler** interface,
+*   often a **BaseHandler** that stores the `next` reference and default forwarding behavior,
+*   several **ConcreteHandlers**,
+*   the **Client** that assembles the chain.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Chain of Responsibility: each handler can process or forward"
+%%| fig-width: 8
+%%| fig-height: 5.1
+classDiagram
+    class Client
+    class Handler {
+        <<interface>>
+        +setNext(h)
+        +handle(request)
+    }
+    class BaseHandler {
+        -next: Handler
+        +setNext(h)
+        +handle(request)
+    }
+    class ConcreteHandlerA {
+        +handle(request)
+    }
+    class ConcreteHandlerB {
+        +handle(request)
+    }
+    class ConcreteHandlerC {
+        +handle(request)
+    }
+    Client --> Handler
+    Handler <|.. BaseHandler
+    BaseHandler <|-- ConcreteHandlerA
+    BaseHandler <|-- ConcreteHandlerB
+    BaseHandler <|-- ConcreteHandlerC
+    BaseHandler o-- Handler : next
+```
+
+It is usually best to pass a dedicated **request object** rather than many separate parameters. This makes the design more extensible and allows different handlers to inspect different aspects of the same request.
+
+###### **1.3.5 Step-by-Step Implementation**
+
+The implementation can be organized into six steps.
+
+**Step 1 — Declare the Handler interface.**  
+Define the signature of the handling method. A request object is usually the most flexible choice.
+
+**Step 2 — Create an abstract base handler if useful.**  
+This base class stores a reference to the next handler. It may also define the default forwarding behavior:
+
+```java
+public void handle(Request request) {
+    if (next != null) {
+        next.handle(request);
+    }
+}
+```
+
+**Step 3 — Implement concrete handlers.**  
+Each handler decides:
+
+*   whether it can process the request,
+*   whether the request should continue further.
+
+**Step 4 — Assemble the chain.**  
+The client may build the chain directly, or a factory may build it from configuration.
+
+**Step 5 — Start processing from any handler.**  
+The request does not have to start at the global top. It can enter the chain at any convenient point.
+
+**Step 6 — Be ready for dynamic outcomes.**  
+Several dynamic outcomes must be expected:
+
+*   the chain may consist of a single link,
+*   some requests may not reach the end,
+*   some may reach the end unhandled.
+
+###### **1.3.6 Relation to Composite and the Editor Help System**
+
+An especially important architectural observation is that **Chain of Responsibility is often used together with Composite**.
+
+Why? Because many systems with chains are also naturally hierarchical. A text editor with menus, windows, and subwindows is not just a set of unrelated objects. It is a structured object graph.
+
+However, it is important to distinguish two different notions:
+
+*   **Static class hierarchy via inheritance**
+*   **Dynamic configuration of instances via ownership**
+
+In the editor example, there is a static class hierarchy such as:
+
+*   `Component`
+*   `Editor`
+*   `Menu`
+*   `Window`
+*   `ProgramWindow`, `PictureWindow`, `TextWindow`
+
+But the chain of responsibility does not simply follow inheritance. It follows the **dynamic owner links** of the current UI state:
+
+*   the active window belongs to a window collection,
+*   that collection belongs to the editor,
+*   a help request bubbles from the active window upward through ownership.
+
+This distinction is fundamental. Composite explains the structure. Chain of Responsibility explains how a request travels through that structure.
+
+###### **1.3.7 Call Center Example and Simplified Request Chain**
+
+The answering-system example is a pure escalation chain: lower-level operators try first, then pass harder questions to higher responsibility levels.
+
+A simpler educational variant uses three request types:
+
+*   `SIMPLE`
+*   `MEDIUM`
+*   `COMPLEX`
+
+and three handlers:
+
+*   `HandleSimpleRequest`
+*   `HandleMediumRequest`
+*   `HandleComplexRequest`
+
+The chain is assembled from simple to complex so that each request is first offered to the least expensive handler that might solve it.
+
+This example is intentionally small, but it shows the same mechanism as a real middleware or escalation pipeline.
+
+###### **1.3.8 Pros and Cons**
+
+The main advantages are:
+
+*   you can control the order of request handling,
+*   **Single Responsibility Principle**: the sender is decoupled from the classes that perform the work,
+*   **Open/Closed Principle**: new handlers can be introduced without changing existing client code.
+
+The main drawback is:
+
+*   some requests may end up unhandled.
+
+This is not a minor detail. In practice, chain designs often need a fallback handler, logging at the end of the chain, or explicit error handling when no handler accepts the request.
+
+##### **1.4 Observer**
+
+###### **1.4.1 Definition and Main Purpose**
+
+**Observer** is a behavioral pattern that lets you define a **subscription mechanism** to notify multiple objects about events or state changes happening to another object they observe.
+
+Other common names are:
+
+*   **Publisher-Subscriber**
+*   **Observable-Observer**
+
+The key structural idea is a **one-to-many relationship**:
+
+*   there is one **observable / subject / publisher**,
+*   there are many **observers / subscribers / listeners**.
+
+When the observable changes state or emits an event, it automatically notifies all registered observers.
+
+###### **1.4.2 When to Use Observer**
+
+Two main conditions are central.
+
+Use Observer:
+
+*   when changes in the state of one object may require changes in other objects,
+*   when the actual set of dependent objects is unknown in advance or changes dynamically,
+*   when objects must observe others only for a limited time or under specific circumstances.
+
+More conceptually, there are **two sides** of interaction:
+
+*   one side **sends messages**,
+*   the other side **receives messages and reacts**.
+
+It is often useful to separate the logic of these two sides so each can evolve independently.
+
+###### **1.4.3 Participants and Structure**
+
+The standard Observer structure contains:
+
+*   **Subscriber / Observer interface** with an `update(...)` method,
+*   **Publisher / Subject interface** with methods for adding and removing subscribers,
+*   a list of subscribers stored by the publisher,
+*   one or more **ConcretePublishers**,
+*   one or more **ConcreteSubscribers**.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Observer pattern: one publisher notifies multiple subscribers"
+%%| fig-width: 8
+%%| fig-height: 5.0
+classDiagram
+    class Client
+    class Publisher {
+        -subscribers: Subscriber[]
+        +subscribe(s)
+        +unsubscribe(s)
+        +notifySubscribers()
+        +mainBusinessLogic()
+    }
+    class Subscriber {
+        <<interface>>
+        +update(context)
+    }
+    class ConcreteSubscriberA {
+        +update(context)
+    }
+    class ConcreteSubscriberB {
+        +update(context)
+    }
+    Client --> Publisher
+    Publisher o-- Subscriber : subscribers
+    Subscriber <|.. ConcreteSubscriberA
+    Subscriber <|.. ConcreteSubscriberB
+```
+
+The publisher communicates with subscribers only through the **subscriber interface**. This is what keeps the design decoupled.
+
+###### **1.4.4 Step-by-Step Implementation**
+
+The implementation can be organized into seven steps.
+
+**Step 1 — Split business logic into publisher and subscribers.**  
+The core stateful logic becomes the publisher. Side reactions become subscribers.
+
+**Step 2 — Declare the Subscriber interface.**  
+At minimum it contains one update method.
+
+**Step 3 — Declare the Publisher interface.**  
+It should support registration and removal of subscribers.
+
+**Step 4 — Decide where subscription logic lives.**  
+Often the subscriber list and registration logic are moved into an abstract publisher class. If that does not fit the existing class hierarchy, the same logic can be extracted into a separate helper object and reused through composition.
+
+**Step 5 — Implement concrete publishers.**  
+Whenever something important happens, they notify all subscribers.
+
+**Step 6 — Implement concrete subscribers.**  
+Each subscriber defines its own reaction to notifications.
+
+**Step 7 — Register subscribers in client code.**  
+The client creates the necessary observers and subscribes them to the right publishers.
+
+###### **1.4.5 Push vs. Pull Notification Models**
+
+There are two important notification variants.
+
+**Push model.**  
+The publisher sends the event data directly inside the update call. Example:
+
+```java
+void update(float temperature, float humidity, int pressure);
+```
+
+The local `WeatherData` reference code uses exactly this style.
+
+**Pull model.**  
+The publisher passes itself as context:
+
+```csharp
+void Update(ISubject s);
+```
+
+The observer then asks the subject for the specific data it needs.
+
+The push model is simpler when every observer needs the same compact data package. The pull model is more flexible when different observers need different subsets of state.
+
+###### **1.4.6 Typical Examples and Variants**
+
+Several application scenarios are typical:
+
+*   **stock exchange** monitored by brokers and banks,
+*   **social networks / newsletters**, where the owner publishes news and subscribers receive it,
+*   the generic publisher-subscriber news example with `SubscriberA`, `SubscriberB`, and `SubscriberC`.
+
+Two more software-oriented examples are:
+
+*   a **weather station**, where displays and monitors subscribe to weather data,
+*   an **editor with file events**, where listeners subscribe to file opening and saving events through an `EventManager`.
+
+These are good examples because they show both common implementation styles:
+
+*   subject class stores observers directly (`WeatherData`),
+*   subject delegates subscription management to a helper object (`EventManager` inside `Editor`).
+
+###### **1.4.7 Minimal Subject-Observer Model**
+
+The basic C# interfaces are:
+
+```csharp
+public interface iObserver {
+    void Update(iSubject s);
+}
+
+public interface iSubject {
+    void Add(iObserver observer);
+    void Remove(iObserver observer);
+    void Notify();
+}
+```
+
+and then concrete subscribers such as:
+
+```csharp
+public class SubscriberA : iObserver {
+    public void Update(iSubject s) {
+        Console.WriteLine("Subscriber A received the news");
+    }
+}
+```
+
+Finally, the publisher stores a list of observers and iterates through it:
+
+```csharp
+public class Publisher : iSubject {
+    List<iObserver> subscribe = new List<iObserver>();
+    public void Add(iObserver observer) { subscribe.Add(observer); }
+    public void Remove(iObserver observer) { subscribe.Remove(observer); }
+    public void Notify() {
+        foreach (var item in subscribe) {
+            item.Update(this);
+        }
+    }
+}
+```
+
+This is the cleanest minimal Observer implementation.
+
+###### **1.4.8 Pros and Cons**
+
+The main advantages are:
+
+*   **Open/Closed Principle**: you can introduce new subscriber classes without changing publisher code,
+*   relations between objects can be established at runtime.
+
+The main drawback explicitly mentioned is:
+
+*   subscribers are notified in **random or unspecified order**.
+
+In practice this means that if notification order matters, the implementation must define and document it explicitly.
+
+###### **1.4.9 Practical Extensions from the Exercises**
+
+Two important practical extensions are:
+
+*   add the **contents of the news** to the scheme, for example a text string payload,
+*   add the **unsubscribe option from the subscriber side**.
+
+These are practical real-world improvements:
+
+*   event payload makes notifications meaningful,
+*   self-unsubscription allows temporary listeners and one-shot subscribers.
+
+---
+
+#### **2. Definitions**
+
+*   **Design pattern**: A reusable architectural scheme describing a standard solution to a recurring software design problem.
+*   **Behavioral pattern**: A GoF pattern category focused on responsibilities, communication, and delegation between objects.
+*   **Command**: A behavioral pattern that encapsulates a request as an object so it can be stored, passed, queued, logged, undone, or composed.
+*   **Action / Transaction**: Alternative names sometimes used for the Command pattern.
+*   **Command interface**: The common interface implemented by all command objects, usually declaring `execute()` and optionally `undo()`.
+*   **ConcreteCommand**: A class that stores a receiver and request data and implements the command interface.
+*   **Receiver**: The object that performs the real work requested by a command.
+*   **Invoker**: The object that stores and triggers commands without knowing receiver-specific APIs.
+*   **Null Command**: A do-nothing command object used instead of `null` to simplify invoker logic.
+*   **Macro command**: A command containing other commands and executing them as a group.
+*   **Chain of Responsibility**: A behavioral pattern in which a request is passed through an ordered chain of handlers until one handles it or the chain ends.
+*   **Handler**: An object capable of processing a request or forwarding it to another handler.
+*   **BaseHandler**: A helper class that stores the reference to the next handler and usually implements default forwarding behavior.
+*   **ConcreteHandler**: A specific handler implementation containing the logic for deciding whether and how to process a request.
+*   **Request object**: A dedicated object carrying the data needed for processing inside a Chain of Responsibility.
+*   **Observer**: A behavioral pattern that defines a subscription mechanism for notifying many dependent objects about changes in one observable object.
+*   **Publisher / Subject / Observable**: The object being observed; it stores subscribers and sends notifications.
+*   **Subscriber / Observer / Listener**: An object that registers with a publisher and reacts to notifications.
+*   **Publisher-Subscriber**: Another common name for the Observer pattern.
+*   **Push model**: An Observer variant in which the publisher sends the event data directly to observers.
+*   **Pull model**: An Observer variant in which the publisher sends itself as context and observers query the needed state.
+*   **Event manager**: A helper object encapsulating subscription storage and notification logic, often used to apply Observer via composition.
+*   **Single Responsibility Principle**: The principle that a class should have one primary reason to change.
+*   **Open/Closed Principle**: The principle that software entities should be open for extension but closed for modification.
+
+---
+
+#### **3. Examples**
+
+##### **3.1. Lecture Recap — Theory Questions** (Lab 14, Task 1)
+
+Answer the following questions to verify conceptual understanding.
+
+**(a)** What is the purpose of the **Command** design pattern?
+
+**(b)** Describe a real-world scenario where the **Command** pattern is beneficial.
+
+**(c)** What is the purpose of the **Chain of Responsibility** design pattern?
+
+**(d)** Describe a real-world scenario where the **Chain of Responsibility** pattern is beneficial.
+
+**(e)** What is the purpose of the **Observer** design pattern?
+
+**(f)** Describe a real-world scenario where the **Observer** pattern is beneficial.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**(a) Purpose of Command:**  
+The Command pattern encapsulates an operation inside an object so that the system can treat actions as data. This decouples the code that triggers an action from the code that performs it and enables queuing, logging, undo/redo, and macro commands.
+
+**(b) Real-world Command scenario:**  
+A **GUI editor** is a standard case. Toolbar buttons, menu items, and keyboard shortcuts should all trigger actions such as Copy, Paste, Save, or Undo through one common interface. Each trigger stores a command object and simply calls `execute()`.
+
+**(c) Purpose of Chain of Responsibility:**  
+The Chain of Responsibility pattern decouples a sender from the exact receiver by passing the request through several candidate handlers in sequence. Each handler decides whether to process the request or forward it.
+
+**(d) Real-world Chain of Responsibility scenario:**  
+A **web middleware pipeline** is a clear example. A request may pass through authentication, authorization, validation, rate limiting, and business logic handlers. Each handler either stops the request or forwards it to the next step.
+
+**(e) Purpose of Observer:**  
+The Observer pattern defines a subscription mechanism so that one object can automatically notify many dependent objects whenever its state changes or an event occurs.
+
+**(f) Real-world Observer scenario:**  
+A **weather station dashboard** is a classic example. The station publishes measurements, and several independent subscribers react: a current display, an alert system, a statistics collector, and perhaps a mobile notification service.
+
+</details>
+
+##### **3.2. Complete a Text Editor Command System** (Lab 14, Task 2)
+
+You are given the structure of a simplified text editor that supports **copy**, **paste**, and **undo**. Complete the implementation using the Command pattern.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The editor is the **Receiver**. Every user action becomes a command object. The application triggers commands uniformly, and undoable commands store enough previous state to reverse their effect.
+
+**Step 1 — Define the receiver `TextEditor`:**
+
+```java
+public class TextEditor {
+    private String text;
+    private String clipboard = "";
+    private int selectionStart = 0;
+    private int selectionEnd = 0;
+
+    public TextEditor(String text) {
+        this.text = text;
+    }
+
+    public void select(int start, int end) {
+        selectionStart = start;
+        selectionEnd = end;
+    }
+
+    public String getSelectedText() {
+        return text.substring(selectionStart, selectionEnd);
+    }
+
+    public void replaceSelection(String replacement) {
+        text = text.substring(0, selectionStart)
+             + replacement
+             + text.substring(selectionEnd);
+        selectionEnd = selectionStart + replacement.length();
+    }
+
+    public String getClipboard() {
+        return clipboard;
+    }
+
+    public void setClipboard(String clipboard) {
+        this.clipboard = clipboard;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
+    }
+}
+```
+
+**Step 2 — Define the command abstraction:**
+
+```java
+public interface Command {
+    void execute();
+    void undo();
+    boolean isUndoable();
+}
+
+public abstract class EditorCommand implements Command {
+    protected final TextEditor editor;
+    private String backup;
+
+    protected EditorCommand(TextEditor editor) {
+        this.editor = editor;
+    }
+
+    protected void saveBackup() {
+        backup = editor.getText();
+    }
+
+    @Override
+    public void undo() {
+        if (backup != null) {
+            editor.setText(backup);
+        }
+    }
+}
+```
+
+**Step 3 — Implement `CopyCommand` and `PasteCommand`:**
+
+```java
+public class CopyCommand extends EditorCommand {
+    public CopyCommand(TextEditor editor) {
+        super(editor);
+    }
+
+    @Override
+    public void execute() {
+        editor.setClipboard(editor.getSelectedText());
+    }
+
+    @Override
+    public boolean isUndoable() {
+        return false;
+    }
+}
+
+public class PasteCommand extends EditorCommand {
+    public PasteCommand(TextEditor editor) {
+        super(editor);
+    }
+
+    @Override
+    public void execute() {
+        saveBackup();
+        editor.replaceSelection(editor.getClipboard());
+    }
+
+    @Override
+    public boolean isUndoable() {
+        return true;
+    }
+}
+```
+
+`CopyCommand` does not change the document text, so it does not belong in the undo history. `PasteCommand` changes the text, so it must save a backup first.
+
+**Step 4 — Create command history and an invoker/application class:**
+
+```java
+import java.util.ArrayDeque;
+import java.util.Deque;
+
+public class CommandHistory {
+    private final Deque<Command> history = new ArrayDeque<>();
+
+    public void push(Command command) {
+        history.push(command);
+    }
+
+    public Command pop() {
+        return history.isEmpty() ? null : history.pop();
+    }
+}
+
+public class EditorApplication {
+    private final CommandHistory history = new CommandHistory();
+
+    public void run(Command command) {
+        command.execute();
+        if (command.isUndoable()) {
+            history.push(command);
+        }
+    }
+
+    public void undo() {
+        Command command = history.pop();
+        if (command != null) {
+            command.undo();
+        }
+    }
+}
+```
+
+**Step 5 — Demonstrate usage:**
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        TextEditor editor = new TextEditor("Design patterns are useful.");
+        EditorApplication app = new EditorApplication();
+
+        editor.select(0, 6);               // "Design"
+        app.run(new CopyCommand(editor));  // clipboard = "Design"
+
+        editor.select(20, 26);             // "useful"
+        app.run(new PasteCommand(editor)); // replace it with clipboard
+
+        System.out.println(editor.getText());
+        // Design patterns are Design.
+
+        app.undo();
+        System.out.println(editor.getText());
+        // Design patterns are useful.
+    }
+}
+```
+
+**Why this is correct:**
+
+1.  The application triggers actions through command objects only.
+2.  The editor remains the single owner of text state.
+3.  Undo works because modifying commands save the previous state first.
+4.  New commands such as Cut or Replace can be added without changing the invoker.
+
+</details>
+
+##### **3.3. Implement Authentication and Role Check Middleware** (Lab 14, Task 3)
+
+You are given a Chain of Responsibility template. Implement handlers for **Authentication** and **RoleCheck**, and test the behavior of the chain.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** Each validation step is a separate handler. The request moves through the chain in order. A handler may reject the request or forward it to the next step.
+
+**Step 1 — Define the request object:**
+
+```java
+public class RequestContext {
+    private final String username;
+    private final boolean authenticated;
+    private final String role;
+    private final String action;
+
+    public RequestContext(String username,
+                          boolean authenticated,
+                          String role,
+                          String action) {
+        this.username = username;
+        this.authenticated = authenticated;
+        this.role = role;
+        this.action = action;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public boolean isAuthenticated() {
+        return authenticated;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public String getAction() {
+        return action;
+    }
+}
+```
+
+**Step 2 — Define the base handler:**
+
+```java
+public abstract class Handler {
+    private Handler next;
+
+    public Handler linkWith(Handler next) {
+        this.next = next;
+        return next;
+    }
+
+    public boolean handle(RequestContext request) {
+        if (next == null) {
+            return true;
+        }
+        return next.handle(request);
+    }
+}
+```
+
+**Step 3 — Implement authentication and role checks:**
+
+```java
+public class AuthenticationHandler extends Handler {
+    @Override
+    public boolean handle(RequestContext request) {
+        if (!request.isAuthenticated()) {
+            System.out.println("Rejected: user is not authenticated.");
+            return false;
+        }
+        System.out.println("Authentication passed for " + request.getUsername());
+        return super.handle(request);
+    }
+}
+
+public class RoleCheckHandler extends Handler {
+    @Override
+    public boolean handle(RequestContext request) {
+        if ("DELETE_USER".equals(request.getAction())
+                && !"ADMIN".equals(request.getRole())) {
+            System.out.println("Rejected: only ADMIN may delete users.");
+            return false;
+        }
+        System.out.println("Role check passed for role " + request.getRole());
+        return super.handle(request);
+    }
+}
+```
+
+**Step 4 — Extend the chain with another handler to prove extensibility:**
+
+```java
+public class AuditHandler extends Handler {
+    @Override
+    public boolean handle(RequestContext request) {
+        System.out.println("Audit: " + request.getUsername()
+                + " requests " + request.getAction());
+        return super.handle(request);
+    }
+}
+```
+
+**Step 5 — Add the final business handler:**
+
+```java
+public class BusinessLogicHandler extends Handler {
+    @Override
+    public boolean handle(RequestContext request) {
+        System.out.println("Action executed: " + request.getAction());
+        return true;
+    }
+}
+```
+
+**Step 6 — Wire and test the chain:**
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Handler auth = new AuthenticationHandler();
+        Handler role = new RoleCheckHandler();
+        Handler audit = new AuditHandler();
+        Handler business = new BusinessLogicHandler();
+
+        auth.linkWith(role).linkWith(audit).linkWith(business);
+
+        RequestContext r1 =
+                new RequestContext("alice", true, "ADMIN", "DELETE_USER");
+        RequestContext r2 =
+                new RequestContext("bob", true, "STUDENT", "DELETE_USER");
+        RequestContext r3 =
+                new RequestContext("guest", false, "GUEST", "READ_ARTICLE");
+
+        System.out.println("--- Request 1 ---");
+        auth.handle(r1);
+
+        System.out.println("--- Request 2 ---");
+        auth.handle(r2);
+
+        System.out.println("--- Request 3 ---");
+        auth.handle(r3);
+    }
+}
+```
+
+**Expected output:**
+
+```text
+--- Request 1 ---
+Authentication passed for alice
+Role check passed for role ADMIN
+Audit: alice requests DELETE_USER
+Action executed: DELETE_USER
+
+--- Request 2 ---
+Authentication passed for bob
+Rejected: only ADMIN may delete users.
+
+--- Request 3 ---
+Rejected: user is not authenticated.
+```
+
+**Why this is correct:**
+
+1.  The sender talks only to the first handler.
+2.  The request object carries all required data.
+3.  Handler order is explicit and meaningful.
+4.  Adding `AuditHandler` required no change to existing handlers.
+
+</details>
+
+##### **3.4. Build an Observer-Based File Event System** (Lab 14, Task 4)
+
+You are given a basic Observer framework for an editor that should notify listeners when files are opened and saved. Complete the missing parts and create a demo.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The editor is the **publisher**, listeners are **observers**, and a separate `EventManager` stores subscriptions. This is the composition-based Observer architecture described in the tutorial.
+
+**Step 1 — Define event types and listener interface:**
+
+```java
+public enum EventType {
+    OPEN,
+    SAVE
+}
+
+public interface EventListener {
+    void update(String fileName);
+}
+```
+
+**Step 2 — Implement `EventManager`:**
+
+```java
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+
+public class EventManager {
+    private final Map<EventType, List<EventListener>> listeners =
+            new EnumMap<>(EventType.class);
+
+    public EventManager() {
+        for (EventType type : EventType.values()) {
+            listeners.put(type, new ArrayList<>());
+        }
+    }
+
+    public void subscribe(EventType type, EventListener listener) {
+        listeners.get(type).add(listener);
+    }
+
+    public void unsubscribe(EventType type, EventListener listener) {
+        listeners.get(type).remove(listener);
+    }
+
+    public void notify(EventType type, String fileName) {
+        for (EventListener listener : listeners.get(type)) {
+            listener.update(fileName);
+        }
+    }
+}
+```
+
+**Step 3 — Implement the publisher `Editor`:**
+
+```java
+public class Editor {
+    public final EventManager events = new EventManager();
+    private String currentFile;
+
+    public void openFile(String fileName) {
+        currentFile = fileName;
+        System.out.println("Editor opens file: " + fileName);
+        events.notify(EventType.OPEN, fileName);
+    }
+
+    public void saveFile() {
+        if (currentFile == null) {
+            throw new IllegalStateException("No file is open.");
+        }
+        System.out.println("Editor saves file: " + currentFile);
+        events.notify(EventType.SAVE, currentFile);
+    }
+}
+```
+
+**Step 4 — Create two different listeners:**
+
+```java
+public class LoggingListener implements EventListener {
+    @Override
+    public void update(String fileName) {
+        System.out.println("[LOG] File event for: " + fileName);
+    }
+}
+
+public class EmailAlertsListener implements EventListener {
+    private final String email;
+
+    public EmailAlertsListener(String email) {
+        this.email = email;
+    }
+
+    @Override
+    public void update(String fileName) {
+        System.out.println("[EMAIL to " + email + "] File changed: " + fileName);
+    }
+}
+```
+
+**Step 5 — Demonstrate usage:**
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        Editor editor = new Editor();
+
+        EventListener logger = new LoggingListener();
+        EventListener mailer = new EmailAlertsListener("admin@example.com");
+
+        editor.events.subscribe(EventType.OPEN, logger);
+        editor.events.subscribe(EventType.SAVE, logger);
+        editor.events.subscribe(EventType.SAVE, mailer);
+
+        editor.openFile("report.txt");
+        editor.saveFile();
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Editor opens file: report.txt
+[LOG] File event for: report.txt
+Editor saves file: report.txt
+[LOG] File event for: report.txt
+[EMAIL to admin@example.com] File changed: report.txt
+```
+
+**Why this is correct:**
+
+1.  The editor knows nothing about logging or email delivery.
+2.  Listeners can be registered and removed dynamically.
+3.  `EventManager` cleanly separates event-dispatch logic from editor business logic.
+
+</details>
+
+##### **3.5. Improve Command with Undo History, Redo, and Macro Actions** (Lecture 14, Task 1)
+
+The source asks you to test the remote-control solution, fix bugs, add **undo with history**, add **redo**, and support more complex actions such as macros. A consistent improved design is shown below.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** Single-step undo is not enough. Multi-step undo/redo needs explicit history stacks.
+
+**Step 1 — Keep the command interface with `execute()` and `undo()`:**
+
+```java
+public interface Command {
+    void execute();
+    void undo();
+}
+```
+
+**Step 2 — Add history-aware invoker logic:**
+
+```java
+import java.util.ArrayDeque;
+import java.util.Deque;
+
+public class SmartRemoteControl {
+    private final Deque<Command> undoHistory = new ArrayDeque<>();
+    private final Deque<Command> redoHistory = new ArrayDeque<>();
+
+    public void press(Command command) {
+        command.execute();
+        undoHistory.push(command);
+        redoHistory.clear();
+    }
+
+    public void undo() {
+        if (undoHistory.isEmpty()) {
+            return;
+        }
+        Command command = undoHistory.pop();
+        command.undo();
+        redoHistory.push(command);
+    }
+
+    public void redo() {
+        if (redoHistory.isEmpty()) {
+            return;
+        }
+        Command command = redoHistory.pop();
+        command.execute();
+        undoHistory.push(command);
+    }
+}
+```
+
+**Why redo clears on new execution:**  
+When the user executes a brand-new command after undoing something, the old redo branch is no longer valid. Therefore `redoHistory.clear()` is necessary.
+
+**Step 3 — Introduce a macro command:**
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class MacroCommand implements Command {
+    private final List<Command> commands = new ArrayList<>();
+
+    public void add(Command command) {
+        commands.add(command);
+    }
+
+    @Override
+    public void execute() {
+        for (Command command : commands) {
+            command.execute();
+        }
+    }
+
+    @Override
+    public void undo() {
+        for (int i = commands.size() - 1; i >= 0; i--) {
+            commands.get(i).undo();
+        }
+    }
+}
+```
+
+Undo must run in reverse order so the composite action is reversed consistently.
+
+**Step 4 — Demonstrate usage:**
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        SmartRemoteControl remote = new SmartRemoteControl();
+
+        Light light = new Light();
+        AirHumidifier humidifier = new AirHumidifier();
+
+        Command lightOn = new SwitchOnLight(light);
+        Command humidifierOn = new SwitchOnAirHumidifier(humidifier);
+
+        MacroCommand eveningMode = new MacroCommand();
+        eveningMode.add(lightOn);
+        eveningMode.add(humidifierOn);
+
+        remote.press(eveningMode);
+        remote.undo();
+        remote.redo();
+    }
+}
+```
+
+**Another valid application of Command:**  
+A **job queue** or **scheduler**. Each task is stored as a command object and executed later by a worker process.
+
+**Answer:** Undo history is implemented with a stack of executed commands, redo with a stack of undone commands, and macro commands work naturally because they implement the same interface as ordinary commands.
+
+</details>
+
+##### **3.6. Extend Observer with Message Content and Self-Unsubscription** (Lecture 14, Task 2)
+
+The source asks you to improve the Observer scheme by adding the **contents of the news** and allowing **unsubscribe from the subscriber side**.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** To support both features, the update method should receive:
+
+*   the publisher reference, so observers can remove themselves,
+*   the news text, so notifications carry useful payload.
+
+**Step 1 — Update the interfaces:**
+
+```csharp
+public interface IObserver
+{
+    void Update(ISubject subject, string news);
+}
+
+public interface ISubject
+{
+    void Add(IObserver observer);
+    void Remove(IObserver observer);
+    void Notify(string news);
+}
+```
+
+**Step 2 — Implement a content-aware publisher:**
+
+```csharp
+using System;
+using System.Collections.Generic;
+
+public class NewsPublisher : ISubject
+{
+    private readonly List<IObserver> subscribers = new List<IObserver>();
+
+    public void Add(IObserver observer)
+    {
+        subscribers.Add(observer);
+    }
+
+    public void Remove(IObserver observer)
+    {
+        subscribers.Remove(observer);
+    }
+
+    public void Notify(string news)
+    {
+        foreach (var observer in new List<IObserver>(subscribers))
+        {
+            observer.Update(this, news);
+        }
+    }
+}
+```
+
+The copy `new List<IObserver>(subscribers)` is important because a subscriber may remove itself during notification.
+
+**Step 3 — Implement observers, including a one-shot observer:**
+
+```csharp
+public class PrintSubscriber : IObserver
+{
+    private readonly string name;
+
+    public PrintSubscriber(string name)
+    {
+        this.name = name;
+    }
+
+    public void Update(ISubject subject, string news)
+    {
+        Console.WriteLine(name + " received: " + news);
+    }
+}
+
+public class OneShotSubscriber : IObserver
+{
+    public void Update(ISubject subject, string news)
+    {
+        Console.WriteLine("OneShot received: " + news);
+        Console.WriteLine("OneShot unsubscribes itself");
+        subject.Remove(this);
+    }
+}
+```
+
+**Step 4 — Demonstrate the improved design:**
+
+```csharp
+public class Program
+{
+    public static void Main()
+    {
+        var publisher = new NewsPublisher();
+
+        publisher.Add(new PrintSubscriber("Alice"));
+        publisher.Add(new OneShotSubscriber());
+        publisher.Add(new PrintSubscriber("Charlie"));
+
+        publisher.Notify("Exam is moved to Friday.");
+        publisher.Notify("Project deadline is next Monday.");
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Alice received: Exam is moved to Friday.
+OneShot received: Exam is moved to Friday.
+OneShot unsubscribes itself
+Charlie received: Exam is moved to Friday.
+Alice received: Project deadline is next Monday.
+Charlie received: Project deadline is next Monday.
+```
+
+**Why this is a better real-world Observer design:**
+
+1.  Notifications now carry meaningful content.
+2.  Subscribers can manage their own lifecycle.
+3.  The design remains decoupled even though it becomes more capable.
+
+</details>
+
+##### **3.7. Universal Remote Control with On/Off and Undo** (Lecture 14, Example 1)
+
+Use the Command pattern to implement the lecture's universal remote control that can operate a `Light` and an `AirHumidifier` through a uniform interface. Support **on**, **off**, and **undo**.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The remote control is an **Invoker**. Devices are **Receivers**. Each button stores a command object instead of directly calling device methods.
+
+**Command interface:**
+
+```java
+public interface Command {
+    void execute();
+    void undo();
+}
+```
+
+**Receivers:**
+
+```java
+public class Light {
+    private boolean enabled;
+
+    public void turnOn() {
+        if (!enabled) {
+            enabled = true;
+            System.out.println("Turning the light on");
+        }
+    }
+
+    public void turnOff() {
+        if (enabled) {
+            enabled = false;
+            System.out.println("Turning the light off");
+        }
+    }
+}
+
+public class AirHumidifier {
+    public enum Mode { SLOW, MEDIUM, HIGH }
+
+    private boolean enabled;
+    private Mode mode;
+
+    public void turnOn() {
+        if (!enabled) {
+            enabled = true;
+            mode = Mode.SLOW;
+            System.out.println("Turning the air humidifier on");
+        }
+    }
+
+    public void turnOff() {
+        if (enabled) {
+            enabled = false;
+            System.out.println("Turning the air humidifier off");
+        }
+    }
+
+    public void setMode(Mode mode) {
+        this.mode = mode;
+    }
+}
+```
+
+**Concrete commands:**
+
+```java
+public class SwitchOnLight implements Command {
+    private final Light light;
+
+    public SwitchOnLight(Light light) {
+        this.light = light;
+    }
+
+    @Override
+    public void execute() {
+        light.turnOn();
+    }
+
+    @Override
+    public void undo() {
+        light.turnOff();
+    }
+}
+
+public class SwitchOffLight implements Command {
+    private final Light light;
+
+    public SwitchOffLight(Light light) {
+        this.light = light;
+    }
+
+    @Override
+    public void execute() {
+        light.turnOff();
+    }
+
+    @Override
+    public void undo() {
+        light.turnOn();
+    }
+}
+
+public class SwitchOnAirHumidifier implements Command {
+    private final AirHumidifier humidifier;
+
+    public SwitchOnAirHumidifier(AirHumidifier humidifier) {
+        this.humidifier = humidifier;
+    }
+
+    @Override
+    public void execute() {
+        humidifier.turnOn();
+        humidifier.setMode(AirHumidifier.Mode.SLOW);
+    }
+
+    @Override
+    public void undo() {
+        humidifier.turnOff();
+    }
+}
+
+public class SwitchOffAirHumidifier implements Command {
+    private final AirHumidifier humidifier;
+
+    public SwitchOffAirHumidifier(AirHumidifier humidifier) {
+        this.humidifier = humidifier;
+    }
+
+    @Override
+    public void execute() {
+        humidifier.turnOff();
+    }
+
+    @Override
+    public void undo() {
+        humidifier.turnOn();
+        humidifier.setMode(AirHumidifier.Mode.SLOW);
+    }
+}
+```
+
+**Invoker:**
+
+```java
+public class RemoteControl {
+    private Command commandSwitchOn;
+    private Command commandSwitchOff;
+    private Command undoCommand;
+
+    public void setCommand(Command commandSwitchOn, Command commandSwitchOff) {
+        this.commandSwitchOn = commandSwitchOn;
+        this.commandSwitchOff = commandSwitchOff;
+    }
+
+    public void pressSwitchOnButton() {
+        commandSwitchOn.execute();
+        undoCommand = commandSwitchOff;
+    }
+
+    public void pressSwitchOffButton() {
+        commandSwitchOff.execute();
+        undoCommand = commandSwitchOn;
+    }
+
+    public void undoCommand() {
+        undoCommand.execute();
+    }
+}
+```
+
+**Client program:**
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Light light = new Light();
+        RemoteControl remote = new RemoteControl();
+        remote.setCommand(new SwitchOnLight(light), new SwitchOffLight(light));
+
+        remote.pressSwitchOnButton();
+        remote.pressSwitchOffButton();
+        remote.undoCommand();
+
+        System.out.println();
+
+        AirHumidifier humidifier = new AirHumidifier();
+        remote.setCommand(new SwitchOnAirHumidifier(humidifier),
+                          new SwitchOffAirHumidifier(humidifier));
+
+        remote.pressSwitchOnButton();
+        remote.pressSwitchOffButton();
+        remote.undoCommand();
+    }
+}
+```
+
+**What this demonstrates:**
+
+1.  The same remote works with completely different devices.
+2.  The remote never needs device-specific branching.
+3.  Undo is implemented by remembering the reverse action.
+
+</details>
+
+##### **3.8. Chain of Responsibility in an Editor Help System** (Lecture 14, Example 2)
+
+Model the lecture's editor help system so that `Ctrl-F1` shows context help near the active component, while `F1` eventually reaches the main editor help if local context help is unavailable.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The request starts at the most specific active component and travels upward through owner links until some component handles it.
+
+**Step 1 — Define request types and a base component:**
+
+```java
+public enum HelpType {
+    CONTEXT,
+    GENERAL
+}
+
+public class HelpRequest {
+    private final HelpType type;
+
+    public HelpRequest(HelpType type) {
+        this.type = type;
+    }
+
+    public HelpType getType() {
+        return type;
+    }
+}
+
+public abstract class Component {
+    protected Component owner;
+
+    public Component(Component owner) {
+        this.owner = owner;
+    }
+
+    public void showHelp(HelpRequest request) {
+        if (owner != null) {
+            owner.showHelp(request);
+        } else {
+            System.out.println("No handler could provide help.");
+        }
+    }
+}
+```
+
+**Step 2 — Implement concrete handlers/components:**
+
+```java
+public class Editor extends Component {
+    public Editor() {
+        super(null);
+    }
+
+    @Override
+    public void showHelp(HelpRequest request) {
+        System.out.println("Editor shows general help.");
+    }
+}
+
+public class Window extends Component {
+    private final String contextualHelp;
+
+    public Window(Component owner, String contextualHelp) {
+        super(owner);
+        this.contextualHelp = contextualHelp;
+    }
+
+    @Override
+    public void showHelp(HelpRequest request) {
+        if (request.getType() == HelpType.CONTEXT && contextualHelp != null) {
+            System.out.println("Window help: " + contextualHelp);
+        } else {
+            super.showHelp(request);
+        }
+    }
+}
+
+public class Button extends Component {
+    private final String tooltip;
+
+    public Button(Component owner, String tooltip) {
+        super(owner);
+        this.tooltip = tooltip;
+    }
+
+    @Override
+    public void showHelp(HelpRequest request) {
+        if (request.getType() == HelpType.CONTEXT && tooltip != null) {
+            System.out.println("Button tooltip: " + tooltip);
+        } else {
+            super.showHelp(request);
+        }
+    }
+}
+```
+
+**Step 3 — Demonstrate the request flow:**
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Editor editor = new Editor();
+        Window programWindow =
+                new Window(editor, "Program window syntax help");
+        Button runButton =
+                new Button(programWindow, "Runs the current program");
+
+        runButton.showHelp(new HelpRequest(HelpType.CONTEXT));
+        runButton.showHelp(new HelpRequest(HelpType.GENERAL));
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Button tooltip: Runs the current program
+Editor shows general help.
+```
+
+**Why this matches the lecture:**
+
+1.  The active component gets the first chance.
+2.  If it cannot answer, the request goes to its owner.
+3.  The chain follows dynamic object ownership, not just inheritance.
+4.  `Ctrl-F1` and `F1` correspond naturally to context and general help modes.
+
+</details>
+
+##### **3.9. Publisher-Subscriber News Feed** (Lecture 14, Example 3)
+
+Implement the lecture's minimal Observer model with one publisher and three subscribers. After removing one subscriber, only the remaining subscribers should receive later notifications.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The publisher stores a list of observers and iterates through it on notification. Subscribers share one common interface but react independently.
+
+```csharp
+using System;
+using System.Collections.Generic;
+
+public interface IObserver
+{
+    void Update(ISubject subject);
+}
+
+public interface ISubject
+{
+    void Add(IObserver observer);
+    void Remove(IObserver observer);
+    void Notify();
+}
+
+public class SubscriberA : IObserver
+{
+    public void Update(ISubject subject)
+    {
+        Console.WriteLine("Subscriber A received the news");
+    }
+}
+
+public class SubscriberB : IObserver
+{
+    public void Update(ISubject subject)
+    {
+        Console.WriteLine("Subscriber B received the news");
+    }
+}
+
+public class SubscriberC : IObserver
+{
+    public void Update(ISubject subject)
+    {
+        Console.WriteLine("Subscriber C received the news");
+    }
+}
+
+public class Publisher : ISubject
+{
+    private readonly List<IObserver> subscribers = new List<IObserver>();
+
+    public void Add(IObserver observer)
+    {
+        subscribers.Add(observer);
+    }
+
+    public void Remove(IObserver observer)
+    {
+        subscribers.Remove(observer);
+        Console.WriteLine("A subscriber gets removed");
+    }
+
+    public void Notify()
+    {
+        foreach (var observer in subscribers)
+        {
+            observer.Update(this);
+        }
+    }
+}
+
+public class Program
+{
+    public static void Main()
+    {
+        Publisher publisher = new Publisher();
+        var a = new SubscriberA();
+        var b = new SubscriberB();
+        var c = new SubscriberC();
+
+        publisher.Add(a);
+        publisher.Add(b);
+        publisher.Add(c);
+
+        publisher.Notify();
+
+        publisher.Remove(b);
+        publisher.Notify();
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Subscriber A received the news
+Subscriber B received the news
+Subscriber C received the news
+A subscriber gets removed
+Subscriber A received the news
+Subscriber C received the news
+```
+
+**What this demonstrates:**
+
+1.  The publisher does not know any concrete subscriber behavior.
+2.  Subscriptions are established and removed at runtime.
+3.  One event is broadcast to many independent receivers.
+
+</details>
