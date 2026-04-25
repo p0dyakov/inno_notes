@@ -682,3 +682,542 @@ $$\oint_C \mathbf{F} \cdot d\mathbf{r} = \int_0^{2\pi} \mathbf{F} \cdot \frac{d\
 Hence, $\mathbf{F}$ is not conservative.
 
 M. S. Alkousa | Chapter 4
+
+## Slide 31: The Fundamental Theorem of Line Integrals
+
+**Theorem (Conservative Fields are Gradient Fields)**
+Suppose $\mathbf{F}$ is a vector field that is continuous on an *open connected region* $D$. If $\int_C \mathbf{F} \cdot d\mathbf{r}$ is independent of path in $D$, then $\mathbf{F}$ is a conservative vector field on $D$; that is, there exists a function $f$ such that $\nabla f = \mathbf{F}$.
+
+**Remark.** This theorem and the Fundamental Theorem of Line Integral say that $\mathbf{F} = \nabla f$ **if and only if**, for any two points $A$ and $B$ in the region $D$, the value of the line integral $\int_C \mathbf{F} \cdot d\mathbf{r}$ is independent of the path $C$ joining $A$ to $B$ in $D$.
+
+**Exercises.** Find a function $f$ such that $\mathbf{F} = \nabla f$ and use the answer to evaluate $\int_C \mathbf{F} \cdot d\mathbf{r}$ along the given curve $C$.
+**(1)** $\mathbf{F}(x, y, z) = (y^2 z + 2xz^2)\hat{i} + 2xyz\hat{j} + (xy^2 + 2x^2 z)\hat{k}$, 
+$C : x = \sqrt{t}, y = t + 1, z = t^2, \ 0 \leq t \leq 1;$
+
+**(2)** $\mathbf{F}(x, y, z) = yze^{xz}\hat{i} + e^{xz}\hat{j} + xye^{xz}\hat{k}$, 
+$C : \mathbf{r}(t) = (t^2 + 1)\hat{i} + (t^2 - 1)\hat{j} + (t^2 - 2t)\hat{k}, \ 0 \leq t \leq 2.$
+
+---
+
+## Slide 32: Green’s Theorem
+
+Green’s Theorem gives the relationship between a line integral around a simple closed curve $C$ (that is, the work or flux integral over a closed curve in the plane, or the circulation of a field around a closed curve in the plane) and a double integral over the plane region $D$ bounded by $C$.
+
+> **Image Description:** 
+> Two coordinate plane graphs are shown, demonstrating the orientation of a curve $C$ bounding a region $D$. 
+> *   **Left Graph (Positive orientation):** The region $D$ is an irregular, blob-like shape in the $xy$-plane. The boundary curve $C$ has arrows indicating a counterclockwise direction. As the curve is traversed, the region $D$ remains to the left.
+> *   **Right Graph (Negative orientation):** The same region $D$ is shown, but the boundary curve $C$ has arrows indicating a clockwise direction. As the curve is traversed, the region $D$ is on the right.
+
+**Figure:** The curve is traversed counterclockwise, and said to be **positively oriented**, if the region it encloses is always to the **left** when moving along the curve. If the curve is traversed clockwise, then the enclosed region is on the **right** when moving along the curve, and the curve is said to be **negatively oriented**.
+
+---
+
+## Slide 33: Green’s Theorem
+
+**Theorem (Green’s Theorem)**
+*Let $C$ be a **positively oriented, piecewise-smooth, simple and closed curve** enclosing a region $D$ in the plane. If $M(x, y)$ and $Q(x, y)$ have continuous partial derivatives on an open region that contains $D$, then*
+$$ \oint_C M dx + N dy = \int_C M dx + N dy = \iint_D \left( \frac{\partial N}{\partial x} - \frac{\partial M}{\partial y} \right) dA = \int_{\partial D} M dx + N dy. $$
+
+**Proof.** See the proof, for some special simply connected regions, in Thomas2024, page 969.
+
+**Example.** Calculate the integral $I = \oint_C \left( 3y - e^{\sin x} \right) dx + \left( 7x + \sqrt{y^4 + 1} \right) dy$, where $C$ is the circle $x^2 + y^2 = 9$.
+
+**Solution.** The region $D$ bounded by $C$ is the disk $x^2 + y^2 \leq 9$. By Green’s Theorem, we find:
+$$ I = \iint_D \left( \frac{\partial}{\partial x} \left( 7x + \sqrt{y^4 + 1} \right) - \frac{\partial}{\partial y} \left( 3y - e^{\sin x} \right) \right) dA $$
+$$ = \int_0^{2\pi} \int_0^3 (7 - 3) r \, dr \, d\theta = 4 \int_0^{2\pi} d\theta \int_0^3 r \, dr = \mathbf{36\pi} $$
+
+---
+
+## Slide 34: Green’s Theorem for Non Simply-Connected Regions
+
+**Remark.** Green’s Theorem can be extended to apply to regions with holes, that is, regions that are **not simply-connected**. Observe that the boundary $C$ of the region $D$ in the inserted figure consists of two simple closed curves $C_1$ and $C_2$. We assume that these boundary curves are oriented so that the region $D$ is always on the left as the curve $C$ is traversed. Thus, the positive direction is counterclockwise for the outer curve $C_1$ but clockwise for the inner curve $C_2$. If we divide $D$ into two regions $D'$ and $D''$ by means of the lines shown in the figure and then apply Green’s Theorem to each of $D'$ and $D''$, we get
+
+> **Image Description:**
+> The image displays two stages of a region $D$ with a hole.
+> *   **Top diagram:** A larger outer blob bounded by a counterclockwise curve $C_1$ and an inner white "hole" bounded by a clockwise curve $C_2$. The shaded region between them is $D$.
+> *   **Bottom diagram:** The region $D$ is split into an upper half $D'$ and a lower half $D''$ by two horizontal line segments. Arrows on the boundary of $D'$ and $D''$ show that along the dividing lines, the integration directions are opposite and will cancel each other out.
+
+$$ \iint_D \left( \frac{\partial N}{\partial x} - \frac{\partial M}{\partial y} \right) dA = \iint_{D'} \left( \frac{\partial N}{\partial x} - \frac{\partial M}{\partial y} \right) dA + \iint_{D''} \left( \frac{\partial N}{\partial x} - \frac{\partial M}{\partial y} \right) dA $$
+$$ = \int_{\partial D'} M dx + N dy + \int_{\partial D''} M dx + N dy. $$
+
+Since the line integrals along the common boundary lines are in opposite directions, they cancel, and we get
+$$ \iint_D \left( \frac{\partial Q}{\partial x} - \frac{\partial P}{\partial y} \right) dA = \int_{C_1} P dx + Q dy + \int_{C_2} P dx + Q dy = \int_C P dx + Q dy, $$
+which is Green’s Theorem for the region $D$.
+
+---
+
+## Slide 35: Green’s Theorem
+
+**Example.** Let $\mathbf{F} = -\frac{y}{x^2 + y^2}\hat{i} + \frac{x}{x^2 + y^2}\hat{j}$. Calculate the integral $\int_C \mathbf{F} \cdot d\mathbf{r}$, for any positively oriented simple closed path $C$ that encloses the origin.
+
+> **Image Description:**
+> A coordinate plane shows an arbitrarily shaped, positively oriented (counterclockwise) closed curve $C$. Completely inside $C$, there is a smaller, positively oriented circle $C'$ centered at the origin. The region between $C$ and $C'$ is shaded and labeled $D$.
+
+**Solution.** Since $C$ is an arbitrary closed path that encloses the origin, it’s difficult to compute the given integral directly. So let’s consider a counterclockwise-oriented circle $C'$ with center the origin and radius $r$, where $r$ is chosen to be small enough that $C'$ lies inside $C$. Let $D$ be the region bounded by $C$ and $C'$.
+Then its positively oriented boundary is $C \cup (-C')$ and so the general version of Green’s Theorem gives
+
+$$ \int_C M dx + N dy + \int_{-C'} M dx + N dy = \int_{C \cup (-C')} \mathbf{F} \cdot d\mathbf{r} $$
+$$ = \iint_D \left( \frac{\partial N}{\partial x} - \frac{\partial M}{\partial y} \right) dA = \iint_D \left( \frac{y^2 - x^2}{(x^2 + y^2)^2} - \frac{y^2 - x^2}{(x^2 + y^2)^2} \right) dA = 0. $$
+
+Therefore $\int_C M dx + N dy = \int_{C'} M dx + N dy \implies \color{red}{\int_C \mathbf{F} \cdot d\mathbf{r} = \int_{C'} \mathbf{F} \cdot d\mathbf{r}}.$
+Using the parametrization given by $\mathbf{r}(t) = r \cos t \mathbf{i} + r \sin t \mathbf{j}, \ 0 \leq t \leq 2\pi$, we find
+$$ \int_{C'} \mathbf{F} \cdot d\mathbf{r} = \int_0^{2\pi} \mathbf{F}(\mathbf{r}(t)) \cdot \mathbf{r}'(t) dt = \int_0^{2\pi} \frac{(-r \sin t)(-r \sin t) + (r \cos t)(r \cos t)}{r^2 \cos^2 t + r^2 \sin^2 t} dt = \mathbf{2\pi} $$
+
+---
+
+## Slide 36: Green’s Theorem: Exercises
+
+**Exercise 1.** Use Green’s Theorem to evaluate the line integral along the given positively oriented curve.
+**(1)** $\int_C ye^x dx + 2e^x dy$, where $C$ is the rectangle with vertices $(0, 0), (3, 0), (3, 4)$, and $(0, 4)$;
+**(2)** $\int_C (x^2 + y^2) dx + (x^2 - y^2) dy$, where $C$ is the triangle with vertices $(0, 0), (2, 1)$, and $(0, 1)$;
+**(3)** $\int_C y^4 dx + 2xy^3 dy$, where $C$ is the ellipse $x^2 + 2y^2 = 2$;
+**(4)** $\int_C (1 - y^3) dx + (x^3 + e^{y^2}) dy$, where $C$ is the boundary of the region between the circles $x^2 + y^2 = 4$ and $x^2 + y^2 = 9$.
+
+**Exercise 2.** Find the counterclockwise circulation and outward flux for the field $\mathbf{F}(x, y) = \sqrt{1 + x^2}\hat{i} + \arctan x\hat{j}$, around and across $C$, which is the triangle from $(0, 0)$ to $(1, 1)$ to $(0, 1)$ to $(0, 0)$.
+
+**Exercise 3.** Use Green’s Theorem to find the work done by the force $\mathbf{F}(x, y) = x(x + y)\hat{i} + xy^2\hat{j}$ in moving a particle from the origin along the $x$-axis to $(1, 0)$, then along the line segment to $(0, 1)$, and then back to the origin along the $y$-axis.
+
+---
+
+## Slide 37: Green’s Theorem: Exercises
+
+**Exercise 4.** A particle starts at the origin, moves along the $x$-axis to $(5, 0)$, then along the quarter-circle $x^2 + y^2 = 25, \ x \geq 0, y \geq 0$, to the point $(0, 5)$, and then down the $y$-axis back to the origin. Use Green’s Theorem to find the work done on this particle by the force field $\mathbf{F}(x, y) = \sin x\hat{i} + (\sin y + xy^2 + \frac{1}{3}x^3)\hat{j}$.
+
+**Exercise 5.** (Region with a hole.) Find the integral $\int_C \mathbf{F} \cdot d\mathbf{r}$, where $\mathbf{F}(x, y) = \frac{2xy\hat{i} + (y^2 - x^2)\hat{j}}{(x^2 + y^2)^2}$, and $C$ is any positively oriented simple closed curve that encloses the origin.
+
+**Exercise 6.** Find the counterclockwise circulation and the outward flux of the field $\mathbf{F}(x, y) = (-\sin y)\hat{i} + (x \cos y)\hat{j}$ around and across the boundary of the square $0 \leq x \leq \pi/2, \ 0 \leq y \leq \pi/2$.
+
+**Exercise 7.** Find the outward flux of the field
+$$ \mathbf{F}(x, y) = \left( 3xy - \frac{x}{1 + y} \right) \hat{i} + (e^x + \arctan y)\hat{j} $$
+across the cardioid $r = a(1 + \cos \theta), \ a > 0$.
+
+**Exercise 8.** Find the counterclockwise circulation of $\mathbf{F}(x, y) = (y + e^x \ln y)\hat{i} + (exy)\hat{j}$ around the boundary of the region that is bounded above by the curve $y = 3 - x^2$ and below by the curve $y = x^4 + 1$.
+
+---
+
+## Slide 38: Parametric surfaces
+
+We have already studied several special classes of surfaces: cylinders, quadric surfaces, graphs of two-variable functions, and level surfaces of three-variable functions. Now we turn to a broader class, called **parametric surfaces**, which are described using vector functions.
+
+We have described curves in the plane in three different ways.
+*   Explicit form: $y = f(x)$.
+*   Implicit form: $F(x, y) = 0$.
+*   Parametric vector form: $\mathbf{r}(t) = x(t)\hat{i} + y(t)\hat{j}, \quad a \leq t \leq b$.
+
+We have analogous descriptions of surfaces in space.
+*   Explicit form: $z = f(x, y)$.
+*   Implicit form: $F(x, y, z) = 0$.
+
+Suppose that
+$$ \mathbf{r}(u, v) = x(u, v)\hat{i} + y(u, v)\hat{j} + z(u, v)\hat{k}, \qquad (4) $$
+is a continuous vector-valued function defined on a region $D$ in the $uv$-plane, and is one-to-one on the interior of the $D$. We call the range of $\mathbf{r}$ the **surface** $S$ defined or traced by $\mathbf{r}$. Equation (4) together with the domain $D$ constitutes a **parametrization** of the surface. The variables $u$ and $v$ are the **parameters**, and $D$ is the **parameter domain**.
+$\color{red}{\text{The requirement that } \mathbf{r} \text{ be one-to-one on the interior of } D \text{ ensures that } S \text{ does not cross itself.}}$
+
+---
+
+## Slide 39: Parametric surfaces
+
+> **Image Description:**
+> The image illustrates the mapping of a parameter domain $D$ in the $uv$-plane to a surface $S$ in the $xyz$-space using a vector function $\mathbf{r}$. 
+> *   **Top Pair:** A domain $D$ in the $uv$-plane is mapped via arrow $\mathbf{r}$ to a smooth 3D surface patch $S$ in $xyz$-space. A specific point $(u, v)$ in $D$ is mapped to a position vector $\mathbf{r}(u, v)$ on the surface $S$.
+> *   **Bottom Pair:** Highlights grid curves. In the $uv$-plane, a horizontal line $v=v_0$ and a vertical line $u=u_0$ intersect at $(u_0, v_0)$. When mapped via $\mathbf{r}$, the line $v=v_0$ transforms into a curve $C_1$ on the surface $S$, and the line $u=u_0$ transforms into a curve $C_2$ on the surface $S$. Their intersection on the surface is $\mathbf{r}(u_0, v_0)$.
+
+**Figure:** If we keep $u$ constant by putting $u = u_0$, then $\mathbf{r}(u_0, v)$, becomes a vector function of the single parameter $v$ and defines a curve $C_1$ lying on $S$. Similarly, if we keep $v$ constant by putting $v = v_0$, we get a curve $C_2$ given by $\mathbf{r}(u, v_0)$ that lies on $S$.
+
+---
+
+## Slide 40: Parametric surfaces (Plane in the Space)
+
+**Example 1.**
+Let $\mathbf{a}$ and $\mathbf{b}$ be two nonparallel vectors. For the vector function that represents the plane that passes through the point $P_0$ with position vector $\mathbf{r}_0$ and contains $\mathbf{a}, \mathbf{b}$. Let $P$ be any point in the plane, so there are scalars $u$ and $v$ such that $\overrightarrow{P_0P} = u \mathbf{a} + v \mathbf{b}$ $\color{red}{\text{(Why?)}}$.
+
+> **Image Description:**
+> A parallelogram in 3D space forms a plane. Point $P_0$ is one vertex. A blue vector $u\mathbf{a}$ lies along the bottom edge, and a blue vector $v\mathbf{b}$ lies along the left edge. Their vector sum points from $P_0$ to point $P$ at the opposite vertex. Base vectors $\mathbf{a}$ and $\mathbf{b}$ are drawn in magenta extending from $P_0$.
+
+If $\mathbf{r}$ is the position vector of $P$, then
+$$ \mathbf{r}(u, v) = \overrightarrow{OP_0} + \overrightarrow{P_0P} = \mathbf{r}_0 + u\mathbf{a} + v\mathbf{b} \quad \forall u, v \in \mathbb{R}. $$
+
+If we write the vectors $\mathbf{r} = (x, y, z), \mathbf{r}_0 = (x_0, y_0, z_0), \mathbf{a} = (a_1, a_2, a_3)$, and $\mathbf{b} = (b_1, b_2, b_3)$, then we can write the parametric equations of the plane through the point $(x_0, y_0, z_0)$ as follows:
+$$ x = x_0 + ua_1 + vb_1, \quad y = y_0 + ua_2 + vb_2, \quad z = z_0 + ua_3 + vb_3, \quad \forall u, v \in \mathbb{R}. $$
+
+---
+
+## Slide 41: Parametric surfaces (Cone)
+
+**Example 2.** For the cone $z = \sqrt{x^2 + y^2}, \ 0 \leq z \leq 1$.
+The cylindrical coordinates provide a parametrization as follows. For any point $(x, y, z)$ on the cone, we have
+$$ x = r \cos \theta, \ y = r \sin \theta, \ z = \sqrt{x^2 + y^2} = r, $$
+with $0 \leq r \leq 1$ and $0 \leq \theta \leq 2\pi$. Taking $u = r$ and $v = \theta$ in (4), we get the following parametrization
+$$ \mathbf{r}(r, \theta) = (r \cos \theta)\hat{i} + (r \sin \theta)\hat{j} + r\hat{k}, $$
+with $0 \leq r \leq 1, \ 0 \leq \theta \leq 2\pi$.
+
+> **Image Description:**
+> An upward-opening cone in an $xyz$-coordinate system. The tip is at the origin and the top is a circular cross section at $z=1$. A point on the cone is defined by a position vector $\mathbf{r}(r, \theta)$. The diagram illustrates the cylindrical coordinates mappings: the distance $r$ from the $z$-axis, the angle $\theta$ from the $x$-axis, and the resulting coordinates $(x, y, z) = (r\cos\theta, r\sin\theta, r)$.
+
+This parametrization is one-to-one on the interior of the domain, though not on the boundary where $r = 0$ (mapped to the tip of the cone) or where $\theta = 0$ or $\theta = 2\pi$ (where the cone glues together along a seam above the $x$-axis). That is,
+*   When $r = 0$, we get $\mathbf{r}(0, \theta) = 0\hat{i} + 0\hat{j} + 0\hat{k}$, for any $\theta \in[0, 2\pi]$.
+*   When $\theta = 0$ or $\theta = 2\pi$, we get $\mathbf{r}(r, 0) = r\hat{i} + 0\hat{j} + r\hat{k} = \mathbf{r}(r, 2\pi)$, for any $r \in [0, 1]$.
+    So the edge $\theta = 0$ and the edge $\theta = 2\pi$ map to the same curve on the cone.
+
+---
+
+## Slide 42: Parametric surfaces (Sphere)
+
+**Example 3.** Spherical coordinates provide a parametrization of the sphere $x^2 + y^2 + z^2 = a^2$, as follows.
+The point $(x, y, z)$ on the sphere has the following coordinates
+$$ x = a \sin \phi \cos \theta, \ y = a \sin \phi \sin \theta, \ z = a \cos \phi, $$
+with $0 \leq \phi \leq \pi$ and $0 \leq \theta \leq 2\pi$.
+
+> **Image Description:**
+> A sphere of radius $a$ in $xyz$-coordinates. The radius vector $\mathbf{r}(\phi, \theta)$ points to the surface. The angle $\phi$ is shown measured down from the positive $z$-axis to the vector. The angle $\theta$ is shown in the $xy$-plane measured from the $x$-axis to the vector's projection. The point on the sphere is $(x, y, z) = (a\sin\phi\cos\theta, a\sin\phi\sin\theta, a\cos\phi)$.
+
+Taking $u = \phi$ and $v = \theta$ in (4), for $0 \leq \phi \leq \pi, \ 0 \leq \theta \leq 2\pi$, gives the following parametrization
+$$ \mathbf{r}(\phi, \theta) = (a \sin \phi \cos \theta)\hat{i} + (a \sin \phi \sin \theta)\hat{j} + (a \cos \phi)\hat{k}, $$
+
+Again, the parametrization is one-to-one on the interior of the domain, though not on its boundary.
+
+---
+
+## Slides 43 & 44: Smooth Surface and Tangent Plane
+
+*(Note: Slide 44 is entirely composed of the image that illustrates the text on Slide 43. They are combined here for clarity.)*
+
+Let $S$ be a parametric surface traced out by a vector function
+$$ \mathbf{r}(u, v) = x(u, v)\hat{i} + y(u, v)\hat{j} + z(u, v)\hat{k}, $$
+and $P_0 \in S$ with position vector $\mathbf{r}(u_0, v_0)$. If we keep $u$ constant by putting $u = u_0$, then $\mathbf{r}(u_0, v)$ becomes a vector function of the single parameter $v$ and defines a grid curve $C_1$ lying on $S$. The tangent vector to $C_1$ at $P_0$ is obtained by taking the partial derivative of $\mathbf{r}$ with respect to $v$:
+$$ \mathbf{r}_v = \frac{\partial x}{\partial v}(u_0, v_0)\hat{i} + \frac{\partial y}{\partial v}(u_0, v_0)\hat{j} + \frac{\partial z}{\partial v}(u_0, v_0)\hat{k}. $$
+Similarly, if $v = v_0$ is a constant, we get a grid curve $C_2$ given by $\mathbf{r}(u, v_0)$ that lies on $S$, and its tangent vector at $P_0$ is
+$$ \mathbf{r}_u = \frac{\partial x}{\partial u}(u_0, v_0)\hat{i} + \frac{\partial y}{\partial u}(u_0, v_0)\hat{j} + \frac{\partial z}{\partial u}(u_0, v_0)\hat{k}. $$
+
+**Definition (Smooth surface, tangent plane)**
+A parametrized surface $\mathbf{r}(u, v) = x(u, v)\hat{i} + y(u, v)\hat{j} + z(u, v)\hat{k}$ is **smooth** (it has no “corners”) if $\mathbf{r}_u = \frac{\partial \mathbf{r}}{\partial u}$ and $\mathbf{r}_v = \frac{\partial \mathbf{r}}{\partial v}$ are continuous and if $\mathbf{r}_u \times \mathbf{r}_v$ is never zero on the interior of the parameter domain. For a smooth surface, the **tangent plane** is the plane that contains the tangent vectors $\mathbf{r}_u$ and $\mathbf{r}_v$, and the vector $\mathbf{r}_u \times \mathbf{r}_v$ is a normal vector to the tangent plane.
+
+> **Image Description (from Slide 44):**
+> A visualization of mapping domain $D$ to a surface $S$.
+> *   **Left side:** A 2D parameter domain $D$ in the $uv$-plane. Two crossing lines are marked: a horizontal line $v = v_0$ and a vertical line $u = u_0$. They intersect at $(u_0, v_0)$.
+> *   **Right side:** The mapped 3D surface patch in the $xyz$-plane. The horizontal line maps to curve $C_1$ and the vertical line maps to curve $C_2$. They intersect at point $P_0$. At $P_0$, two tangent vectors are drawn: $\mathbf{r}_v$ tangent to $C_1$, and $\mathbf{r}_u$ tangent to $C_2$.
+
+---
+
+## Slide 45: Surface Area
+
+Now consider a small rectangle $\Delta A_{uv}$ in $D := \{(u, v) \in [a, b] \times [c, d]\}$ with sides on the lines $u = u_0, u = u_0 + \Delta u, v = v_0$, and $v = v_0 + \Delta v$. Each side of $\Delta A_{uv}$ maps onto a curve on the surface $S$, and together these four curves bound a “curved patch element” $\Delta \sigma_{uv}$.
+
+> **Image Description:**
+> Three connected diagrams explaining the geometry of a surface patch.
+> *   **Left Diagram:** Shows the parameter domain $D$ in the $uv$-plane with a small rectangular highlighted region $\Delta A_{uv}$ defined by bounds $[u_0, u_0+\Delta u]$ and $[v_0, v_0+\Delta v]$. 
+> *   **Middle Diagram:** A red arrow labeled "Parametrization" points from the $uv$-plane to a 3D surface $S$ in $xyz$-space. The small rectangle maps to a curved blue patch element labeled $\Delta \sigma_{uv}$. The bounding curves are $C_1: v=v_0$, $C_2: u=u_0$, $v=v_0+\Delta v$, and $u=u_0+\Delta u$. The bottom-left corner of the patch is $P_0$.
+> *   **Right Diagram:** A zoomed-in view of the patch. The base corner is $P_0$. The tangent vectors $\Delta u \mathbf{r}_u$ and $\Delta v \mathbf{r}_v$ define a flat parallelogram approximating the curved patch. A vector normal to this parallelogram is shown pointing upwards as $\mathbf{r}_u \times \mathbf{r}_v$.
+
+**Figure:** The side $v = v_0$ maps to curve $C_1$, the side $u = u_0$ maps onto $C_2$, and their common vertex $(u_0, v_0)$ maps to $P_0$. The partial derivative vector $\mathbf{r}_u(u_0, v_0)$ is tangent to $C_1$ at $P_0$, and $\mathbf{r}_v(u_0, v_0)$ is tangent to $C_2$ at $P_0$. The cross product $\mathbf{r}_u \times \mathbf{r}_v$ is normal to the surface at $P_0$ (recall that we assumed $\mathbf{r}_u \times \mathbf{r}_v \neq \mathbf{0}$).
+
+---
+
+## Slide 46: Surface Area
+
+We next approximate the surface patch element $\Delta \sigma_{uv}$ by the parallelogram on the tangent plane whose sides are determined by the vectors $\Delta u \mathbf{r}_u$ and $\Delta v \mathbf{r}_v$. The area of this parallelogram is
+$$ \|\Delta u \mathbf{r}_u \times \Delta v \mathbf{r}_v\| = \|\mathbf{r}_u \times \mathbf{r}_v\| \Delta u \Delta v. $$
+
+A partition of the region $D$ in the $uv$-plane by rectangular regions $\Delta A_{uv}$ induces a partition of the surface $S$ into surface patch elements $\Delta \sigma_{uv}$. We approximate the area of each surface patch element $\Delta \sigma_{uv}$ by the parallelogram area and sum these areas together to obtain an approximation of the surface area of $S$:
+$$ \sum_n \|\mathbf{r}_u \times \mathbf{r}_v\| \Delta u \Delta v. $$
+
+As $\Delta u$ and $\Delta v$ approach zero independently, the number of area elements $n$ approaches $\infty$ and the continuity of $\mathbf{r}_u$ and $\mathbf{r}_v$ guarantees that the sum approaches the double integral $\iint_D \|\mathbf{r}_u \times \mathbf{r}_v\| du \, dv$. $\color{red}{\text{Let } d\sigma := \|\mathbf{r}_u \times \mathbf{r}_v\| du \, dv}$ denote the **surface area differential** (it is analogous to the arc length differential $ds$ in line integrals).
+
+**Definition**
+The **area** of the smooth surface $\mathbf{r}(u, v) = x(u, v)\hat{i} + y(u, v)\hat{j} + z(u, v)\hat{k}$, is
+$$ \color{red}{A = \iint_S d\sigma = \iint_D \|\mathbf{r}_u \times \mathbf{r}_v\| du \, dv.} $$
+
+---
+
+## Slide 47: Surface Area: Examples
+
+**Example 1.**
+Find the surface area of the cone $z = \sqrt{x^2 + y^2}$ with $0 \leq z \leq 1$.
+
+**Solution.** For this cone, we found the parametrization
+$$ \mathbf{r}(r, \theta) = (r \cos \theta)\hat{i} + (r \sin \theta)\hat{j} + r\hat{k}, \quad 0 \leq r \leq 1, \quad 0 \leq \theta \leq 2\pi. $$
+Thus,
+$$ \mathbf{r}_r \times \mathbf{r}_\theta = \begin{vmatrix} \hat{i} & \hat{j} & \hat{k} \\ \cos \theta & \sin \theta & 1 \\ -r \sin \theta & r \cos \theta & 0 \end{vmatrix} = -(r \cos \theta)\hat{i} - (r \sin \theta)\hat{j} + r\hat{k}. $$
+Thus,
+$$ \|\mathbf{r}_r \times \mathbf{r}_\theta\| = \sqrt{r^2 \cos^2 \theta + r^2 \sin^2 \theta + r^2} = \sqrt{2} r. $$
+
+Therefore, the area of the given cone is
+$$ A = \iint_S d\sigma = \int_0^{2\pi} \int_0^1 \|\mathbf{r}_r \times \mathbf{r}_\theta\| \, dr \, d\theta = \int_0^{2\pi} \int_0^1 \sqrt{2} r \, dr \, d\theta = \frac{\sqrt{2}}{2}(2\pi) = \mathbf{\sqrt{2}\pi} $$
+
+---
+
+## Slide 48: Surface Area: Examples
+
+**Example 2.** Find the surface area of a sphere of radius $a$.
+
+**Solution.** For this sphere, we found the parametrization
+$$ \mathbf{r}(\phi, \theta) = (a \sin \phi \cos \theta)\hat{i} + (a \sin \phi \sin \theta)\hat{j} + (a \cos \phi)\hat{k}, \quad 0 \leq \phi \leq \pi, \ 0 \leq \theta \leq 2\pi. $$
+
+For $\mathbf{r}_\phi \times \mathbf{r}_\theta$, we get
+$$ \mathbf{r}_\phi \times \mathbf{r}_\theta = \begin{vmatrix} \hat{i} & \hat{j} & \hat{k} \\ a \cos \phi \cos \theta & a \cos \phi \sin \theta & -a \sin \phi \\ -a \sin \phi \sin \theta & a \sin \phi \cos \theta & 0 \end{vmatrix} $$
+$$ = (a^2 \sin^2 \phi \cos \theta)\hat{i} + (a^2 \sin^2 \phi \sin \theta)\hat{j} + (a^2 \sin \phi \cos \phi)\hat{k}. $$
+
+Thus,
+$$ \|\mathbf{r}_\phi \times \mathbf{r}_\theta\| = \sqrt{a^4 \sin^4 \phi \cos^2 \theta + a^4 \sin^4 \phi \sin^2 \theta + a^4 \sin^2 \phi \cos^2 \phi} = a^2 \sqrt{\sin^2 \phi} = a^2 \sin \phi. $$
+
+Therefore, the area of the given sphere is
+$$ A = \int_0^{2\pi} \int_0^\pi a^2 \sin \phi \, d\phi \, d\theta = \int_0^{2\pi} \left[ -a^2 \cos \phi \right]_0^\pi d\theta = \int_0^{2\pi} 2a^2 \, d\theta = \mathbf{4\pi a^2} $$
+
+---
+
+## Slide 49: Explicit Surfaces: Surface area of the graph of an explicit function
+
+For the special case of a surface $S$ with equation $z = f(x, y)$, where $(x, y)$ lies in $D$ and $f$ has continuous partial derivatives, we take $x$ and $y$ as parameters, and we get the following parametric equations
+$$ x = x, \quad y = y, \quad z = f(x, y). $$
+So
+$$ \mathbf{r}_x = \hat{i} + \left( \frac{\partial f}{\partial x} \right) \hat{k}, \quad \mathbf{r}_y = \hat{j} + \left( \frac{\partial f}{\partial y} \right) \hat{k}. $$
+Thus,
+$$ \mathbf{r}_x \times \mathbf{r}_y = \begin{vmatrix} \hat{i} & \hat{j} & \hat{k} \\ 1 & 0 & \frac{\partial f}{\partial x} \\ 0 & 1 & \frac{\partial f}{\partial y} \end{vmatrix} = -\frac{\partial f}{\partial x}\hat{i} - \frac{\partial f}{\partial y}\hat{j} + \hat{k}, $$
+and
+$$ \|\mathbf{r}_x \times \mathbf{r}_y\| = \sqrt{\left( \frac{\partial f}{\partial x} \right)^2 + \left( \frac{\partial f}{\partial y} \right)^2 + 1} = \sqrt{1 + \left( \frac{\partial z}{\partial x} \right)^2 + \left( \frac{\partial z}{\partial y} \right)^2}. $$
+
+Therefore, the surface area formula becomes
+$$ A(S) = \iint_D \sqrt{1 + \left( \frac{\partial z}{\partial x} \right)^2 + \left( \frac{\partial z}{\partial y} \right)^2} \, dA $$
+
+---
+
+## Slide 50: Implicit Surfaces: Surface area of the graph of an implicit function
+
+Surfaces are often presented as level sets of a function, described by an equation such as $F(x, y, z) = c$, for some constant $c$. Such a level surface does not come with an explicit parametrization and is called an **implicitly defined surface**. It may be difficult to find explicit formulas for the functions $x(u, v), y(u, v)$, and $z(u, v)$ that describe the surface in the form
+$$ \mathbf{r}(u, v) = x(u, v)\hat{i} + y(u, v)\hat{j} + z(u, v)\hat{k}. $$
+
+$\color{blue}{\text{We now show how to compute the surface area differen-}}$
+$\color{blue}{\text{tial } d\sigma \text{ for implicit surfaces.}}$
+
+> **Image Description:**
+> A 3D diagram showing a surface $S$ labeled "Surface $F(x, y, z) = c$" floating above the $xy$-plane. Below the surface is its vertical projection, a flat blue region labeled $R$, on a coordinate plane. The text "The vertical projection or 'shadow' of $S$ on a coordinate plane" points to $R$. An upward unit vector $\mathbf{p}$ is drawn perpendicular to region $R$.
+
+We have a surface defined by the equation $F(x, y, z) = c$. Let us choose $\mathbf{p}$ to be a unit vector normal to the plane region $R$. We assume that the surface is **smooth** ($F$ is differentiable, $\nabla F$ is nonzero and continuous on $S$) and that $\nabla F \cdot \mathbf{p} \neq 0$.
+
+Assume that the normal vector $\mathbf{p}$ is the unit vector $\mathbf{k}$, so the region $R$ lies in the $xy$-plane. By assumption, we then have $\nabla F \cdot \mathbf{p} = \nabla F \cdot \mathbf{k} = F_z \neq 0$ on $S$.
+
+---
+
+## Slide 51: Implicit Surfaces: Surface area of the graph of an implicit function
+
+The Implicit Function Theorem implies that $S$ is then the graph of a differentiable function $z = h(x, y)$, although the function $h(x, y)$ is **not** explicitly known.
+Define the parameters $u$ and $v$ by $u = x$ and $v = y$. Then $z = h(u, v)$, and
+$$ \mathbf{r}(u, v) = u\hat{i} + v\hat{j} + h(u, v)\hat{k} $$
+gives a parametrization of the surface $S$. Applying the Chain Rule for implicit differentiation, we get
+$$ \mathbf{r}_u = \hat{i} + \frac{\partial h}{\partial u}\hat{k} = \hat{i} - \frac{F_x}{F_z}\hat{k} \quad \text{and} \quad \mathbf{r}_v = \hat{j} + \frac{\partial h}{\partial v}\hat{k} = \hat{j} - \frac{F_y}{F_z}\hat{k}. $$
+
+Therefore, we have
+$$ \mathbf{r}_u \times \mathbf{r}_v = \frac{F_x}{F_z}\hat{i} + \frac{F_y}{F_z}\hat{j} + \hat{k} = \frac{1}{F_z}(F_x\hat{i} + F_y\hat{j} + F_z\hat{k}) = \frac{\nabla F}{\nabla F \cdot \mathbf{k}} = \frac{\nabla F}{\nabla F \cdot \mathbf{p}}. $$
+
+Therefore, the surface area differential is given by
+$$ \color{red}{d\sigma = \|\mathbf{r}_u \times \mathbf{r}_v\| \, du \, dv = \frac{\|\nabla F\|}{|\nabla F \cdot \mathbf{p}|} dx \, dy, \quad u = x \text{ and } v = y.} $$
+
+**Remark.** We obtain similar calculations if instead the vector $\mathbf{p} = \hat{j}$ is normal to the $xz$-plane when $F_y \neq 0$ on $S$, or if $\mathbf{p} = \hat{i}$ is normal to the $yz$-plane when $F_x \neq 0$ on $S$.
+
+---
+
+## Slide 52: Implicit Surfaces: Surface area of the graph of an implicit function
+
+**Definition (Formula for the Surface Area of an Implicit Surface)**
+The area of the surface $F(x, y, z) = c$ over a closed and bounded plane region $R$ is
+$$ \color{red}{\text{Surface area} = \iint_S d\sigma = \iint_R \frac{\|\nabla F\|}{|\nabla F \cdot \mathbf{p}|} dA,} $$
+where $\mathbf{p} = \hat{i}, \hat{j}$, or $\hat{k}$ is normal to $R$ and $\nabla F \cdot \mathbf{p} \neq 0$.
+
+**Example.** For the surface area of the spherical band: $x^2 + y^2 + z^2 = 4$, between the plane $z = -1$, and $z = 3$. We have $F(x, y, z) = x^2 + y^2 + z^2 - 4 = 0$, Thus
+$$ \nabla F = (2x, 2y, 2z)^\top \implies \|\nabla F\| = \sqrt{4x^2 + 4y^2 + 4z^2} = 2\sqrt{x^2 + y^2 + z^2} = 4. $$
+
+We project $S$ onto the $xy$-plane (the projection is $R = \{(x, y) | \ 1 \leq x^2 + y^2 \leq 3\}$), so $\mathbf{p} = \hat{k}$, and $\nabla F \cdot \mathbf{p} = 2z$.
+
+$$ \text{Surface area} = \iint_R \frac{\|\nabla F\|}{|\nabla F \cdot \mathbf{p}|} dA = \iint_R \frac{4}{|2z|} dA = \iint_{1 \leq x^2 + y^2 \leq 3} \frac{2}{\sqrt{x^2 + y^2 - 4}} dA $$
+$$ = \int_0^{2\pi} \int_1^{\sqrt{3}} \frac{2r}{\sqrt{4 - r^2}} \, dr \, d\theta = 2\pi \int_1^{\sqrt{3}} \frac{2r}{\sqrt{4 - r^2}} \, dr \, d\theta = \mathbf{4\pi \left(1 + \sqrt{3}\right)} $$
+
+---
+
+## Slide 53: Parametric surfaces and Their Areas: Exercises
+
+**Exercise 1.** Determine whether the points $P$ and $Q$ lie on the given surface.
+**(1)** $\mathbf{r}(u, v) = (u + v)\hat{i}, (u - 2v)\hat{j} + (3 + u - v)\hat{k}, \quad P(4, -5, 1), \ Q(0, 4, 6);$
+**(2)** $\mathbf{r}(u, v) = (1 + u - v)\hat{i}, (u + v^2)\hat{j} + (u^2 - v^2)\hat{k}, \quad P(1, 2, 1), \ Q(2, 3, 3).$
+
+**Exercise 2.** Identify the surface with the given vector equation.
+**(1)** $\mathbf{r}(u, v) = (u + v)\hat{i} + (3 - v)\hat{j} + (1 + 4u + 5v)\hat{k};$
+**(2)** $\mathbf{r}(u, v) = u^2\hat{i} + u \cos v\hat{j} + u \sin v\hat{k};$
+**(3)** $\mathbf{r}(s, t) = 3 \cos t\hat{i} + s\hat{j} + \sin t\hat{k}, \quad -1 \leq s \leq 1.$
+
+**Exercise 3.** Find a parametric representation for the surface.
+**(1)** The plane that passes through the point $(0, -1, 5)$ and contains the vectors $(2, 1, 4)$ and $(-3, 2, 5)$.
+**(2)** The part of the hyperboloid $4x^2 - 4y^2 - z^2 = 4$ that lies in front of the $yz$-plane.
+**(3)** The part of the cylinder $x^2 + z^2 = 9$ that lies above the $xy$-plane and between the planes $y = -4$ and $y = 4$.
+**(4)** The part of the sphere $x^2 + y^2 + z^2 = 36$ that lies between the planes $z = 0$ and $z = 3\sqrt{3}$.
+
+**Exercise 4.** Find the area of the surface.
+**(1)** The part of the surface $z = 4 - 2x^2 + y$ that lies above the triangle with vertices $(0, 0), (1, 0)$, and $(1, 1)$.
+**(2)** The part of the paraboloid $y = x^2 + z^2$ that lies within the cylinder $x^2 + z^2 = 16$.
+
+---
+
+## Slide 54: Surface Integrals of Scalar Functions: Definition
+
+In many physics and engineering problems, we need to integrate a function over a curved surface in space. This leads to the concept of a **surface integral**, which is the two-dimensional version of a line integral (used for curves).
+Just like line integrals, surface integrals come in two types. The first type integrates a scalar function over a surface — for example, if a surface has a certain mass density at each point, integrating this density gives the total mass of the surface. The second type integrates a vector field over a surface — for example, to measure the net flow of a fluid through a surface submerged in it (similar to how we earlier measured the flux of a vector field across a curve).
+
+Let $G(x, y, z)$ be a continuous function, and $S$ be a **smooth** surface defined parametrically on a region $R$ in the $uv$-plane,
+$$ \mathbf{r}(u, v) = x(u, v)\hat{i} + y(u, v)\hat{j} + z(u, v)\hat{k}, \quad (u, v) \in R. $$
+
+> **Image Description:**
+> A small, curved surface patch element $\Delta \sigma_k$ on a 3D surface $S$ is approximated by a flat parallelogram. The corner is the point $P_k$ at coordinates $(x_k, y_k, z_k)$. The sides of the flat parallelogram are formed by the tangent vectors $\Delta u \mathbf{r}_u$ and $\Delta v \mathbf{r}_v$. The area of the curved patch is noted as $\Delta \sigma_k = \Delta \sigma_{uv}$.
+
+The subdivision of $R$ (considered as a rectangle for simplicity) divides the surface $S$ into corresponding curved surface elements, or patches, of area
+$$ \color{red}{\Delta \sigma_{uv} \approx \|\mathbf{r}_u \times \mathbf{r}_v\| \, du \, dv = \text{area of the tangent parallelogram determined by } \Delta u\mathbf{r}_u, \Delta v\mathbf{r}_v.} $$
+
+---
+
+## Slide 55: Surface Integrals of Scalar Functions: Definition
+
+We number the surface element patches in some order with their areas given by $\Delta \sigma_1, \Delta \sigma_2, \ldots, \Delta \sigma_n$. We choose a point $(x_k, y_k, z_k)$ in the $k$th patch, multiply the value of the function $G$ at that point by the area $\Delta \sigma_k$, and add together the products, we get a Riemann sum over $S$,
+$$ \sum_{k=1}^n G(x_k, y_k, z_k)\Delta \sigma_k. $$
+
+Depending on how we pick $(x_k, y_k, z_k)$ in the $k$th patch, we may get different values for this Riemann sum. Then we take the limit as the number of surface patches increases, their areas shrink to zero, and both $\Delta u \to 0$ and $\Delta v \to 0$. This limit, whenever it exists independent of all choices made, defines the **surface integral of $G$ over the surface $S$** as
+$$ \color{red}{\iint_S G(x, y, z) \, d\sigma = \lim_{n \to \infty} \sum_{k=1}^n G(x_k, y_k, z_k)\Delta \sigma_k.} \qquad (5) $$
+
+If $S$ is a **piecewise smooth surface** (that is $S$ is partitioned by smooth curves into a finite number of smooth surfaces $S_1, \ldots, S_n$ with nonoverlapping interiors), and $G$ is continuous over $S$, then the surface integral defined by (5) can be shown to exist, and **the domain additivity property** takes the form
+$$ \iint_S G \, d\sigma = \iint_{S_1} G \, d\sigma + \iint_{S_2} G \, d\sigma + \ldots + \iint_{S_n} G \, d\sigma. $$
+
+---
+
+## Slide 56: Formulas for a Surface Integral of a Scalar Function
+
+**(1)** For a smooth surface $S$ defined **parametrically** as
+$$ \mathbf{r}(u, v) = x(u, v)\hat{i} + y(u, v)\hat{j} + z(u, v)\hat{k}, \quad (u, v) \in R, $$
+and a continuous function $G(x, y, z)$ defined on $S$, the surface integral of $G$ over $S$ is given by the double integral over $R$ in $uv$-plane,
+$$ \color{red}{\iint_S G(x, y, z) \, d\sigma = \iint_R G(f(u, v), g(u, v), h(u, v)) \|\mathbf{r}_u \times \mathbf{r}_v\| \, du \, dv.} $$
+
+**(2)** Let $S$ be a surface given **implicitly** by $F(x, y, z) = c$, with $F$ continuously differentiable. If $S$ projects onto a closed, bounded region $R$ in a coordinate plane, then for any continuous function $G$ on $S$, the surface integral over $S$ equals the following double integral over $R$:
+$$ \color{red}{\iint_S G(x, y, z) \, d\sigma = \iint_R G(x, y, z) \frac{\|\nabla F\|}{|\nabla F \cdot \mathbf{p}|} \, dA,} $$
+where $\mathbf{p}$ is a unit vector normal to $R$ and $\nabla F \cdot \mathbf{p} \neq 0$ (note $\mathbf{p} \in \{\hat{i}, \hat{j}, \hat{k}\}$).
+
+**(3)** **Special case from 2.** For a surface $S$ given **explicitly** as the graph of $z = f(x, y)$, where $f$ is a continuously differentiable function over a region $R$ in the $xy$-plane, so $F(x, y, z) = z - f(x, y)$ and $\mathbf{p} = \hat{k}$. The the surface integral of $G$ over $S$ is
+$$ \color{red}{\iint_S G(x, y, z) \, d\sigma = \iint_R G(x, y, f(x, y)) \sqrt{f_x^2 + f_y^2 + 1} \, dx \, dy.} $$
+
+---
+
+## Slide 57: Surface Integrals of Scalar Functions: Examples
+
+**Example 1.** Integrate $G(x, y, z) = x^2$ over the cone $z = \sqrt{x^2 + y^2}, \ 0 \leq z \leq 1$.
+**Solution.** We have $z = \sqrt{x^2 + y^2} := f(x, y)$, and
+$$ \iint_S x^2 \, d\sigma = \iint_{R: x^2 + y^2 \leq 1} x^2 \sqrt{1 + f_x^2 + f_y^2} \, dx \, dy = \iint_{x^2 + y^2 \leq 1} \sqrt{2} x^2 \, dx \, dy $$
+$$ = \sqrt{2} \int_0^{2\pi} \int_0^1 r^3 \cos^2 \theta \, dr \, d\theta = \mathbf{\frac{\pi\sqrt{2}}{4}} $$
+
+**Example 2.** Evaluate $\iint_S z \, d\sigma$, where $S$ is the surface whose sides $S_1$ are given by the cylinder $x^2 + y^2 = 1$, whose bottom $S_2$ is the disk $x^2 + y^2 \leq 1$ in the plane $z = 0$, and whose top $S_3$ is the part of the plane $z = 1 + x$ that lies above $S_2$.
+
+> **Image Description:**
+> A 3D illustration of a cylindrical solid that has been sliced at a slant on top. 
+> *   $S_1$ is the curved vertical wall of the cylinder given by $x^2 + y^2 = 1$.
+> *   $S_2$ is the flat circular base on the $xy$-plane ($z=0$).
+> *   $S_3$ is the slanted elliptical top surface defined by the plane $z = 1 + x$.
+
+**Solution.** We have $S = S_1 \cup S_2 \cup S_3$.
+For $S_1$ we use $\theta$ and $z$ as parameters and write its parametric equations as $x = \cos \theta, \ y = \sin \theta, \ z = z$, where
+$$ 0 \leq \theta \leq 2\pi \quad \text{and} \quad 0 \leq z \leq 1 + x = 1 + \cos \theta. $$
+
+---
+
+## Slide 58: Surface Integrals of Scalar Functions
+
+Therefore,
+$$ \mathbf{r}_\theta \times \mathbf{r}_z = \begin{vmatrix} \hat{i} & \hat{j} & \hat{k} \\ -\sin \theta & \cos \theta & 0 \\ 0 & 0 & 1 \end{vmatrix} = \cos \theta \hat{i} + \sin \theta \hat{j}, $$
+and
+$$ \|\mathbf{r}_\theta \times \mathbf{r}_z\| = \sqrt{\cos^2 \theta + \sin^2 \theta} = 1. $$
+
+Thus the surface integral over $S_1$ is
+$$ \iint_{S_1} z \, dS = \iint_R z \|\mathbf{r}_\theta \times \mathbf{r}_z\| \, dA = \int_0^{2\pi} \int_0^{1+\cos\theta} z \, dz \, d\theta = \int_0^{2\pi} \frac{1}{2}(1 + \cos \theta)^2 \, d\theta $$
+$$ = \frac{1}{2} \int_0^{2\pi} \left[ 1 + 2\cos \theta + \frac{1}{2}(1 + \cos 2\theta) \right] d\theta = \mathbf{\frac{3\pi}{2}} $$
+
+Since $S_2$ lies in the plane $z = 0$, we have
+$$ \iint_{S_2} z \, dS = \iint_{S_2} 0 \, dS = \mathbf{0} $$
+
+---
+
+## Slide 59: Surface Integrals of Scalar Functions
+
+The top surface $S_3$ lies above the unit disk $R = \{(x, y)| \ x^2 + y^2 \leq 1\}$ and is part of the plane $z = 1 + x = f(x, y)$. So, we get
+$$ \iint_{S_3} z \, d\sigma = \iint_R (1 + x)\sqrt{1 + \left( \frac{\partial z}{\partial x} \right)^2 + \left( \frac{\partial z}{\partial y} \right)^2} \, dA $$
+$$ = \iint_{x^2 + y^2 \leq 1} (1 + x)\sqrt{1 + 1 + 0} \, dA $$
+$$ = \sqrt{2} \int_0^{2\pi} \int_0^1 (1 + r \cos \theta)r \, dr \, d\theta $$
+$$ = \sqrt{2} \int_0^{2\pi} \left( \frac{1}{2} + \frac{1}{3}\cos \theta \right) d\theta = \mathbf{\sqrt{2}\pi} $$
+
+Therefore,
+$$ \iint_S z \, dS = \iint_{S_1} z \, dS + \iint_{S_2} z \, dS + \iint_{S_3} z \, dS = \mathbf{\left( \frac{3}{2} + \sqrt{2} \right)\pi} $$
+
+---
+
+## Slide 60: Surface Integrals of Scalar Functions: Exercises
+
+**Exercise 1.** Evaluate
+$$ \iint_S \sqrt{x(1 + 2z)} \, d\sigma, $$
+on the portion of the cylinder $z = y^2/2$ over the triangular region $R : x \geq 0, y \geq 0, x + y \leq 1$, in the $xy$-plane.
+
+**Exercise 2.** Integrate $G(x, y, z) = xyz$ over the surface of the cube cut from the first octant by the planes $x = 1, \ y = 1$, and $z = 1$.
+
+**Exercise 3.**
+In the following exercises, integrate the given function $G$ over the given surface.
+**(1)** $G(x, y, z) = x$, over the parabolic cylinder $y = x^2, \ 0 \leq x \leq 2, \ 0 \leq z \leq 3$;
+**(2)** $G(x, y, z) = z$, over the cylindrical surface $y^2 + z^2 = 4, \ z \geq 0, \ 1 \leq x \leq 4$;
+**(3)** $G(x, y, z) = x^2$, over the unit sphere $x^2 + y^2 + z^2 = 1$;
+**(4)** $G(x, y, z) = x + y + z$ over the portion of the plane $2x + 2y + z = 2$ that lies in the first octant;
+**(5)** $G(x, y, z) = yz$, over the part of the sphere $x^2 + y^2 + z^2 = 4$ that lies above the cone $z = \sqrt{x^2 + y^2}$.
+
+---
+
+## Slide 61: Oriented Surfaces
+
+Recall that a curve $C$ with a parametrization $\mathbf{r}(t)$ has a natural orientation, or direction, given by increasing $t$. The unit tangent vector $\mathbf{T}$ along $C$ points in this forward direction at each point on the curve.
+Similarly, to specify an orientation on a surface $S$ in space, we assign a normal vector at each point on the surface. A parametrization $\mathbf{r}(u, v)$ of the surface yields a vector $\mathbf{r}_u \times \mathbf{r}_v$ (or $\mathbf{r}_v \times \mathbf{r}_u$) that is normal to the surface, thereby providing an orientation wherever the parametrization is defined.
+If we can choose a continuous field of unit normal vectors $\mathbf{n}$ on a smooth surface $S$, then $S$ is called **orientable (or two-sided)**. Spheres and other smooth surfaces that form the boundaries of solid regions in space are orientable, since we can select an outward-pointing unit normal vector $\mathbf{n}$ (and inward-pointing vector $-\mathbf{n}$) at each point to define an orientation.
+
+> **Image Description:**
+> Two 3D illustrations showing orientable surfaces and their normal vectors.
+> *   **Left Image:** A blue saddle-like surface defined on axes $x, y, z$. A normal vector $\mathbf{n}_1$ points up and slightly right from the top edge, and a normal vector $\mathbf{n}_2$ points left from the front edge.
+> *   **Right Image:** Shows a continuous closed blob-like surface. On its top surface, magenta arrows representing normal vectors $\mathbf{n}$ point outward ("An outward-pointing vector field"). On the bottom right segment of the identical blob, magenta arrows point inward ("an inward-pointing vector field"). The caption says "An outward-pointing vector field and an inward-pointing vector field give the two possible orientations".
+
+---
+
+## Slide 62: Oriented Surfaces
+
+A surface together with its normal field $\mathbf{n}$, or, equivalently, a surface with a consistent choice of sides, is called an **oriented surface**.
+
+Not all surfaces can be oriented. The **Möbius band**$^1$ **(or strip)** is an example of a surface that is **not orientable**. **It has only one side**, and no choice of a vectors can give a continuous normal vector field on the Möbius band.
+
+> **Image Description:**
+> A three-part illustration demonstrating the construction and non-orientability of a Möbius band.
+> *   **Top Diagram:** A rectangular flat strip with corners labeled $B, C$ on top and $A, D$ on the bottom.
+> *   **Left Diagram:** The strip is twisted and joined. It shows a dashed track with a bug starting at "Start" with a "Finish" arrow showing that traversing the center line brings it to the exact opposite orientation of the surface, proving it is a single-sided surface. 
+> *   **Center Diagram:** A Möbius band with magenta normal vectors pointing perpendicularly. The arrows clearly show that trying to define a continuous normal vector leads to conflicting (opposite) directions when tracing along the surface.
+> *   **Right Diagram:** Shows how the edges align. Edge $AB$ is twisted and glued to edge $CD$ with opposing direction arrows, completing the Möbius loop.
+
+**Figure:** The Möbius band is a nonorientable, or one-sided, surface.
+___
+$^1$It is named after the German geometer August Möbius (1790–1868). See Möbius strip on Wikipedia.
+
+---
+
+## Slide 63: Oriented Surfaces
+
+If $S$ is a smooth orientable surface given in parametric form by a vector function $\mathbf{r}(u, v)$, then it is automatically supplied with the orientation of the unit normal vector
+$$ \color{red}{\mathbf{n} = \frac{\mathbf{r}_u \times \mathbf{r}_v}{\|\mathbf{r}_u \times \mathbf{r}_v\|}}, $$
+and the opposite orientation is given by $-\mathbf{n}$.
+For a surface $z = f(x, y)$, thus $F(x, y, z) := z - f(x, y)$, given as the graph of $f$, a natural orientation given by the unit normal vector
+$$ \color{red}{\mathbf{n} = \frac{\nabla F}{\|\nabla F\|} = \frac{-\frac{\partial f}{\partial x}\hat{i} - \frac{\partial f}{\partial y}\hat{j} + \hat{k}}{\sqrt{1 + \left( \frac{\partial f}{\partial x} \right)^2 + \left( \frac{\partial f}{\partial y} \right)^2}}.} $$
+Since the $\mathbf{k}$-component is positive, this gives the **upward** orientation of the surface.
+For a **closed surface**, that is, a surface that is the boundary of a solid region $E$, the convention is that the **positive orientation** is the one for which the normal vectors point outward from $E$, and inward-pointing normals give the negative orientation.
+
+> **Image Description:**
+> Two spheres demonstrating surface orientation on a 3D coordinate plane.
+> *   **Left Sphere ("Positive orientation"):** A blue sphere centered at the origin with magenta normal vectors pointing outward from its surface in all directions.
+> *   **Right Sphere ("Negative orientation"):** A blue sphere centered at the origin with magenta normal vectors pointing inward toward the center of the sphere from its surface.
+
+---
+
+## Slide 64: Thank You for Your Attention!
+
+Thank You for Your Attention!

@@ -1,0 +1,1266 @@
+---
+title: "W14. Matrix Exponentials, Stability, and the DFT Matrix"
+author: "Salman Ahmadi-Asl"
+date: "April 24, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Summary**
+
+##### **1.1 Matrix Exponentials and Linear Dynamic Systems**
+
+A first-order linear system of differential equations has the form
+
+$$\frac{d\mathbf{u}}{dt} = A\mathbf{u}, \qquad \mathbf{u}(0) = \mathbf{u}_0,$$
+
+where $A$ is a constant matrix and $\mathbf{u}(t)$ is the state vector. This is the matrix version of the scalar equation $u'(t) = au(t)$, whose solution is $u(t) = e^{at}u(0)$. The same idea works for matrices, but the exponential must be interpreted through its power series:
+
+$$e^{At} = I + At + \frac{(At)^2}{2!} + \frac{(At)^3}{3!} + \cdots.$$
+
+The solution of the system is
+
+$$\mathbf{u}(t) = e^{At}\mathbf{u}_0.$$
+
+This formula is not just notation. Differentiating the power series term by term gives
+
+$$\frac{d}{dt}e^{At} = Ae^{At},$$
+
+so $\mathbf{u}'(t) = Ae^{At}\mathbf{u}_0 = A\mathbf{u}(t)$, and at $t=0$ we have $e^{A0}=I$, hence $\mathbf{u}(0)=\mathbf{u}_0$.
+
+When $A$ is diagonalizable, matrix exponentials are easiest to compute through eigenvalues and eigenvectors. If
+
+$$A = S\Lambda S^{-1}, \qquad \Lambda = \text{diag}(\lambda_1,\ldots,\lambda_n),$$
+
+then
+
+$$e^{At} = S e^{\Lambda t} S^{-1}, \qquad e^{\Lambda t} = \text{diag}(e^{\lambda_1t},\ldots,e^{\lambda_nt}).$$
+
+Thus each eigenvector direction evolves independently, and the corresponding eigenvalue controls the growth or decay rate in that direction.
+
+##### **1.2 Stability from Eigenvalues, Trace, and Determinant**
+
+For a two-dimensional linear system $\dot{\mathbf{u}}=A\mathbf{u}$, the eigenvalues of $A$ determine whether solutions grow, decay, rotate, or combine these behaviors.
+
+If both eigenvalues have negative real parts, all solutions near the origin decay toward the origin; the system is **stable**. If at least one eigenvalue has positive real part, there are solutions that grow away from the origin; the system is **unstable**. If eigenvalues are complex, their real part controls growth or decay while their imaginary part produces rotation.
+
+For a $2 \times 2$ matrix
+
+$$A = \begin{pmatrix} a & b \\ c & d \end{pmatrix},$$
+
+the **trace** and **determinant** are
+
+$$T = \text{tr}(A) = a+d, \qquad D = \det(A)=ad-bc.$$
+
+The characteristic polynomial is
+
+$$\lambda^2 - T\lambda + D = 0,$$
+
+so the eigenvalues are
+
+$$\lambda_{1,2} = \frac{T \pm \sqrt{T^2 - 4D}}{2}.$$
+
+The quantity $T^2-4D$ is the discriminant. It separates real eigenvalues from complex eigenvalues:
+
+- if $T^2-4D>0$, the eigenvalues are real and distinct;
+- if $T^2-4D=0$, the eigenvalues are repeated;
+- if $T^2-4D<0$, the eigenvalues are complex conjugates with real part $T/2$.
+
+The determinant gives the product of the eigenvalues, and the trace gives their sum. Therefore, if $D<0$, the eigenvalues have opposite signs, so the system is unstable. If $D>0$ and $T<0$, both real eigenvalues are negative or both complex eigenvalues have negative real part, so the system is stable. If $D>0$ and $T>0$, the system is unstable.
+
+##### **1.3 Nilpotent Matrices and Finite Exponential Series**
+
+A matrix $B$ is **nilpotent** if some power of it is the zero matrix. The simplest nonzero case is $B^2=0$. Then all higher powers also vanish:
+
+$$B^3 = B^2B = 0, \qquad B^4 = B^2B^2 = 0, \quad \ldots$$
+
+The infinite matrix exponential series collapses to a finite expression:
+
+$$e^{Bt} = I + Bt.$$
+
+This is important because it shows that matrix exponentials are not always hard to compute. The structure of the matrix determines the method. Diagonalizable matrices are handled by eigenvectors; nilpotent matrices are handled by the power series directly.
+
+##### **1.4 Fourier Analysis and the Discrete Fourier Transform**
+
+**Fourier analysis** is based on the idea that complicated signals can be decomposed into simple oscillations. In continuous mathematics, this leads to the Fourier transform
+
+$$F(\omega)=\int_{-\infty}^{\infty} f(t)e^{-i\omega t}\,dt.$$
+
+Computers, however, work with finite lists of samples, not continuous functions. If $\mathbf{x}=(x_0,x_1,\ldots,x_{N-1})^T$ is a vector of $N$ samples, the **Discrete Fourier Transform (DFT)** produces $N$ frequency components:
+
+$$y_k = \sum_{n=0}^{N-1} x_n e^{-2\pi i kn/N}, \qquad k=0,1,\ldots,N-1.$$
+
+The DFT is used in audio processing, image compression, medical imaging, telecommunications, numerical differential equations, quantum mechanics, and many other fields. Its power comes from representing a signal in a frequency basis rather than the original time or sample basis. In that frequency basis, periodic structure, oscillations, and repeated patterns often become easier to detect, filter, compress, or solve with.
+
+For deeper study of how the DFT leads to fast algorithms, the standard reference mentioned in the lecture is Strang's *Linear Algebra and Its Applications*, especially the FFT chapter.
+
+##### **1.5 Roots of Unity**
+
+The DFT is built from **roots of unity**. The $N$-th roots of unity are the complex numbers satisfying
+
+$$z^N=1.$$
+
+They are
+
+$$e^{2\pi i k/N} = \cos\left(\frac{2\pi k}{N}\right)+i\sin\left(\frac{2\pi k}{N}\right), \qquad k=0,1,\ldots,N-1.$$
+
+They lie evenly spaced on the unit circle in the complex plane. For example, when $N=8$, the roots are eight equally spaced points: $1$, a first-quadrant diagonal point, $i$, a second-quadrant diagonal point, $-1$, a third-quadrant diagonal point, $-i$, and a fourth-quadrant diagonal point. This geometric picture matters because the powers of $\omega$ rotate by equal angles and eventually return to $1$.
+
+In the DFT convention used here, we define the primitive root
+
+$$\omega = e^{-2\pi i/N}.$$
+
+Then $\omega^N=1$, and all powers repeat periodically:
+
+$$\omega^{k+N}=\omega^k.$$
+
+There are also two useful symmetry rules:
+
+$$\omega^{N/2}=-1 \quad \text{if } N \text{ is even},$$
+
+and
+
+$$\overline{\omega^k}=\omega^{-k}=\omega^{N-k}.$$
+
+The key algebraic identity is the finite geometric sum:
+
+$$\sum_{k=0}^{N-1}\omega^{mk} =
+\begin{cases}
+N, & m \equiv 0 \pmod N,\\
+0, & m \not\equiv 0 \pmod N.
+\end{cases}$$
+
+This identity is the reason the Fourier matrix is orthogonal in the complex sense.
+
+##### **1.6 The Fourier Matrix**
+
+The DFT can be written as a matrix-vector multiplication:
+
+$$\mathbf{y}=F_N\mathbf{x}.$$
+
+The normalized $N \times N$ **Fourier matrix** is
+
+$$
+(F_N)_{jk} = \frac{1}{\sqrt{N}}\omega^{jk}, \qquad j,k=0,1,\ldots,N-1,
+$$
+
+where $\omega=e^{-2\pi i/N}$. Written out,
+
+$$F_N=\frac{1}{\sqrt{N}}
+\begin{pmatrix}
+1 & 1 & 1 & \cdots & 1\\
+1 & \omega & \omega^2 & \cdots & \omega^{N-1}\\
+1 & \omega^2 & \omega^4 & \cdots & \omega^{2(N-1)}\\
+\vdots & \vdots & \vdots & \ddots & \vdots\\
+1 & \omega^{N-1} & \omega^{2(N-1)} & \cdots & \omega^{(N-1)^2}
+\end{pmatrix}.
+$$
+
+The factor $1/\sqrt{N}$ is a normalization. With this factor, $F_N$ preserves lengths and becomes a unitary matrix. Some sources omit the normalization; then the inverse contains a factor $1/N$ instead. This convention issue is common: the unnormalized DFT, the normalized DFT, and the inverse DFT may distribute the constants differently, but they encode the same transformation.
+
+For example, when $N=4$, $\omega=e^{-2\pi i/4}=-i$, so
+
+$$F_4=\frac{1}{2}
+\begin{pmatrix}
+1 & 1 & 1 & 1\\
+1 & -i & -1 & i\\
+1 & -1 & 1 & -1\\
+1 & i & -1 & -i
+\end{pmatrix}.
+$$
+
+##### **1.7 Conjugate Fourier Matrix and Inverse DFT**
+
+The **conjugate Fourier matrix** is obtained by conjugating every entry of $F_N$:
+
+$$
+(\overline{F_N})_{jk}=\frac{1}{\sqrt{N}}\overline{\omega^{jk}}
+=\frac{1}{\sqrt{N}}\omega^{-jk}.
+$$
+
+The conjugate transpose $F_N^*=\overline{F_N}^{\,T}$ is the inverse of the normalized Fourier matrix:
+
+$$F_N^{-1}=F_N^*.$$
+
+Therefore, if $\mathbf{X}=F_N\mathbf{x}$ is the DFT, then the original samples are recovered by
+
+$$\mathbf{x}=F_N^*\mathbf{X}.$$
+
+Component-wise,
+
+$$x_n=\frac{1}{\sqrt{N}}\sum_{k=0}^{N-1}X_k\omega^{-nk}.$$
+
+This is the inverse DFT under the symmetric normalization convention.
+
+For $N=4$, the conjugate Fourier matrix is
+
+$$
+\overline{F_4}=\frac{1}{2}
+\begin{pmatrix}
+1 & 1 & 1 & 1\\
+1 & i & -1 & -i\\
+1 & -1 & 1 & -1\\
+1 & -i & -1 & i
+\end{pmatrix}.
+$$
+
+It differs from $F_4$ by changing $i$ to $-i$ and $-i$ to $i$.
+
+##### **1.8 Orthogonality and Unitarity of the Fourier Matrix**
+
+In complex vector spaces, orthogonality is measured with the Hermitian inner product, which uses conjugation. The columns of $F_N$ form an orthonormal basis of $\mathbb{C}^N$:
+
+$$F_N^*F_N=I_N.$$
+
+To see why, compute the inner product of column $m$ and column $n$:
+
+$$
+(F_N^*F_N)_{mn}
+=\sum_{k=0}^{N-1}\overline{(F_N)_{km}}(F_N)_{kn}
+=\frac{1}{N}\sum_{k=0}^{N-1}\omega^{k(n-m)}.
+$$
+
+If $m=n$, every term is $1$, so the sum is $N$ and the result is $1$. If $m\neq n$, the sum is a finite geometric series with ratio not equal to $1$, and it equals $0$. Hence
+
+$$
+(F_N^*F_N)_{mn}=\delta_{mn},
+$$
+
+where $\delta_{mn}$ is the Kronecker delta. This proves that $F_N$ is **unitary**. Since $F_N^*F_N=I_N$, the rows are also orthonormal:
+
+$$F_NF_N^*=I_N.$$
+
+One subtle point is that the Fourier matrix is symmetric, $F_N^T=F_N$, because $\omega^{jk}=\omega^{kj}$. But it is not generally Hermitian, because $F_N^*\neq F_N$ except in very small special cases.
+
+Several consequences follow immediately from unitarity. First, $|\det(F_N)|=1$, because
+
+$$1=\det(I)=\det(F_N^*F_N)=\det(F_N^*)\det(F_N)=\overline{\det(F_N)}\det(F_N)=|\det(F_N)|^2.$$
+
+Second, all eigenvalues of a unitary matrix have absolute value $1$. For the Fourier matrix, the stronger identity $F_N^4=I$ implies that its eigenvalues must be fourth roots of unity, so they belong to the set $\{1,-1,i,-i\}$, with multiplicities depending on $N$.
+
+##### **1.9 Powers of the Fourier Matrix**
+
+The Fourier matrix has a remarkable connection with permutations. For the normalized DFT matrix, $F_N^2$ reverses indices modulo $N$:
+
+$$F_N^2 e_k = e_{-k \bmod N}.$$
+
+Thus $F_N^2$ is a permutation matrix $P$, and
+
+$$F_N^4=I.$$
+
+For $N=4$, this means
+
+$$F_4^2=
+\begin{pmatrix}
+1 & 0 & 0 & 0\\
+0 & 0 & 0 & 1\\
+0 & 0 & 1 & 0\\
+0 & 1 & 0 & 0
+\end{pmatrix}.
+$$
+
+The permutation fixes indices $0$ and $2$ and swaps indices $1$ and $3$. This property is often a useful shortcut in computations involving repeated Fourier transforms.
+
+The relationship with the conjugate matrix also explains the column permutation in the unnormalized convention. Since $\overline{\omega^{jk}}=\omega^{-jk}=\omega^{j(n-k)}$, conjugating the Fourier matrix replaces column $k$ by column $-k \pmod n$. Therefore $\overline{F}=FP$ for the permutation $P e_k=e_{-k\bmod n}$.
+
+---
+
+#### **2. Definitions**
+
+*   **Matrix exponential**: The matrix function $e^{At}=I+At+\frac{(At)^2}{2!}+\cdots$, used to solve $\dot{\mathbf{u}}=A\mathbf{u}$.
+*   **Linear dynamic system**: A differential equation system of the form $\dot{\mathbf{u}}=A\mathbf{u}$, where the future state is determined by a matrix acting on the current state.
+*   **Stable system**: A system whose solutions decay toward the equilibrium; for a $2 \times 2$ linear system this occurs when all eigenvalues have negative real parts.
+*   **Unstable system**: A system with at least one eigenvalue having positive real part, so some solutions grow away from equilibrium.
+*   **Trace**: The sum of diagonal entries of a square matrix; for a $2 \times 2$ matrix it equals the sum of eigenvalues.
+*   **Determinant**: A scalar measuring signed area/volume scaling; for a $2 \times 2$ matrix it equals the product of eigenvalues.
+*   **Nilpotent matrix**: A matrix $B$ such that $B^k=0$ for some positive integer $k$.
+*   **Fourier analysis**: The study of representing signals or functions as sums of complex exponentials.
+*   **Continuous Fourier Transform**: The integral transform $F(\omega)=\int_{-\infty}^{\infty}f(t)e^{-i\omega t}\,dt$, which represents a continuous function by frequencies.
+*   **Discrete Fourier Transform (DFT)**: The transformation from $N$ samples to $N$ frequency components, computed by sums involving roots of unity.
+*   **Root of unity**: A complex number $z$ satisfying $z^N=1$ for some positive integer $N$.
+*   **Primitive $N$-th root of unity**: A root $\omega$ whose powers generate all $N$ roots of unity; here $\omega=e^{-2\pi i/N}$.
+*   **Fourier matrix**: The matrix $F_N$ with entries $(F_N)_{jk}=\frac{1}{\sqrt{N}}\omega^{jk}$, representing the normalized DFT.
+*   **Conjugate Fourier matrix**: The entrywise conjugate $\overline{F_N}$, with entries $\frac{1}{\sqrt{N}}\omega^{-jk}$.
+*   **Inverse DFT**: The operation that reconstructs the sample vector from its frequency components; under normalized convention it is multiplication by $F_N^*$.
+*   **Orthonormal basis**: A basis whose vectors all have norm $1$ and are pairwise orthogonal.
+*   **Unitary matrix**: A complex square matrix $U$ satisfying $U^*U=I$, equivalently $U^{-1}=U^*$.
+*   **Conjugate transpose**: The matrix $A^*$ obtained by transposing $A$ and conjugating every entry.
+*   **Kronecker delta**: The symbol $\delta_{mn}$, equal to $1$ if $m=n$ and $0$ otherwise.
+*   **Permutation matrix**: A matrix obtained by permuting the columns of the identity matrix; multiplying by it permutes vector components.
+
+---
+
+#### **3. Formulas**
+
+*   **Matrix exponential series**: $e^{At}=I+At+\dfrac{(At)^2}{2!}+\dfrac{(At)^3}{3!}+\cdots$.
+*   **Solution of a linear system**: $\mathbf{u}(t)=e^{At}\mathbf{u}_0$ for $\dot{\mathbf{u}}=A\mathbf{u}$ and $\mathbf{u}(0)=\mathbf{u}_0$.
+*   **Diagonalizable matrix exponential**: If $A=S\Lambda S^{-1}$, then $e^{At}=Se^{\Lambda t}S^{-1}$.
+*   **Trace-determinant characteristic polynomial**: $\lambda^2-T\lambda+D=0$, where $T=\text{tr}(A)$ and $D=\det(A)$.
+*   **Eigenvalues from trace and determinant**: $\lambda_{1,2}=\dfrac{T\pm\sqrt{T^2-4D}}{2}$.
+*   **Nilpotent exponential for $B^2=0$**: $e^{Bt}=I+Bt$.
+*   **Continuous Fourier Transform**: $F(\omega)=\displaystyle\int_{-\infty}^{\infty}f(t)e^{-i\omega t}\,dt$.
+*   **DFT component formula**: $y_k=\displaystyle\sum_{n=0}^{N-1}x_n e^{-2\pi i kn/N}$.
+*   **Primitive root of unity**: $\omega=e^{-2\pi i/N}$.
+*   **Periodicity of roots**: $\omega^N=1$ and $\omega^{k+N}=\omega^k$.
+*   **Conjugation of roots**: $\overline{\omega^k}=\omega^{-k}=\omega^{N-k}$.
+*   **Fourier matrix entries**: $(F_N)_{jk}=\dfrac{1}{\sqrt{N}}\omega^{jk}$ for $j,k=0,\ldots,N-1$.
+*   **Geometric sum of roots of unity**: $\displaystyle\sum_{k=0}^{N-1}\omega^{mk}=N$ if $m\equiv0\pmod N$, and $0$ otherwise.
+*   **Fourier unitarity**: $F_N^*F_N=F_NF_N^*=I_N$.
+*   **Inverse Fourier matrix**: $F_N^{-1}=F_N^*$.
+*   **Inverse DFT formula**: $x_n=\dfrac{1}{\sqrt{N}}\displaystyle\sum_{k=0}^{N-1}X_k\omega^{-nk}$.
+*   **Column orthogonality identity**: $\displaystyle\sum_{k=0}^{N-1}\overline{\omega^{km}}\omega^{kn}=N\delta_{mn}$.
+*   **Row orthogonality identity**: $\displaystyle\sum_{k=0}^{N-1}\overline{\omega^{mk}}\omega^{nk}=N\delta_{mn}$.
+*   **Fourier determinant magnitude**: $|\det(F_N)|=1$ for the normalized Fourier matrix.
+*   **Fourier square permutation**: $F_N^2e_k=e_{-k\bmod N}$ and $F_N^4=I$.
+*   **Possible Fourier eigenvalues**: If $F_N^4=I$, then every eigenvalue of $F_N$ is in $\{1,-1,i,-i\}$.
+
+---
+
+#### **4. Examples**
+
+##### **4.1 Eigenvalues, Eigenvectors, and Matrix Exponential** (Lab 11, Task 1)
+
+Find the eigenvalues, eigenvectors, and $e^{At}$ for
+
+$$A=\begin{pmatrix}-1&1\\1&-1\end{pmatrix}.$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Diagonalize $A$ using eigenvectors. Once $A=S\Lambda S^{-1}$, the matrix exponential is $e^{At}=Se^{\Lambda t}S^{-1}$.
+
+**Step 1 — Find the eigenvalues.**
+
+Compute the characteristic polynomial:
+
+$$
+\det(A-\lambda I)
+=\det\begin{pmatrix}-1-\lambda&1\\1&-1-\lambda\end{pmatrix}
+=(-1-\lambda)^2-1.
+$$
+
+Factor:
+
+$$(-1-\lambda)^2-1=(\lambda+1)^2-1=(\lambda+1-1)(\lambda+1+1)=\lambda(\lambda+2).$$
+
+Therefore,
+
+$$\lambda_1=0,\qquad \lambda_2=-2.$$
+
+**Step 2 — Find eigenvectors.**
+
+For $\lambda_1=0$, solve $A\mathbf{v}=0$:
+
+$$
+\begin{pmatrix}-1&1\\1&-1\end{pmatrix}
+\begin{pmatrix}x\\y\end{pmatrix}
+=\begin{pmatrix}-x+y\\x-y\end{pmatrix}
+=\begin{pmatrix}0\\0\end{pmatrix}.
+$$
+
+Thus $x=y$, so one eigenvector is
+
+$$\mathbf{v}_1=\begin{pmatrix}1\\1\end{pmatrix}.$$
+
+For $\lambda_2=-2$, solve $(A+2I)\mathbf{v}=0$:
+
+$$
+A+2I=\begin{pmatrix}1&1\\1&1\end{pmatrix}.
+$$
+
+The equation is $x+y=0$, so $y=-x$. One eigenvector is
+
+$$\mathbf{v}_2=\begin{pmatrix}1\\-1\end{pmatrix}.$$
+
+**Step 3 — Build the diagonalization.**
+
+Let
+
+$$
+S=\begin{pmatrix}1&1\\1&-1\end{pmatrix},
+\qquad
+\Lambda=\begin{pmatrix}0&0\\0&-2\end{pmatrix}.
+$$
+
+The inverse of $S$ is
+
+$$S^{-1}=\frac{1}{2}\begin{pmatrix}1&1\\1&-1\end{pmatrix},$$
+
+because $S^2=2I$.
+
+**Step 4 — Exponentiate the diagonal matrix.**
+
+$$
+e^{\Lambda t}
+=\begin{pmatrix}e^{0t}&0\\0&e^{-2t}\end{pmatrix}
+=\begin{pmatrix}1&0\\0&e^{-2t}\end{pmatrix}.
+$$
+
+Therefore,
+
+$$
+e^{At}=S e^{\Lambda t}S^{-1}
+=\begin{pmatrix}1&1\\1&-1\end{pmatrix}
+\begin{pmatrix}1&0\\0&e^{-2t}\end{pmatrix}
+\frac{1}{2}\begin{pmatrix}1&1\\1&-1\end{pmatrix}.
+$$
+
+Multiply:
+
+$$
+e^{At}
+=\frac{1}{2}
+\begin{pmatrix}
+1+e^{-2t} & 1-e^{-2t}\\
+1-e^{-2t} & 1+e^{-2t}
+\end{pmatrix}.
+$$
+
+**Answer:**
+
+$$
+\lambda_1=0,\quad \mathbf{v}_1=(1,1)^T;\qquad
+\lambda_2=-2,\quad \mathbf{v}_2=(1,-1)^T,
+$$
+
+and
+
+$$
+e^{At}=\frac{1}{2}
+\begin{pmatrix}
+1+e^{-2t} & 1-e^{-2t}\\
+1-e^{-2t} & 1+e^{-2t}
+\end{pmatrix}.
+$$
+
+</details>
+
+##### **4.2 Solve a Linear Differential Equation System** (Lab 11, Task 2)
+
+Solve
+
+$$\frac{d\mathbf{u}}{dt}(t)=A\mathbf{u},\qquad \mathbf{u}(0)=\mathbf{u}_0,$$
+
+where
+
+$$A=\begin{pmatrix}-1&1\\1&-1\end{pmatrix},\qquad \mathbf{u}_0=\begin{pmatrix}3\\1\end{pmatrix}.$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use $\mathbf{u}(t)=e^{At}\mathbf{u}_0$. The matrix exponential was found in Task 1.
+
+From Task 1,
+
+$$
+e^{At}=\frac{1}{2}
+\begin{pmatrix}
+1+e^{-2t} & 1-e^{-2t}\\
+1-e^{-2t} & 1+e^{-2t}
+\end{pmatrix}.
+$$
+
+Multiply by the initial vector:
+
+$$
+\mathbf{u}(t)
+=\frac{1}{2}
+\begin{pmatrix}
+1+e^{-2t} & 1-e^{-2t}\\
+1-e^{-2t} & 1+e^{-2t}
+\end{pmatrix}
+\begin{pmatrix}3\\1\end{pmatrix}.
+$$
+
+Compute each component explicitly:
+
+$$
+u_1(t)=\frac{1}{2}\left(3(1+e^{-2t})+1(1-e^{-2t})\right)
+=\frac{1}{2}(4+2e^{-2t})=2+e^{-2t}.
+$$
+
+$$
+u_2(t)=\frac{1}{2}\left(3(1-e^{-2t})+1(1+e^{-2t})\right)
+=\frac{1}{2}(4-2e^{-2t})=2-e^{-2t}.
+$$
+
+Thus
+
+$$
+\mathbf{u}(t)=
+\begin{pmatrix}
+2+e^{-2t}\\
+2-e^{-2t}
+\end{pmatrix}.
+$$
+
+**Check the initial condition:**
+
+$$\mathbf{u}(0)=\begin{pmatrix}2+1\\2-1\end{pmatrix}=\begin{pmatrix}3\\1\end{pmatrix}.$$
+
+**Interpretation:** The sum $u_1(t)+u_2(t)=4$ stays constant. The difference $u_1(t)-u_2(t)=2e^{-2t}$ decays to $0$, so both components approach $2$.
+
+**Answer:**
+
+$$
+\mathbf{u}(t)=
+\begin{pmatrix}
+2+e^{-2t}\\
+2-e^{-2t}
+\end{pmatrix}.
+$$
+
+</details>
+
+##### **4.3 Matrices for Three Stability Regions** (Lab 11, Task 3)
+
+Find a matrix $A$ to illustrate each stability region:
+
+$(a)$ $\lambda_1<0$ and $\lambda_2>0$; $(b)$ $\lambda_1>0$ and $\lambda_2>0$; $(c)$ complex eigenvalues with real part $a>0$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** We may choose simple matrices whose eigenvalues are obvious. Diagonal matrices give prescribed real eigenvalues directly, and rotation-scaling blocks give complex eigenvalues.
+
+**(a) One negative and one positive eigenvalue.**
+
+Choose
+
+$$A_a=\begin{pmatrix}-1&0\\0&2\end{pmatrix}.$$
+
+Because this matrix is diagonal, its eigenvalues are the diagonal entries:
+
+$$\lambda_1=-1,\qquad \lambda_2=2.$$
+
+This lies in the region $D<0$, because $\det(A_a)=(-1)(2)=-2<0$. The system is unstable because the positive eigenvalue gives a growing direction.
+
+**(b) Two positive real eigenvalues.**
+
+Choose
+
+$$A_b=\begin{pmatrix}1&0\\0&3\end{pmatrix}.$$
+
+Again the eigenvalues are read from the diagonal:
+
+$$\lambda_1=1,\qquad \lambda_2=3.$$
+
+Here $T=4>0$ and $D=3>0$, so both eigenvalues are positive and solutions grow away from the origin.
+
+**(c) Complex eigenvalues with positive real part.**
+
+A standard matrix with eigenvalues $a\pm bi$ is
+
+$$
+A_c=\begin{pmatrix}a&-b\\b&a\end{pmatrix}.
+$$
+
+Choose $a=1$ and $b=2$:
+
+$$A_c=\begin{pmatrix}1&-2\\2&1\end{pmatrix}.$$
+
+The characteristic polynomial is
+
+$$
+\det(A_c-\lambda I)
+=\det\begin{pmatrix}1-\lambda&-2\\2&1-\lambda\end{pmatrix}
+=(1-\lambda)^2+4.
+$$
+
+Setting it equal to zero gives
+
+$$
+(1-\lambda)^2=-4
+\quad\Rightarrow\quad
+1-\lambda=\pm 2i
+\quad\Rightarrow\quad
+\lambda=1\mp 2i.
+$$
+
+So the eigenvalues are $1+2i$ and $1-2i$, both with real part $1>0$. The system spirals outward and is unstable.
+
+**Answer:** One possible set is
+
+$$
+A_a=\begin{pmatrix}-1&0\\0&2\end{pmatrix},\qquad
+A_b=\begin{pmatrix}1&0\\0&3\end{pmatrix},\qquad
+A_c=\begin{pmatrix}1&-2\\2&1\end{pmatrix}.
+$$
+
+</details>
+
+##### **4.4 Stability Changes from Trace and Determinant** (Lab 11, Task 4)
+
+From their trace and determinant, at what time $t$ do the following matrices change between stable with real eigenvalues, stable with complex eigenvalues, and unstable?
+
+$$A_1=\begin{pmatrix}1&-1\\t&-1\end{pmatrix},\qquad
+A_2=\begin{pmatrix}t&-1\\1&t\end{pmatrix}.$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For a $2\times2$ matrix, use $T=\text{tr}(A)$, $D=\det(A)$, and the discriminant $\Delta=T^2-4D$. Stability depends on the sign of the real parts of eigenvalues; real versus complex depends on $\Delta$.
+
+**Matrix $A_1$.**
+
+Compute trace and determinant:
+
+$$
+T_1=1+(-1)=0,
+\qquad
+D_1=(1)(-1)-(-1)t=-1+t=t-1.
+$$
+
+The discriminant is
+
+$$
+\Delta_1=T_1^2-4D_1=0-4(t-1)=4(1-t).
+$$
+
+Now classify by $t$.
+
+- If $t<1$, then $D_1<0$. The eigenvalues have opposite signs, so the system is unstable.
+- If $t=1$, then $D_1=0$. One eigenvalue is zero; this is the boundary between opposite-sign real eigenvalues and complex eigenvalues.
+- If $t>1$, then $D_1>0$ and $\Delta_1<0$, so eigenvalues are complex. Their real part is $T_1/2=0$, so they are purely imaginary, not asymptotically stable.
+
+Therefore $A_1$ changes type at
+
+$$t=1.$$
+
+It moves from unstable real eigenvalues ($t<1$) to purely imaginary complex eigenvalues ($t>1$). Because $T_1=0$ always, it does not become stable with negative real part.
+
+**Matrix $A_2$.**
+
+Compute trace and determinant:
+
+$$
+T_2=t+t=2t,
+\qquad
+D_2=t^2-(-1)(1)=t^2+1.
+$$
+
+The discriminant is
+
+$$
+\Delta_2=T_2^2-4D_2=(2t)^2-4(t^2+1)=4t^2-4t^2-4=-4.
+$$
+
+So the eigenvalues are complex for every real $t$. In fact,
+
+$$
+\lambda=t\pm i.
+$$
+
+The real part is $t$. Therefore:
+
+- if $t<0$, both eigenvalues have negative real part, so the system is stable with complex eigenvalues;
+- if $t=0$, eigenvalues are purely imaginary, $\lambda=\pm i$, so this is the stability boundary;
+- if $t>0$, both eigenvalues have positive real part, so the system is unstable with complex eigenvalues.
+
+Thus $A_2$ changes stability at
+
+$$t=0.$$
+
+**Answer:** $A_1$ changes eigenvalue type at $t=1$; it is unstable for $t<1$ and has purely imaginary eigenvalues for $t>1$. $A_2$ changes stability at $t=0$; it is stable spiral for $t<0$, neutral at $t=0$, and unstable spiral for $t>0$.
+
+</details>
+
+##### **4.5 Exponential of a Nilpotent Matrix** (Lab 11, Task 5)
+
+The matrix $B$ has $B^2=0$. Find $e^{Bt}$ from an infinite series. Check that the derivative of $e^{Bt}$ is $Be^{Bt}$.
+
+$$B=\begin{pmatrix}0&-1\\0&0\end{pmatrix}.$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** If $B^2=0$, then all powers $B^k$ for $k\geq2$ are zero. The infinite exponential series becomes finite.
+
+First verify $B^2=0$:
+
+$$
+B^2=
+\begin{pmatrix}0&-1\\0&0\end{pmatrix}
+\begin{pmatrix}0&-1\\0&0\end{pmatrix}
+=\begin{pmatrix}0&0\\0&0\end{pmatrix}.
+$$
+
+Use the power series:
+
+$$
+e^{Bt}=I+Bt+\frac{(Bt)^2}{2!}+\frac{(Bt)^3}{3!}+\cdots.
+$$
+
+Since $(Bt)^2=B^2t^2=0$, all terms after $Bt$ vanish:
+
+$$e^{Bt}=I+Bt.$$
+
+Substitute $B$:
+
+$$
+e^{Bt}
+=\begin{pmatrix}1&0\\0&1\end{pmatrix}
+t\begin{pmatrix}0&-1\\0&0\end{pmatrix}
+=\begin{pmatrix}1&-t\\0&1\end{pmatrix}.
+$$
+
+Now check the derivative:
+
+$$
+\frac{d}{dt}e^{Bt}
+=\frac{d}{dt}\begin{pmatrix}1&-t\\0&1\end{pmatrix}
+=\begin{pmatrix}0&-1\\0&0\end{pmatrix}
+=B.
+$$
+
+Compute $Be^{Bt}$:
+
+$$
+Be^{Bt}
+=\begin{pmatrix}0&-1\\0&0\end{pmatrix}
+\begin{pmatrix}1&-t\\0&1\end{pmatrix}
+=\begin{pmatrix}0&-1\\0&0\end{pmatrix}
+=B.
+$$
+
+Thus
+
+$$\frac{d}{dt}e^{Bt}=Be^{Bt}.$$
+
+**Answer:**
+
+$$e^{Bt}=\begin{pmatrix}1&-t\\0&1\end{pmatrix}.$$
+
+</details>
+
+##### **4.6 Powers of the Fourier Matrix from a Column Permutation** (Lab 11, Task 6)
+
+Find a permutation $P$ of the columns of $F$ that produces $FP=\overline{F}$ for the $n$ by $n$ Fourier matrix. Combine with $F\overline{F}=nI$ to find $F^2$ and $F^4$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** This problem uses the unnormalized Fourier matrix. Its entries are $F_{jk}=\omega^{jk}$ with $j,k=0,\ldots,n-1$ and $\omega=e^{-2\pi i/n}$. The conjugate entries are $\overline{F}_{jk}=\omega^{-jk}=\omega^{j(n-k)}$.
+
+For column $k$ of $\overline{F}$, the entries are
+
+$$\omega^{-jk}=\omega^{j(n-k)}.$$
+
+This is the same as column $n-k$ of $F$, with indices understood modulo $n$. Therefore, to transform $F$ into $\overline{F}$, the permutation $P$ must send column $k$ to column $-k \pmod n$.
+
+In index form:
+
+$$0\mapsto0,\qquad k\mapsto n-k \quad (k=1,\ldots,n-1).$$
+
+Thus $P$ is the reversal permutation modulo $n$:
+
+$$
+P e_k=e_{-k\bmod n}.
+$$
+
+Since $FP=\overline{F}$, multiply both sides on the right by $P$:
+
+$$FPP=\overline{F}P.$$
+
+Because $P^2=I$, this returns $F$ from $\overline{F}$, as expected.
+
+Now use the given identity
+
+$$F\overline{F}=nI.$$
+
+Since $\overline{F}=FP$, substitute:
+
+$$F(FP)=nI.$$
+
+Therefore
+
+$$F^2P=nI.$$
+
+Multiply on the right by $P$:
+
+$$F^2=nP.$$
+
+Then
+
+$$F^4=(F^2)^2=(nP)^2=n^2P^2=n^2I.$$
+
+**Normalized version:** If the normalized Fourier matrix is $Q=\frac{1}{\sqrt{n}}F$, then
+
+$$Q^2=P,\qquad Q^4=I.$$
+
+**Answer:** $P$ is the permutation $e_k\mapsto e_{-k\bmod n}$. For the unnormalized Fourier matrix, $F^2=nP$ and $F^4=n^2I$. For the normalized Fourier matrix, $Q^2=P$ and $Q^4=I$.
+
+</details>
+
+##### **4.7 Solve a $4 \times 4$ Fourier System** (Lab 11, Task 7)
+
+Solve the $4$ by $4$ system $F_4c=y$ if the right-hand sides are
+
+$$y_0=2,\qquad y_1=0,\qquad y_2=2,\qquad y_3=0.$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The source problem uses the unnormalized $4\times4$ Fourier matrix
+
+$$
+F_4=
+\begin{pmatrix}
+1&1&1&1\\
+1&-i&-1&i\\
+1&-1&1&-1\\
+1&i&-1&-i
+\end{pmatrix}.
+$$
+
+For the unnormalized matrix, $F_4^{-1}=\frac{1}{4}\overline{F_4}^{\,T}$. Since $F_4$ is symmetric, this is $\frac{1}{4}\overline{F_4}$.
+
+We need solve
+
+$$F_4c=y,\qquad y=\begin{pmatrix}2\\0\\2\\0\end{pmatrix}.$$
+
+Thus
+
+$$
+c=F_4^{-1}y=\frac{1}{4}\overline{F_4}y.
+$$
+
+Now
+
+$$
+\overline{F_4}=
+\begin{pmatrix}
+1&1&1&1\\
+1&i&-1&-i\\
+1&-1&1&-1\\
+1&-i&-1&i
+\end{pmatrix}.
+$$
+
+Multiply:
+
+$$
+\overline{F_4}y
+=
+\begin{pmatrix}
+1&1&1&1\\
+1&i&-1&-i\\
+1&-1&1&-1\\
+1&-i&-1&i
+\end{pmatrix}
+\begin{pmatrix}2\\0\\2\\0\end{pmatrix}
+=
+\begin{pmatrix}
+4\\
+0\\
+4\\
+0
+\end{pmatrix}.
+$$
+
+Therefore
+
+$$
+c=\frac{1}{4}\begin{pmatrix}4\\0\\4\\0\end{pmatrix}
+=\begin{pmatrix}1\\0\\1\\0\end{pmatrix}.
+$$
+
+**Check:**
+
+$$
+F_4\begin{pmatrix}1\\0\\1\\0\end{pmatrix}
+=
+\begin{pmatrix}
+2\\0\\2\\0
+\end{pmatrix}=y.
+$$
+
+**Answer:**
+
+$$c=\begin{pmatrix}1\\0\\1\\0\end{pmatrix}.$$
+
+</details>
+
+##### **4.8 The $2 \times 2$ Fourier Matrix** (Lecture 11, Example 1)
+
+For $N=2$, write the Fourier matrix $F_2$ explicitly and verify orthogonality.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Use $\omega=e^{-2\pi i/N}$ and the normalized Fourier matrix formula $(F_N)_{jk}=\frac{1}{\sqrt{N}}\omega^{jk}$.
+
+For $N=2$,
+
+$$
+\omega=e^{-2\pi i/2}=e^{-\pi i}=-1.
+$$
+
+The entries are
+
+$$
+F_2=\frac{1}{\sqrt{2}}
+\begin{pmatrix}
+\omega^{0\cdot0}&\omega^{0\cdot1}\\
+\omega^{1\cdot0}&\omega^{1\cdot1}
+\end{pmatrix}
+=\frac{1}{\sqrt{2}}
+\begin{pmatrix}
+1&1\\
+1&-1
+\end{pmatrix}.
+$$
+
+Because this matrix is real, $F_2^*=F_2^T$. It is also symmetric, so $F_2^*=F_2$. Check:
+
+$$
+F_2^*F_2
+=\frac{1}{2}
+\begin{pmatrix}1&1\\1&-1\end{pmatrix}
+\begin{pmatrix}1&1\\1&-1\end{pmatrix}
+=\frac{1}{2}
+\begin{pmatrix}2&0\\0&2\end{pmatrix}
+=I_2.
+$$
+
+**Answer:**
+
+$$F_2=\frac{1}{\sqrt{2}}\begin{pmatrix}1&1\\1&-1\end{pmatrix},$$
+
+and its columns are orthonormal because $F_2^*F_2=I_2$.
+
+</details>
+
+##### **4.9 The $3 \times 3$ Fourier Matrix** (Lecture 11, Example 2)
+
+For $N=3$, write the Fourier matrix $F_3$ explicitly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** For $N=3$, the primitive root is $\omega=e^{-2\pi i/3}$ and powers are reduced modulo $3$ because $\omega^3=1$.
+
+Compute the root:
+
+$$
+\omega=e^{-2\pi i/3}
+=\cos\left(\frac{2\pi}{3}\right)-i\sin\left(\frac{2\pi}{3}\right)
+=-\frac{1}{2}-i\frac{\sqrt{3}}{2}.
+$$
+
+The Fourier matrix is
+
+$$
+F_3=\frac{1}{\sqrt{3}}
+\begin{pmatrix}
+1&1&1\\
+1&\omega&\omega^2\\
+1&\omega^2&\omega^4
+\end{pmatrix}.
+$$
+
+Since $\omega^3=1$, we have $\omega^4=\omega^3\omega=\omega$. Therefore,
+
+$$
+F_3=\frac{1}{\sqrt{3}}
+\begin{pmatrix}
+1&1&1\\
+1&\omega&\omega^2\\
+1&\omega^2&\omega
+\end{pmatrix}.
+$$
+
+**Answer:**
+
+$$
+F_3=\frac{1}{\sqrt{3}}
+\begin{pmatrix}
+1&1&1\\
+1&\omega&\omega^2\\
+1&\omega^2&\omega
+\end{pmatrix},
+\qquad
+\omega=-\frac{1}{2}-i\frac{\sqrt{3}}{2}.
+$$
+
+</details>
+
+##### **4.10 The $4 \times 4$ Fourier Matrix** (Lecture 11, Example 3)
+
+For $N=4$, write the Fourier matrix $F_4$ explicitly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Compute powers of $\omega=e^{-2\pi i/4}$ and substitute them into $(F_4)_{jk}=\frac{1}{2}\omega^{jk}$.
+
+For $N=4$,
+
+$$
+\omega=e^{-2\pi i/4}=e^{-i\pi/2}=-i.
+$$
+
+Its powers are
+
+$$
+\omega^0=1,\qquad
+\omega^1=-i,\qquad
+\omega^2=-1,\qquad
+\omega^3=i,\qquad
+\omega^4=1.
+$$
+
+Now fill the entries row by row:
+
+$$
+F_4=\frac{1}{2}
+\begin{pmatrix}
+\omega^0&\omega^0&\omega^0&\omega^0\\
+\omega^0&\omega^1&\omega^2&\omega^3\\
+\omega^0&\omega^2&\omega^4&\omega^6\\
+\omega^0&\omega^3&\omega^6&\omega^9
+\end{pmatrix}.
+$$
+
+Reduce powers modulo $4$: $\omega^4=1$, $\omega^6=\omega^2=-1$, and $\omega^9=\omega^1=-i$. Hence
+
+$$
+F_4=\frac{1}{2}
+\begin{pmatrix}
+1&1&1&1\\
+1&-i&-1&i\\
+1&-1&1&-1\\
+1&i&-1&-i
+\end{pmatrix}.
+$$
+
+As a concrete entry check,
+
+$$
+(F_4)_{12}=\frac{1}{2}\omega^{1\cdot2}
+=\frac{1}{2}\omega^2
+=-\frac{1}{2}.
+$$
+
+**Answer:**
+
+$$
+F_4=\frac{1}{2}
+\begin{pmatrix}
+1&1&1&1\\
+1&-i&-1&i\\
+1&-1&1&-1\\
+1&i&-1&-i
+\end{pmatrix}.
+$$
+
+</details>
+
+##### **4.11 Compute the DFT of a Four-Point Vector** (Lecture 11, Example 4)
+
+Compute the DFT of $\mathbf{x}=(1,0,1,0)^T$ using $F_4$.
+
+$$
+F_4=\frac{1}{2}
+\begin{pmatrix}
+1&1&1&1\\
+1&-i&-1&i\\
+1&-1&1&-1\\
+1&i&-1&-i
+\end{pmatrix}.
+$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The DFT is the matrix-vector product $\mathbf{y}=F_4\mathbf{x}$.
+
+Compute:
+
+$$
+\mathbf{y}
+=\frac{1}{2}
+\begin{pmatrix}
+1&1&1&1\\
+1&-i&-1&i\\
+1&-1&1&-1\\
+1&i&-1&-i
+\end{pmatrix}
+\begin{pmatrix}1\\0\\1\\0\end{pmatrix}.
+$$
+
+Only the first and third columns contribute:
+
+$$
+\mathbf{y}
+=\frac{1}{2}
+\begin{pmatrix}
+1+1\\
+1+(-1)\\
+1+1\\
+1+(-1)
+\end{pmatrix}
+=\frac{1}{2}
+\begin{pmatrix}
+2\\0\\2\\0
+\end{pmatrix}
+=
+\begin{pmatrix}
+1\\0\\1\\0
+\end{pmatrix}.
+$$
+
+**Answer:** The DFT of $(1,0,1,0)^T$ is itself:
+
+$$\mathbf{y}=(1,0,1,0)^T.$$
+
+</details>
+
+##### **4.12 Show that $F_4^2$ is a Permutation Matrix** (Lecture 11, Example 5)
+
+Show that $F_N^2$ is a permutation matrix for $N=4$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Applying the normalized Fourier transform twice reverses indices modulo $N$. For $N=4$, indices $0,1,2,3$ become $0,3,2,1$.
+
+Using
+
+$$
+F_4=\frac{1}{2}
+\begin{pmatrix}
+1&1&1&1\\
+1&-i&-1&i\\
+1&-1&1&-1\\
+1&i&-1&-i
+\end{pmatrix},
+$$
+
+direct multiplication gives
+
+$$
+F_4^2=
+\begin{pmatrix}
+1&0&0&0\\
+0&0&0&1\\
+0&0&1&0\\
+0&1&0&0
+\end{pmatrix}.
+$$
+
+This matrix is a permutation matrix because each row and each column has exactly one entry equal to $1$, and all other entries are $0$.
+
+Its action on a vector is
+
+$$
+\begin{pmatrix}
+1&0&0&0\\
+0&0&0&1\\
+0&0&1&0\\
+0&1&0&0
+\end{pmatrix}
+\begin{pmatrix}x_0\\x_1\\x_2\\x_3\end{pmatrix}
+=
+\begin{pmatrix}x_0\\x_3\\x_2\\x_1\end{pmatrix}.
+$$
+
+So $F_4^2$ fixes components $0$ and $2$ and swaps components $1$ and $3$.
+
+**Answer:**
+
+$$
+F_4^2=
+\begin{pmatrix}
+1&0&0&0\\
+0&0&0&1\\
+0&0&1&0\\
+0&1&0&0
+\end{pmatrix},
+$$
+
+which is the permutation matrix for index reversal modulo $4$.
+
+</details>
+
+##### **4.13 Orthogonality of the Columns of $F_3$** (Lecture 11, Task 1)
+
+Show that the columns of $F_3$ are orthogonal.
+
+$$
+F_3=\frac{1}{\sqrt{3}}
+\begin{pmatrix}
+1&1&1\\
+1&\omega&\omega^2\\
+1&\omega^2&\omega
+\end{pmatrix},
+\qquad
+\omega=e^{-2\pi i/3}.
+$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** In $\mathbb{C}^3$, orthogonality uses the Hermitian inner product. That means we conjugate the entries of the first vector before multiplying.
+
+Let the columns of $F_3$ be
+
+$$
+c_0=\frac{1}{\sqrt{3}}\begin{pmatrix}1\\1\\1\end{pmatrix},\qquad
+c_1=\frac{1}{\sqrt{3}}\begin{pmatrix}1\\\omega\\\omega^2\end{pmatrix},\qquad
+c_2=\frac{1}{\sqrt{3}}\begin{pmatrix}1\\\omega^2\\\omega\end{pmatrix}.
+$$
+
+For $N=3$, we have
+
+$$1+\omega+\omega^2=0,\qquad \omega^3=1,\qquad \overline{\omega}=\omega^{-1}=\omega^2.$$
+
+**Check $c_0$ with $c_1$:**
+
+$$
+\langle c_0,c_1\rangle
+=\frac{1}{3}(1+\omega+\omega^2)=0.
+$$
+
+**Check $c_0$ with $c_2$:**
+
+$$
+\langle c_0,c_2\rangle
+=\frac{1}{3}(1+\omega^2+\omega)=0.
+$$
+
+**Check $c_1$ with $c_2$:**
+
+Using conjugation,
+
+$$
+\langle c_1,c_2\rangle
+=\frac{1}{3}\left(\overline{1}\cdot1+\overline{\omega}\cdot\omega^2+\overline{\omega^2}\cdot\omega\right).
+$$
+
+Since $\overline{\omega}=\omega^2$ and $\overline{\omega^2}=\omega$, this becomes
+
+$$
+\langle c_1,c_2\rangle
+=\frac{1}{3}\left(1+\omega^2\omega^2+\omega\omega\right)
+=\frac{1}{3}(1+\omega^4+\omega^2).
+$$
+
+Because $\omega^4=\omega$, we get
+
+$$
+\langle c_1,c_2\rangle
+=\frac{1}{3}(1+\omega+\omega^2)=0.
+$$
+
+Each column also has norm $1$; for example,
+
+$$
+\|c_1\|^2
+=\frac{1}{3}(|1|^2+|\omega|^2+|\omega^2|^2)
+=\frac{1}{3}(1+1+1)=1.
+$$
+
+**Answer:** The columns of $F_3$ are mutually orthogonal, and after the factor $1/\sqrt{3}$ they are orthonormal. Hence $F_3^*F_3=I_3$.
+
+</details>
