@@ -2,14 +2,12 @@
 """Fix formatting in all .qmd files:
 1. Remove blank lines between list items (numbered and bullet)
 2. Add blank line after ':' before bullet lists and tables
-3. Detect AI thinking artifacts, evaluate with Claude, and optionally remove
+3. Detect AI thinking artifacts and write a root Markdown report
 """
 import re
 import glob
-import subprocess
-import json
-import os
 from pathlib import Path
+from datetime import datetime
 
 AI_PATTERNS = [
     # hesitation / thinking aloud
@@ -60,6 +58,243 @@ AI_PATTERNS = [
 ]
 
 
+COURSE_SECTION_RULES = [
+    (r'/Mathematical Analysis I/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Mathematical Analysis II/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Software Systems Analysis and Design/', ['Theory', 'Definitions', 'Practice'], []),
+    (r'/Introduction to Programming/', ['Theory', 'Definitions', 'Practice'], []),
+    (r'/Theoretical Computer Science/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Data Structures and Algorithms/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Analytical Geometry and Linear Algebra I/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Analytical Geometry and Linear Algebra II/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Academic Writing and Argumentation I/', ['Theory'], []),
+    (r'/Academic Writing and Argumentation II/', ['Theory'], []),
+    (r'/Logic and Discrete Mathematics/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Computer Architecture/', ['Theory', 'Definitions'], ['Practice']),
+]
+
+DEFAULT_ALLOWED_SECTIONS = ['Theory', 'Definitions', 'Formulas', 'Practice']
+TITLE_WEEK_RE = re.compile(r'^W\d+(?:-W\d+|[AB])?\.\s+.+$')
+TOP_SECTION_RE = re.compile(r'^####\s+\*\*(\d+)\.\s+(.+?)\*\*\s*$')
+ANY_HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*$')
+THEORY_LEVEL5_RE = re.compile(r'^#####\s+\*\*1\.\d+\s+.+?\*\*\s*$')
+THEORY_LEVEL6_RE = re.compile(r'^######\s+\*\*1\.\d+\.\d+\s+.+?\*\*\s*$')
+PRACTICE_HEADING_RE = re.compile(r'^#####\s+\*\*(\d+)\.(\d+)\.\s+(.+?)\*\*\s+\((.+)\)\s*$')
+SOURCE_RE = re.compile(r'^(Lab|Lecture|Tutorial|Chapter|Midterm|Final|Test|Homework)(?:\s+([^,]+))?,\s+(Example|Task)\s+(\d+)$')
+FORBIDDEN_TITLE_WORD_RE = re.compile(r'\b(Lecture|Chapter|Lab|Tutorial|Homework|Midterm|Final|Test|Slide|Slides)\b', re.IGNORECASE)
+
+
+def normalize_path(filepath):
+    return '/' + filepath.replace('\\', '/')
+
+
+def section_rule_for_file(filepath):
+    path = normalize_path(filepath)
+    for pattern, required, optional in COURSE_SECTION_RULES:
+        if re.search(pattern, path):
+            return required, optional
+    return ['Theory'], ['Definitions', 'Formulas', 'Practice']
+
+
+def should_skip_file(filepath):
+    path = filepath.replace('\\', '/')
+    name = Path(path).name
+    return name in ('404.qmd', 'index.qmd') or name.endswith('.ru.qmd')
+
+
+def extract_yaml(lines):
+    if not lines or lines[0].strip() != '---':
+        return None, 0
+
+    yaml_lines = []
+    for i in range(1, len(lines)):
+        if lines[i].strip() == '---':
+            return yaml_lines, i + 1
+        yaml_lines.append(lines[i])
+
+    return None, 0
+
+
+def parse_yaml_pairs(yaml_lines):
+    values = {}
+    for line in yaml_lines:
+        match = re.match(r'^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$', line)
+        if not match:
+            continue
+        key, value = match.groups()
+        values[key] = value.strip().strip('"').strip("'")
+    return values
+
+
+def validate_yaml(filepath, lines):
+    issues = []
+    yaml_lines, _ = extract_yaml(lines)
+    if yaml_lines is None:
+        return ["YAML: missing opening/closing front matter block."]
+
+    yaml = parse_yaml_pairs(yaml_lines)
+    required_keys = ['title', 'author', 'date', 'format', 'engine']
+    for key in required_keys:
+        if key not in yaml:
+            issues.append(f"YAML: missing `{key}` field.")
+
+    title = yaml.get('title')
+    if title and not TITLE_WEEK_RE.match(title):
+        issues.append("YAML: `title` must start with `W<N>.`, `W<N>-W<X>.`, `W<N>A.`, or `W<N>B.`.")
+
+    if yaml.get('format') and yaml['format'] != 'html':
+        issues.append("YAML: `format` must be `html`.")
+
+    if yaml.get('engine') and yaml['engine'] != 'knitr':
+        issues.append("YAML: `engine` must be `knitr`.")
+
+    return issues
+
+
+def validate_top_sections(filepath, lines):
+    issues = []
+    required, optional = section_rule_for_file(filepath)
+    allowed_names = required + optional
+    expected_numbers = {name: str(index + 1) for index, name in enumerate(allowed_names)}
+    found = {}
+
+    for line_num, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if not stripped.startswith('#### '):
+            continue
+
+        match = TOP_SECTION_RE.match(stripped)
+        if not match:
+            issues.append(f"Line {line_num}: malformed or forbidden top-level section `{stripped}`.")
+            continue
+
+        number, name = match.groups()
+        if name not in allowed_names:
+            issues.append(f"Line {line_num}: forbidden top-level section `{name}`.")
+            continue
+
+        expected_number = expected_numbers[name]
+        if number != expected_number:
+            issues.append(f"Line {line_num}: section `{name}` must be numbered `{expected_number}.`, found `{number}.`.")
+
+        if name in found:
+            issues.append(f"Line {line_num}: duplicate top-level section `{name}`; first seen on line {found[name]}.")
+        else:
+            found[name] = line_num
+
+    for name in required:
+        if name not in found:
+            issues.append(f"Missing required top-level section `{expected_numbers[name]}. {name}`.")
+
+    return issues
+
+
+def validate_source_label(label):
+    match = SOURCE_RE.match(label)
+    if not match:
+        return "source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source."
+
+    source, source_number, item_kind, item_number = match.groups()
+    if source in ('Lab', 'Lecture', 'Tutorial', 'Chapter', 'Homework'):
+        if not source_number or not re.fullmatch(r'\d+', source_number.strip()):
+            return f"`{source}` source must include a numeric file/chapter number."
+    elif source == 'Test':
+        if not source_number or not re.fullmatch(r'I|II', source_number.strip()):
+            return "`Test` source must use roman `I` or `II`."
+    elif source in ('Midterm', 'Final'):
+        if source_number and not re.fullmatch(r'\d{4}', source_number.strip()):
+            return f"`{source}` source number must be a year like `2025` when present."
+
+    if not re.fullmatch(r'\d+', item_number):
+        return "`Example`/`Task` number must be numeric."
+
+    return None
+
+
+def validate_practice_headings(lines):
+    issues = []
+    in_practice = False
+
+    for line_num, line in enumerate(lines, start=1):
+        stripped = line.strip()
+
+        top_section = TOP_SECTION_RE.match(stripped)
+        if top_section:
+            in_practice = top_section.group(2) == 'Practice'
+            continue
+
+        if not in_practice:
+            continue
+
+        if not stripped.startswith('#####'):
+            continue
+
+        match = PRACTICE_HEADING_RE.match(stripped)
+        if not match:
+            issues.append(f"Line {line_num}: malformed practice heading `{stripped}`.")
+            continue
+
+        section_number, item_number, title, source_label = match.groups()
+        if section_number not in ('3', '4'):
+            issues.append(f"Line {line_num}: practice heading section number must be `3` or `4`, found `{section_number}`.")
+
+        if not item_number.isdigit():
+            issues.append(f"Line {line_num}: practice item number must be numeric.")
+
+        if FORBIDDEN_TITLE_WORD_RE.search(title):
+            issues.append(f"Line {line_num}: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.")
+
+        source_error = validate_source_label(source_label)
+        if source_error:
+            issues.append(f"Line {line_num}: {source_error} Found `({source_label})`.")
+
+    return issues
+
+
+def validate_theory_headings(lines):
+    issues = []
+    in_theory = False
+
+    for line_num, line in enumerate(lines, start=1):
+        stripped = line.strip()
+
+        top_section = TOP_SECTION_RE.match(stripped)
+        if top_section:
+            in_theory = top_section.group(2) == 'Theory'
+            continue
+
+        if not in_theory:
+            continue
+
+        heading = ANY_HEADING_RE.match(stripped)
+        if not heading:
+            continue
+
+        marks = heading.group(1)
+        if len(marks) <= 4:
+            issues.append(f"Line {line_num}: heading inside `Theory` must be deeper than `####`.")
+            continue
+
+        if len(marks) == 5 and not THEORY_LEVEL5_RE.match(stripped):
+            issues.append(f"Line {line_num}: Theory subsection must match `##### **1.1 Title**`.")
+        elif len(marks) == 6 and not THEORY_LEVEL6_RE.match(stripped):
+            issues.append(f"Line {line_num}: Theory nested subsection must match `###### **1.1.1 Title**`.")
+
+    return issues
+
+
+def validate_format_rules(filepath, lines):
+    if should_skip_file(filepath):
+        return []
+
+    issues = []
+    issues.extend(validate_yaml(filepath, lines))
+    issues.extend(validate_top_sections(filepath, lines))
+    issues.extend(validate_theory_headings(lines))
+    issues.extend(validate_practice_headings(lines))
+    return issues
+
+
 
 def is_list_item(line):
     """Line starts with a list marker like '1. ', '- ', or '* '."""
@@ -102,43 +337,12 @@ def get_section_header(lines, line_num):
     return None
 
 
-def get_all_examples(lines):
-    """Extract all example headers (##### **X.Y ...) from Examples sections."""
-    examples = []
-    in_examples = False
-
-    for i, line in enumerate(lines):
-        s = line.strip()
-
-        # Check if entering Examples section
-        if s.startswith('#### **') and 'Examples' in s:
-            in_examples = True
-            continue
-
-        # Check if leaving Examples section (new section header at same level or higher)
-        if in_examples and s.startswith('#### **') and 'Examples' not in s:
-            in_examples = False
-            continue
-
-        # Collect example headers
-        if in_examples and s.startswith('#####'):
-            examples.append({
-                'line_num': i + 1,
-                'text': s
-            })
-
-    return examples
-
-
-
-
 def process_file(filepath):
     with open(filepath) as f:
         content = f.read()
     lines = content.split('\n')
 
-    # === Extract all examples ===
-    all_examples = get_all_examples(lines)
+    format_issues = validate_format_rules(filepath, lines)
 
     # === Detect AI artifacts ===
     ai_found = []
@@ -272,150 +476,108 @@ def process_file(filepath):
         with open(filepath, 'w') as f:
             f.write(new_content)
 
-    return removed, added + separators_added, ai_found, changed, all_examples
+    return removed, added + separators_added, ai_found, changed, format_issues
+
+
+def build_report(stats, artifacts_by_file, format_issues_by_file):
+    """Build the root Markdown report."""
+    lines = [
+        "# Formatting Report",
+        "",
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "## AI Artifacts",
+        "",
+    ]
+
+    if artifacts_by_file:
+        for file_path in sorted(artifacts_by_file):
+            lines.append(f"### {file_path}")
+            lines.append("")
+            for artifact in artifacts_by_file[file_path]:
+                section = artifact.get('section') or '(no section header found)'
+                lines.append(f"- Line {artifact['line_num']}; section: `{section}`")
+                lines.append("")
+                lines.append("```md")
+                lines.append(artifact['line'])
+                lines.append("```")
+                lines.append("")
+    else:
+        lines.append("No potential AI artifacts detected.")
+        lines.append("")
+
+    lines.extend([
+        "## Format Checks",
+        "",
+    ])
+
+    if format_issues_by_file:
+        for file_path in sorted(format_issues_by_file):
+            lines.append(f"### {file_path}")
+            lines.append("")
+            for issue in format_issues_by_file[file_path]:
+                lines.append(f"- {issue}")
+            lines.append("")
+    else:
+        lines.append("No format-rule violations detected.")
+        lines.append("")
+
+    lines.extend([
+        "## Formatting Changes",
+        "",
+        f"- Files processed: {stats['files_processed']}",
+        f"- Files changed: {stats['files_changed']}",
+        f"- Blank lines removed between list items: {stats['blank_lines_removed']}",
+        f"- Blank lines/separators added: {stats['blank_lines_added']}",
+        f"- Potential AI artifacts detected: {stats['ai_artifacts_detected']}",
+        "",
+    ])
+
+    return '\n'.join(lines)
 
 
 # ─── Main ───
-REVIEW_FOLDER = "ai_artifacts_review"
+REPORT_FILE = "formatting_report.md"
 
-qmd_files = sorted(glob.glob('**/*.qmd', recursive=True))
-print(f"Processing {len(qmd_files)} .qmd files\n")
+qmd_files = sorted(
+    fp for fp in glob.glob('**/*.qmd', recursive=True)
+    if not fp.startswith('_site/') and not fp.startswith('_freeze/') and not should_skip_file(fp)
+)
 
 total_removed = 0
 total_added = 0
 total_ai_detected = 0
 files_changed = 0
 all_artifacts = {}  # file -> list of artifacts
-all_examples_map = {}  # file -> list of all examples
+format_issues = {}  # file -> list of format issues
 
 for fp in qmd_files:
-    removed, added, ai, changed, examples = process_file(fp)
+    removed, added, ai, changed, file_format_issues = process_file(fp)
     total_removed += removed
     total_added += added
     total_ai_detected += len(ai)
     if changed:
         files_changed += 1
 
-    # Store examples for later
-    if examples:
-        all_examples_map[fp] = examples
+    if ai:
+        all_artifacts[fp] = ai
 
-    if removed or added or ai:
-        print(f"{'=' * 70}")
-        print(f"  {fp}")
-        if removed:
-            print(f"  [-] Removed {removed} blank lines between list items")
-        if added:
-            print(f"  [+] Added {added} blank lines after ':' before lists")
-        if ai:
-            print(f"  [!] {len(ai)} potential AI artifact(s) detected:")
-            for artifact in ai:
-                print(f"      Line {artifact['line_num']}: {artifact['text']}")
-            all_artifacts[fp] = ai
-        print()
+    if file_format_issues:
+        format_issues[fp] = file_format_issues
 
-# === Create review folder structure (disabled) ===
-if all_examples_map or all_artifacts:
-    print(f"{'=' * 70}")
-    print(f"Creating review folder: {REVIEW_FOLDER}/")
-    print(f"{'=' * 70}\n")
+stats = {
+    'files_processed': len(qmd_files),
+    'files_changed': files_changed,
+    'blank_lines_removed': total_removed,
+    'blank_lines_added': total_added,
+    'ai_artifacts_detected': total_ai_detected,
+}
 
-    Path(REVIEW_FOLDER).mkdir(exist_ok=True)
+Path(REPORT_FILE).write_text(
+    build_report(stats, all_artifacts, format_issues),
+    encoding='utf-8',
+)
 
-    for file_path in set(list(all_examples_map.keys()) + list(all_artifacts.keys())):
-        review_file = Path(REVIEW_FOLDER) / file_path
-        review_file.parent.mkdir(parents=True, exist_ok=True)
-
-        examples = all_examples_map.get(file_path, [])
-        artifacts = all_artifacts.get(file_path, [])
-        artifact_lines = {a['line_num'] for a in artifacts}
-
-        review_content = f"# All Examples: {file_path}\n\n"
-        review_content += f"Total examples: {len(examples)}\n"
-        if artifacts:
-            review_content += f"Examples with AI artifacts: {len([a for a in artifacts if a['line_num'] in artifact_lines])}\n\n"
-        review_content += "---\n\n"
-
-        for example in examples:
-            has_artifact = any(
-                artifact['line_num'] >= example['line_num'] and
-                artifact['line_num'] <= example['line_num'] + 50
-                for artifact in artifacts
-            )
-            marker = "⚠️ " if has_artifact else ""
-            review_content += f"{marker}{example['text']}\n\n"
-
-        with open(review_file, 'w') as f:
-            f.write(review_content)
-
-        print(f"  ✓ Created: {review_file}")
-
-    print(f"\n{'=' * 70}\n")
-
-print(f"{'=' * 70}")
-print(f"SUMMARY:")
-print(f"  Files processed:  {len(qmd_files)}")
-print(f"  Files changed:    {files_changed}")
-print(f"  Blank lines removed (list gaps):  {total_removed}")
-print(f"  Blank lines added (colon → list): {total_added}")
-print(f"  AI artifacts detected:            {total_ai_detected}")
-
-if all_artifacts:
-    # Add review folder to .gitignore
-    gitignore_path = ".gitignore"
-    gitignore_entry = f"/{REVIEW_FOLDER}\n"
-
-    if os.path.exists(gitignore_path):
-        with open(gitignore_path, 'r') as f:
-            gitignore_content = f.read()
-        if REVIEW_FOLDER not in gitignore_content:
-            with open(gitignore_path, 'a') as f:
-                f.write(gitignore_entry)
-            print(f"✓ Added '/{REVIEW_FOLDER}' to .gitignore\n")
-    else:
-        with open(gitignore_path, 'w') as f:
-            f.write(gitignore_entry)
-        print(f"✓ Created .gitignore with '/{REVIEW_FOLDER}'\n")
-
-    print(f"\n{'=' * 70}")
-    print("AI ARTIFACTS FOUND - Sending to Claude for optimization...")
-    print(f"{'=' * 70}\n")
-
-    # Build prompt for Claude
-    artifact_text = "# AI ARTIFACTS DETECTED IN NOTES\n\n"
-    for file_path, artifacts in all_artifacts.items():
-        artifact_text += f"## File: {file_path}\n\n"
-        for artifact in artifacts:
-            section = artifact.get('section', '(no section header found)')
-            artifact_text += f"**Section:** {section}\n"
-            artifact_text += f"**Line {artifact['line_num']}:**\n```\n{artifact['line']}\n```\n\n"
-
-    prompt = f"""Review these educational notes with AI thinking artifacts (self-corrections, hesitations, meta-commentary).
-
-{artifact_text}
-
-Your task:
-1. Identify each AI artifact (hesitation phrases, self-corrections, unnecessary reasoning)
-2. Optimize each solution by REMOVING only the unnecessary thinking/reasoning
-3. KEEP the correct final solution in the exact same format (formulas, structure, everything)
-
-Do NOT change the mathematical content or format. Only remove AI thinking artifacts like:
-- "Actually, correcting:", "Let me recalculate:", "Hmm, let me reconsider:"
-- "In other words," when it's just rephrasing (keep it if it's essential explanation)
-- Intermediate failed attempts
-- "I think", "I realized", etc.
-
-Please proceed:"""
-
-    print("=" * 70)
-    print("CLAUDE OPTIMIZATION PROMPT:")
-    print("=" * 70)
-    print(prompt)
-    print("\n" + "=" * 70)
-    print("Please copy the above prompt and paste it to Claude to optimize the solutions.")
-    print("Then copy the response and save it for applying the fixes.")
-    print("=" * 70)
-else:
-    print("\nNo AI artifacts detected!")
-
-print("\nDone!")
+print(f"Processed {len(qmd_files)} .qmd files.")
+print(f"Changed {files_changed} file(s).")
+print(f"Report written to {REPORT_FILE}.")

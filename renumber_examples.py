@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Script to renumber examples in Mathematical Analysis II notes.
+Script to renumber practice items in Mathematical Analysis II notes.
 
 Usage:
     python renumber_examples.py <file_path> [--format FORMAT]
 
-Examples:
+Practice:
     python renumber_examples.py "Mathematical Analysis II/1.qmd"
     python renumber_examples.py "Mathematical Analysis II/1.qmd" --format "3.{}"
     python renumber_examples.py "Mathematical Analysis II/1.qmd" --format "4.{}"
@@ -17,9 +17,9 @@ import argparse
 from pathlib import Path
 
 
-def renumber_examples(file_path: str, format_pattern: str = "4.{}") -> None:
+def renumber_practice_items(file_path: str, format_pattern: str = "4.{}") -> None:
     """
-    Renumber all examples in a .qmd file.
+    Renumber all practice item headings in a .qmd file.
 
     Args:
         file_path: Path to the .qmd file
@@ -30,7 +30,7 @@ def renumber_examples(file_path: str, format_pattern: str = "4.{}") -> None:
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # Pattern to match example headings like: ##### **4.123. Title** (Source)
+    # Pattern to match practice item headings like: ##### **4.123. Title** (Source)
     # Captures: section number (4), old number (123), title, and source
     pattern = r'^(#####\s+\*\*)(\d+)\.(\d+)(\..*?\*\*.*?)$'
 
@@ -65,16 +65,21 @@ def renumber_examples(file_path: str, format_pattern: str = "4.{}") -> None:
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(new_content)
 
-    print(f"✓ Renumbered {counter - 1} examples in {file_path}")
+    print(f"✓ Renumbered {counter - 1} practice items in {file_path}")
     print(f"  Format used: {format_pattern.format('N')}")
+
+
+def renumber_examples(file_path: str, format_pattern: str = "4.{}") -> None:
+    """Backward-compatible wrapper for older calls."""
+    renumber_practice_items(file_path, format_pattern)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Renumber examples in Mathematical Analysis II notes',
+        description='Renumber practice items in Mathematical Analysis II notes',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
+Practice:
   %(prog)s "Mathematical Analysis II/1.qmd"
   %(prog)s "Mathematical Analysis II/1.qmd" --format "3.{}"
   %(prog)s "Mathematical Analysis II/1.qmd" --format "4.{}"
@@ -103,7 +108,7 @@ Examples:
         print(f"Error: Format pattern must contain '{{}}': {args.format}", file=sys.stderr)
         sys.exit(1)
 
-    renumber_examples(str(file_path), args.format)
+    renumber_practice_items(str(file_path), args.format)
 
 
 if __name__ == '__main__':

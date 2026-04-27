@@ -22,7 +22,7 @@ The input will contain:
 - transcripts from all relevant source files
 - source names such as `Lecture`, `Lab`, `Tutorial`, `Homework`, `Assignment`, `Quiz`, `Test`, `Midterm`, `Final`, `Exercises`
 
-The table of contents is authoritative. Use it as a coverage checklist so that no topic is omitted from the Summary.
+The table of contents is authoritative. Use it as a coverage checklist so that no topic is omitted from the Theory section.
 
 ## 3. Mandatory Preflight
 
@@ -71,17 +71,17 @@ Rules:
 Use this order unless the local folder has a stronger established convention:
 
 ```md
-#### **1. Summary**
+#### **1. Theory**
 #### **2. Definitions**
 #### **3. Formulas**        # only when truly useful, usually for math-heavy articles
-#### **4. Examples**        # or Section 3 if Formulas are omitted
+#### **4. Practice**        # or Section 3 if Formulas are omitted
 ```
 
 Do not invent extra top-level sections unless clearly required by the folder style.
 
-## 5. Summary Rules
+## 5. Theory Rules
 
-The Summary is the most important part.
+The Theory section is the most important part.
 
 - It must teach from zero.
 - It must cover every topic from the table of contents and all important transcript sections.
@@ -110,7 +110,7 @@ Style rules:
 
 The Definitions section is a compact glossary.
 
-- Include every core term introduced in the Summary.
+- Include every core term introduced in the Theory section.
 - Definitions must be self-contained.
 - Keep each definition concise, precise, and readable.
 
@@ -134,7 +134,7 @@ Format:
 *   **Formula Name**: $...$
 ```
 
-## 8. Examples and Tasks
+## 8. Practice Items and Tasks
 
 This distinction is mandatory:
 
@@ -143,7 +143,7 @@ This distinction is mandatory:
 
 Model the article around that distinction.
 
-Do not create a separate top-level `Tasks` section. Place both `Example` and `Task` items inside one shared `Examples` section, and order them only by the canonical source-block order.
+Do not create a separate top-level `Tasks` section. Place both `Example` and `Task` items inside one shared `Practice` section, and order them only by the canonical source-block order.
 
 ### Core rule
 
@@ -154,7 +154,7 @@ If it is presented as student work, exercise, lab problem, homework problem, tut
 
 Include all source problems that matter for study:
 
-- all explicit Examples
+- all explicit source items labeled `Example`
 - all explicit Tasks / Problems / Exercises / Homework items
 - all worked demonstrations that should become `Example`
 - all student-facing problems that should become `Task`
@@ -208,7 +208,7 @@ Use:
 ##### **4.N. Short Descriptive Title** (Source Block, Item Number)
 ```
 
-Examples:
+Practice heading examples:
 
 - `(Lecture 6, Example 3)`
 - `(Tutorial 4, Task 2)`
@@ -464,7 +464,7 @@ Do not use `renumber_examples.py` as a substitute for thinking. First choose the
 
 Before finishing, verify all of the following:
 
-1. Every topic from the top-level table of contents appears in the Summary.
+1. Every topic from the top-level table of contents appears in the Theory section.
 2. The article matches the local style of at least 3 neighboring articles.
 3. Source blocks remain in original order.
 4. `Example` and `Task` are assigned according to pedagogical role, not randomly.
