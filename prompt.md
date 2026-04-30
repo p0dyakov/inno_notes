@@ -28,6 +28,8 @@ The table of contents is authoritative. Use it as a coverage checklist so that n
 
 Before writing, analyze at least 3 existing `.qmd` articles from the same target folder.
 
+Use articles written in the same language as the target output as the naming reference. For an English article, ignore localized translation files such as `*.ru.qmd` when deriving file naming, title style, week numbering, terminology style, and date conventions. Use localized articles only when the requested output language is the same localization.
+
 From those files, extract and follow:
 
 - title style
@@ -39,7 +41,9 @@ From those files, extract and follow:
 - how source labels are written in parentheses
 - how diagrams are placed and styled
 
-Use local folder conventions unless they conflict with the hard rules below. If local files vary, choose the dominant pattern and keep it consistent through the whole new article.
+Use local folder conventions unless they conflict with the hard rules below. If local files vary, choose the dominant pattern among same-language articles and keep it consistent through the whole new article.
+
+For title naming, infer the `W...` prefix from same-language neighboring articles, but always use a short concise topic title. Prefer one compact noun phrase such as `"W15. Maximum Flow Algorithms"` rather than listing every subtopic in the title. The repository week number may differ from the raw lecture number in the transcript; follow the folder sequence unless the user explicitly says otherwise.
 
 ## 4. Hard Output Structure
 
@@ -51,7 +55,7 @@ Use:
 
 ```yaml
 ---
-title: "W[X]. [Topic 1], [Topic 2], [Topic 3]"
+title: "W[X]. [Concise Topic Title]"
 author: "[course author]"
 date: "[Month D, YYYY]"
 format: html
@@ -61,8 +65,9 @@ engine: knitr
 
 Rules:
 
-- the title must follow the local folder style
+- the title must use a short concise topic phrase
 - topic names in the title must reflect the real content
+- do not overstuff the title with all subtopics
 - use the correct course author from the repository convention
 - do not invent extra YAML fields unless local files in that folder consistently use them
 

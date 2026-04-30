@@ -1,0 +1,994 @@
+---
+title: "W15. Maximum Flow Algorithms"
+author: "Nikolai Kudasov"
+date: "April 28, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Theory**
+
+##### **1.1 Flow Networks**
+
+###### **1.1.1 Directed Networks with Capacities**
+
+A **flow network** is a directed graph $G = (V,E)$ used to model movement of some resource from a distinguished **source** $s$ to a distinguished **sink** $t$. The resource may be data in a communication network, goods in a transportation system, assignments in a matching problem, or pixels assigned to regions in an image-segmentation problem.
+
+Each directed edge $(u,v)$ has a nonnegative **capacity** $c(u,v) \ge 0$. Capacity is the maximum amount of flow that the edge can carry. By convention, if $(u,v) \notin E$, then $c(u,v)=0$.
+
+The standard model assumes:
+
+- $s \ne t$;
+- no edges enter the source $s$;
+- no edges leave the sink $t$;
+- no anti-parallel edge pair appears directly, so if $(u,v) \in E$, then $(v,u) \notin E$.
+
+These restrictions simplify the theory without reducing modeling power. If a real system has several sources, add a new **super-source** $s'$ and connect it to every original source by a very large-capacity edge. If it has several sinks, add a new **super-sink** $t'$ and connect every original sink to $t'$ by a very large-capacity edge. If a model needs anti-parallel edges, replace one of the two directions by a two-edge path through a dummy vertex.
+
+```{dot}
+//| fig-height: 3
+//| fig-width: 7
+digraph flow_network_example {
+  rankdir=LR
+  node [shape=circle, style=filled, fillcolor="#f9fbfd", color="#355c7d",
+        fontcolor="#1f2d3d", fontsize=12, width=0.55]
+  edge [color="#355c7d", fontsize=10, fontcolor="#1f2d3d", arrowsize=0.8]
+
+  S [fillcolor="#ffd6e0"]
+  T [fillcolor="#d8ecff"]
+
+  S -> A [label="4"]
+  S -> C [label="1"]
+  A -> B [label="1"]
+  A -> D [label="2"]
+  C -> A [label="2"]
+  C -> D [label="4"]
+  B -> C [label="3"]
+  B -> T [label="3"]
+  D -> B [label="2"]
+  D -> T [label="1"]
+}
+```
+
+###### **1.1.2 Feasible Flows**
+
+A **flow** is a function $f : V \times V \to \mathbb{R}$ that assigns a numerical amount of flow to each ordered pair of vertices. A feasible flow must satisfy two laws.
+
+The **capacity constraint** says that no edge may carry negative flow or more flow than its capacity:
+
+$$
+0 \le f(u,v) \le c(u,v)
+$$
+
+for all $u,v \in V$.
+
+The **flow-conservation constraint** says that every internal vertex neither creates nor destroys flow. For every $u \in V \setminus \{s,t\}$,
+
+$$
+\sum_{v \in V} f(v,u) = \sum_{w \in V} f(u,w).
+$$
+
+That is, total incoming flow equals total outgoing flow. The source may create flow, and the sink may absorb it; all other vertices only pass it through.
+
+The **value** of a flow is the total flow leaving the source:
+
+$$
+|f| = \sum_{v \in V} f(s,v).
+$$
+
+By conservation, this is also equal to the total flow entering the sink. For example, if $2$ units leave $s$ on one edge and $1$ unit leaves on another, then $|f|=3$, and the same $3$ units must eventually enter $t$.
+
+###### **1.1.3 Maximum Flow Problem**
+
+The **maximum-flow problem** asks for a feasible flow of maximum possible value. It is an optimization problem: many feasible flows may exist, but we want the one that sends as much total flow as possible from $s$ to $t$.
+
+In the introductory lecture network, the sink has incoming capacities $B \to T$ of $3$ and $D \to T$ of $1$, so no flow can exceed $4$ if these are the only edges into $T$. A feasible flow with value $4$ therefore proves optimal: send $3$ units out through $S \to A$ and $1$ through $S \to C$, route enough through $B$ to saturate $B \to T$, and send $1$ unit through $D \to T$.
+
+The important lesson is that maximum flow is not only about local unused capacity. A bad earlier routing choice may need to be partly cancelled before a larger total flow becomes possible. That is why residual networks are necessary.
+
+##### **1.2 Residual Networks and Augmenting Paths**
+
+###### **1.2.1 Residual Capacity**
+
+Given a current flow $f$, the **residual capacity** $c_f(u,v)$ describes how much additional flow can be pushed from $u$ to $v$ after accounting for the current choices:
+
+$$
+c_f(u,v) =
+\begin{cases}
+c(u,v)-f(u,v), & \text{if } (u,v) \in E, \\
+f(v,u), & \text{if } (v,u) \in E, \\
+0, & \text{otherwise.}
+\end{cases}
+$$
+
+The first case is ordinary unused capacity on a forward edge. The second case is more subtle: if $f(v,u)>0$, then we may send flow from $u$ back to $v$ in the residual graph, which means cancelling some of the earlier flow from $v$ to $u$.
+
+The **residual network** $G_f=(V,E_f)$ contains exactly the directed edges with positive residual capacity:
+
+$$
+E_f = \{(u,v) : c_f(u,v) > 0\}.
+$$
+
+Reverse residual edges are essential. Without them, Ford-Fulkerson-style algorithms would be unable to undo unlucky augmenting paths. A previous path may have used a capacity-limited edge in a way that blocks a better global arrangement; the reverse residual edge gives the algorithm a legal way to reroute that flow.
+
+###### **1.2.2 Augmenting Paths**
+
+An **augmenting path** is a directed path from $s$ to $t$ in the residual network $G_f$. If such a path exists, then the current flow is not maximal, because we can increase the flow along that path.
+
+For an augmenting path $p$, its **bottleneck residual capacity** is
+
+$$
+c_f(p)=\min\{c_f(u,v):(u,v)\text{ lies on }p\}.
+$$
+
+This is the maximum amount that can be pushed through the entire path without violating some residual capacity. To augment:
+
+- increase $f(u,v)$ by $c_f(p)$ on original forward edges of $p$;
+- decrease $f(v,u)$ by $c_f(p)$ when $p$ uses a reverse residual edge $(u,v)$ corresponding to original edge $(v,u)$.
+
+The result is again a feasible flow, and its value increases by exactly $c_f(p)$.
+
+###### **1.2.3 Why Path Choice Matters**
+
+Ford-Fulkerson does not specify which augmenting path to choose. This matters because poor choices can produce many small augmentations.
+
+Consider a network with capacities
+
+$$
+s \to a:100,\quad s \to b:100,\quad a \to t:100,\quad b \to t:100,\quad a \to b:1.
+$$
+
+If the algorithm repeatedly chooses paths that use the middle edge and then cancels it through a reverse residual edge, it may augment by only $1$ unit at a time. A better choice would use the two direct high-capacity routes and finish in two augmentations. This is the motivation for Edmonds-Karp, which fixes path choice by always using BFS.
+
+##### **1.3 Ford-Fulkerson Method**
+
+###### **1.3.1 General Method**
+
+The **Ford-Fulkerson method** repeatedly improves a feasible flow by finding an augmenting path in the residual network.
+
+```text
+FORD-FULKERSON-METHOD(G, s, t)
+1  initialize flow f to 0
+2  while there exists an augmenting path p in the residual network G_f
+3      augment flow f along p
+4  return f
+```
+
+The complete edge-update version is:
+
+```text
+FORD-FULKERSON(G, s, t)
+1  for each edge (u, v) in G.E
+2      (u, v).f = 0
+3  while there exists a path p from s to t in the residual network G_f
+4      c_f(p) = min { c_f(u, v) : (u, v) is in p }
+5      for each edge (u, v) in p
+6          if (u, v) in G.E
+7              (u, v).f = (u, v).f + c_f(p)
+8          else (v, u).f = (v, u).f - c_f(p)
+9  return f
+```
+
+The method starts with the zero flow, which is always feasible. Each iteration preserves feasibility and strictly increases the value. When no augmenting path remains, the max-flow min-cut theorem proves that the current flow is maximum.
+
+###### **1.3.2 Running Time**
+
+If capacities are integers and augmenting paths are found by DFS or BFS, each augmentation increases the flow value by at least $1$. Therefore the number of augmentations is at most $|f^*|$, where $f^*$ is a maximum flow.
+
+Finding one augmenting path costs $O(V+E)$, which is $O(E)$ for the usual connected network setting. Updating the path costs at most $O(V)$. Thus the common bound is
+
+$$
+O(E|f^*|).
+$$
+
+This is **pseudo-polynomial**, not strongly polynomial, because it depends on the numerical value of the maximum flow rather than only on the number of vertices and edges. If capacities are very large, $|f^*|$ may be huge even when the graph is small.
+
+##### **1.4 Cuts and the Max-Flow Min-Cut Theorem**
+
+###### **1.4.1 Cuts in Flow Networks**
+
+A **cut** $(S,T)$ in a flow network is a partition of the vertex set such that
+
+$$
+s \in S,\qquad t \in T,\qquad S \cap T = \emptyset,\qquad S \cup T = V.
+$$
+
+The **capacity** of the cut is
+
+$$
+c(S,T)=\sum_{u \in S}\sum_{v \in T} c(u,v).
+$$
+
+Only edges directed from $S$ to $T$ are counted. This is because a cut capacity measures how much flow can cross from the source side to the sink side. Edges from $T$ back to $S$ do not help send flow from $s$ to $t$; in the net-flow equation they subtract instead.
+
+The **net flow across a cut** is
+
+$$
+f(S,T)=
+\sum_{u \in S}\sum_{v \in T} f(u,v)
+-
+\sum_{u \in S}\sum_{v \in T} f(v,u).
+$$
+
+It counts flow crossing forward from the source side to the sink side, minus flow crossing back.
+
+###### **1.4.2 Net Flow Equals Flow Value**
+
+For every feasible flow $f$ and every cut $(S,T)$,
+
+$$
+f(S,T)=|f|.
+$$
+
+The reason is conservation. Start with the cut $S=\{s\}$, where the net flow across the cut is exactly the flow leaving the source. If we move an internal vertex from $T$ to $S$, the total net flow across the cut does not change, because that vertex has equal incoming and outgoing flow. Repeating this argument reaches any cut.
+
+This immediately gives a key upper bound:
+
+$$
+|f| = f(S,T) \le c(S,T).
+$$
+
+So every cut capacity is an upper bound on every feasible flow value. If we ever find a flow and a cut with equal value, both must be optimal.
+
+###### **1.4.3 Max-Flow Min-Cut Theorem**
+
+A **minimum cut** is a cut with minimum capacity among all cuts in the network.
+
+The **max-flow min-cut theorem** states that for a flow $f$ in a network $G$, the following are equivalent:
+
+1. $f$ is a maximum flow;
+2. the residual network $G_f$ contains no augmenting path;
+3. $|f|=c(S,T)$ for some cut $(S,T)$.
+
+The theorem gives both an algorithmic stopping condition and a certificate of optimality. When Ford-Fulkerson cannot find another augmenting path, let $S$ be the set of vertices reachable from $s$ in the residual network, and let $T=V\setminus S$. This cut has capacity exactly $|f|$, so it is a minimum cut.
+
+##### **1.5 Edmonds-Karp Algorithm**
+
+###### **1.5.1 BFS Augmenting Paths**
+
+**Edmonds-Karp** is the Ford-Fulkerson method with one specific rule: always choose a shortest augmenting path in the residual network, where "shortest" means fewest edges. This path is found by BFS.
+
+This rule makes the algorithm deterministic enough for a polynomial-time analysis. Each augmentation still increases the flow value, but the important structural fact is stronger: BFS distances from $s$ in the sequence of residual graphs never decrease.
+
+Intuitively, once an edge on a shortest augmenting path becomes saturated, it cannot become useful again as a critical bottleneck until residual distances have increased enough. This prevents the algorithm from oscillating through the same short bad choices indefinitely.
+
+###### **1.5.2 Running Time**
+
+Each BFS in a residual graph costs $O(E)$. Each augmentation saturates at least one edge on the chosen shortest path; such an edge is called **critical** for that augmentation.
+
+In Edmonds-Karp, any directed edge can become critical only $O(V)$ times. Since there are $O(E)$ residual edges, the number of augmentations is $O(VE)$. Multiplying by the $O(E)$ BFS cost gives
+
+$$
+O(VE^2).
+$$
+
+Unlike the basic Ford-Fulkerson bound $O(E|f^*|)$, this is polynomial in the graph size and does not depend on the numerical values of capacities.
+
+##### **1.6 Modeling Extensions**
+
+###### **1.6.1 Bipartite Matching as Maximum Flow**
+
+Maximum bipartite matching reduces naturally to maximum flow. Given a bipartite graph $G=(L \cup R,E)$:
+
+1. create a source $s$ and connect $s$ to every vertex in $L$ with capacity $1$;
+2. direct every original edge from $L$ to $R$ with capacity $1$;
+3. connect every vertex in $R$ to a sink $t$ with capacity $1$.
+
+Any integral flow of value $k$ corresponds to a matching of size $k$: a unit of flow through $u \to v$ means match $u \in L$ with $v \in R$. The capacity-1 edges from $s$ and into $t$ ensure that no vertex is used more than once.
+
+###### **1.6.2 Lower and Upper Bounds**
+
+Some network models require every edge to carry at least a lower bound $\ell(u,v)$ and at most an upper bound $c(u,v)$. Feasibility can be reduced to an ordinary max-flow computation.
+
+First, reserve the lower bound on each edge by defining residual demand:
+
+$$
+c'(u,v)=c(u,v)-\ell(u,v).
+$$
+
+Then compute each vertex's imbalance caused by the reserved lower-bound flows. Add a super-source connected to vertices that already have excess forced inflow, and add a super-sink connected from vertices that already have excess forced outflow. Finally, run max flow and check whether all demand edges out of the super-source are saturated. If they are, a feasible circulation exists; otherwise no feasible flow satisfies all lower bounds.
+
+***
+
+#### **2. Definitions**
+
+*   **Flow network**: A directed graph with nonnegative edge capacities, a source $s$, and a sink $t$.
+*   **Capacity** $c(u,v)$: The maximum amount of flow allowed on directed edge $(u,v)$.
+*   **Source**: The distinguished vertex where flow originates.
+*   **Sink**: The distinguished vertex where flow is absorbed.
+*   **Super-source**: An artificial source connected to multiple original sources to reduce a multi-source problem to a single-source problem.
+*   **Super-sink**: An artificial sink connected from multiple original sinks to reduce a multi-sink problem to a single-sink problem.
+*   **Anti-parallel edges**: A pair of directed edges $(u,v)$ and $(v,u)$ between the same two vertices.
+*   **Feasible flow**: A flow satisfying capacity constraints and flow conservation.
+*   **Capacity constraint**: The condition $0 \le f(u,v) \le c(u,v)$.
+*   **Flow conservation**: The condition that every internal vertex has total incoming flow equal to total outgoing flow.
+*   **Flow value** $|f|$: The total amount of flow leaving the source, equivalently entering the sink.
+*   **Maximum-flow problem**: The problem of finding a feasible flow with maximum value.
+*   **Residual capacity** $c_f(u,v)$: The remaining amount that can be sent from $u$ to $v$, including possible cancellation of opposite flow.
+*   **Residual network** $G_f$: The directed graph containing all edges with positive residual capacity.
+*   **Reverse residual edge**: An edge in the residual network that represents the ability to cancel existing flow on an original edge.
+*   **Augmenting path**: A path from $s$ to $t$ in the residual network.
+*   **Bottleneck residual capacity** $c_f(p)$: The minimum residual capacity along an augmenting path $p$.
+*   **Ford-Fulkerson method**: The generic augmenting-path method for computing maximum flow.
+*   **Cut** $(S,T)$: A partition of vertices with $s \in S$ and $t \in T$.
+*   **Cut capacity** $c(S,T)$: The total capacity of edges directed from $S$ to $T$.
+*   **Net flow across a cut** $f(S,T)$: Flow from $S$ to $T$ minus flow from $T$ to $S$.
+*   **Minimum cut**: A cut of minimum capacity among all source-sink cuts.
+*   **Max-flow min-cut theorem**: The theorem equating maximum flow value with minimum cut capacity.
+*   **Edmonds-Karp algorithm**: Ford-Fulkerson with BFS shortest augmenting paths.
+*   **Critical edge**: An edge saturated as the bottleneck of an augmenting path.
+*   **Bipartite matching reduction**: The construction that turns matching in $G=(L\cup R,E)$ into a unit-capacity max-flow problem.
+*   **Lower-bound flow constraint**: A requirement that an edge must carry at least a specified amount of flow.
+
+***
+
+#### **3. Formulas**
+
+*   **Capacity constraint**: $0 \le f(u,v) \le c(u,v)$
+*   **Flow conservation**: $\displaystyle\sum_{v \in V} f(v,u)=\sum_{w \in V} f(u,w)$ for $u \in V\setminus\{s,t\}$
+*   **Flow value**: $\displaystyle |f|=\sum_{v \in V} f(s,v)$
+*   **Residual capacity**: $\displaystyle c_f(u,v)=\begin{cases}c(u,v)-f(u,v),& (u,v)\in E,\\ f(v,u),& (v,u)\in E,\\0,&\text{otherwise}\end{cases}$
+*   **Bottleneck of an augmenting path**: $\displaystyle c_f(p)=\min\{c_f(u,v):(u,v)\text{ lies on }p\}$
+*   **Cut capacity**: $\displaystyle c(S,T)=\sum_{u\in S}\sum_{v\in T}c(u,v)$
+*   **Net flow across a cut**: $\displaystyle f(S,T)=\sum_{u\in S}\sum_{v\in T}f(u,v)-\sum_{u\in S}\sum_{v\in T}f(v,u)$
+*   **Cut upper bound**: $|f| \le c(S,T)$
+*   **Ford-Fulkerson with integer capacities**: $O(E|f^*|)$
+*   **Edmonds-Karp augmentations**: $O(VE)$
+*   **Edmonds-Karp running time**: $O(VE^2)$
+*   **Lower-bound residual capacity**: $c'(u,v)=c(u,v)-\ell(u,v)$
+
+***
+
+#### **4. Practice**
+
+##### **4.1. Compute the Value of a Flow** (Lecture 13, Example 1)
+
+In the lecture flow example, edge labels are flow/capacity:
+
+$$
+S\to A:2/4,\quad S\to C:1/1,\quad A\to B:0/1,\quad A\to D:2/2,
+$$
+
+$$
+C\to A:0/2,\quad C\to D:1/4,\quad B\to C:3/3,\quad B\to T:2/3,
+$$
+
+$$
+D\to B:1/2,\quad D\to T:1/1.
+$$
+
+Compute the value $|f|$ and verify it using the sink side.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The value of a flow is the total flow leaving the source. By flow conservation, it must equal the total flow entering the sink.
+
+The source $S$ has two outgoing edges:
+
+$$
+S\to A \text{ carries } 2,\qquad S\to C \text{ carries } 1.
+$$
+
+Therefore
+
+$$
+|f|=2+1=3.
+$$
+
+Now verify at the sink. The incoming edges to $T$ carry:
+
+$$
+B\to T:2,\qquad D\to T:1.
+$$
+
+Thus the total flow entering the sink is
+
+$$
+2+1=3.
+$$
+
+The two computations agree, as they must for any feasible flow.
+
+**Answer:** $|f|=3$.
+
+</details>
+
+##### **4.2. Build a Residual Network** (Lecture 13, Example 2)
+
+For the current flow
+
+$$
+S\to A:2/2,\quad S\to C:0/1,\quad A\to B:1/1,\quad A\to D:0/2,
+$$
+
+$$
+C\to A:1/2,\quad C\to D:1/4,\quad B\to C:2/3,\quad B\to T:2/3,
+$$
+
+$$
+D\to B:1/2,\quad D\to T:0/1,
+$$
+
+list the positive residual capacities.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each original edge may contribute a forward residual edge for unused capacity and a reverse residual edge for cancellable current flow.
+
+Process each edge separately.
+
+| Original edge | Flow/capacity | Positive residual edges |
+| :--- | :--- | :--- |
+| $S\to A$ | $2/2$ | $A\to S$ with capacity $2$ |
+| $S\to C$ | $0/1$ | $S\to C$ with capacity $1$ |
+| $A\to B$ | $1/1$ | $B\to A$ with capacity $1$ |
+| $A\to D$ | $0/2$ | $A\to D$ with capacity $2$ |
+| $C\to A$ | $1/2$ | $C\to A$ with capacity $1$, $A\to C$ with capacity $1$ |
+| $C\to D$ | $1/4$ | $C\to D$ with capacity $3$, $D\to C$ with capacity $1$ |
+| $B\to C$ | $2/3$ | $B\to C$ with capacity $1$, $C\to B$ with capacity $2$ |
+| $B\to T$ | $2/3$ | $B\to T$ with capacity $1$, $T\to B$ with capacity $2$ |
+| $D\to B$ | $1/2$ | $D\to B$ with capacity $1$, $B\to D$ with capacity $1$ |
+| $D\to T$ | $0/1$ | $D\to T$ with capacity $1$ |
+
+Every listed residual edge has positive capacity, so it belongs to $G_f$.
+
+**Answer:** The residual network consists of the positive residual edges listed in the table above.
+
+</details>
+
+##### **4.3. Compute the Capacity of Two Cuts** (Lecture 13, Task 1)
+
+In the flow network from Section 1.1.1, compute the capacity of the following cuts:
+
+$$
+(S,T)=\langle \{S,A,B\},\{C,D,T\}\rangle
+$$
+
+and
+
+$$
+(S,T)=\langle \{S,B,D\},\{A,C,T\}\rangle.
+$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Cut capacity counts only directed edges from the source side of the cut to the sink side. Edges going backward are not included.
+
+For the first cut,
+
+$$
+S_1=\{S,A,B\},\qquad T_1=\{C,D,T\}.
+$$
+
+The edges from $S_1$ to $T_1$ are:
+
+$$
+S\to C \text{ with capacity }1,
+$$
+
+$$
+A\to D \text{ with capacity }2,
+$$
+
+$$
+B\to C \text{ with capacity }3.
+$$
+
+Therefore
+
+$$
+c(S_1,T_1)=1+2+3=6.
+$$
+
+For the second cut,
+
+$$
+S_2=\{S,B,D\},\qquad T_2=\{A,C,T\}.
+$$
+
+The lecture trace gives the crossing capacities from $S_2$ to $T_2$ as
+
+$$
+2,\ 1,\ 4,\ 1,\ 3.
+$$
+
+Thus
+
+$$
+c(S_2,T_2)=2+1+4+1+3=11.
+$$
+
+**Answer:** The cut capacities are $6$ and $11$.
+
+</details>
+
+##### **4.4. Compute Net Flow Across a Cut** (Lecture 13, Task 2)
+
+For the cut
+
+$$
+(S,T)=\langle \{S,A,B\},\{C,D,T\}\rangle,
+$$
+
+the lecture trace gives the crossing-flow calculation
+
+$$
+0+1+0+1+2-2.
+$$
+
+Compute the net flow and explain the subtraction.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Net flow across a cut is forward crossing flow minus backward crossing flow.
+
+The forward terms in the lecture calculation are
+
+$$
+0+1+0+1+2.
+$$
+
+Their sum is
+
+$$
+0+1+0+1+2=4.
+$$
+
+The final term is a backward crossing flow of $2$, which must be subtracted because it goes from the sink side of the cut back to the source side.
+
+Therefore
+
+$$
+f(S,T)=4-2=2.
+$$
+
+This value must match $|f|$ for the corresponding feasible flow, by the net-flow-across-a-cut lemma.
+
+**Answer:** The net flow across the cut is $2$.
+
+</details>
+
+##### **4.5. Compute Max Flow and a Minimum Cut** (Lecture 13, Task 3)
+
+Apply Ford-Fulkerson to the network with capacities
+
+$$
+S\to F(7),\ S\to A(2),\ F\to C(6),\ F\to B(3),\ A\to B(1),\ A\to G(3),
+$$
+
+$$
+B\to H(4),\ C\to H(4),\ C\to D(3),\ G\to H(1),\ G\to E(2),
+$$
+
+$$
+H\to D(2),\ H\to T(1),\ H\to E(4),\ D\to T(1),\ E\to T(4).
+$$
+
+Then provide one minimum cut and verify $|f|=c(S,T)$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** To prove a flow is maximum, it is enough to exhibit a cut with the same capacity.
+
+First observe the sink-side upper bound. The only edges entering $T$ are:
+
+$$
+H\to T(1),\qquad D\to T(1),\qquad E\to T(4).
+$$
+
+Thus the cut with sink side $\{T\}$ has capacity
+
+$$
+1+1+4=6.
+$$
+
+No flow can have value more than $6$.
+
+Now construct a feasible flow of value $6$ using augmenting paths.
+
+1.  Send $3$ units along
+    $$
+    S\to F\to B\to H\to E\to T.
+    $$
+    This saturates $F\to B$ and uses $3$ of the $4$ units on $E\to T$.
+
+2.  Send $1$ unit along
+    $$
+    S\to F\to C\to D\to T.
+    $$
+    This saturates $D\to T$.
+
+3.  Send $1$ unit along
+    $$
+    S\to A\to B\to H\to T.
+    $$
+    This saturates $A\to B$, $H\to T$, and fills the remaining capacity of $B\to H$.
+
+4.  Send $1$ unit along
+    $$
+    S\to A\to G\to E\to T.
+    $$
+    This fills the remaining capacity of $E\to T$.
+
+The resulting nonzero flows are:
+
+$$
+S\to F=4,\quad S\to A=2,
+$$
+
+$$
+F\to B=3,\quad F\to C=1,\quad A\to B=1,\quad A\to G=1,
+$$
+
+$$
+B\to H=4,\quad C\to D=1,\quad G\to E=1,
+$$
+
+$$
+H\to E=3,\quad H\to T=1,\quad D\to T=1,\quad E\to T=4.
+$$
+
+Check conservation:
+
+- $F$ receives $4$ and sends $3+1=4$.
+- $A$ receives $2$ and sends $1+1=2$.
+- $B$ receives $3+1=4$ and sends $4$.
+- $H$ receives $4$ and sends $3+1=4$.
+- $C$ receives $1$ and sends $1$.
+- $D$ receives $1$ and sends $1$.
+- $G$ receives $1$ and sends $1$.
+- $E$ receives $3+1=4$ and sends $4$.
+
+The value is
+
+$$
+|f|=f(S,F)+f(S,A)=4+2=6.
+$$
+
+The cut
+
+$$
+(\{S,F,A,B,C,D,G,H,E\},\{T\})
+$$
+
+has capacity
+
+$$
+c(S,T)=c(H,T)+c(D,T)+c(E,T)=1+1+4=6.
+$$
+
+Since the feasible flow value equals the cut capacity, the max-flow min-cut theorem proves that this flow is maximum and this cut is minimum.
+
+**Answer:** The maximum flow value is $6$, and one minimum cut is all vertices except $T$ on the source side and $\{T\}$ on the sink side.
+
+</details>
+
+##### **4.6. Run Edmonds-Karp on the Lecture Network** (Lecture 13, Task 4)
+
+Run Edmonds-Karp on the lecture network whose preserved BFS augmenting paths are:
+
+1. $F\to B\to H\to E$ with bottleneck $3$;
+2. $F\to C\to D\to H\to E$ with bottleneck $1$;
+3. $F\to C\to D\to H\to B\to A\to G\to E$ with bottleneck $1$.
+
+Compute the final flow value and explain why these are Edmonds-Karp-style augmentations.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Edmonds-Karp always chooses a shortest augmenting path in the current residual graph, using BFS.
+
+The preserved lecture trace lists the BFS-selected augmenting paths and their bottlenecks. We add the bottleneck values because each augmentation increases the flow value by exactly its bottleneck residual capacity.
+
+The first path contributes
+
+$$
+3.
+$$
+
+The second path contributes
+
+$$
+1.
+$$
+
+The third path contributes
+
+$$
+1.
+$$
+
+Therefore the final value reached by this trace is
+
+$$
+3+1+1=5.
+$$
+
+The slide also records the cut-capacity check
+
+$$
+3+2=5
+$$
+
+and
+
+$$
+1+4=5.
+$$
+
+These equalities are min-cut certificates: once a cut of capacity $5$ is found, no flow can exceed $5$. Since the augmenting-path trace already constructs a flow of value $5$, the flow is maximum.
+
+The reason the paths are Edmonds-Karp-style paths is not their capacities but their selection rule: at each stage BFS searches the current residual network and chooses a path with the smallest number of residual edges.
+
+**Answer:** The final maximum flow value in the lecture trace is $5$.
+
+</details>
+
+##### **4.7. Integer Capacities and Termination** (Lecture 13, Task 5)
+
+Show that if all capacities are integers, Ford-Fulkerson terminates and returns an integer maximum flow.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** With integer capacities, every residual capacity and every bottleneck remains integer.
+
+Initially all flows are zero, so all flows are integers. Assume all current flows are integers. Then every residual capacity is computed as either
+
+$$
+c(u,v)-f(u,v)
+$$
+
+or
+
+$$
+f(v,u).
+$$
+
+Both are integers. Therefore the bottleneck of any augmenting path,
+
+$$
+c_f(p)=\min\{c_f(u,v):(u,v)\in p\},
+$$
+
+is also a positive integer.
+
+When we augment, each changed edge has its flow increased or decreased by this integer bottleneck, so all flows remain integers. Also, the flow value increases by at least $1$ in every iteration.
+
+The value of any flow is bounded above by the capacity of every cut, for example the cut $(\{s\},V\setminus\{s\})$. Since this upper bound is finite, Ford-Fulkerson can perform only finitely many integer increases.
+
+When the algorithm stops, there is no augmenting path. By the max-flow min-cut theorem, the current flow is maximum.
+
+**Answer:** Integer capacities imply integer bottlenecks, so the flow value increases by at least $1$ per iteration and cannot exceed a finite cut capacity; termination and optimality follow.
+
+</details>
+
+##### **4.8. Construct a Bad DFS Example** (Lecture 13, Task 6)
+
+Construct a network where DFS-based Ford-Fulkerson performs many more augmentations than Edmonds-Karp.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** DFS can repeatedly choose long or unlucky paths through a small bottleneck, while Edmonds-Karp chooses shortest paths that avoid that behavior.
+
+Use the four-vertex network
+
+$$
+s\to a:100,\qquad s\to b:100,
+$$
+
+$$
+a\to t:100,\qquad b\to t:100,
+$$
+
+$$
+a\to b:1.
+$$
+
+If DFS explores $a$ before $t$ and chooses
+
+$$
+s\to a\to b\to t,
+$$
+
+then the bottleneck is $1$, because of edge $a\to b$. After this augmentation, a reverse residual edge $b\to a$ of capacity $1$ appears.
+
+DFS may next choose
+
+$$
+s\to b\to a\to t
+$$
+
+using that reverse edge, again augmenting only $1$ unit. With an unlucky adjacency order, the algorithm can alternate these small improvements many times, requiring $\Theta(200)$ augmentations in this concrete instance and $\Theta(C)$ augmentations if the large capacities are $C$.
+
+Edmonds-Karp, however, uses BFS. It first finds shortest paths of length $2$, such as
+
+$$
+s\to a\to t
+$$
+
+and
+
+$$
+s\to b\to t.
+$$
+
+Each has bottleneck $100$, so Edmonds-Karp finishes in two augmentations.
+
+**Answer:** The network with two $100$-capacity direct branches and a $1$-capacity middle edge makes DFS-based Ford-Fulkerson much worse than Edmonds-Karp.
+
+</details>
+
+##### **4.9. Recover a Minimum Cut from a Maximum Flow** (Lecture 13, Task 7)
+
+Given a maximum flow $f$, show how to recover a minimum cut in $O(V+E)$ time using the residual graph.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** After a maximum flow, the residual network has no augmenting path from $s$ to $t$.
+
+Build the residual network $G_f$. Then run DFS or BFS from $s$ in $G_f$ and let
+
+$$
+S=\{v\in V: v \text{ is reachable from } s \text{ in } G_f\}.
+$$
+
+Let
+
+$$
+T=V\setminus S.
+$$
+
+Because $f$ is maximum, there is no augmenting path, so $t$ is not reachable from $s$ in $G_f$. Therefore $t\in T$, and $(S,T)$ is a valid cut.
+
+Now consider any original edge $(u,v)$ with $u\in S$ and $v\in T$. If it had unused capacity, then $c_f(u,v)>0$, so $v$ would be reachable from $s$ in the residual network. That contradicts $v\in T$. Hence every edge from $S$ to $T$ is saturated.
+
+Similarly, any original edge from $T$ to $S$ carries zero flow; otherwise its reverse residual edge would allow reachability back into $T$.
+
+Thus the net flow across the cut equals its capacity:
+
+$$
+|f|=f(S,T)=c(S,T).
+$$
+
+By the max-flow min-cut theorem, this cut is minimum.
+
+The DFS or BFS scans each residual edge at most once, so the running time is
+
+$$
+O(V+E).
+$$
+
+**Answer:** Take the vertices reachable from $s$ in the final residual graph as $S$; the cut $(S,V\setminus S)$ is minimum and is found in $O(V+E)$ time.
+
+</details>
+
+##### **4.10. Monotonic BFS Distances in Edmonds-Karp** (Lecture 13, Task 8)
+
+Prove that in Edmonds-Karp, the BFS distance from $s$ to any vertex in the residual graphs never decreases.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** New residual edges created by augmentation are reverse edges of the chosen shortest path, and they point from a larger BFS layer to a smaller one.
+
+Let $d_f(v)$ be the BFS distance from $s$ to vertex $v$ in the residual network before an augmentation. Edmonds-Karp chooses a shortest augmenting path, so every edge $(u,v)$ on that path satisfies
+
+$$
+d_f(v)=d_f(u)+1.
+$$
+
+After augmenting, some forward edges on the path may disappear if they become saturated. The only new edges that can appear are reverse edges. If the path used $(u,v)$, the new reverse edge is $(v,u)$.
+
+Before augmentation,
+
+$$
+d_f(v)=d_f(u)+1,
+$$
+
+so the reverse edge points from layer $d_f(u)+1$ back to layer $d_f(u)$. Such an edge cannot create a shorter route from $s$ to $u$, because $u$ was already one layer closer than $v$.
+
+For contradiction, suppose some vertex distance decreases for the first time after an augmentation. Let $x$ be the first vertex on a newly shorter path whose new distance is smaller than before, and let $(y,x)$ be the edge that enters it on that new shortest path. This edge must be newly created, because otherwise the same shorter path would have existed before. Therefore $(y,x)$ is a reverse edge of some augmented edge $(x,y)$.
+
+But then before augmentation the chosen BFS path had
+
+$$
+d_f(y)=d_f(x)+1.
+$$
+
+The new path reaches $y$ before $x$, so it would imply a route to $x$ shorter than its old BFS distance, contradicting the choice of $x$ as the first decreased vertex and the old BFS layering.
+
+Hence no BFS distance can decrease.
+
+**Answer:** New residual edges go backward along old BFS layers, so they cannot create shorter paths from $s$; all residual BFS distances are monotonically nondecreasing.
+
+</details>
+
+##### **4.11. Reduce Bipartite Matching to Max Flow** (Lecture 13, Task 9)
+
+In a bipartite graph $G=(L\cup R,E)$, reduce maximum bipartite matching to maximum flow and justify correctness.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Unit capacities enforce the rule that each vertex can participate in at most one matched edge.
+
+Construct a flow network as follows:
+
+1. Add a source $s$.
+2. Add an edge $s\to u$ of capacity $1$ for every $u\in L$.
+3. Direct every bipartite edge from left to right: for each $\{u,v\}\in E$ with $u\in L$ and $v\in R$, add $u\to v$ with capacity $1$.
+4. Add an edge $v\to t$ of capacity $1$ for every $v\in R$.
+
+Now prove the two directions.
+
+First, any matching of size $k$ gives a flow of value $k$. For each matched edge $(u,v)$, send one unit along
+
+$$
+s\to u\to v\to t.
+$$
+
+No vertex is used twice in a matching, so no capacity-1 edge out of $s$ or into $t$ is exceeded.
+
+Second, any integral flow of value $k$ gives a matching of size $k$. Choose exactly those bipartite edges $u\to v$ that carry one unit of flow. Since every $s\to u$ edge has capacity $1$, each left vertex is used at most once. Since every $v\to t$ edge has capacity $1$, each right vertex is used at most once. Therefore the selected edges form a matching.
+
+The integrality theorem for max flow applies because all capacities are integers, so there exists an integral maximum flow.
+
+**Answer:** Add a unit-capacity source edge to each left vertex, unit-capacity directed bipartite edges, and unit-capacity sink edges from right vertices; maximum integral flow value equals maximum matching size.
+
+</details>
+
+##### **4.12. Lower and Upper Capacity Bounds** (Lecture 13, Task 10)
+
+Suppose each edge has both lower and upper capacity bounds. Outline how to reduce feasibility of such a circulation to one max-flow computation.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Lower bounds can be pre-sent, leaving a balance problem that ordinary max flow can check.
+
+Let every edge $(u,v)$ require
+
+$$
+\ell(u,v)\le f(u,v)\le c(u,v).
+$$
+
+First subtract the lower bound from each edge by defining a new capacity
+
+$$
+c'(u,v)=c(u,v)-\ell(u,v).
+$$
+
+Think of $\ell(u,v)$ units as already forced through edge $(u,v)$. This creates imbalances at vertices. For each vertex $x$, compute
+
+$$
+b(x)=\sum_{u}\ell(u,x)-\sum_{v}\ell(x,v).
+$$
+
+If $b(x)>0$, then $x$ has received too much forced inflow and must send out $b(x)$ units in the adjusted network. If $b(x)<0$, then $x$ has sent too much forced outflow and must receive $-b(x)$ units.
+
+Create a super-source $s'$ and a super-sink $t'$:
+
+- if $b(x)>0$, add $s'\to x$ with capacity $b(x)$;
+- if $b(x)<0$, add $x\to t'$ with capacity $-b(x)$.
+
+Keep every original edge with adjusted capacity $c'(u,v)$. Run max flow from $s'$ to $t'$.
+
+There is a feasible circulation with lower bounds if and only if every edge leaving $s'$ is saturated. If saturation succeeds, combine the computed adjusted flow with the reserved lower bounds:
+
+$$
+f(u,v)=\ell(u,v)+f'(u,v).
+$$
+
+If some demand edge is not saturated, the required lower-bound imbalances cannot be repaired, so no feasible circulation exists.
+
+**Answer:** Subtract lower bounds, add super-source and super-sink edges for vertex imbalances, run one max-flow computation, and check whether all super-source edges are saturated.
+
+</details>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update the Quarto website footer timestamp before rendering."""
+"""Update the home page footer timestamp before rendering."""
 
 from datetime import datetime
 from pathlib import Path
@@ -7,7 +7,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-QUARTO_CONFIG = ROOT / "_quarto.yml"
+HOME_PAGE = ROOT / "index.qmd"
 
 
 def format_timestamp() -> str:
@@ -15,16 +15,16 @@ def format_timestamp() -> str:
     return f"{now.strftime('%B')} {now.day}, {now.year} at {now:%H:%M}"
 
 
-footer = f'  page-footer: "Last updated: {format_timestamp()}"'
-text = QUARTO_CONFIG.read_text(encoding="utf-8")
+footer = f'<div class="inn-home-last-updated">Last updated: {format_timestamp()}</div>'
+text = HOME_PAGE.read_text(encoding="utf-8")
 next_text, count = re.subn(
-    r'(?m)^  page-footer:\s*".*"$',
+    r'(?m)^<div class="inn-home-last-updated">Last updated: .*?</div>$',
     footer,
     text,
     count=1,
 )
 
 if count == 0:
-    next_text = text.replace("website:\n", f"website:\n{footer}\n", 1)
+    next_text = text.rstrip() + f"\n\n{footer}\n"
 
-QUARTO_CONFIG.write_text(next_text, encoding="utf-8")
+HOME_PAGE.write_text(next_text, encoding="utf-8")

@@ -1,0 +1,2258 @@
+---
+title: "W15. Coordination and Recovery Patterns"
+author: "Eugene Zouev, Munir Makhmutov"
+date: "April 28, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Theory**
+
+##### **1.1 Design Patterns in Context**
+
+This week closes the design-patterns part of the course with four patterns: **Mediator**, **Memento**, **Template Method**, and **Abstract Factory**. The first three are **behavioral patterns** because they organize how objects communicate, remember state, or distribute algorithm steps. Abstract Factory is a **creational pattern** because it organizes how related objects are created.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "This week's patterns inside the GoF taxonomy"
+%%| fig-width: 7
+%%| fig-height: 3.2
+flowchart TB
+    Patterns["Design Patterns"]
+    Behavioral["Behavioral"]
+    Creational["Creational"]
+    Mediator["Mediator"]
+    Memento["Memento"]
+    Template["Template Method"]
+    AbstractFactory["Abstract Factory"]
+    Patterns --> Behavioral
+    Patterns --> Creational
+    Behavioral --> Mediator
+    Behavioral --> Memento
+    Behavioral --> Template
+    Creational --> AbstractFactory
+```
+
+The common theme is **control of dependencies**. Mediator prevents many objects from depending directly on one another. Memento prevents external objects from depending on an object's private state representation. Template Method prevents subclasses from changing the structure of an algorithm. Abstract Factory prevents client code from depending on concrete product classes.
+
+| Pattern | Main problem | Main idea |
+|:---|:---|:---|
+| **Mediator** | Too many direct object-to-object dependencies | Route collaboration through one mediator object |
+| **Memento** | Need undo/rollback without exposing internals | Store snapshots in memento objects |
+| **Template Method** | Similar algorithms duplicate the same structure | Put the algorithm skeleton in a superclass |
+| **Abstract Factory** | Need compatible product families without concrete classes | Create products through a family-specific factory |
+
+##### **1.2 Mediator**
+
+###### **1.2.1 Definition and Motivation**
+
+**Mediator** is a behavioral pattern that reduces chaotic dependencies between objects by restricting direct communication and forcing objects to collaborate through a **mediator object**. Other names are **Intermediary** and **Controller**.
+
+Without Mediator, a system with many interactive components can quickly become a dense graph of dependencies. For example, in a dialog window, a checkbox may enable a textbox, a button may validate text, a list may update a preview, and a filter may change visible records. If every component knows every other component, a small change in one interaction may require changes in many classes.
+
+Mediator replaces this many-to-many communication with a hub-and-spoke structure:
+
+*   components know the mediator;
+*   the mediator knows the components it coordinates;
+*   components notify the mediator when something happens;
+*   the mediator decides what other components should do.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Mediator pattern: components communicate through a mediator"
+%%| fig-width: 7.4
+%%| fig-height: 4.5
+classDiagram
+    class Mediator {
+        <<interface>>
+        +notify(sender)
+    }
+    class ConcreteMediator {
+        -componentA
+        -componentB
+        -componentC
+        +notify(sender)
+        +reactOnA()
+        +reactOnB()
+    }
+    class ComponentA {
+        -m: Mediator
+        +operationA()
+    }
+    class ComponentB {
+        -m: Mediator
+        +operationB()
+    }
+    class ComponentC {
+        -m: Mediator
+        +operationC()
+    }
+    ConcreteMediator ..|> Mediator
+    ComponentA --> Mediator
+    ComponentB --> Mediator
+    ComponentC --> Mediator
+    ConcreteMediator --> ComponentA
+    ConcreteMediator --> ComponentB
+    ConcreteMediator --> ComponentC
+```
+
+###### **1.2.2 Participants and Runtime Flow**
+
+The standard Mediator structure has three main roles:
+
+*   **Mediator**: declares the communication method, commonly `notify(sender)` or `notify(sender, event)`.
+*   **ConcreteMediator**: stores references to coordinated components and implements the interaction logic.
+*   **Components**: perform local work and notify the mediator instead of calling each other directly.
+
+The runtime flow is simple. A component performs an operation, then calls the mediator. The mediator checks which component sent the notification and runs the corresponding coordination logic:
+
+```java
+if (sender == componentA) {
+    reactOnA();
+}
+```
+
+A component method therefore looks like this:
+
+```java
+public void operationD() {
+    mediator.notify(this);
+}
+```
+
+The important design point is that `ComponentD` does not need to know whether `ComponentA`, `ComponentB`, or `ComponentC` exists. It only knows the mediator interface.
+
+###### **1.2.3 Properties, Applicability, and Risks**
+
+Mediator provides four practical benefits.
+
+**Decoupling** means components are no longer directly dependent on all other components they interact with. **Simplification** means interaction logic is centralized instead of scattered across many classes. **Reusability** means components can often be reused in a different context by connecting them to a different mediator. **Extensibility** means new components can be added by extending the mediator's coordination rules rather than rewriting all existing components.
+
+Mediator is useful when:
+
+*   a set of objects communicates in many different combinations;
+*   changing one interaction forces changes in several component classes;
+*   components should be reusable independently from a particular screen, workflow, or subsystem;
+*   a central controller naturally owns the business rule for interaction.
+
+The main risk is creating a **god mediator**: a huge class that contains too much unrelated logic. This happens when the mediator becomes responsible not only for coordination, but also for all domain behavior. The solution is to keep components responsible for their own local work and split large mediators by screen, subsystem, workflow, or bounded context.
+
+###### **1.2.4 Chat Example**
+
+A text chat is a natural Mediator example. Users do not send messages directly to each other. Each user sends a message to the chat mediator, and the mediator forwards it to all other users.
+
+The mediator interface defines the allowed communication:
+
+```java
+public interface ChatMediator {
+    void sendMessage(Message message);
+    void addUser(User user);
+}
+```
+
+The concrete mediator stores the participants:
+
+```java
+public class ChatMediatorImplementation implements ChatMediator {
+    private List<User> userList = new ArrayList<>();
+
+    @Override
+    public void sendMessage(Message message) {
+        for (User user : userList) {
+            if (user != message.getSender()) {
+                user.receiveMessage(message);
+            }
+        }
+    }
+
+    @Override
+    public void addUser(User user) {
+        userList.add(user);
+    }
+}
+```
+
+The `Message` object is important because it carries both the content and the sender:
+
+```java
+public class Message {
+    private final User sender;
+    private final String content;
+
+    public Message(User sender, String content) {
+        this.sender = sender;
+        this.content = content;
+    }
+}
+```
+
+Each user sends through the mediator:
+
+```java
+public void sendMessage(String content) {
+    mediator.sendMessage(new Message(this, content));
+}
+```
+
+This preserves the core Mediator rule: a user does not need references to all other users in the chat.
+
+##### **1.3 Memento**
+
+###### **1.3.1 Definition and Motivation**
+
+**Memento** is a behavioral pattern that saves and restores a previous state of an object without revealing the details of its implementation. Another name is **Snapshot**.
+
+The pattern is needed whenever a system must support undo, redo, rollback, checkpoints, or history. A text editor is the standard example: after typing several edits, the user expects to return to a previous version. The editor's internal state may include text, cursor position, selection, styles, metadata, and other implementation details. External history management should not be allowed to modify those internals directly.
+
+Memento separates responsibilities:
+
+*   the **Originator** owns the real state and knows how to save and restore itself;
+*   the **Memento** stores a snapshot of that state;
+*   the **Caretaker** stores mementos and decides when to restore one, but does not inspect or modify the saved state.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Memento pattern: originator creates snapshots, caretaker stores them"
+%%| fig-width: 7.2
+%%| fig-height: 4.2
+classDiagram
+    class Originator {
+        -state
+        +save(): Memento
+        +restore(m: Memento)
+    }
+    class Memento {
+        -state
+    }
+    class Caretaker {
+        -history: Memento[]
+        +backup()
+        +undo()
+    }
+    Originator --> Memento : creates/restores
+    Caretaker o-- Memento : stores
+    Caretaker --> Originator
+```
+
+###### **1.3.2 Implementation Variants**
+
+There are several common ways to implement Memento.
+
+**Nested memento class.** In languages that support nested classes, the memento can be nested inside the originator. This lets the originator access private saved state while the caretaker only stores opaque memento objects.
+
+```java
+public class TextEditor {
+    private String text;
+
+    public Memento save() {
+        return new Memento(text);
+    }
+
+    public void restore(Memento memento) {
+        this.text = memento.getSavedText();
+    }
+
+    public static class Memento {
+        private final String text;
+
+        private Memento(String textToSave) {
+            this.text = textToSave;
+        }
+
+        private String getSavedText() {
+            return text;
+        }
+    }
+}
+```
+
+**Intermediate interface.** If nested classes are not appropriate, the caretaker can store only a `Memento` interface while the originator casts to a concrete memento internally:
+
+```java
+Memento m = originator.save();
+history.push(m);
+
+ConcreteMemento cm = (ConcreteMemento) m;
+state = cm.getState();
+```
+
+This reduces what the caretaker can see, although the originator still knows the concrete snapshot type.
+
+**Stricter encapsulation.** A stricter variant gives the memento its own `restore()` method. The caretaker still cannot inspect state; it only asks the memento to restore the originator it captured:
+
+```java
+public interface Memento {
+    void restore();
+}
+```
+
+This variant is useful when the design must fully prevent access to both the originator's state and the memento's stored copy.
+
+###### **1.3.3 Editor Example**
+
+In the simple editor example, `Editor` is the originator, `EditorMemento` is the snapshot, and `History` is the caretaker.
+
+```java
+public class Editor {
+    private String content = "";
+
+    public void type(String words) {
+        content += words;
+    }
+
+    public EditorMemento save() {
+        return new EditorMemento(content);
+    }
+
+    public void restore(EditorMemento memento) {
+        content = memento.getContent();
+    }
+}
+```
+
+The memento stores immutable state:
+
+```java
+public class EditorMemento {
+    private final String content;
+
+    public EditorMemento(String content) {
+        this.content = content;
+    }
+
+    public String getContent() {
+        return content;
+    }
+}
+```
+
+The history object stores saved versions:
+
+```java
+public class History {
+    private final List<EditorMemento> mementos = new ArrayList<>();
+
+    public void add(EditorMemento memento) {
+        mementos.add(memento);
+    }
+
+    public EditorMemento get(int index) {
+        return mementos.get(index);
+    }
+}
+```
+
+The important point is that `History` does not edit the editor's state. It only stores and returns snapshot objects.
+
+##### **1.4 Template Method**
+
+###### **1.4.1 Definition and Motivation**
+
+**Template Method** is a behavioral pattern that defines the skeleton of an algorithm in a superclass but lets subclasses override specific steps without changing the algorithm's structure.
+
+The pattern is useful when several classes perform the same overall procedure but differ in some details. For example, data-mining classes for DOC, CSV, and PDF files may all follow the same structure:
+
+1.  open a file;
+2.  extract raw data;
+3.  parse data;
+4.  analyze data;
+5.  send a report;
+6.  close the file.
+
+If each class copies this full algorithm, the code duplicates structure and becomes harder to maintain. Template Method moves the invariant sequence into a superclass and leaves only variable steps for subclasses.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Template Method pattern: superclass fixes the algorithm skeleton"
+%%| fig-width: 7
+%%| fig-height: 4.4
+classDiagram
+    class AbstractClass {
+        +templateMethod()
+        +step1()
+        +step2()
+        +step3()
+        +hook()
+    }
+    class ConcreteClassA {
+        +step2()
+        +step3()
+    }
+    class ConcreteClassB {
+        +step1()
+        +step2()
+        +step3()
+        +hook()
+    }
+    AbstractClass <|-- ConcreteClassA
+    AbstractClass <|-- ConcreteClassB
+```
+
+###### **1.4.2 Template Methods, Steps, and Hooks**
+
+A **template method** is the method that contains the algorithm skeleton. It is often declared `final` so subclasses cannot reorder the algorithm.
+
+The operations called by the template method fall into three categories:
+
+*   **abstract steps**, which every subclass must implement;
+*   **default steps**, which have a superclass implementation but may be overridden;
+*   **hooks**, which are optional extension points with default behavior.
+
+The recipe example demonstrates all three ideas:
+
+```java
+public abstract class Recipe {
+
+    public final void cookRecipeTemplate() {
+        prepareIngredients();
+        cook();
+        if (isSpecialDish()) {
+            garnish();
+        }
+        serve();
+    }
+
+    public void cook() {
+        System.out.println("Cook main recipe");
+    }
+
+    public void prepareIngredients() {
+        System.out.println("Prepare ingredients");
+    }
+
+    public void serve() {
+        System.out.println("Serve the hot dish");
+    }
+
+    public boolean isSpecialDish() {
+        return false;
+    }
+
+    public void garnish() {
+        System.out.println("Garnish the dish");
+    }
+}
+```
+
+Here `cookRecipeTemplate()` fixes the sequence. `prepareIngredients()`, `cook()`, and `serve()` are steps with default behavior. `isSpecialDish()` is a hook: subclasses may override it to enable the optional `garnish()` step.
+
+###### **1.4.3 Applicability and Risks**
+
+Template Method is appropriate when:
+
+*   several algorithms have identical structure but different internal steps;
+*   subclasses should be able to customize parts of an algorithm but not its order;
+*   duplicate procedural code appears across related classes;
+*   a framework needs to call user-defined operations at specific extension points.
+
+The main risk is overusing inheritance. Template Method couples subclasses to the superclass's protected operations and algorithm skeleton. If behavior must be swapped freely at runtime, Strategy may be a better fit because Strategy uses composition instead of inheritance.
+
+##### **1.5 Abstract Factory**
+
+###### **1.5.1 Definition and Motivation**
+
+**Abstract Factory** is a creational pattern that produces families of related objects without specifying their concrete classes.
+
+The key word is **families**. Suppose an application needs a button and a checkbox. On Windows, both should look like Windows widgets. On macOS, both should look like macOS widgets. The client should not create `WindowsButton` and `WindowsCheckbox` directly, because then platform choices leak throughout the application.
+
+Abstract Factory moves the product choice into a factory object. The application receives a factory and asks it for abstract products:
+
+```java
+Button button = factory.createButton();
+Checkbox checkbox = factory.createCheckbox();
+```
+
+The concrete factory decides which concrete classes are created.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Abstract Factory pattern: each concrete factory creates one compatible product family"
+%%| fig-width: 8
+%%| fig-height: 5.0
+classDiagram
+    class Client {
+        -factory: AbstractFactory
+        +someOperation()
+    }
+    class AbstractFactory {
+        <<interface>>
+        +createProductA()
+        +createProductB()
+    }
+    class ConcreteFactory1
+    class ConcreteFactory2
+    class AbstractProductA {
+        <<interface>>
+    }
+    class AbstractProductB {
+        <<interface>>
+    }
+    class ProductA1
+    class ProductA2
+    class ProductB1
+    class ProductB2
+    Client --> AbstractFactory
+    ConcreteFactory1 ..|> AbstractFactory
+    ConcreteFactory2 ..|> AbstractFactory
+    ProductA1 ..|> AbstractProductA
+    ProductA2 ..|> AbstractProductA
+    ProductB1 ..|> AbstractProductB
+    ProductB2 ..|> AbstractProductB
+    ConcreteFactory1 ..> ProductA1
+    ConcreteFactory1 ..> ProductB1
+    ConcreteFactory2 ..> ProductA2
+    ConcreteFactory2 ..> ProductB2
+```
+
+###### **1.5.2 Participants**
+
+The standard participants are:
+
+*   **AbstractFactory**: declares creation methods for every product type in the family.
+*   **ConcreteFactory**: creates one variant of every product type.
+*   **AbstractProduct**: declares the interface for a product family member.
+*   **ConcreteProduct**: implements a specific product variant.
+*   **Client**: uses only abstract factory and abstract product interfaces.
+
+For GUI widgets, the product families are `Button` and `Checkbox`, and the variants are Windows and macOS:
+
+```java
+public interface GUIFactory {
+    Button createButton();
+    Checkbox createCheckbox();
+}
+
+public class MacOSFactory implements GUIFactory {
+    public Button createButton() {
+        return new MacOSButton();
+    }
+
+    public Checkbox createCheckbox() {
+        return new MacOSCheckbox();
+    }
+}
+```
+
+The application remains independent from concrete widget classes:
+
+```java
+public class Application {
+    private Button button;
+    private Checkbox checkbox;
+
+    public Application(GUIFactory factory) {
+        button = factory.createButton();
+        checkbox = factory.createCheckbox();
+    }
+}
+```
+
+###### **1.5.3 Applicability, Pros, and Cons**
+
+Use Abstract Factory when:
+
+*   code must work with several families of related products;
+*   products from one family must be compatible with each other;
+*   concrete product classes should be unknown to client code;
+*   the product family may be selected at runtime from configuration, platform, environment, or user choice.
+
+The benefits are strong compatibility guarantees, reduced coupling to concrete classes, better separation of product creation logic, and easier addition of new product variants. The cost is additional complexity: the pattern introduces several interfaces and concrete classes, so it should be used when the family structure is real, not for isolated one-off objects.
+
+#### **2. Definitions**
+
+*   **Abstract Factory**: A creational design pattern that creates families of related objects through factory interfaces without exposing concrete product classes to clients.
+*   **Abstract Product**: An interface or abstract class that represents one type of product created by an abstract factory.
+*   **Caretaker**: The Memento participant that stores snapshots and decides when to restore them, without inspecting their internal state.
+*   **Component**: In Mediator, an object that performs local behavior and notifies the mediator instead of communicating directly with other components.
+*   **Concrete Factory**: A factory that creates all products belonging to one specific product variant or family.
+*   **Concrete Mediator**: The object that coordinates communication between concrete components.
+*   **Concrete Product**: A specific implementation of an abstract product interface.
+*   **Hook**: An optional operation in Template Method that subclasses may override to influence the algorithm without changing its structure.
+*   **Mediator**: A behavioral design pattern that centralizes object interaction in a mediator object to reduce direct dependencies.
+*   **Memento**: A behavioral design pattern that stores an object's previous state so it can be restored later without exposing implementation details.
+*   **Originator**: The Memento participant that owns the real state and creates or restores snapshots.
+*   **Snapshot**: Another name for a memento object that captures a saved state.
+*   **Template Method**: A behavioral design pattern that places an algorithm skeleton in a superclass while allowing subclasses to override selected steps.
+*   **Template method**: The method that defines the fixed sequence of an algorithm in the Template Method pattern.
+
+#### **3. Practice**
+
+##### **3.1. Lecture Recap - Pattern Purposes and Scenarios** (Lab 15, Task 1)
+
+Answer the recap questions from the lab:
+
+*   What is the purpose of Template Method, and where is it useful?
+*   What is the purpose of Mediator, and where is it useful?
+*   What is the purpose of Memento, and where is it useful?
+*   What is the purpose of Abstract Factory, and where is it useful?
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** Each pattern should be recognized by the dependency problem it solves, not by a memorized class diagram.
+
+1.  **Template Method**
+
+    Template Method defines the fixed skeleton of an algorithm in a superclass and lets subclasses override selected steps. It is useful when several classes repeat the same algorithm structure but differ in details.
+
+    A real-world scenario is a document export pipeline. Exporting to PDF, HTML, and plain text may all follow the same sequence: load document, validate content, transform data, render output, write file, and log the result. The transformation and rendering steps differ, but the overall sequence should remain stable.
+
+2.  **Mediator**
+
+    Mediator centralizes communication between objects so they do not depend directly on one another. It is useful when a set of objects has many interactions and the dependency graph becomes hard to maintain.
+
+    A real-world scenario is air traffic control. Aircraft do not negotiate landing order directly with every other aircraft. They communicate with the control tower, and the tower coordinates safe movement.
+
+3.  **Memento**
+
+    Memento saves and restores object state without exposing the object's internal representation. It is useful for undo, redo, transaction rollback, editor history, game checkpoints, and version recovery.
+
+    A real-world scenario is a text editor. The editor can create snapshots after meaningful edits. The undo manager stores these snapshots and asks the editor to restore them later, without directly modifying the editor's private fields.
+
+4.  **Abstract Factory**
+
+    Abstract Factory creates families of related objects without specifying concrete classes. It is useful when products must be compatible with one another and the concrete family is selected dynamically.
+
+    A real-world scenario is a cross-platform GUI toolkit. A macOS factory creates macOS buttons and checkboxes; a Windows factory creates Windows buttons and checkboxes. The application works with `Button`, `Checkbox`, and `GUIFactory` interfaces rather than platform-specific classes.
+
+</details>
+
+##### **3.2. Cooking Recipes with Template Method** (Lab 15, Task 2)
+
+Design a simple cooking recipe application. Each recipe has unique ingredients and preparation steps, but the general presentation structure is fixed: list ingredients, prepare the recipe, and serve the dish. Implement `CakeRecipe` and `SaladRecipe`, call `makeRecipe()` on both, and demonstrate Template Method.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** `makeRecipe()` must be the template method. It owns the order of the algorithm. Subclasses supply only the variable details.
+
+**Step 1 - Define the abstract template class.**
+
+```java
+public abstract class RecipeTemplate {
+    protected String[] ingredients;
+
+    public RecipeTemplate(String[] ingredients) {
+        this.ingredients = ingredients;
+    }
+
+    public final void makeRecipe() {
+        listIngredients();
+        prepareRecipe();
+        serve();
+    }
+
+    public void listIngredients() {
+        System.out.println("Ingredients:");
+        for (String ingredient : ingredients) {
+            System.out.println("- " + ingredient);
+        }
+    }
+
+    public abstract void prepareRecipe();
+
+    public void serve() {
+        System.out.println("Serve the dish.");
+    }
+}
+```
+
+`makeRecipe()` is `final` because subclasses should not reorder the recipe presentation. `prepareRecipe()` is abstract because cake and salad preparation differ.
+
+**Step 2 - Implement the concrete recipes.**
+
+```java
+public class CakeRecipe extends RecipeTemplate {
+    public CakeRecipe() {
+        super(new String[] {"flour", "sugar", "eggs", "butter"});
+    }
+
+    @Override
+    public void prepareRecipe() {
+        System.out.println("Mix the batter, pour it into a pan, and bake it.");
+    }
+}
+
+public class SaladRecipe extends RecipeTemplate {
+    public SaladRecipe() {
+        super(new String[] {"lettuce", "tomatoes", "cucumber", "olive oil"});
+    }
+
+    @Override
+    public void prepareRecipe() {
+        System.out.println("Wash and chop vegetables, then toss them with olive oil.");
+    }
+}
+```
+
+The subclasses do not duplicate the common order. They provide ingredients and the preparation step.
+
+**Step 3 - Demonstrate the pattern.**
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        RecipeTemplate cake = new CakeRecipe();
+        cake.makeRecipe();
+
+        System.out.println();
+
+        RecipeTemplate salad = new SaladRecipe();
+        salad.makeRecipe();
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Ingredients:
+- flour
+- sugar
+- eggs
+- butter
+Mix the batter, pour it into a pan, and bake it.
+Serve the dish.
+
+Ingredients:
+- lettuce
+- tomatoes
+- cucumber
+- olive oil
+Wash and chop vegetables, then toss them with olive oil.
+Serve the dish.
+```
+
+**Why this is Template Method:** the superclass controls the invariant algorithm `listIngredients() -> prepareRecipe() -> serve()`, while each subclass customizes the recipe-specific step.
+
+</details>
+
+##### **3.3. Smart House Coordination with Mediator** (Lab 15, Task 3)
+
+Complete a smart house system using Mediator. Devices such as door locks, motion sensors, lights, and alarms should communicate through a mediator rather than calling each other directly.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** Smart devices are components. The home controller is the mediator. Each device reports events to the mediator, and the mediator coordinates other devices.
+
+**Step 1 - Declare the mediator interface and base device.**
+
+```cpp
+#include <iostream>
+#include <string>
+#include <vector>
+
+class SmartDevice;
+
+class SmartHomeMediator {
+public:
+    virtual void notify(SmartDevice* sender, const std::string& event) = 0;
+    virtual ~SmartHomeMediator() = default;
+};
+
+class SmartDevice {
+protected:
+    SmartHomeMediator* mediator;
+    std::string name;
+
+public:
+    SmartDevice(const std::string& name, SmartHomeMediator* mediator)
+        : mediator(mediator), name(name) {}
+
+    std::string getName() const {
+        return name;
+    }
+
+    virtual ~SmartDevice() = default;
+};
+```
+
+Every concrete device stores only the mediator pointer. It does not store pointers to all other devices.
+
+**Step 2 - Implement concrete devices.**
+
+```cpp
+class DoorLock : public SmartDevice {
+public:
+    DoorLock(SmartHomeMediator* mediator)
+        : SmartDevice("Door lock", mediator) {}
+
+    void unlock() {
+        std::cout << "Door is unlocked\n";
+        mediator->notify(this, "door_unlocked");
+    }
+
+    void lock() {
+        std::cout << "Door is locked\n";
+    }
+};
+
+class MotionSensor : public SmartDevice {
+public:
+    MotionSensor(SmartHomeMediator* mediator)
+        : SmartDevice("Motion sensor", mediator) {}
+
+    void detectMotion() {
+        std::cout << "Motion detected\n";
+        mediator->notify(this, "motion_detected");
+    }
+};
+
+class Light : public SmartDevice {
+public:
+    Light(SmartHomeMediator* mediator)
+        : SmartDevice("Light", mediator) {}
+
+    void turnOn() {
+        std::cout << "Lights are on\n";
+    }
+
+    void turnOff() {
+        std::cout << "Lights are off\n";
+    }
+};
+
+class Alarm : public SmartDevice {
+public:
+    Alarm(SmartHomeMediator* mediator)
+        : SmartDevice("Alarm", mediator) {}
+
+    void trigger() {
+        std::cout << "Alarm is triggered\n";
+    }
+
+    void disable() {
+        std::cout << "Alarm is disabled\n";
+    }
+};
+```
+
+`DoorLock` and `MotionSensor` report events. `Light` and `Alarm` provide actions that the mediator may call.
+
+**Step 3 - Implement the concrete mediator.**
+
+```cpp
+class HomeController : public SmartHomeMediator {
+private:
+    DoorLock* door = nullptr;
+    MotionSensor* sensor = nullptr;
+    Light* light = nullptr;
+    Alarm* alarm = nullptr;
+
+public:
+    void setDevices(DoorLock* d, MotionSensor* s, Light* l, Alarm* a) {
+        door = d;
+        sensor = s;
+        light = l;
+        alarm = a;
+    }
+
+    void notify(SmartDevice* sender, const std::string& event) override {
+        if (event == "door_unlocked") {
+            alarm->disable();
+            light->turnOn();
+        } else if (event == "motion_detected") {
+            light->turnOn();
+            alarm->trigger();
+        }
+    }
+};
+```
+
+The controller owns the coordination rules. For example, if motion is detected, it turns on the lights and triggers the alarm.
+
+**Step 4 - Demonstrate the system.**
+
+```cpp
+int main() {
+    HomeController controller;
+
+    DoorLock door(&controller);
+    MotionSensor sensor(&controller);
+    Light light(&controller);
+    Alarm alarm(&controller);
+
+    controller.setDevices(&door, &sensor, &light, &alarm);
+
+    door.unlock();
+    sensor.detectMotion();
+}
+```
+
+**Expected output:**
+
+```text
+Door is unlocked
+Alarm is disabled
+Lights are on
+Motion detected
+Lights are on
+Alarm is triggered
+```
+
+**Why this is Mediator:** neither `DoorLock` nor `MotionSensor` knows which other devices react to an event. The mediator contains that policy.
+
+</details>
+
+##### **3.4. Text Editor Undo/Redo with Memento** (Lab 15, Task 4)
+
+Build a text editor that supports undo and redo using Memento. Identify the Originator and Caretaker classes, and implement the missing behavior in `TextEditor` and `UndoRedoManager`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** `TextEditor` is the Originator because it owns the editable text. `UndoRedoManager` is the Caretaker because it stores snapshots and chooses which one to restore.
+
+**Step 1 - Implement the originator and memento.**
+
+```cpp
+#include <iostream>
+#include <stack>
+#include <string>
+
+class TextEditor {
+private:
+    std::string text;
+
+public:
+    class Memento {
+    private:
+        std::string savedText;
+
+    public:
+        explicit Memento(const std::string& text) : savedText(text) {}
+
+        std::string getSavedText() const {
+            return savedText;
+        }
+    };
+
+    void setText(const std::string& newText) {
+        text = newText;
+    }
+
+    void appendText(const std::string& extraText) {
+        text += extraText;
+    }
+
+    std::string getText() const {
+        return text;
+    }
+
+    Memento save() const {
+        return Memento(text);
+    }
+
+    void restore(const Memento& memento) {
+        text = memento.getSavedText();
+    }
+};
+```
+
+The memento stores a copy of the editor text. In a richer editor it could also store cursor position, selected range, style spans, and modification time.
+
+**Step 2 - Implement undo and redo history.**
+
+```cpp
+class UndoRedoManager {
+private:
+    TextEditor& editor;
+    std::stack<TextEditor::Memento> undoStack;
+    std::stack<TextEditor::Memento> redoStack;
+
+public:
+    explicit UndoRedoManager(TextEditor& editor) : editor(editor) {}
+
+    void backup() {
+        undoStack.push(editor.save());
+        while (!redoStack.empty()) {
+            redoStack.pop();
+        }
+    }
+
+    void undo() {
+        if (undoStack.empty()) {
+            return;
+        }
+
+        redoStack.push(editor.save());
+        TextEditor::Memento previous = undoStack.top();
+        undoStack.pop();
+        editor.restore(previous);
+    }
+
+    void redo() {
+        if (redoStack.empty()) {
+            return;
+        }
+
+        undoStack.push(editor.save());
+        TextEditor::Memento next = redoStack.top();
+        redoStack.pop();
+        editor.restore(next);
+    }
+};
+```
+
+`backup()` clears the redo stack because a new edit after an undo creates a new history branch. This is the behavior users expect from common editors.
+
+**Step 3 - Demonstrate the behavior.**
+
+```cpp
+int main() {
+    TextEditor editor;
+    UndoRedoManager history(editor);
+
+    editor.setText("Hello");
+    history.backup();
+
+    editor.appendText(", world");
+    history.backup();
+
+    editor.appendText("!");
+    std::cout << editor.getText() << "\n";
+
+    history.undo();
+    std::cout << editor.getText() << "\n";
+
+    history.undo();
+    std::cout << editor.getText() << "\n";
+
+    history.redo();
+    std::cout << editor.getText() << "\n";
+}
+```
+
+**Expected output:**
+
+```text
+Hello, world!
+Hello, world
+Hello
+Hello, world
+```
+
+**Why this is Memento:** the manager stores snapshots but never edits the `text` field directly. Only the originator knows how to restore its own state.
+
+</details>
+
+##### **3.5. GUI Widgets with Abstract Factory** (Lab 15, Task 5)
+
+Implement the UML class diagram representing Abstract Factory for platform-specific buttons and checkboxes. Demonstrate the solution by instantiating a factory for a specific operating system and creating widgets through that factory.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The application should depend on `GUIFactory`, `Button`, and `Checkbox`, not on `WinButton`, `MacButton`, `WinCheckbox`, or `MacCheckbox`.
+
+**Step 1 - Define abstract products.**
+
+```java
+public interface Button {
+    void paint();
+}
+
+public interface Checkbox {
+    void paint();
+}
+```
+
+These interfaces represent product families. Every button variant implements `Button`; every checkbox variant implements `Checkbox`.
+
+**Step 2 - Define concrete products.**
+
+```java
+public class WinButton implements Button {
+    @Override
+    public void paint() {
+        System.out.println("Rendering a Windows button");
+    }
+}
+
+public class MacButton implements Button {
+    @Override
+    public void paint() {
+        System.out.println("Rendering a macOS button");
+    }
+}
+
+public class WinCheckbox implements Checkbox {
+    @Override
+    public void paint() {
+        System.out.println("Rendering a Windows checkbox");
+    }
+}
+
+public class MacCheckbox implements Checkbox {
+    @Override
+    public void paint() {
+        System.out.println("Rendering a macOS checkbox");
+    }
+}
+```
+
+**Step 3 - Define the abstract factory and concrete factories.**
+
+```java
+public interface GUIFactory {
+    Button createButton();
+    Checkbox createCheckbox();
+}
+
+public class WinFactory implements GUIFactory {
+    @Override
+    public Button createButton() {
+        return new WinButton();
+    }
+
+    @Override
+    public Checkbox createCheckbox() {
+        return new WinCheckbox();
+    }
+}
+
+public class MacFactory implements GUIFactory {
+    @Override
+    public Button createButton() {
+        return new MacButton();
+    }
+
+    @Override
+    public Checkbox createCheckbox() {
+        return new MacCheckbox();
+    }
+}
+```
+
+Each factory creates one compatible family. `WinFactory` never returns a macOS product.
+
+**Step 4 - Use the factory from client code.**
+
+```java
+public class Application {
+    private final Button button;
+    private final Checkbox checkbox;
+
+    public Application(GUIFactory factory) {
+        button = factory.createButton();
+        checkbox = factory.createCheckbox();
+    }
+
+    public void paint() {
+        button.paint();
+        checkbox.paint();
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        GUIFactory factory = new MacFactory();
+        Application app = new Application(factory);
+        app.paint();
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Rendering a macOS button
+Rendering a macOS checkbox
+```
+
+**Why this is Abstract Factory:** the client selects one factory and receives a compatible set of products through abstract interfaces.
+
+</details>
+
+##### **3.6. Extending the Chat Mediator** (Lecture 15, Task 1)
+
+The lecture exercise asks to test the chat solution, add audio/video messages, and add other types of users such as chat admins.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** Keep the chat mediator responsible for routing, but let message classes and user subclasses express the new behavior.
+
+**Step 1 - Introduce message types.**
+
+```java
+public enum MessageType {
+    TEXT,
+    AUDIO,
+    VIDEO
+}
+
+public class Message {
+    private final User sender;
+    private final String content;
+    private final MessageType type;
+
+    public Message(User sender, String content, MessageType type) {
+        this.sender = sender;
+        this.content = content;
+        this.type = type;
+    }
+
+    public User getSender() {
+        return sender;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public MessageType getType() {
+        return type;
+    }
+}
+```
+
+The sender remains part of the message, so the mediator can still avoid echoing a message back to its sender.
+
+**Step 2 - Extend users without changing the mediator interface.**
+
+```java
+public class User {
+    protected final String name;
+    protected final ChatMediator mediator;
+
+    public User(String name, ChatMediator mediator) {
+        this.name = name;
+        this.mediator = mediator;
+    }
+
+    public void sendText(String content) {
+        mediator.sendMessage(new Message(this, content, MessageType.TEXT));
+    }
+
+    public void sendAudio(String content) {
+        mediator.sendMessage(new Message(this, content, MessageType.AUDIO));
+    }
+
+    public void sendVideo(String content) {
+        mediator.sendMessage(new Message(this, content, MessageType.VIDEO));
+    }
+
+    public void receiveMessage(Message message) {
+        System.out.println(name + " received " + message.getType() + ": "
+                + message.getSender().name + " -> " + message.getContent());
+    }
+}
+
+public class AdminUser extends User {
+    public AdminUser(String name, ChatMediator mediator) {
+        super(name, mediator);
+    }
+
+    public void mute(User user) {
+        System.out.println(name + " muted " + user.name);
+    }
+}
+```
+
+`AdminUser` is still a user, so it can participate in mediator-based communication. Its extra behavior does not force ordinary users to change.
+
+**Step 3 - Use the original mediator routing rule.**
+
+```java
+public class ChatMediatorImplementation implements ChatMediator {
+    private final List<User> userList = new ArrayList<>();
+
+    @Override
+    public void sendMessage(Message message) {
+        for (User user : userList) {
+            if (user != message.getSender()) {
+                user.receiveMessage(message);
+            }
+        }
+    }
+
+    @Override
+    public void addUser(User user) {
+        userList.add(user);
+    }
+}
+```
+
+The mediator does not need separate methods for text, audio, and video. It routes a `Message` object.
+
+**Step 4 - Demonstrate the extension.**
+
+```java
+ChatMediator mediator = new ChatMediatorImplementation();
+User vlad = new User("Vlad", mediator);
+User lara = new User("Lara", mediator);
+AdminUser max = new AdminUser("Max", mediator);
+
+mediator.addUser(vlad);
+mediator.addUser(lara);
+mediator.addUser(max);
+
+vlad.sendText("Hello everyone");
+lara.sendAudio("voice-message-01.mp3");
+max.sendVideo("rules.mp4");
+max.mute(vlad);
+```
+
+**Expected output:**
+
+```text
+Lara received TEXT: Vlad -> Hello everyone
+Max received TEXT: Vlad -> Hello everyone
+Vlad received AUDIO: Lara -> voice-message-01.mp3
+Max received AUDIO: Lara -> voice-message-01.mp3
+Vlad received VIDEO: Max -> rules.mp4
+Lara received VIDEO: Max -> rules.mp4
+Max muted Vlad
+```
+
+**Why this preserves Mediator:** users still do not know the full chat membership. New message types are represented as data, not as direct user-to-user method calls.
+
+</details>
+
+##### **3.7. Extending Editor Mementos** (Lecture 15, Task 2)
+
+The lecture exercise asks to test the editor solution, implement Memento as a nested class, and add modification time and other fields.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The memento should contain all state needed to restore a meaningful editor version. That can include content, cursor position, and modification time.
+
+**Step 1 - Create an editor with a nested memento.**
+
+```java
+import java.time.LocalDateTime;
+import java.util.Stack;
+
+public class TextEditor {
+    private String content = "";
+    private int cursorPosition = 0;
+    private LocalDateTime modifiedAt = LocalDateTime.now();
+
+    public void type(String words) {
+        content = content.substring(0, cursorPosition)
+                + words
+                + content.substring(cursorPosition);
+        cursorPosition += words.length();
+        modifiedAt = LocalDateTime.now();
+    }
+
+    public void moveCursor(int position) {
+        if (position < 0 || position > content.length()) {
+            throw new IllegalArgumentException("Invalid cursor position");
+        }
+        cursorPosition = position;
+    }
+
+    public Memento save() {
+        return new Memento(content, cursorPosition, modifiedAt);
+    }
+
+    public void restore(Memento memento) {
+        content = memento.content;
+        cursorPosition = memento.cursorPosition;
+        modifiedAt = memento.modifiedAt;
+    }
+
+    public String describe() {
+        return content + " | cursor=" + cursorPosition
+                + " | modifiedAt=" + modifiedAt;
+    }
+
+    public static class Memento {
+        private final String content;
+        private final int cursorPosition;
+        private final LocalDateTime modifiedAt;
+
+        private Memento(String content, int cursorPosition,
+                        LocalDateTime modifiedAt) {
+            this.content = content;
+            this.cursorPosition = cursorPosition;
+            this.modifiedAt = modifiedAt;
+        }
+    }
+}
+```
+
+The nested class constructor is private, so outside code cannot create fake snapshots. The caretaker can store `TextEditor.Memento`, but it cannot inspect its private fields.
+
+**Step 2 - Implement history as a stack.**
+
+```java
+public class History {
+    private final Stack<TextEditor.Memento> history = new Stack<>();
+
+    public void push(TextEditor.Memento memento) {
+        history.push(memento);
+    }
+
+    public TextEditor.Memento pop() {
+        return history.pop();
+    }
+
+    public boolean isEmpty() {
+        return history.isEmpty();
+    }
+}
+```
+
+**Step 3 - Demonstrate restoration.**
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        TextEditor editor = new TextEditor();
+        History history = new History();
+
+        editor.type("Version 1");
+        history.push(editor.save());
+
+        editor.type(" plus version 2");
+        System.out.println("Current: " + editor.describe());
+
+        editor.restore(history.pop());
+        System.out.println("Restored: " + editor.describe());
+    }
+}
+```
+
+**Expected output shape:**
+
+```text
+Current: Version 1 plus version 2 | cursor=23 | modifiedAt=...
+Restored: Version 1 | cursor=9 | modifiedAt=...
+```
+
+The exact timestamps depend on when the program runs, but the restored state must return the content and cursor position to the saved version.
+
+</details>
+
+##### **3.8. Text Chat with Mediator** (Lecture 15, Example 1)
+
+Implement the lecture's text chat example where users communicate through a chat mediator. All chat members should receive each message except the sender.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The mediator stores the list of users and is the only object that performs broadcast routing.
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+interface ChatMediator {
+    void sendMessage(Message message);
+    void addUser(User user);
+}
+
+class ChatMediatorImplementation implements ChatMediator {
+    private final List<User> userList = new ArrayList<>();
+
+    @Override
+    public void sendMessage(Message message) {
+        for (User user : userList) {
+            if (user != message.getSender()) {
+                user.receiveMessage(message);
+            }
+        }
+    }
+
+    @Override
+    public void addUser(User user) {
+        userList.add(user);
+    }
+}
+
+class Message {
+    private final User sender;
+    private final String content;
+
+    public Message(User sender, String content) {
+        this.sender = sender;
+        this.content = content;
+    }
+
+    public User getSender() {
+        return sender;
+    }
+
+    public String getContent() {
+        return content;
+    }
+}
+
+class User {
+    private final String name;
+    private final ChatMediator mediator;
+
+    public User(String name, ChatMediator mediator) {
+        this.name = name;
+        this.mediator = mediator;
+    }
+
+    public void sendMessage(String content) {
+        mediator.sendMessage(new Message(this, content));
+    }
+
+    public void receiveMessage(Message message) {
+        System.out.println(name + " received this message:");
+        System.out.println("\t" + message.getSender().name + ": "
+                + message.getContent());
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        ChatMediator mediator = new ChatMediatorImplementation();
+
+        User vlad = new User("Vlad", mediator);
+        User max = new User("Max", mediator);
+        User lara = new User("Lara", mediator);
+
+        mediator.addUser(vlad);
+        mediator.addUser(max);
+        mediator.addUser(lara);
+
+        vlad.sendMessage("Hello every one");
+        lara.sendMessage("Hi Vladik!");
+        vlad.sendMessage("Just Vlad, please learn to read");
+        lara.sendMessage("and it's everyone NOT every one!!!");
+        max.sendMessage("Calm down everyone!");
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Max received this message:
+	Vlad: Hello every one
+Lara received this message:
+	Vlad: Hello every one
+Vlad received this message:
+	Lara: Hi Vladik!
+Max received this message:
+	Lara: Hi Vladik!
+Max received this message:
+	Vlad: Just Vlad, please learn to read
+Lara received this message:
+	Vlad: Just Vlad, please learn to read
+Vlad received this message:
+	Lara: and it's everyone NOT every one!!!
+Max received this message:
+	Lara: and it's everyone NOT every one!!!
+Vlad received this message:
+	Max: Calm down everyone!
+Lara received this message:
+	Max: Calm down everyone!
+```
+
+**Why this works:** the `Message` contains the sender. The mediator checks `user != message.getSender()` and forwards the message only to the other users.
+
+</details>
+
+##### **3.9. Simple Editor History with Memento** (Lecture 15, Example 2)
+
+Implement the lecture's editor example using Memento. The editor should save several content states and then restore earlier versions from history.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The editor is the only object that reads and writes its `content` field. History merely stores mementos.
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+class Editor {
+    private String content = "";
+
+    public String getContent() {
+        return content;
+    }
+
+    public void type(String words) {
+        content += words;
+    }
+
+    public EditorMemento save() {
+        return new EditorMemento(content);
+    }
+
+    public void restore(EditorMemento memento) {
+        content = memento.getContent();
+    }
+}
+
+class EditorMemento {
+    private final String content;
+
+    public EditorMemento(String content) {
+        this.content = content;
+    }
+
+    public String getContent() {
+        return content;
+    }
+}
+
+class History {
+    private final List<EditorMemento> mementos = new ArrayList<>();
+
+    public void add(EditorMemento memento) {
+        mementos.add(memento);
+    }
+
+    public EditorMemento get(int index) {
+        return mementos.get(index);
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Editor editor = new Editor();
+        History history = new History();
+
+        editor.type("Hello World! ");
+        history.add(editor.save());
+
+        editor.type("Goodbye World! ");
+        history.add(editor.save());
+
+        editor.type("Hello again! ");
+        history.add(editor.save());
+
+        System.out.println(editor.getContent());
+
+        editor.restore(history.get(1));
+        System.out.println(editor.getContent());
+
+        editor.restore(history.get(0));
+        System.out.println(editor.getContent());
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Hello World! Goodbye World! Hello again!
+Hello World! Goodbye World! 
+Hello World! 
+```
+
+**What this demonstrates:**
+
+1.  `save()` captures the current editor state.
+2.  `History` stores snapshots but does not modify the editor.
+3.  `restore()` replaces the editor's current state with a saved one.
+
+</details>
+
+##### **3.10. Recipe with Template Method** (Lecture 15, Example 3)
+
+Implement the lecture's recipe example. `Recipe` should define the template method, and `PizzaRecipe` and `GelatoRecipe` should override selected steps.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** `cookRecipeTemplate()` fixes the algorithm order. Concrete recipes override the parts that differ.
+
+```java
+abstract class Recipe {
+    public final void cookRecipeTemplate() {
+        prepareIngredients();
+        cook();
+        if (isSpecialDish()) {
+            garnish();
+        }
+        serve();
+    }
+
+    public void cook() {
+        System.out.println("Cook main recipe");
+    }
+
+    public void prepareIngredients() {
+        System.out.println("Prepare ingredients");
+    }
+
+    public void serve() {
+        System.out.println("Serve the hot dish");
+    }
+
+    public void garnish() {
+        System.out.println("Garnish the dish");
+    }
+
+    public boolean isSpecialDish() {
+        return false;
+    }
+}
+
+class PizzaRecipe extends Recipe {
+    @Override
+    public void cook() {
+        System.out.println("Cooking the pizza");
+    }
+
+    @Override
+    public void prepareIngredients() {
+        System.out.println("Prepare dough, sauce and cheese");
+    }
+}
+
+class GelatoRecipe extends Recipe {
+    @Override
+    public void cook() {
+        System.out.println("Cooking the gelato");
+    }
+
+    @Override
+    public void prepareIngredients() {
+        System.out.println("Prepare sugar, yolks, milk and cream");
+    }
+
+    @Override
+    public void serve() {
+        System.out.println("Serving the frozen gelato");
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Recipe pizza = new PizzaRecipe();
+        pizza.cookRecipeTemplate();
+
+        Recipe gelato = new GelatoRecipe();
+        gelato.cookRecipeTemplate();
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Prepare dough, sauce and cheese
+Cooking the pizza
+Serve the hot dish
+Prepare sugar, yolks, milk and cream
+Cooking the gelato
+Serving the frozen gelato
+```
+
+`PizzaRecipe` inherits the default serving behavior. `GelatoRecipe` overrides serving because frozen gelato is served differently. Neither subclass changes the skeleton of the algorithm.
+
+</details>
+
+##### **3.11. Website Pages with Template Method** (Tutorial 15, Example 1)
+
+Explain and implement the tutorial's `WebsiteTemplate` example, where every page has the same header and footer but different content.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** A website page is a good Template Method example because page layout often has fixed regions and variable content.
+
+```java
+abstract class WebsiteTemplate {
+    public final void showPage() {
+        showHeader();
+        showPageContent();
+        showFooter();
+    }
+
+    private static void showHeader() {
+        System.out.println("IU");
+    }
+
+    private static void showFooter() {
+        System.out.println("Address: Earth, Russia, Republic of Tatarstan, "
+                + "Innopolis, Universitetskaya 1");
+    }
+
+    public abstract void showPageContent();
+}
+
+class WelcomePage extends WebsiteTemplate {
+    @Override
+    public void showPageContent() {
+        System.out.println("Welcome to Innopolis University");
+    }
+}
+
+class NewsPage extends WebsiteTemplate {
+    @Override
+    public void showPageContent() {
+        System.out.println("BREAKING NEWS: Spring Ball was on 25th. "
+                + "Hope you didn't miss it!");
+    }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        WebsiteTemplate welcomePage = new WelcomePage();
+        WebsiteTemplate newsPage = new NewsPage();
+
+        welcomePage.showPage();
+        System.out.println();
+        newsPage.showPage();
+    }
+}
+```
+
+**Expected output:**
+
+```text
+IU
+Welcome to Innopolis University
+Address: Earth, Russia, Republic of Tatarstan, Innopolis, Universitetskaya 1
+
+IU
+BREAKING NEWS: Spring Ball was on 25th. Hope you didn't miss it!
+Address: Earth, Russia, Republic of Tatarstan, Innopolis, Universitetskaya 1
+```
+
+The header and footer methods are private static helper operations because subclasses do not need to change them. The only abstract step is `showPageContent()`.
+
+</details>
+
+##### **3.12. Note Editor Coordination with Mediator** (Tutorial 15, Example 2)
+
+Explain the tutorial's note editor structure where a GUI editor mediator registers components such as title, textbox, add button, delete button, save button, list, and filter.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** A GUI editor often has many components whose behavior depends on each other. Mediator keeps this interaction out of the components themselves.
+
+The tutorial demo wires the system like this:
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        Mediator mediator = new Editor();
+
+        mediator.registerComponent(new Title());
+        mediator.registerComponent(new TextBox());
+        mediator.registerComponent(new AddButton());
+        mediator.registerComponent(new DeleteButton());
+        mediator.registerComponent(new SaveButton());
+        mediator.registerComponent(new List(new DefaultListModel()));
+        mediator.registerComponent(new Filter());
+
+        mediator.createGUI();
+    }
+}
+```
+
+A minimal version of the same idea can be expressed as follows.
+
+```java
+interface Mediator {
+    void registerComponent(Component component);
+    void notify(Component sender, String event);
+}
+
+abstract class Component {
+    protected Mediator mediator;
+
+    public void setMediator(Mediator mediator) {
+        this.mediator = mediator;
+    }
+}
+
+class TextBox extends Component {
+    private String text = "";
+
+    public void setText(String text) {
+        this.text = text;
+        mediator.notify(this, "text_changed");
+    }
+
+    public String getText() {
+        return text;
+    }
+}
+
+class SaveButton extends Component {
+    public void click() {
+        mediator.notify(this, "save_clicked");
+    }
+}
+
+class Editor implements Mediator {
+    private TextBox textBox;
+    private SaveButton saveButton;
+
+    @Override
+    public void registerComponent(Component component) {
+        component.setMediator(this);
+        if (component instanceof TextBox) {
+            textBox = (TextBox) component;
+        } else if (component instanceof SaveButton) {
+            saveButton = (SaveButton) component;
+        }
+    }
+
+    @Override
+    public void notify(Component sender, String event) {
+        if (sender == saveButton && event.equals("save_clicked")) {
+            System.out.println("Saving note: " + textBox.getText());
+        }
+    }
+}
+```
+
+**Demonstration:**
+
+```java
+Editor editor = new Editor();
+TextBox textBox = new TextBox();
+SaveButton saveButton = new SaveButton();
+
+editor.registerComponent(textBox);
+editor.registerComponent(saveButton);
+
+textBox.setText("Remember Template Method");
+saveButton.click();
+```
+
+**Expected output:**
+
+```text
+Saving note: Remember Template Method
+```
+
+The textbox does not call the save button, and the save button does not read from the textbox directly. Both rely on the editor mediator.
+
+</details>
+
+##### **3.13. Nested Memento in a Text Editor** (Tutorial 15, Example 3)
+
+Implement the tutorial's nested memento example with `TextEditor`, `History`, and `Demo`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** A nested memento lets the editor expose a snapshot type while keeping the saved data private.
+
+```java
+import java.util.Stack;
+
+class TextEditor {
+    private String text;
+
+    public void setText(String text) {
+        this.text = text;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public Memento save() {
+        return new Memento(text);
+    }
+
+    public void restore(Memento memento) {
+        this.text = memento.getSavedText();
+    }
+
+    public static class Memento {
+        private final String text;
+
+        private Memento(String textToSave) {
+            this.text = textToSave;
+        }
+
+        private String getSavedText() {
+            return text;
+        }
+    }
+}
+
+class History {
+    private final Stack<TextEditor.Memento> history = new Stack<>();
+
+    public void push(TextEditor.Memento memento) {
+        history.push(memento);
+    }
+
+    public TextEditor.Memento pop() {
+        return history.pop();
+    }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        TextEditor editor = new TextEditor();
+        History history = new History();
+
+        editor.setText("Version 1");
+        history.push(editor.save());
+
+        editor.setText("Version 2");
+        System.out.println("Current state: " + editor.getText());
+
+        editor.restore(history.pop());
+        System.out.println("After backtracking: " + editor.getText());
+    }
+}
+```
+
+**Expected output:**
+
+```text
+Current state: Version 2
+After backtracking: Version 1
+```
+
+The constructor and getter inside `Memento` are private. This prevents outside code from creating arbitrary snapshots or reading saved text directly.
+
+</details>
+
+##### **3.14. Project Rollback with Memento** (Tutorial 15, Example 4)
+
+Implement the tutorial's project rollback example, where a project saves version state to a repository object and later rolls back.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** Memento is not limited to text editors. Any object with recoverable state can act as an originator.
+
+```java
+import java.util.Date;
+
+class Save {
+    private final String version;
+    private final Date date;
+
+    public Save(String version) {
+        this.version = version;
+        date = new Date();
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public Date getDate() {
+        return date;
+    }
+}
+
+class Project {
+    private String version;
+    private Date date;
+
+    public void setVersionAndDate(String version) {
+        this.version = version;
+        date = new Date();
+    }
+
+    public Save save() {
+        return new Save(version);
+    }
+
+    public void load(Save save) {
+        version = save.getVersion();
+        date = save.getDate();
+    }
+
+    @Override
+    public String toString() {
+        return "Project{" +
+                "version='" + version + '\'' +
+                ", date=" + date +
+                '}';
+    }
+}
+
+class GitHubRepo {
+    private Save save;
+
+    public Save getSave() {
+        return save;
+    }
+
+    public void setSave(Save save) {
+        this.save = save;
+    }
+}
+```
+
+**Demonstration:**
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        Project project = new Project();
+        GitHubRepo repo = new GitHubRepo();
+
+        System.out.println("Creating new project. V1.0");
+        project.setVersionAndDate("V1.0");
+        System.out.println(project);
+
+        System.out.println("Saving current version to GitHub repo...");
+        repo.setSave(project.save());
+
+        System.out.println("Updating project to V1.1");
+        project.setVersionAndDate("V1.1");
+        System.out.println(project);
+
+        System.out.println("Rolling back to V1.0");
+        project.load(repo.getSave());
+        System.out.println("Project after rollback");
+        System.out.println(project);
+    }
+}
+```
+
+**Expected output shape:**
+
+```text
+Creating new project. V1.0
+Project{version='V1.0', date=...}
+Saving current version to GitHub repo...
+Updating project to V1.1
+Project{version='V1.1', date=...}
+Rolling back to V1.0
+Project after rollback
+Project{version='V1.0', date=...}
+```
+
+The exact dates depend on runtime. The restored project should return to version `V1.0` and to the saved date stored in the memento.
+
+</details>
+
+##### **3.15. Cross-Platform GUI with Abstract Factory** (Tutorial 15, Example 5)
+
+Implement the tutorial's Abstract Factory example: an application configures a GUI factory at runtime, then creates a button and checkbox through that factory.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key concept:** The application chooses a concrete factory once, usually during initialization, and then uses only abstract product interfaces.
+
+```java
+interface Button {
+    void paint();
+}
+
+class WindowsButton implements Button {
+    @Override
+    public void paint() {
+        System.out.println("You have created WindowsButton.");
+    }
+}
+
+class MacOSButton implements Button {
+    @Override
+    public void paint() {
+        System.out.println("You have created MacOSButton.");
+    }
+}
+
+interface Checkbox {
+    void paint();
+}
+
+class WindowsCheckbox implements Checkbox {
+    @Override
+    public void paint() {
+        System.out.println("You have created WindowsCheckbox.");
+    }
+}
+
+class MacOSCheckbox implements Checkbox {
+    @Override
+    public void paint() {
+        System.out.println("You have created MacOSCheckbox.");
+    }
+}
+
+interface GUIFactory {
+    Button createButton();
+    Checkbox createCheckbox();
+}
+
+class WindowsFactory implements GUIFactory {
+    @Override
+    public Button createButton() {
+        return new WindowsButton();
+    }
+
+    @Override
+    public Checkbox createCheckbox() {
+        return new WindowsCheckbox();
+    }
+}
+
+class MacOSFactory implements GUIFactory {
+    @Override
+    public Button createButton() {
+        return new MacOSButton();
+    }
+
+    @Override
+    public Checkbox createCheckbox() {
+        return new MacOSCheckbox();
+    }
+}
+
+class Application {
+    private final Button button;
+    private final Checkbox checkbox;
+
+    public Application(GUIFactory factory) {
+        button = factory.createButton();
+        checkbox = factory.createCheckbox();
+    }
+
+    public void paint() {
+        button.paint();
+        checkbox.paint();
+    }
+}
+
+public class Demo {
+    private static Application configureApplication() {
+        GUIFactory factory;
+        String osName = System.getProperty("os.name").toLowerCase();
+
+        if (osName.contains("mac")) {
+            factory = new MacOSFactory();
+        } else {
+            factory = new WindowsFactory();
+        }
+
+        return new Application(factory);
+    }
+
+    public static void main(String[] args) {
+        Application app = configureApplication();
+        app.paint();
+    }
+}
+```
+
+**Expected output on macOS:**
+
+```text
+You have created MacOSButton.
+You have created MacOSCheckbox.
+```
+
+**Expected output on non-macOS platforms in this simplified example:**
+
+```text
+You have created WindowsButton.
+You have created WindowsCheckbox.
+```
+
+The important guarantee is family consistency: the application receives a macOS button together with a macOS checkbox, or a Windows button together with a Windows checkbox.
+
+</details>
