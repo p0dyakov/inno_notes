@@ -1,0 +1,666 @@
+---
+title: "W15. Recursive Sets"
+author: "Manuel Mazzara"
+date: "April 30, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Theory**
+
+##### **1.1 Recursive Sets in the Computability Landscape**
+
+###### **1.1.1 Language Classes Around Decidability**
+
+The end of the course places **recursive sets** inside the larger hierarchy of language and computation classes. At the bottom of the classical formal-language hierarchy are regular languages, accepted by finite-state machines. Above them are context-free languages, accepted by pushdown automata. Above those are context-sensitive languages, accepted by linear bounded automata. At the top of the Chomsky hierarchy are recursively enumerable languages, accepted by Turing Machines.
+
+Recursive sets sit strictly between context-sensitive languages and recursively enumerable sets in the computability view. They are the languages for which membership can be decided by a Turing Machine that always halts. Recursively enumerable sets are weaker: a Turing Machine must accept when the input belongs to the set, but it may loop forever when the input does not belong.
+
+```{dot}
+//| fig-cap: "Computability landscape around recursive and recursively enumerable sets"
+//| fig-width: 6.8
+//| fig-height: 4.3
+digraph computability_landscape {
+  rankdir=TB;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=ellipse, style=filled, color="#355c7d", penwidth=1.1];
+  edge [style=invis];
+
+  nonre [label="Not recursively enumerable\nnot Turing-recognizable", fillcolor="#f9d9e2", width=5.8, height=0.9];
+  re [label="Recursively enumerable sets\nTuring-recognizable / semidecidable", fillcolor="#fff3cd", width=5.0, height=0.9];
+  rec [label="Recursive sets\ndecidable by a TM that halts", fillcolor="#d7f0c2", width=4.2, height=0.85];
+  cfl [label="Context-free languages\nPDA / CFG", fillcolor="#d6eef5", width=3.4, height=0.75];
+  reg [label="Regular languages\nFSA / regular grammar", fillcolor="#e8f4f8", width=2.7, height=0.7];
+
+  nonre -> re -> rec -> cfl -> reg;
+}
+```
+
+The important distinction is not raw expressive power alone, but whether negative answers are computable. A decider gives both yes and no answers in finite time. A recognizer gives guaranteed yes answers, but may provide no answer at all on no-instances.
+
+###### **1.1.2 Decidable and Partially Decidable Problems**
+
+A **decision problem** can be represented as a set $S \subseteq \mathbb{N}$: the input $x$ is a yes-instance exactly when $x \in S$. This representation assumes that objects such as programs, automata, formulas, and strings have been encoded as natural numbers.
+
+A set $S$ is **recursive**, or **decidable**, when there is a total computable characteristic function
+
+$$c_S(x) =
+\begin{cases}
+1, & x \in S,\\
+0, & x \notin S.
+\end{cases}$$
+
+The word **total** is essential: the algorithm must halt on every input. If it halts only on yes-instances, then it is not a decider.
+
+A set $S$ is **recursively enumerable (RE)**, also called **Turing-recognizable**, **acceptable**, or **partially decidable**, when there is an algorithmic way to enumerate its members, or equivalently a Turing Machine that accepts exactly the inputs in $S$. If $x \in S$, the machine eventually accepts. If $x \notin S$, the machine may reject or may run forever.
+
+The Halting Problem is the canonical example. If a program halts on an input, simulation eventually discovers that fact, so the yes-instances are RE. But if the program does not halt, plain simulation never produces a finite certificate of nontermination in general.
+
+##### **1.2 Basic Results About Recursive Sets**
+
+###### **1.2.1 Every Recursive Set Is Recursively Enumerable**
+
+The first basic theorem says:
+
+$$S \text{ recursive} \Longrightarrow S \text{ recursively enumerable}.$$
+
+This matches the hierarchy: decidability is stronger than semidecidability. If an algorithm can always decide membership, then it can certainly support a recognition or enumeration procedure.
+
+The proof from the lecture uses the **characteristic function**. If $S = \emptyset$, then $S$ is RE by the lecture definition. If $S \neq \emptyset$, choose a fixed element $k \in S$. Since $S$ is recursive, $c_S$ is total and computable. Define
+
+$$g_S(x) =
+\begin{cases}
+x, & c_S(x)=1,\\
+k, & c_S(x)=0.
+\end{cases}$$
+
+The function $g_S$ is total and computable. Its image is exactly $S$: every element of $S$ appears as itself, while every element outside $S$ is mapped to the already-valid element $k$. Therefore $S$ is RE.
+
+The proof is **non-constructive** in one respect. It assumes a fixed $k \in S$ when $S$ is nonempty, but it does not require a general algorithm for finding such a $k$. For the theorem, existence is enough.
+
+###### **1.2.2 Two Semidecidabilities Make One Decidability**
+
+The second basic theorem is the central characterization:
+
+$$S \text{ is recursive} \Longleftrightarrow S \text{ is RE and } \overline{S} \text{ is RE},$$
+
+where $\overline{S} = \mathbb{N} - S$ is the complement of $S$.
+
+The forward direction is straightforward. If $S$ is recursive, then $S$ is RE by the previous theorem. Also $c_S$ is computable, so the complement characteristic function
+
+$$c_{\overline{S}}(x)=1-c_S(x)$$
+
+is computable. Therefore $\overline{S}$ is recursive and hence RE.
+
+The backward direction explains why two semidecision procedures are enough. Suppose $S$ and $\overline{S}$ are both RE. Then there are enumerations
+
+$$S = \{g_S(0), g_S(1), g_S(2), \ldots\}$$
+
+and
+
+$$\overline{S} = \{g_{\overline{S}}(0), g_{\overline{S}}(1), g_{\overline{S}}(2), \ldots\}.$$
+
+To decide whether $x \in S$, run the two enumerations in parallel:
+
+$$g_S(0),\ g_{\overline{S}}(0),\ g_S(1),\ g_{\overline{S}}(1),\ldots$$
+
+Because $S$ and $\overline{S}$ partition $\mathbb{N}$, the input $x$ must appear in exactly one of these enumerations. If it appears in the enumeration of $S$, answer yes. If it appears in the enumeration of $\overline{S}$, answer no. This algorithm always halts, so $S$ is recursive.
+
+The corollary is that **recursive sets are closed under complement**. Answering no to a problem is computationally equivalent to answering yes to its complement. This is exactly why closure under complement was important for weaker computational models earlier in the course.
+
+##### **1.3 Recursively Enumerable Sets and Total Computable Functions**
+
+###### **1.3.1 Total Computable Functions**
+
+A computable function may be **partial**: for some inputs it may not return a value because the computation does not halt. A function is **total** if it returns a value for every input.
+
+This distinction is central to programming languages. Turing Machines and ordinary programming languages are powerful enough to express partial computable functions because loops and recursion may fail to terminate. That nontermination is not an accidental flaw; it is part of what gives the model full computational power.
+
+A formalism that avoids all nontermination, such as a very restricted programming language or a finite-state model, may define only total functions. But such a formalism necessarily loses expressive power.
+
+###### **1.3.2 No RE Formalism Captures Exactly All Total Computable Functions**
+
+The lecture states the following theorem. Consider a set $S$ of indices such that:
+
+*   if $i \in S$, then $f_i$ is total;
+*   for every total computable function $f$, there exists $i \in S$ with $f_i=f$.
+
+In other words, $S$ contains all and only indices of total computable functions. Then $S$ is **not recursively enumerable**.
+
+The intuition is diagonalization. If all total computable functions could be effectively listed as
+
+$$f_0, f_1, f_2, \ldots,$$
+
+then one could define a new total computable function
+
+$$d(n)=f_n(n)+1.$$
+
+The function $d$ differs from the $n$-th function at input $n$, so it cannot appear anywhere in the list. But if the list contained all total computable functions, $d$ would have to appear in it. This contradiction shows that no effective enumeration can capture exactly the total computable functions.
+
+###### **1.3.3 Programming-Language Implications**
+
+This theorem has a direct programming interpretation. There is no recursively enumerable formalism, such as a grammar, automaton system, Turing-machine subclass, or programming-language subset, that defines all and only terminating programs.
+
+A finite-state model defines total computable functions, but not all of them, because fixed finite memory is too weak. A Turing-complete programming language such as C can express every computable function in the usual sense, but it also admits nonterminating programs. Any syntactic subset of C whose loop rules guarantee termination can contain only terminating programs, but it must miss some terminating programs.
+
+This is the recurring tradeoff: if a model is expressive enough to describe all algorithms, then it also admits nontermination. If a model rules out nontermination by construction, then it cannot express every terminating algorithm.
+
+##### **1.4 Kleene's Recursion Theorem**
+
+###### **1.4.1 Fixed Points in Mathematics and Computation**
+
+In ordinary mathematics, a **fixed point** of a function $f$ is a value $x$ such that
+
+$$f(x)=x.$$
+
+For example, the equation $\cos(x)=x$ has a numerical fixed point near $0.7390851332$.
+
+Kleene's theorem uses a related idea, but the fixed point is not syntactic equality of numbers. It is equality of program behavior. Programs have indices, and different indices may compute the same function. So a fixed point of a program transformer need not satisfy $p=t(p)$. It must satisfy
+
+$$f_p=f_{t(p)}.$$
+
+That is, program number $p$ and program number $t(p)$ compute the same partial computable function.
+
+###### **1.4.2 Statement of Kleene's Fixed-Point Theorem**
+
+Let
+
+$$t:\mathbb{N}\to\mathbb{N}$$
+
+be a total computable function. Think of $t$ as an algorithmic transformation of program indices: given the code number of a program, it outputs the code number of another program. **Kleene's fixed-point theorem** states that there is an integer $p$ such that
+
+$$f_p=f_{t(p)}.$$
+
+Equivalently, for any effective way of modifying programs, there is some program whose computed behavior is unchanged by that modification.
+
+The theorem is also called **Kleene's Recursion Theorem**. It was proved in 1938 by Stephen Kleene, a student of Alonzo Church. The lecture emphasizes that it arose in the historical context of attempts to understand, and even challenge, the Church-Turing thesis.
+
+###### **1.4.3 Semantic Rather Than Syntactic Fixed Points**
+
+The theorem should not be misread. It does not say that some integer $p$ must equal $t(p)$. It says that the partial computable functions are equal:
+
+$$\phi_p = \phi_{t(p)},$$
+
+where $\phi_x$ denotes the partial computable function computed by program index $x$.
+
+This is a **semantic fixed point**. The transformed program may have different code, different syntax, and a different index, but it computes the same input-output behavior. This distinction matters because computability theory identifies programs by what they compute, while programming syntax can vary wildly for the same behavior.
+
+Kleene's theorem is one of the deep self-reference tools of computability theory. In this lecture it is used as the main ingredient in the proof of Rice's theorem.
+
+##### **1.5 Rice's Theorem**
+
+###### **1.5.1 Formal Statement**
+
+Let $F$ be a set of computable functions. Define
+
+$$S = \{x \mid f_x \in F\}.$$
+
+Thus $S$ is the set of program or Turing Machine indices whose computed function belongs to the property class $F$.
+
+**Rice's theorem** states:
+
+$$S \text{ is decidable} \Longleftrightarrow F=\emptyset \text{ or } F \text{ is the set of all computable functions}.$$
+
+So in every nontrivial case, $S$ is not decidable.
+
+The two trivial cases are easy. If $F=\emptyset$, then no program has the property, so the always-no decider works. If $F$ is the set of all computable functions, then every program has the property, so the always-yes decider works. Rice's theorem says these are the only decidable semantic cases.
+
+###### **1.5.2 Informal Statement**
+
+Informally, Rice's theorem says:
+
+**Every nontrivial semantic property of programs is undecidable.**
+
+A property is **semantic** if it concerns the behavior of the program, or the function it computes, rather than its surface syntax. A property is **nontrivial** if it is true for some programs but not for all programs.
+
+Examples of semantic properties include:
+
+*   whether a program solves a specified problem;
+*   whether two programs are equivalent;
+*   whether the computed function always returns even values;
+*   whether the computed function has a finite image;
+*   whether the program terminates for all inputs.
+
+Rice's theorem does not apply to purely syntactic questions. For example, "does this source file contain an if-then-else statement?" is a syntactic property. It can often be decided by parsing or scanning the source code. By contrast, "does this program behave correctly for every input?" is semantic.
+
+###### **1.5.3 Proof Idea Using Kleene's Theorem**
+
+The lecture proves Rice's theorem by contradiction. Suppose $S$ is recursive, while $F$ is nontrivial: $F\neq\emptyset$ and $F$ is not the set of all computable functions.
+
+Because $F$ is nonempty, there is some index $i$ such that
+
+$$f_i \in F.$$
+
+Because $F$ is not universal, there is some index $j$ such that
+
+$$f_j \notin F.$$
+
+If $S$ were recursive, its characteristic function would be total and computable:
+
+$$c_S(x)=
+\begin{cases}
+1, & f_x\in F,\\
+0, & f_x\notin F.
+\end{cases}$$
+
+Using this computable test, define a computable function $c'_S$ by
+
+$$c'_S(x)=
+\begin{cases}
+i, & f_x\notin F,\\
+j, & f_x\in F.
+\end{cases}$$
+
+This function deliberately switches to an index on the opposite side of the property. If the input program lacks the property, $c'_S$ returns an index that has it. If the input program has the property, $c'_S$ returns an index that lacks it.
+
+By Kleene's fixed-point theorem, there exists an index $x'$ such that
+
+$$f_{c'_S(x')} = f_{x'}.$$
+
+Now consider the two cases. If $c'_S(x')=i$, then by the definition of $c'_S$, $f_{x'}\notin F$. But $f_{c'_S(x')}=f_i$, and $f_i\in F$, so $f_{x'}\in F$. Contradiction.
+
+If $c'_S(x')=j$, then by the definition of $c'_S$, $f_{x'}\in F$. But $f_{c'_S(x')}=f_j$, and $f_j\notin F$, so $f_{x'}\notin F$. Contradiction again.
+
+Both cases are impossible, so the assumption that $S$ is recursive must be false. Therefore every nontrivial semantic property of computable functions is undecidable.
+
+###### **1.5.4 Consequences for Program Analysis**
+
+Rice's theorem has strong negative consequences. For any chosen computable function $g$, the property "this program computes $g$" is semantic and nontrivial, provided at least one program computes $g$ and at least one program computes something else. Therefore no general algorithm can decide whether an arbitrary program computes $g$.
+
+More broadly, any interesting property of program behavior is undecidable in full generality. This includes correctness, equivalence, termination on all inputs, and many value-range properties. Such problems may be semidecidable in special cases, and they may be decidable under restrictions, but there is no universal complete decider for arbitrary programs.
+
+##### **1.6 Syntactic and Semantic Properties**
+
+###### **1.6.1 The Difference**
+
+A **syntactic property** is a property of program text or structure. It asks about what appears in the code. Examples include whether a program contains a loop, an if-then-else branch, a particular variable name, or a specific syntactic pattern.
+
+A **semantic property** is a property of program behavior. It asks what the program does when executed. Examples include whether the program terminates on all inputs, whether it computes a certain function, whether it ever outputs zero, or whether every execution satisfies a specification.
+
+The distinction is not always obvious in practice. A syntactic restriction can imply a semantic fact. For example, a language subset may syntactically restrict loops in a way that guarantees termination. But Rice's theorem applies to the semantic property itself, not to a conservative syntactic approximation.
+
+###### **1.6.2 Nontriviality**
+
+A property is **trivial** if it holds for every program or for no program. Trivial semantic properties are decidable by ignoring the input and always answering yes or always answering no.
+
+A property is **nontrivial** if at least one program has it and at least one program does not. Rice's theorem says that every such semantic property is undecidable for arbitrary programs.
+
+The course summary can be stated compactly:
+
+$$\text{Every nontrivial property of partial computable functions is undecidable.}$$
+
+Equivalently, no general effective method can decide whether an arbitrary algorithm computes a partial function with any interesting behavioral property.
+
+##### **1.7 The Big Picture of the Course**
+
+###### **1.7.1 From Regular Sets to Recursively Enumerable Sets**
+
+The course moves from weaker to stronger models of language recognition and generation. Each step adds expressive power by changing either the memory model of the automaton or the allowed shape of grammar productions.
+
+Regular languages use finite memory. Context-free languages use stack memory. Context-sensitive languages use linearly bounded tape. Recursively enumerable languages use unrestricted Turing-machine memory.
+
+The hierarchy is strict:
+
+$$\text{Regular} \subsetneq \text{Context-Free} \subsetneq \text{Context-Sensitive} \subsetneq \text{Recursive} \subsetneq \text{Recursively Enumerable}.$$
+
+The last inclusion is the computability-theoretic distinction between always-halting deciders and recognizers that may loop on no-instances. Outside the RE class are languages that are not Turing-recognizable at all.
+
+###### **1.7.2 Correspondence Between Automata and Grammars**
+
+The same hierarchy can be read in two worlds:
+
+*   the **operational world**, where automata process input strings;
+*   the **generative world**, where grammars generate strings.
+
+```{dot}
+//| fig-cap: "Correspondence between language classes, automata, and grammars"
+//| fig-width: 7.6
+//| fig-height: 3.4
+digraph correspondence {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=box, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+
+  re [label="Recursively enumerable\nlanguages", fillcolor="#f9d9e2"];
+  tm [label="Turing Machine", fillcolor="#fff3cd"];
+  ug [label="Unrestricted grammar\nno production restrictions", fillcolor="#eef3f7"];
+
+  csl [label="Context-sensitive\nlanguages", fillcolor="#fff3cd"];
+  lba [label="Linear bounded\nautomaton", fillcolor="#fff3cd"];
+  csg [label="Context-sensitive grammar\nrewrite by context", fillcolor="#eef3f7"];
+
+  cfl [label="Context-free\nlanguages", fillcolor="#d6eef5"];
+  pda [label="Pushdown automaton", fillcolor="#d6eef5"];
+  cfg [label="Context-free grammar\ncontext does not count", fillcolor="#eef3f7"];
+
+  reg [label="Regular\nlanguages", fillcolor="#d7f0c2"];
+  fsa [label="Finite-state automaton", fillcolor="#d7f0c2"];
+  rg [label="Regular grammar\nterminal plus at most one nonterminal", fillcolor="#eef3f7"];
+
+  re -> tm -> ug;
+  csl -> lba -> csg;
+  cfl -> pda -> cfg;
+  reg -> fsa -> rg;
+}
+```
+
+The operational and generative views are both necessary. Automata explain how a machine recognizes inputs. Grammars explain how the valid strings are produced. Compiler theory, parsing, language design, and formal verification all depend on moving between these two descriptions.
+
+###### **1.7.3 The Halting Problem as the Boundary Signal**
+
+The **Halting Problem** asks whether, given a program and an input, the program eventually stops on that input. It is undecidable. This result signals the transition from language theory into computability limits.
+
+The Halting Problem is relevant because it shows that the power of Turing-complete computation necessarily comes with nontermination. Once programs can simulate arbitrary Turing Machines, no universal algorithm can always determine whether they halt.
+
+Rice's theorem generalizes this message. The problem is not only halting; every nontrivial semantic property of program behavior is undecidable in the unrestricted setting.
+
+##### **1.8 Formal Verification**
+
+###### **1.8.1 Meaning and Motivation**
+
+**Formal verification** means using mathematically precise methods to determine the correctness of systems. It can be applied to both hardware and software. The motivation is practical: bugs are expensive when discovered late, so verification aims to discover design errors before a finished product is deployed.
+
+A verification problem requires two formal objects:
+
+*   a **model** of the system being verified;
+*   a **specification** of the properties that should hold.
+
+```{dot}
+//| fig-cap: "Formal verification turns requirements and systems into mathematical objects checked by a verification tool"
+//| fig-width: 7.2
+//| fig-height: 2.7
+digraph verification_pipeline {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=box, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+
+  req [label="Requirements", fillcolor="#eef3f7"];
+  sys [label="System", fillcolor="#eef3f7"];
+  spec [label="Specification", fillcolor="#d6eef5"];
+  model [label="Model", fillcolor="#d6eef5"];
+  tool [label="Verification tool", fillcolor="#fff3cd"];
+  result [label="Verification result", fillcolor="#d7f0c2"];
+
+  req -> spec [label="formalisation"];
+  sys -> model [label="formalisation"];
+  spec -> tool;
+  model -> tool;
+  tool -> result;
+}
+```
+
+The core idea is to replace vague statements such as "the program should be correct" with formal claims that can be checked, proved, refuted, or approximated.
+
+###### **1.8.2 Program Verification Problem**
+
+The **Program Verification problem** is:
+
+Given a program $P$ and a specification $S$, determine whether every execution of $P$, for every value of its input arguments, satisfies $S$.
+
+In logical notation, the question is whether the Turing-machine model of the program satisfies the formula representing the specification:
+
+$$TM(P) \models F(S).$$
+
+For arbitrary Turing-complete programs and sufficiently expressive specifications, this problem is undecidable. This follows from the same fundamental limits behind the Halting Problem and Rice's theorem. Full automation of software verification is impossible in the unrestricted setting.
+
+This conclusion should not be read as "verification is useless". It means verification must use engineering workarounds: restrictions, approximations, abstractions, interactive proofs, bounded analysis, type systems, annotations, and conservative algorithms.
+
+###### **1.8.3 Making Verification Decidable by Restriction**
+
+The verification problem may become decidable when the expressiveness of the computational model or the specification language is restricted.
+
+If the program model is finite-state, then verification becomes decidable. A finite-state system has finitely many configurations, so in principle one can explore all possible states and transitions. Real programs are usually not finite-state because they may have arbitrarily complex inputs, dynamic memory allocation, recursion, unbounded data structures, and unbounded loops.
+
+**Software model checking** is the engineering compromise: it automatically verifies real programs by analyzing finite-state models or abstractions of them. The abstraction may lose information, but it can make exhaustive reasoning possible.
+
+##### **1.9 Model Checking**
+
+###### **1.9.1 Core Idea**
+
+**Model checking** is a technique for verifying finite-state concurrent systems. It checks whether a finite model satisfies a formal specification.
+
+The model is typically a form of finite-state automaton, often a **Kripke structure**, whose states are labelled with propositions that are true in those states. The specification is written in **propositional temporal logic**, an extension of propositional logic with operators for describing how truth changes over time.
+
+The verification procedure is an exhaustive, but optimized, search of the model's state space to determine whether the temporal formula holds.
+
+###### **1.9.2 Model Checking Results**
+
+A model checker takes two inputs:
+
+*   a model of the system;
+*   a formula $\varphi$ expressing the desired property.
+
+It may produce one of three practical outcomes:
+
+*   **yes**, meaning the model satisfies the specification;
+*   **no**, usually accompanied by a counterexample path explaining how the property fails;
+*   **resource failure**, such as memory overflow, when the state space is too large.
+
+```{dot}
+//| fig-cap: "Model checking: a finite model and temporal formula are checked by exhaustive state-space search"
+//| fig-width: 7.2
+//| fig-height: 2.5
+digraph model_checking {
+  rankdir=LR;
+  bgcolor="transparent";
+  node [fontname="Helvetica", fontsize=10, shape=box, style=filled, color="#355c7d", penwidth=1.1];
+  edge [fontname="Helvetica", fontsize=9, color="#355c7d"];
+
+  model [label="Finite-state model\n(Kripke structure)", fillcolor="#d6eef5"];
+  formula [label="Specification formula\nφ in temporal logic", fillcolor="#eef3f7"];
+  checker [label="Model checker\nstate-space search", fillcolor="#fff3cd"];
+  yes [label="yes\nwitness / proof", fillcolor="#d7f0c2"];
+  no [label="no\ncounterexample path", fillcolor="#f9d9e2"];
+  overflow [label="memory overflow\nstate explosion", fillcolor="#f9d9e2"];
+
+  model -> checker;
+  formula -> checker;
+  checker -> yes;
+  checker -> no;
+  checker -> overflow;
+}
+```
+
+The counterexample is one of the major advantages of model checking. When a design is wrong, the tool can often produce an execution path that demonstrates the error, helping engineers locate the source of the bug.
+
+###### **1.9.3 State Space Explosion**
+
+The main challenge of model checking is the **state space explosion problem**. Even when each component of a system has only a moderate number of states, the combined system may have an enormous number of global states because concurrent components interleave in many possible ways.
+
+This is why model checking is both automatic and difficult. It is decidable for finite-state models, but decidability does not automatically mean feasibility. Practical tools use symbolic representations, reductions, abstraction, partial-order methods, and other optimizations to make large verification tasks manageable.
+
+##### **1.10 Further Directions**
+
+###### **1.10.1 Complexity Theory, Compilers, and Verification**
+
+The lecture closes by locating the course topics in the broader curriculum. **Complexity theory** studies the resources needed to solve decidable problems, especially time and space. **Compilers** use grammars, automata, parsing, and language theory as practical tools. **Software formal verification** applies logic and computability ideas to the correctness of real systems.
+
+These areas are connected by the same central theme: formal models let us state precisely what can be computed, generated, recognized, parsed, decided, or verified.
+
+###### **1.10.2 Suggested Readings**
+
+The lecture suggests two readings for students who want more context:
+
+*   Carol E. Cleland, "The Concept of Computability", *Theoretical Computer Science*, Volume 317, Issues 1-3, 2004.
+*   Wilfried Sieg, "Computability Theory", in *Philosophy of Mathematics*, edited by Andrew D. Irvine, Elsevier, 2009.
+
+These readings extend the course's final topics toward the philosophical and historical foundations of computability.
+
+***
+
+#### **2. Definitions**
+
+*   **Acceptable set**: Another name for a recursively enumerable or Turing-recognizable set.
+*   **Characteristic function**: The total function $c_S$ that returns $1$ for elements of $S$ and $0$ for elements outside $S$.
+*   **Complement**: For $S \subseteq \mathbb{N}$, the set $\overline{S}=\mathbb{N}-S$.
+*   **Counterexample**: An execution path or trace showing that a model violates a specification.
+*   **Decidable set**: A set whose membership problem is solved by a total computable characteristic function.
+*   **Decision problem**: A computational problem with yes-or-no answers, representable as membership in a set.
+*   **Finite-state model**: A model with finitely many possible states and transitions.
+*   **Fixed point**: A value left unchanged by a function; in Kleene's theorem, an index whose computed behavior is unchanged by a computable index transformation.
+*   **Formal verification**: The use of mathematical methods to determine whether a system satisfies a formal specification.
+*   **Halting Problem**: The decision problem asking whether a given program eventually stops on a given input.
+*   **Kleene's fixed-point theorem**: The theorem stating that every total computable function on program indices has a semantic fixed point $p$ with $f_p=f_{t(p)}$.
+*   **Kripke structure**: A finite-state model whose states are labelled with propositions, commonly used in model checking.
+*   **Model checking**: Automatic verification of finite-state models against formal temporal-logic specifications.
+*   **Nontrivial property**: A property that holds for some programs but not for all programs.
+*   **Partial computable function**: A computable function that may be undefined on some inputs because the computation may not halt.
+*   **Program Verification problem**: The problem of deciding whether every execution of a program satisfies a given specification.
+*   **Recursive set**: A decidable set; membership can be answered yes or no by an algorithm that always halts.
+*   **Recursively enumerable set**: A set whose members can be effectively enumerated, or equivalently whose yes-instances can be accepted by a Turing Machine.
+*   **Rice's theorem**: The theorem stating that every nontrivial semantic property of computable functions is undecidable.
+*   **Semantic property**: A property concerning the behavior or computed function of a program.
+*   **Semidecidable set**: A set for which yes-instances are recognized in finite time, while no-instances may run forever.
+*   **State space explosion**: The rapid growth of the number of global states in a finite-state model, especially for concurrent systems.
+*   **Syntactic property**: A property concerning the structure or text of a program rather than its behavior.
+*   **Temporal logic**: A logic extending propositional logic with operators for reasoning about how truth changes over time.
+*   **Total computable function**: A computable function that returns a value for every input.
+*   **Turing-recognizable set**: Another name for a recursively enumerable set.
+
+***
+
+#### **3. Formulas**
+
+*   **Characteristic Function**: $c_S(x)=1$ if $x\in S$, and $c_S(x)=0$ if $x\notin S$.
+*   **Complement Characteristic Function**: $c_{\overline{S}}(x)=1-c_S(x)$.
+*   **Recursive Implies RE Enumerator**: $g_S(x)=x$ if $c_S(x)=1$, and $g_S(x)=k$ otherwise, for fixed $k\in S$.
+*   **Recursive-RE Characterization**: $S$ is recursive $\Longleftrightarrow S$ is RE and $\overline{S}$ is RE.
+*   **Kleene Fixed Point**: For every total computable $t:\mathbb{N}\to\mathbb{N}$, there exists $p$ such that $f_p=f_{t(p)}$.
+*   **Rice Set of Indices**: $S=\{x\mid f_x\in F\}$.
+*   **Rice's Theorem**: $S$ is decidable $\Longleftrightarrow F=\emptyset$ or $F$ is the set of all computable functions.
+*   **Program Verification Query**: $TM(P)\models F(S)$.
+*   **Hierarchy of Language Classes**: $\text{Regular}\subsetneq\text{Context-Free}\subsetneq\text{Context-Sensitive}\subsetneq\text{Recursive}\subsetneq\text{Recursively Enumerable}$.
+
+***
+
+#### **4. Practice**
+
+##### **4.1. Prove That Every Recursive Set Is Recursively Enumerable** (Lecture 14, Example 1)
+
+Prove that if $S$ is recursive, then $S$ is recursively enumerable.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A recursive set has a total computable membership test. Use that test to define a total computable function whose image is exactly the set.
+
+1.  **Start with the empty-set case.** If $S=\emptyset$, then $S$ is RE by the lecture definition. There is nothing to enumerate.
+2.  **Assume the set is nonempty.** Suppose $S\neq\emptyset$. Choose one fixed element $k\in S$.
+3.  **Use decidability.** Since $S$ is recursive, the characteristic function
+    $$c_S(x)=
+    \begin{cases}
+    1, & x\in S,\\
+    0, & x\notin S
+    \end{cases}$$
+    is total and computable.
+4.  **Define an enumerating function.** Let
+    $$g_S(x)=
+    \begin{cases}
+    x, & c_S(x)=1,\\
+    k, & c_S(x)=0.
+    \end{cases}$$
+5.  **Check computability.** The function $g_S$ first computes $c_S(x)$, which always halts. Then it returns either $x$ or the fixed value $k$. Therefore $g_S$ is total and computable.
+6.  **Check the image.** If $x\in S$, then $g_S(x)=x$, so every element of $S$ appears in the image of $g_S$. If $x\notin S$, then $g_S(x)=k$, and $k$ is already in $S$. Thus no value outside $S$ appears.
+
+**Answer:** $S$ is the image of a total computable function, so $S$ is recursively enumerable.
+
+</details>
+
+##### **4.2. Prove the Complement Characterization of Recursive Sets** (Lecture 14, Example 2)
+
+Prove that
+
+$$S \text{ is recursive} \Longleftrightarrow S \text{ is RE and } \overline{S} \text{ is RE}.$$
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** One semidecision procedure recognizes yes-instances of $S$. A second semidecision procedure recognizes no-instances by recognizing yes-instances of the complement.
+
+**Forward direction: assume $S$ is recursive.**
+
+1.  Since $S$ is recursive, Practice 4.1 gives that $S$ is RE.
+2.  Since $S$ is recursive, $c_S$ is total and computable.
+3.  Define
+    $$c_{\overline{S}}(x)=1-c_S(x).$$
+    This function swaps the yes and no answers.
+4.  The function $c_{\overline{S}}$ is total and computable, so $\overline{S}$ is recursive.
+5.  Since every recursive set is RE, $\overline{S}$ is RE.
+
+Therefore, if $S$ is recursive, both $S$ and its complement are RE.
+
+**Backward direction: assume $S$ and $\overline{S}$ are RE.**
+
+1.  Since $S$ is RE, let
+    $$S=\{g_S(0),g_S(1),g_S(2),\ldots\}.$$
+2.  Since $\overline{S}$ is RE, let
+    $$\overline{S}=\{g_{\overline{S}}(0),g_{\overline{S}}(1),g_{\overline{S}}(2),\ldots\}.$$
+3.  On input $x$, enumerate both sets in parallel:
+    $$g_S(0),\ g_{\overline{S}}(0),\ g_S(1),\ g_{\overline{S}}(1),\ldots$$
+4.  Since $S$ and $\overline{S}$ are disjoint and their union is $\mathbb{N}$, the input $x$ appears in exactly one enumeration.
+5.  If $x$ appears in the enumeration of $S$, answer yes. If it appears in the enumeration of $\overline{S}$, answer no.
+
+The procedure always halts because every natural number belongs to one of the two sets.
+
+**Answer:** A set is decidable exactly when both it and its complement are semidecidable.
+
+</details>
+
+##### **4.3. Interpret Kleene's Fixed-Point Theorem** (Lecture 14, Example 3)
+
+Explain why Kleene's theorem gives a semantic fixed point rather than a syntactic fixed point.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Program indices are names for computed behavior. Two different indices may compute the same partial function.
+
+1.  **Start with the theorem.** Kleene's theorem says that for every total computable function $t:\mathbb{N}\to\mathbb{N}$, there exists $p$ such that
+    $$f_p=f_{t(p)}.$$
+2.  **Interpret $t$.** The function $t$ is an effective transformation of program indices. It takes the code number of one program and returns the code number of another program.
+3.  **Separate code from behavior.** The equation does not say
+    $$p=t(p).$$
+    It says that the program at index $p$ and the program at index $t(p)$ compute the same partial function.
+4.  **Explain semantic equality.** The two programs may have different source code, different machine descriptions, and different indices. They are fixed only at the level of behavior: for every input, they either produce the same output or both fail to halt.
+
+**Answer:** Kleene's theorem guarantees fixed behavior under every computable program transformation, not identical program text or identical indices.
+
+</details>
+
+##### **4.4. Prove Rice's Theorem** (Lecture 14, Example 4)
+
+Use Kleene's fixed-point theorem to prove that every nontrivial semantic property of computable functions is undecidable.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** If a nontrivial semantic property were decidable, we could use its decider to construct a computable index transformation that switches programs across the property boundary. Kleene's theorem then forces a contradiction.
+
+1.  **Set up the property.** Let $F$ be a nontrivial set of computable functions. Define
+    $$S=\{x\mid f_x\in F\}.$$
+2.  **Assume decidability for contradiction.** Suppose $S$ is recursive. Then its characteristic function
+    $$c_S(x)=
+    \begin{cases}
+    1, & f_x\in F,\\
+    0, & f_x\notin F
+    \end{cases}$$
+    is total and computable.
+3.  **Use nontriviality.** Since $F\neq\emptyset$, choose an index $i$ such that $f_i\in F$. Since $F$ is not the set of all computable functions, choose an index $j$ such that $f_j\notin F$.
+4.  **Construct a computable switch.** Define
+    $$c'_S(x)=
+    \begin{cases}
+    i, & f_x\notin F,\\
+    j, & f_x\in F.
+    \end{cases}$$
+    This is computable because $c_S$ is computable.
+5.  **Apply Kleene's theorem.** Since $c'_S$ is total and computable, there exists $x'$ such that
+    $$f_{c'_S(x')}=f_{x'}.$$
+6.  **Analyze the first case.** If $c'_S(x')=i$, then by definition of $c'_S$, $f_{x'}\notin F$. But $f_{c'_S(x')}=f_i$, and $f_i\in F$. Since $f_{x'}=f_i$, we get $f_{x'}\in F$, contradiction.
+7.  **Analyze the second case.** If $c'_S(x')=j$, then by definition of $c'_S$, $f_{x'}\in F$. But $f_{c'_S(x')}=f_j$, and $f_j\notin F$. Since $f_{x'}=f_j$, we get $f_{x'}\notin F$, contradiction.
+8.  **Conclude.** Both possible cases contradict the assumption that $S$ is recursive.
+
+**Answer:** If $F$ is nontrivial, the index set $S=\{x\mid f_x\in F\}$ is undecidable. Therefore every nontrivial semantic property of computable functions is undecidable.
+
+</details>

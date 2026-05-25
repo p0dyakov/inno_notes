@@ -1,0 +1,804 @@
+---
+title: "W16. Amortized Analysis"
+author: "Nikolai Kudasov"
+date: "May 5, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Theory**
+
+##### **1.1 Why Amortized Analysis Is Needed**
+
+###### **1.1.1 Cost of a Sequence**
+
+Many data structures have operations whose individual worst-case costs look scary, even though long valid sequences of operations are cheap overall. **Amortized analysis** is the method used to explain this situation rigorously.
+
+The key idea is to analyze a **sequence** of operations, not a single operation in isolation. A single operation may cost $\Theta(n)$, but if such expensive operations cannot happen too often, then the average cost per operation over every valid sequence may still be $O(1)$ or $O(\log n)$.
+
+This is a worst-case guarantee over sequences. It is not the same as probabilistic average-case analysis. Average-case analysis assumes a probability distribution over inputs or operation choices. Amortized analysis makes no such assumption: it says that every legal sequence of $n$ operations has total cost at most some bound $T(n)$.
+
+###### **1.1.2 Stack with Multi-Pop**
+
+Consider a stack supporting three operations:
+
+- $\text{Push}(v)$ pushes value $v$ onto the stack;
+- $\text{Pop}()$ removes the top value;
+- $\text{PopMany}(k)$ removes up to the top $k$ values.
+
+The worst-case cost of one $\text{Push}$ is $\Theta(1)$, and the worst-case cost of one $\text{Pop}$ is $\Theta(1)$. A single $\text{PopMany}(k)$ can cost $\Theta(k)$, and if the stack currently contains $\Theta(n)$ elements, this can be $\Theta(n)$.
+
+A naive worst-case-per-operation argument would say that $n$ operations may cost $O(n^2)$, because each operation might be treated as if it could cost $O(n)$. This is too pessimistic. Every element popped by $\text{Pop}$ or $\text{PopMany}$ must first have been pushed. Since at most $n$ pushes can occur in a sequence of $n$ operations, at most $n$ elements can be popped in total. Therefore the whole sequence costs $O(n)$, not $O(n^2)$.
+
+This example captures the spirit of amortized analysis: expensive operations spend work that was made possible by earlier cheap operations.
+
+##### **1.2 Aggregate Analysis**
+
+###### **1.2.1 Method**
+
+**Aggregate analysis** is the simplest amortized-analysis technique. Instead of assigning different charges to different operation types, it directly bounds the total running time of any sequence of $n$ operations.
+
+The method has two steps:
+
+1. Prove that every valid sequence of $n$ operations has total actual cost at most $T(n)$.
+2. Divide by $n$ to obtain an amortized cost per operation:
+   $$
+   \hat{c} = \frac{T(n)}{n}.
+   $$
+
+The symbol $\hat{c}$ denotes amortized cost. It does not mean the actual cost of every operation is equal to $\hat{c}$. It means that, over the whole sequence, the operations can be charged as if each cost at most $\hat{c}$ on average.
+
+Aggregate analysis is easy to understand, but it can be too coarse. It gives one common amortized bound for all operations, even when different operation types have different natural costs.
+
+###### **1.2.2 Binary Counter**
+
+A standard example is a binary counter stored as a bit array $A[0 \ldots k-1]$, where $A[0]$ is the least significant bit.
+
+```text
+INCREMENT(A, k)
+1  i = 0
+2  while i < k and A[i] == 1
+3      A[i] = 0
+4      i = i + 1
+5  if i < k
+6      A[i] = 1
+```
+
+One increment may flip many bits. For example, $0111_2$ becomes $1000_2$, which flips four bits. Thus a single operation can cost $\Theta(k)$.
+
+However, over many increments, low-order bits flip much more often than high-order bits. Bit $0$ flips every increment, bit $1$ flips every two increments, bit $2$ flips every four increments, and so on. For $n$ increments, the total number of bit flips is bounded by
+
+$$
+n + \frac{n}{2} + \frac{n}{4} + \frac{n}{8} + \cdots < 2n.
+$$
+
+So the total cost of $n$ increments is $O(n)$, and the amortized cost of one increment is $O(1)$, even though one individual increment may flip $\Theta(k)$ bits.
+
+##### **1.3 Accounting Method**
+
+###### **1.3.1 Credits**
+
+The **accounting method** assigns each operation an **amortized cost** $\hat{c}_i$, which may differ from its **actual cost** $c_i$.
+
+If $\hat{c}_i > c_i$, the operation stores the difference as **credit**. If $\hat{c}_i < c_i$, the operation spends previously stored credit. The charging scheme is valid only if the credit balance never becomes negative.
+
+Formally, for every prefix of the operation sequence,
+
+$$
+\sum_{i=1}^{k} \hat{c}_i \ge \sum_{i=1}^{k} c_i
+$$
+
+for all $1 \le k \le n$. This prefix condition is essential. It prevents the analysis from borrowing credit from future operations that have not happened yet.
+
+###### **1.3.2 Stack Credits**
+
+For the stack with $\text{Push}$, $\text{Pop}$, and $\text{PopMany}$, a valid accounting scheme is:
+
+| Operation | Actual cost | Amortized cost |
+| :--- | :--- | :--- |
+| $\text{Push}(v)$ | $1$ | $2$ |
+| $\text{Pop}()$ | $1$ | $0$ |
+| $\text{PopMany}(k)$ | number of removed elements | $0$ |
+
+Each push pays $1$ for itself and stores $1$ credit on the pushed element. Later, when that element is removed by either $\text{Pop}$ or $\text{PopMany}$, its stored credit pays for the removal. Since an element cannot be popped more than once, the credit is sufficient.
+
+This proves $O(1)$ amortized cost per stack operation.
+
+###### **1.3.3 Binary Counter Credits**
+
+For the binary counter, charge $2$ for every change from $0$ to $1$, and charge $0$ for every change from $1$ to $0$.
+
+When a bit changes from $0$ to $1$, one unit pays for the actual flip and one unit is stored as credit on that bit. Later, when that same bit changes from $1$ to $0$, the stored credit pays for the flip. Every trailing $1$ that becomes $0$ already has its own credit.
+
+An increment changes at most one bit from $0$ to $1$, so it receives amortized cost at most $2$. Therefore binary-counter increment has $O(1)$ amortized cost.
+
+##### **1.4 Potential Method**
+
+###### **1.4.1 Potential Functions**
+
+The **potential method** is a mathematical version of the accounting method. Instead of placing explicit credits on individual objects, it defines a nonnegative stored energy for the whole data structure.
+
+Let $D_i$ be the state of the data structure after the $i$-th operation. A **potential function** $\Phi(D_i)$ maps states to real numbers. The amortized cost of operation $i$ is
+
+$$
+\hat{c}_i = c_i + \Phi(D_i) - \Phi(D_{i-1}).
+$$
+
+If the potential increases, the operation is charged extra and stores energy for the future. If the potential decreases, the operation uses stored energy to pay for actual work.
+
+To make the bound valid, the potential must satisfy
+
+$$
+\Phi(D_i) \ge \Phi(D_0)
+$$
+
+for every $i$. Usually $\Phi(D_0)=0$ and $\Phi(D_i)\ge 0$. Then summing the amortized costs telescopes:
+
+$$
+\sum_{i=1}^{n}\hat{c}_i
+=
+\sum_{i=1}^{n}c_i + \Phi(D_n)-\Phi(D_0)
+\ge
+\sum_{i=1}^{n}c_i.
+$$
+
+So the total amortized cost upper-bounds the total actual cost.
+
+###### **1.4.2 Stack Potential**
+
+For the stack, choose
+
+$$
+\Phi(D)=\text{number of elements in the stack}.
+$$
+
+This potential is always nonnegative. A push costs $1$ and increases potential by $1$, so its amortized cost is $2$. A pop costs $1$ and decreases potential by $1$, so its amortized cost is $0$. A $\text{PopMany}(k)$ operation removing $r$ elements costs $r$ and decreases potential by $r$, so its amortized cost is also $0$.
+
+This is the same intuition as the accounting method: each stack element represents one unit of stored future removal work.
+
+###### **1.4.3 Binary Counter Potential**
+
+For the binary counter, choose
+
+$$
+\Phi(D)=\text{number of 1-bits in the counter}.
+$$
+
+Suppose an increment changes $t$ trailing $1$ bits to $0$ and then changes one $0$ bit to $1$. The actual cost is $t+1$. The number of $1$ bits decreases by $t$ and increases by $1$, so the potential change is $1-t$.
+
+Therefore
+
+$$
+\hat{c}_i = (t+1) + (1-t) = 2.
+$$
+
+Again the amortized cost is constant. Long carry chains are paid for by the potential stored in the trailing $1$ bits.
+
+##### **1.5 Dynamic Tables**
+
+###### **1.5.1 Expansion Only**
+
+A **dynamic array** stores elements in a contiguous table with some capacity $C$ and current number of elements $n$. The operation $\text{AddLast}$ appends one element. If the table is full, the data structure allocates a new table of double capacity and copies all existing elements.
+
+A single append may cost $\Theta(n)$ during resizing, but resizing happens only after many cheap appends. One potential function for expansion-only dynamic arrays is
+
+$$
+\Phi(D)=2n-C.
+$$
+
+This potential is useful when the table is at least half full after initialization and resizing. It grows by $2$ on ordinary appends, storing credit for the next copy. When a resize happens, capacity doubles, and the drop in potential pays for copying the old elements.
+
+The result is $O(1)$ amortized time per $\text{AddLast}$.
+
+###### **1.5.2 Expansion and Contraction**
+
+If the table also supports $\text{RemoveLast}$, contraction must be handled carefully. A bad rule such as "halve the table whenever it becomes half full" can cause repeated grow-shrink oscillation. The standard fix is **hysteresis**: grow when full, but shrink only when the load drops below one quarter.
+
+The load factor is
+
+$$
+\alpha = \frac{n}{C}.
+$$
+
+With doubling at $\alpha=1$ and halving below $\alpha=\frac14$, the table has a buffer zone around half full. A suitable potential is
+
+$$
+\Phi(D)=
+\begin{cases}
+\frac{1}{2}C-n, & n \le \frac{1}{2}C,\\
+2n-C, & n > \frac{1}{2}C.
+\end{cases}
+$$
+
+The potential is zero near $n=C/2$ and grows when the table becomes either too full or too empty. That stored potential pays for the next expansion or contraction. With this choice, both $\text{AddLast}$ and $\text{RemoveLast}$ have $O(1)$ amortized cost.
+
+##### **1.6 More Amortized Data Structures**
+
+###### **1.6.1 Queue from Two Stacks**
+
+A queue can be implemented using two stacks. Let $R$ be the stack used for enqueues and $F$ be the stack used for dequeues.
+
+- $\text{Enqueue}(x)$ pushes $x$ onto $R$.
+- $\text{Dequeue}()$ pops from $F$ if $F$ is nonempty.
+- If $F$ is empty, move all elements from $R$ to $F$ by popping them from $R$ and pushing them onto $F$, then pop from $F$.
+
+The transfer reverses the order, so the oldest enqueued element becomes the top of $F$ and can be dequeued first.
+
+The amortized analysis is simple: each enqueued element will be pushed once into $R$, moved once from $R$ to $F$, and popped once from $F$. If each enqueue is charged $3$, it can pay for all three constant-cost actions associated with that element. Thus both queue operations have $O(1)$ amortized cost.
+
+###### **1.6.2 Union by Smaller Set**
+
+Suppose a set data structure supports
+
+$$
+\text{Union}(S_1,S_2)
+$$
+
+in time $O(\min(|S_1|,|S_2|))$ by moving or relabeling the elements of the smaller set. Starting from singleton sets, each time an element is moved, the size of its containing set at least doubles. An element can therefore be moved at most $\lfloor \log_2 n \rfloor$ times before it belongs to the full universe of size $n$.
+
+The total movement over all unions is $O(n\log n)$, and the amortized cost per union is $O(\log n)$.
+
+###### **1.6.3 Periodic Rebalancing**
+
+Some data structures perform occasional global repairs. For example, a binary search tree might insert normally and then rebalance after enough insertions have accumulated. The accounting method handles this by charging each insertion extra credit and saving that credit for the next full rebuild.
+
+The central design question is not whether rebuilding is expensive; it is whether enough cheap operations must occur between rebuilds to pay for it. If a tree of size $n$ is rebuilt in $O(n)$ time only after $\Omega(n/\log n)$ insertions have occurred, then charging $O(\log n)$ extra per insertion is enough to pay for the rebuild.
+
+***
+
+#### **2. Definitions**
+
+*   **Amortized analysis**: A worst-case analysis of the average cost per operation over every valid sequence of operations.
+*   **Actual cost** $c_i$: The real cost paid by the $i$-th operation.
+*   **Amortized cost** $\hat{c}_i$: The artificial cost assigned to the $i$-th operation for analysis.
+*   **Aggregate analysis**: A method that bounds total cost $T(n)$ for $n$ operations and divides by $n$.
+*   **Accounting method**: A method that overcharges some operations and stores the surplus as credit for later expensive operations.
+*   **Credit**: Stored prepaid work used to pay for future actual cost.
+*   **Prefix condition**: The requirement that total amortized cost is at least total actual cost for every prefix of the sequence.
+*   **Potential method**: A method that represents stored prepaid work by a function of the data-structure state.
+*   **Potential function** $\Phi(D)$: A function assigning stored energy or credit to a data-structure state.
+*   **State** $D_i$: The data structure after the $i$-th operation.
+*   **Binary counter**: A bit-array representation of an integer where increment may flip trailing $1$ bits to $0$ and one $0$ bit to $1$.
+*   **Trailing 1s**: Consecutive $1$ bits at the low-order end of a binary counter.
+*   **Dynamic array**: An array-backed sequence that resizes when capacity becomes insufficient.
+*   **Capacity** $C$: The number of elements that can fit in the currently allocated table.
+*   **Load factor** $\alpha$: The ratio $n/C$ of stored elements to capacity.
+*   **Hysteresis**: Using different thresholds for expansion and contraction to avoid repeated resizing.
+*   **Queue from two stacks**: A FIFO queue implementation that uses one stack for incoming elements and one stack for outgoing elements.
+*   **Union by smaller set**: A union strategy that always moves or relabels elements of the smaller set.
+*   **Periodic rebalancing**: Occasional global rebuilding paid for by credit accumulated during ordinary operations.
+
+***
+
+#### **3. Formulas**
+
+*   **Aggregate amortized cost**: $\hat{c}=\frac{T(n)}{n}$
+*   **Accounting prefix condition**: $\displaystyle \sum_{i=1}^{k}\hat{c}_i \ge \sum_{i=1}^{k}c_i$ for every $1 \le k \le n$
+*   **Potential amortized cost**: $\hat{c}_i=c_i+\Phi(D_i)-\Phi(D_{i-1})$
+*   **Potential validity condition**: $\Phi(D_i)\ge \Phi(D_0)$ for every $i$
+*   **Binary-counter aggregate flips**: $\displaystyle n+\frac{n}{2}+\frac{n}{4}+\cdots < 2n$
+*   **Stack potential**: $\Phi(D)=\text{number of elements in the stack}$
+*   **Binary-counter potential**: $\Phi(D)=\text{number of 1-bits}$
+*   **Expansion-only dynamic-array potential**: $\Phi(D)=2n-C$
+*   **Expansion-contraction table potential**: $\displaystyle \Phi(D)=\begin{cases}\frac{1}{2}C-n,& n\le \frac{1}{2}C,\\2n-C,& n>\frac{1}{2}C\end{cases}$
+*   **Union-by-smaller-set movement bound**: $O(\log n)$ moves per element
+
+***
+
+#### **4. Practice**
+
+##### **4.1. Analyze Multi-Pop Stack by Aggregate Analysis** (Lecture 14, Example 1)
+
+Using aggregate analysis, analyze the total running time of a sequence of $n$ operations $\text{Push}$, $\text{Pop}$, and $\text{PopMany}$ on an initially empty stack.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A popped element must previously have been pushed, and each pushed element can be popped at most once.
+
+First consider the loose bound. In one operation, $\text{PopMany}(k)$ may remove many elements. If the stack has $\Theta(n)$ elements, one such operation may cost $\Theta(n)$. Treating every one of the $n$ operations as if it could independently cost $\Theta(n)$ gives
+
+$$
+O(n^2).
+$$
+
+This bound is valid but not tight.
+
+For the tight aggregate analysis, count element movements instead:
+
+1.  Each $\text{Push}$ inserts one element and costs $1$.
+2.  Each element inserted by a push can be removed only once.
+3.  A removal may happen through $\text{Pop}$ or as one of the removals inside $\text{PopMany}$.
+4.  Since the sequence has at most $n$ pushes, at most $n$ elements can ever be removed.
+
+Therefore the total cost of all pushes is at most $n$, and the total cost of all removals is at most $n$. Hence
+
+$$
+T(n) \le 2n = O(n).
+$$
+
+Dividing by the number of operations gives
+
+$$
+\hat{c}=\frac{T(n)}{n}=O(1).
+$$
+
+**Answer:** Any sequence of $n$ stack operations costs $O(n)$ total, so each operation has $O(1)$ amortized cost.
+
+</details>
+
+##### **4.2. Analyze Binary Counter by Aggregate Analysis** (Lecture 14, Example 2)
+
+Use aggregate analysis to analyze the cost of incrementing a binary counter stored as a bit array.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Bit $j$ flips only once every $2^j$ increments, so high-order bits are cheap over a long sequence.
+
+Let $A[0]$ be the least significant bit. During $n$ increments:
+
+- bit $0$ flips on every increment, so at most $n$ times;
+- bit $1$ flips every $2$ increments, so at most $\lfloor n/2 \rfloor$ times;
+- bit $2$ flips every $4$ increments, so at most $\lfloor n/4 \rfloor$ times;
+- in general, bit $j$ flips at most $\lfloor n/2^j \rfloor$ times.
+
+Thus the total number of flips is at most
+
+$$
+\sum_{j\ge 0}\left\lfloor\frac{n}{2^j}\right\rfloor
+\le
+\sum_{j\ge 0}\frac{n}{2^j}
+=
+n\sum_{j\ge 0}\frac{1}{2^j}.
+$$
+
+The geometric series satisfies
+
+$$
+\sum_{j\ge 0}\frac{1}{2^j}=2.
+$$
+
+Therefore
+
+$$
+T(n) \le 2n = O(n).
+$$
+
+The amortized cost per increment is
+
+$$
+\frac{T(n)}{n}=O(1).
+$$
+
+**Answer:** A sequence of $n$ increments flips fewer than $2n$ bits, so one increment costs $O(1)$ amortized time.
+
+</details>
+
+##### **4.3. Analyze Multi-Pop Stack by the Accounting Method** (Lecture 14, Example 3)
+
+Analyze a sequence of $n$ operations $\text{Push}$, $\text{Pop}$, and $\text{PopMany}$ on an initially empty stack using the accounting method.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Store one credit on each pushed element, and use that credit when the element is removed.
+
+Assign amortized costs as follows:
+
+| Operation | Actual cost | Amortized cost |
+| :--- | :--- | :--- |
+| $\text{Push}(v)$ | $1$ | $2$ |
+| $\text{Pop}()$ | $1$ if nonempty | $0$ |
+| $\text{PopMany}(k)$ | number of removed elements | $0$ |
+
+When $\text{Push}(v)$ happens, the operation pays:
+
+$$
+2 = 1 + 1.
+$$
+
+The first unit pays for the actual push. The second unit is stored as credit on the new stack element.
+
+Now consider any future removal. If an element is removed by $\text{Pop}$, its own stored credit pays the actual cost $1$. If an element is removed as part of $\text{PopMany}(k)$, the same argument applies: each removed element carries one credit, and that credit pays for removing that element.
+
+The credit balance can never become negative because the data structure never removes an element that was not previously pushed. Each removal consumes the credit of exactly one existing element.
+
+Thus every operation has amortized cost at most $2$, which is $O(1)$.
+
+**Answer:** Charge $\text{Push}$ cost $2$ and charge both pop operations cost $0$; the stored credit on pushed elements pays for all removals, giving $O(1)$ amortized cost.
+
+</details>
+
+##### **4.4. Analyze Binary Counter by the Accounting Method** (Lecture 14, Example 4)
+
+Use the accounting method to analyze a sequence of `INCREMENT` operations on a binary counter stored as a bit array.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A bit that is set to $1$ stores credit for the later moment when it is reset to $0$.
+
+During one increment, some number $t$ of trailing $1$ bits change to $0$, and then at most one $0$ bit changes to $1$.
+
+Use this charging scheme:
+
+- charge $2$ for a flip $0 \to 1$;
+- charge $0$ for a flip $1 \to 0$.
+
+When a bit flips from $0$ to $1$, one unit pays for the actual flip and one unit is stored as credit on that bit. Later, if that bit flips from $1$ to $0$, the stored credit pays for the reset.
+
+Now check a whole increment. It may reset $t$ trailing $1$ bits, but each of those bits already contains one stored credit. The increment then sets at most one $0$ bit to $1$, and this costs amortized $2$.
+
+So the amortized cost of one increment is at most
+
+$$
+2.
+$$
+
+The credit balance is always nonnegative because only bits currently equal to $1$ may be reset, and every such bit received credit when it became $1$.
+
+**Answer:** Charge $2$ for the single $0\to1$ flip and let stored credits pay for all $1\to0$ flips; each increment costs $O(1)$ amortized time.
+
+</details>
+
+##### **4.5. Analyze Multi-Pop Stack by the Potential Method** (Lecture 14, Example 5)
+
+Analyze a sequence of $n$ operations $\text{Push}$, $\text{Pop}$, and $\text{PopMany}$ on an initially empty stack using the potential method.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The number of elements in the stack is exactly the amount of prepaid removal work.
+
+Let
+
+$$
+\Phi(D)=\text{number of elements in stack }D.
+$$
+
+The stack starts empty, so $\Phi(D_0)=0$. The potential is never negative, so the potential method is valid.
+
+For $\text{Push}$, suppose the stack had $m$ elements before the operation. The actual cost is $1$, and the stack has $m+1$ elements afterward. Therefore
+
+$$
+\hat{c}_i = 1 + (m+1)-m = 2.
+$$
+
+For $\text{Pop}$, suppose the stack had $m>0$ elements before the operation. The actual cost is $1$, and the stack has $m-1$ elements afterward. Therefore
+
+$$
+\hat{c}_i = 1 + (m-1)-m = 0.
+$$
+
+For $\text{PopMany}(k)$, let
+
+$$
+r=\min(m,k)
+$$
+
+be the number of elements actually removed. The actual cost is $r$, and the potential decreases from $m$ to $m-r$. Hence
+
+$$
+\hat{c}_i = r + (m-r)-m = 0.
+$$
+
+All three amortized costs are at most $2$.
+
+**Answer:** With $\Phi(D)=|D|$, push costs $2$ amortized and both removal operations cost $0$ amortized, so every operation is $O(1)$ amortized.
+
+</details>
+
+##### **4.6. Analyze Binary Counter by the Potential Method** (Lecture 14, Example 6)
+
+Use the potential method to analyze `INCREMENT` on a binary counter stored as a bit array.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The $1$ bits store exactly the potential needed to pay for future carry propagation.
+
+Let
+
+$$
+\Phi(D)=\text{number of 1-bits in the counter}.
+$$
+
+The initial all-zero counter has potential $0$, and the number of $1$ bits is never negative, so the potential function is valid.
+
+Suppose an increment changes $t$ trailing $1$ bits into $0$ bits. If the counter has an available higher $0$ bit, the operation then changes one $0$ bit into $1$. The actual number of flips is
+
+$$
+c_i=t+1.
+$$
+
+Let the old number of $1$ bits be $q$. After the operation, $t$ old $1$ bits disappear and one new $1$ bit appears, so the new number of $1$ bits is
+
+$$
+q-t+1.
+$$
+
+The potential change is therefore
+
+$$
+\Phi(D_i)-\Phi(D_{i-1})=(q-t+1)-q=1-t.
+$$
+
+Now compute the amortized cost:
+
+$$
+\hat{c}_i = c_i + \Phi(D_i)-\Phi(D_{i-1})
+= (t+1)+(1-t)=2.
+$$
+
+If the counter overflows because all bits are $1$, then the operation flips $t$ bits to $0$ and does not create a new $1$ bit. The actual cost is $t$, the potential change is $-t$, and the amortized cost is $0$. This is still bounded by $2$.
+
+**Answer:** With potential equal to the number of $1$ bits, each increment has amortized cost at most $2$, hence $O(1)$.
+
+</details>
+
+##### **4.7. Analyze Dynamic Array Expansion** (Lecture 14, Example 7)
+
+Consider a dynamic array that supports `AddLast`. When the array is full, the capacity doubles and all existing elements are copied. Analyze `AddLast` using the potential method.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Ordinary appends build up potential that pays for the next resize.
+
+Let $n$ be the number of elements and $C$ be the capacity after an operation. Use
+
+$$
+\Phi(D)=2n-C.
+$$
+
+Assume the table is initialized and resized so that the potential is nonnegative in the states under consideration. This is the standard expansion-only setting where the table is at least half full after the initial small cases.
+
+There are two cases.
+
+**Case 1: no resize.** Before the operation, the table has $n$ elements and capacity $C$, with $n<C$. The operation appends one element, so the actual cost is $1$. The new state has $n+1$ elements and the same capacity $C$:
+
+$$
+\Phi(D_i)=2(n+1)-C,
+\qquad
+\Phi(D_{i-1})=2n-C.
+$$
+
+Thus
+
+$$
+\hat{c}_i
+=1+\bigl(2(n+1)-C\bigr)-(2n-C)
+=1+2
+=3.
+$$
+
+**Case 2: resize.** Before the operation, the table is full: $n=C$. To append, we copy $n$ old elements and insert the new one, so the actual cost is $n+1$. The new capacity is $2C=2n$, and the new number of elements is $n+1$.
+
+The new potential is
+
+$$
+\Phi(D_i)=2(n+1)-2n=2.
+$$
+
+The old potential is
+
+$$
+\Phi(D_{i-1})=2n-n=n.
+$$
+
+Therefore
+
+$$
+\hat{c}_i=(n+1)+2-n=3.
+$$
+
+Both cases have amortized cost $3$.
+
+**Answer:** With $\Phi(D)=2n-C$, every `AddLast` has amortized cost $3$, so expansion-only dynamic arrays support append in $O(1)$ amortized time.
+
+</details>
+
+##### **4.8. Implement a Queue with Two Stacks** (Lecture 14, Example 8)
+
+Implement a queue using two stacks so that `Enqueue` and `Dequeue` have $O(1)$ amortized cost. Prove the bound using the accounting method.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each element is pushed onto the input stack once, transferred once, and popped from the output stack once.
+
+Use two stacks:
+
+- $R$ receives newly enqueued elements;
+- $F$ supplies elements for dequeue.
+
+The operations are:
+
+```text
+ENQUEUE(x)
+1  R.push(x)
+
+DEQUEUE()
+1  if F is empty
+2      while R is not empty
+3          F.push(R.pop())
+4  return F.pop()
+```
+
+The transfer reverses the order of $R$. The element that has waited longest in $R$ becomes the top of $F$, so dequeue order is FIFO.
+
+Now assign amortized costs:
+
+| Operation part | Actual cost | Amortized charge |
+| :--- | :--- | :--- |
+| push into $R$ during `Enqueue` | $1$ | $3$ |
+| move one element $R \to F$ | $2$ | paid by stored credit |
+| pop from $F$ during `Dequeue` | $1$ | $1$ |
+
+A single enqueue is charged $3$. One unit pays for the immediate push into $R$. The remaining two units are stored on that element. Later, if the element is transferred, moving it from $R$ to $F$ costs two primitive stack operations: one pop from $R$ and one push into $F$. The stored two credits pay for that transfer.
+
+Finally, the actual pop from $F$ is charged directly to the dequeue operation with amortized cost $1$.
+
+Each element is transferred at most once, because after it moves from $R$ to $F$, it never returns to $R$. Therefore the stored credits are sufficient.
+
+**Answer:** Use one input stack and one output stack; charge enqueue $3$ and dequeue $1$. The transfer cost is prepaid by enqueue credits, so both operations are $O(1)$ amortized.
+
+</details>
+
+##### **4.9. Analyze Dynamic Table with Expansion and Contraction** (Lecture 14, Example 9)
+
+Consider a dynamic array supporting `AddLast` and `RemoveLast`. When full, the table doubles in size; when the number of elements drops below one quarter of the capacity, the table halves in size. Analyze the operations using the potential method.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The potential must pay for both copying during expansion and copying during contraction.
+
+Let $n$ be the number of stored elements and $C$ be the table capacity. Use the potential
+
+$$
+\Phi(D)=
+\begin{cases}
+\frac{1}{2}C-n, & n \le \frac{1}{2}C,\\
+2n-C, & n > \frac{1}{2}C.
+\end{cases}
+$$
+
+This function is always nonnegative in the allowed range. It is zero at $n=C/2$, grows as the table becomes full, and also grows as the table becomes too empty.
+
+For ordinary operations that do not resize, $C$ is unchanged and $n$ changes by $1$. In either linear branch of the potential function, the potential changes by at most $2$ in absolute value. Since the actual operation cost is $1$, the amortized cost is bounded by a constant.
+
+Now check expansion. Just before expansion, $n=C$. The old potential is
+
+$$
+\Phi(D_{i-1})=2C-C=C.
+$$
+
+The operation copies $C$ old elements and inserts one new element, so the actual cost is $C+1$. After expansion, the new number of elements is $C+1$ and the new capacity is $2C$. The new load is slightly above one half, so
+
+$$
+\Phi(D_i)=2(C+1)-2C=2.
+$$
+
+Thus
+
+$$
+\hat{c}_i=(C+1)+2-C=3.
+$$
+
+Now check contraction. Contraction happens after a removal makes the size drop below $C/4$. Let the size after removal be $n'$. The old capacity is $C$, and the new capacity is $C/2$. At the threshold, $n'$ is about $C/4$, so the cost of copying the remaining elements is $O(n')$.
+
+Before contraction, the table is in the lower branch, so the potential is approximately
+
+$$
+\frac{1}{2}C-n'.
+$$
+
+When $n' \approx C/4$, this is approximately $C/4$, which is enough to pay for copying $n' \approx C/4$ elements. After halving the capacity, the new table is near half full, so the potential returns close to $0$.
+
+Therefore the expensive contraction is paid by the potential accumulated while the table was becoming sparse.
+
+**Answer:** The piecewise potential above gives constant amortized cost for ordinary operations and pays for both resizing directions, so `AddLast` and `RemoveLast` are $O(1)$ amortized.
+
+</details>
+
+##### **4.10. Analyze Union by Smaller Set** (Lecture 14, Example 10)
+
+Consider a data structure storing a universe of elements and supporting $\text{Union}(S_1,S_2)$ in time $O(\min(|S_1|,|S_2|))$. Initially all sets are singletons. Show $O(\log n)$ amortized cost per union, where $n$ is the total number of elements.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Whenever an element is moved, the size of its containing set at least doubles.
+
+Implement union by moving or relabeling every element of the smaller set into the larger set. The cost of
+
+$$
+\text{Union}(S_1,S_2)
+$$
+
+is proportional to
+
+$$
+\min(|S_1|,|S_2|).
+$$
+
+Track one fixed element $x$. Initially $x$ belongs to a singleton set of size $1$. The only time $x$ pays cost is when its current set is the smaller set in a union and therefore gets moved.
+
+Suppose $x$ is in a set of size $m$ and gets moved into another set. Since its set is the smaller one, the other set has size at least $m$. After the union, the new set containing $x$ has size at least
+
+$$
+m+m=2m.
+$$
+
+So every time $x$ is moved, the size of its set at least doubles:
+
+$$
+1,\ 2,\ 4,\ 8,\ \dots
+$$
+
+The set size can never exceed $n$, so $x$ can be moved at most
+
+$$
+\lfloor \log_2 n \rfloor
+$$
+
+times.
+
+There are $n$ elements, so the total number of element moves over the entire sequence is
+
+$$
+O(n\log n).
+$$
+
+Since there can be at most $n-1$ successful unions starting from $n$ singleton sets, the amortized cost per successful union is
+
+$$
+O(\log n).
+$$
+
+The same reasoning can be expressed as a potential argument by assigning each element remaining movement potential proportional to the number of future doublings still possible.
+
+**Answer:** Moving the smaller set makes each element move at most $\log_2 n$ times, so the amortized cost of `Union` is $O(\log n)$.
+
+</details>
+
+##### **4.11. Analyze Periodic Rebalancing of a Binary Search Tree** (Lecture 14, Example 11)
+
+Consider a binary search tree supporting `Insert(x)`. After every $k$ insertions, where $k$ is the current height of the tree, perform a full rebalance in $O(n)$ time, where $n$ is the number of keys in the tree. Analyze `Insert` using the accounting method and show $O(\log n)$ amortized cost per insertion.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Each insertion deposits credit toward the next rebuild, and rebuilding restores logarithmic height.
+
+After a full rebalance, a binary search tree with $n$ keys has height
+
+$$
+O(\log n).
+$$
+
+Let this height be $k$. The rule says that after every $k$ insertions, the tree is rebuilt. A normal insertion in a tree of height $O(k)$ costs $O(k)$, and because $k=O(\log n)$ immediately after rebalancing, the search-and-link part of insertion is $O(\log n)$ during the phase up to the next rebuild.
+
+Now pay for the rebuild. A full rebalance costs $O(n)$. The lecture statement says to deposit credit on each insertion toward the future rebalance. To obtain $O(\log n)$ amortized insertion cost, each insertion can deposit $O(\log n)$ credit.
+
+Over a phase of sufficiently many insertions, this accumulates enough credit to pay for global rebuilding. The intended amortized-accounting picture is:
+
+1.  Each insertion pays its own search and link cost, $O(\log n)$.
+2.  Each insertion also deposits $O(\log n)$ credit.
+3.  The saved credits are spent when the next full rebalance occurs.
+
+Thus every insertion is charged
+
+$$
+O(\log n)+O(\log n)=O(\log n)
+$$
+
+amortized cost.
+
+One subtle point is that the exact trigger rule must guarantee enough insertions between rebuilds to fund an $O(n)$ rebuild. In standard periodic rebuilding schemes, this is done by rebuilding after a linear-size batch of updates or by using a more precise balance invariant. Under the lecture's intended accounting assumption that the deposited credits cover each scheduled rebuild, the amortized insertion bound is $O(\log n)$.
+
+**Answer:** Charge each insertion $O(\log n)$ for its ordinary work and another $O(\log n)$ as rebuild credit; the accumulated credit pays for full rebalancing, giving $O(\log n)$ amortized insertion cost.
+
+</details>

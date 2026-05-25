@@ -1,6 +1,6 @@
 # Formatting Report
 
-Generated: 2026-04-25 11:42:21
+Generated: 2026-05-03 14:39:13
 
 ## AI Artifacts
 
@@ -1045,6 +1045,10 @@ No potential AI artifacts detected.
 
 - Line 457: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
 
+### semester-2/Data Structures and Algorithms/14.qmd
+
+- Line 671: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+
 ### semester-2/Data Structures and Algorithms/2.qmd
 
 - Line 441: heading inside `Theory` must be deeper than `####`.
@@ -1567,40 +1571,40 @@ No potential AI artifacts detected.
 - Line 882: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 8, Homework Problem 1)`.
 - Line 918: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
 - Line 918: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 8, Homework Problem 2)`.
-- Line 1118: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
-- Line 1359: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
-- Line 1386: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
-- Line 1403: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
-- Line 1441: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
-- Line 1475: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
-- Line 1509: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
-- Line 1525: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+- Line 1369: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+- Line 1610: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+- Line 1637: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+- Line 1654: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+- Line 1692: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+- Line 1726: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+- Line 1760: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+- Line 1776: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
 
 ### semester-2/Mathematical Analysis II/3.qmd
 
 - Line 349: Theory subsection must match `##### **1.1 Title**`.
 - Line 381: Theory subsection must match `##### **1.1 Title**`.
-- Line 1045: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 5a)`.
-- Line 1064: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 5b)`.
-- Line 1082: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 5c)`.
-- Line 1100: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 6a)`.
-- Line 1120: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 6b)`.
-- Line 2397: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 1)`.
-- Line 2437: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 2)`.
-- Line 2477: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 3)`.
-- Line 2512: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 4)`.
-- Line 2548: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 5)`.
-- Line 2583: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 6)`.
-- Line 2621: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 7)`.
-- Line 2655: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 8)`.
-- Line 2694: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 9)`.
-- Line 2725: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 10)`.
-- Line 2805: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 11)`.
-- Line 2830: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 12)`.
-- Line 2867: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 13)`.
-- Line 2888: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 14)`.
-- Line 2916: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 15)`.
-- Line 2953: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 16)`.
+- Line 794: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 5a)`.
+- Line 813: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 5b)`.
+- Line 831: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 5c)`.
+- Line 849: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 6a)`.
+- Line 869: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 11, Task 6b)`.
+- Line 2146: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 1)`.
+- Line 2186: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 2)`.
+- Line 2226: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 3)`.
+- Line 2261: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 4)`.
+- Line 2297: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 5)`.
+- Line 2332: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 6)`.
+- Line 2370: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 7)`.
+- Line 2404: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 8)`.
+- Line 2443: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 9)`.
+- Line 2474: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 10)`.
+- Line 2554: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 11)`.
+- Line 2579: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 12)`.
+- Line 2616: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 13)`.
+- Line 2637: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 14)`.
+- Line 2665: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 15)`.
+- Line 2702: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Exercises, Task 16)`.
 
 ### semester-2/Mathematical Analysis II/4.qmd
 
@@ -1626,8 +1630,11 @@ No potential AI artifacts detected.
 - Line 1838: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 13, Homework 5)`.
 - Line 1889: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 13, Homework 6)`.
 - Line 1944: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 13, Homework 7)`.
-- Line 1977: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Chapter 4, Illustrative Examples)`.
-- Line 3414: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Chapter 4, Examples 15-17)`.
+- Line 2799: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 15, Homework 1)`.
+- Line 2859: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 15, Homework 2)`.
+- Line 2904: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Lab 15, Homework 3)`.
+- Line 2973: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Chapter 4, Illustrative Examples)`.
+- Line 4410: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Chapter 4, Examples 15-17)`.
 
 ### semester-2/Software Systems Analysis and Design/1.qmd
 
@@ -1647,6 +1654,10 @@ No potential AI artifacts detected.
 ### semester-2/Software Systems Analysis and Design/13.qmd
 
 - Line 819: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
+
+### semester-2/Software Systems Analysis and Design/14.qmd
+
+- Line 580: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.
 
 ### semester-2/Software Systems Analysis and Design/3.qmd
 
@@ -1733,8 +1744,8 @@ No potential AI artifacts detected.
 
 ## Formatting Changes
 
-- Files processed: 154
-- Files changed: 0
-- Blank lines removed between list items: 0
-- Blank lines/separators added: 0
+- Files processed: 156
+- Files changed: 2
+- Blank lines removed between list items: 6
+- Blank lines/separators added: 2
 - Potential AI artifacts detected: 0
