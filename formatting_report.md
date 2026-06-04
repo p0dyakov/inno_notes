@@ -1034,7 +1034,7 @@ No potential AI artifacts detected.
 - Line 653: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Problem Set 10, Task 2)`.
 - Line 726: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Problem Set 10, Task 3)`.
 
-### semester-2/Data Structures and Algorithms/12.qmd
+### semester-2/Data Structures and Algorithms/11.qmd
 
 - Line 438: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Problem Set 12, Task 1)`.
 - Line 525: source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source. Found `(Problem Set 12, Task 2)`.

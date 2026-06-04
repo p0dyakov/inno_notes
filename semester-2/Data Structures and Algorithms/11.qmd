@@ -12,33 +12,35 @@ engine: knitr
 
 ###### **1.1.1 Optimization Problems**
 
-Many important algorithmic problems are **optimization problems**: there is a large (often exponential) set of feasible solutions, each with an associated cost or value, and the goal is to find one with minimum (or maximum) cost. Such problems are recognisable by formulations using words like "shortest", "minimum", "maximum", or "cheapest".
+Many important algorithmic problems are **optimization problems**: there is a large set of feasible solutions, each with an associated cost or value, and the goal is to find one with minimum or maximum objective value. Such problems are recognisable by formulations using words like "shortest", "minimum", "maximum", and "cheapest".
 
-Deciding whether a path from $u$ to $v$ exists is a *decision* problem; finding a *shortest* path is an *optimization* problem. The distinction matters because optimizing over all feasible solutions by brute force is generally intractable.
+This differs from a **decision problem**, where we only ask whether some feasible solution exists. For example, asking whether there is a path from $u$ to $v$ is a decision problem, while asking for the *shortest* path is an optimization problem. The distinction matters because the optimization version is often much harder: brute force usually requires examining exponentially many candidates.
 
 ###### **1.1.2 The Greedy Pattern**
 
-A **greedy algorithm** builds a solution incrementally: at each step it makes the locally "best-looking" choice, committing to that choice without revisiting it. The design pattern is attractive because greedy algorithms are often fast and simple. However, they are not universally correct — many problems admit no correct greedy algorithm. For the problems studied in this lecture (minimum spanning trees), greedy choices provably yield globally optimal solutions, and the key insight is the **cut property** that justifies this.
+A **greedy algorithm** builds a solution incrementally and commits to a locally best-looking choice at each step. Greedy methods are attractive because they are usually simple and fast. However, greediness is not automatically correct: some problems admit no correct greedy strategy at all.
+
+For minimum spanning trees, greedy algorithms *are* correct. The reason is structural: there is a theorem, the **cut property**, that identifies which local choices are always safe. Prim's and Kruskal's algorithms both work by repeatedly choosing such safe edges.
 
 ##### **1.2 Minimum Spanning Trees**
 
 ###### **1.2.1 Spanning Trees and Their Weight**
 
-Let $G = (V, E)$ be an undirected connected graph. A **spanning tree** of $G$ is a set of edges $T \subseteq E$ such that $(V, T)$ is connected and acyclic — in other words, $T$ forms a tree that reaches every vertex. A spanning tree of a graph with $|V|$ vertices always contains exactly $|V| - 1$ edges.
+Let $G = (V, E)$ be an undirected connected graph. A **spanning tree** of $G$ is a subset of edges $T \subseteq E$ such that $(V, T)$ is connected and acyclic. Equivalently, it is a tree that reaches every vertex of the graph. Any spanning tree on $|V|$ vertices contains exactly $|V| - 1$ edges.
 
-When edges carry real-valued **weights**, the **weight** of a spanning tree is the sum of the weights of its edges:
+If each edge has a real-valued **weight**, then the weight of a spanning tree is
 
 $$w(T) = \sum_{e \in T} w(e).$$
 
-A **minimum spanning tree (MST)** is a spanning tree of minimum total weight. If all edge weights are equal, every spanning tree is an MST.
+A **minimum spanning tree (MST)** is a spanning tree whose total weight is as small as possible. If all edge weights are equal, then every spanning tree is automatically an MST, because all spanning trees have the same number of edges and therefore the same total weight.
 
-A common variant: if $G$ is disconnected, there is no spanning tree, but a **spanning forest** — a union of spanning trees, one per connected component — always exists. Its minimum-weight version is a **minimum spanning forest**. One can always reduce this to the connected case by adding artificial edges of weight $0$ between components.
+If the graph is disconnected, a spanning tree does not exist. The right notion is then a **spanning forest**: a union of spanning trees, one for each connected component. A **minimum spanning forest** minimises the total weight over all such forests.
 
-The study of MSTs dates to 1926, when Otakar Borůvka asked how to design a cost-effective electric distribution network for Moravia — connecting all locations at minimum total cable cost.
+The historical origin of the MST problem is often traced to Otakar Borůvka's 1926 work on designing a low-cost electrical network in Moravia: connect all required locations while using as little total cable length as possible.
 
-###### **1.2.2 Example: Finding the MST**
+###### **1.2.2 Example: Finding an MST**
 
-Consider the following weighted undirected graph on six vertices $A$ through $F$:
+Consider the following weighted undirected graph on six vertices:
 
 ```{dot}
 //| fig-height: 2.8
@@ -61,27 +63,40 @@ graph mst_example {
 }
 ```
 
-The MST consists of edges $A$–$D$ (4), $C$–$E$ (5), $A$–$B$ (6), $C$–$F$ (6), and $B$–$E$ (7), for a total weight of $\mathbf{28}$.
+One MST consists of edges $A$–$D$ (4), $C$–$E$ (5), $A$–$B$ (6), $C$–$F$ (6), and $B$–$E$ (7). Its total weight is
+
+$$4 + 5 + 6 + 6 + 7 = \mathbf{28}.$$
 
 ###### **1.2.3 The Cut Property**
 
-The theoretical foundation for MST algorithms is the **cut property**. A **cut** $(S,\, V \setminus S)$ is a partition of the vertex set into two non-empty parts. A cut **respects** a set of edges $A$ if no edge in $A$ crosses the cut (i.e., has one endpoint in $S$ and one in $V \setminus S$). A **light edge** for a cut is an edge crossing the cut with minimum weight among all crossing edges.
+The key theorem behind MST algorithms is the **cut property**. A **cut** $(S, V \setminus S)$ partitions the vertex set into two non-empty parts. A cut **respects** a set of already chosen edges $A$ if no edge in $A$ crosses from $S$ to $V \setminus S$. A **light edge** for a cut is a crossing edge of minimum weight.
 
-**Theorem (Cut Property, Cormen et al. 2022, Thm. 21.1).** Let $A \subseteq E$ be a subset of edges that is contained in *some* MST of $G$. Let $(S,\, V \setminus S)$ be any cut that respects $A$, and let $(u, v)$ be a light edge crossing this cut. Then $A \cup \{(u, v)\}$ is also contained in some MST.
+**Theorem (Cut Property).** Let $A \subseteq E$ be a set of edges contained in some MST. If $(S, V \setminus S)$ is a cut that respects $A$ and $(u, v)$ is a light edge crossing that cut, then $A \cup \{(u, v)\}$ is also contained in some MST.
 
-Intuitively: if we have a partial MST solution and we cut the graph so that none of our chosen edges cross the boundary, then the cheapest crossing edge is safe to add. Both Prim's and Kruskal's algorithms can be viewed as repeatedly applying this rule to extend a partial solution.
+This theorem says that once we have a partial solution that could still extend to an MST, the cheapest edge crossing an appropriate cut is always **safe** to add. Prim's and Kruskal's algorithms differ in how they define the cut, but both repeatedly use this same principle.
 
 ##### **1.3 Prim's Algorithm**
 
-###### **1.3.1 Overview**
+###### **1.3.1 A Naive Growing Strategy**
 
-**Prim's algorithm** grows the MST from a single root vertex $r$. It maintains a frontier of vertices not yet in the tree, each labelled with a **key** equal to the weight of the cheapest edge connecting that vertex to the current tree. At each step, the vertex with the smallest key is extracted from the frontier, added to the tree, and the keys of its neighbours are updated if a cheaper connection has been found. The algorithm terminates when all vertices have been added to the tree.
+A natural first idea is to grow a tree from a chosen root by always taking the cheapest edge from the current tree to a vertex outside the tree. This strategy is conceptually close to Prim's algorithm, but a direct implementation often stores **edges** in the priority queue, not vertices. That means the queue can contain many obsolete edges whose outside endpoint has already been absorbed into the tree.
 
-The correctness of each step follows from the cut property: when vertex $u$ is extracted (it has the minimum key among non-tree vertices), the edge $(u.\pi, u)$ of weight $u.\text{key}$ is the light edge for the cut separating the current tree from the rest of the graph.
+The naive method is still correct for MST construction, but it is less elegant and often less efficient to implement than the standard formulation of Prim's algorithm.
 
-Key difference from the naïve approach: Prim's algorithm keeps a queue of **vertices** (not edges), so each vertex appears in the queue at most once and its key can be decreased efficiently. A naïve approach that inserts all candidate edges into the queue ends up with $O(|E|)$ queue entries and slower overall performance.
+###### **1.3.2 Prim's Algorithm**
 
-###### **1.3.2 Pseudocode**
+**Prim's algorithm** grows the MST from a root vertex $r$ while maintaining, for each non-tree vertex $v$, the minimum known weight of an edge connecting $v$ to the current tree. This value is stored as the vertex's **key**.
+
+At every step:
+
+1. extract the non-tree vertex $u$ with minimum key;
+2. add $u$ to the tree;
+3. inspect every edge $(u, v)$ leaving $u$;
+4. if $v$ is still outside the tree and $w(u, v)$ is smaller than $v.\text{key}$, update $v.\text{key}$ and set $v.\pi = u$.
+
+Thus the priority queue stores **vertices**, not edges. Each vertex is present only once in the queue, and its priority is decreased whenever we discover a cheaper connection to the current tree.
+
+###### **1.3.3 Pseudocode**
 
 ```text
 MST-PRIM(G, w, r)
@@ -93,102 +108,110 @@ MST-PRIM(G, w, r)
 6  for each vertex u ∈ G.V
 7      INSERT(Q, u)
 8  while Q ≠ ∅
-9      u = EXTRACT-MIN(Q)           // finalize u; edge (u.π, u) enters the MST
-10     for each vertex v in G.Adj[u]  // relax neighbors still in Q
+9      u = EXTRACT-MIN(Q)
+10     for each vertex v in G.Adj[u]
 11         if v ∈ Q and w(u, v) < v.key
 12             v.π  = u
 13             v.key = w(u, v)
 14             DECREASE-KEY(Q, v, w(u, v))
 ```
 
-After the algorithm completes, the MST is described by the predecessor pointers: for each non-root vertex $u$, the edge $(u.\pi, u)$ belongs to the MST.
+After the algorithm terminates, the MST consists of all edges $(u.\pi, u)$ for non-root vertices $u$.
 
-###### **1.3.3 Complexity Analysis**
+###### **1.3.4 Why Prim's Algorithm is Correct**
 
-The complexity depends on the priority-queue implementation.
+At the moment a vertex $u$ is extracted from the priority queue, the current tree vertices form one side of a cut and all remaining vertices form the other side. The key of $u$ is the smallest weight of any edge crossing that cut into $u$, and since $u$ has minimum key among all remaining vertices, the edge $(u.\pi, u)$ is a light edge for the cut. By the cut property, it is safe to add.
 
-**Lines 1–3** initialize all keys to $\infty$: $\Theta(|V|)$ total.
+Therefore each iteration preserves the invariant that the chosen edges remain extendable to an MST. After $|V|-1$ safe additions, we have a spanning tree, and since every step was safe, that spanning tree is minimum.
 
-**Lines 6–7** insert all vertices into $Q$: $\Theta(|V| \log |V|)$ with a binary heap, $\Theta(|V|)$ with a Fibonacci heap.
+###### **1.3.5 Complexity Analysis**
 
-**Line 9** calls `EXTRACT-MIN` once per vertex: $|V|$ extractions, each $O(\log |V|)$ with a binary heap, giving $\Theta(|V| \log |V|)$ total.
+The total running time depends on the priority-queue implementation.
 
-**Lines 11–14** call `DECREASE-KEY` at most once per edge: $|E|$ calls, each $O(\log |V|)$ with a binary heap, giving $\Theta(|E| \log |V|)$ total. With Fibonacci heaps, `DECREASE-KEY` is $O(1)$ amortized, giving $\Theta(|E|)$ total for this step.
+- Initialization of all keys and predecessors costs $\Theta(|V|)$.
+- `EXTRACT-MIN` is called once per vertex.
+- `DECREASE-KEY` is called whenever an edge gives a better connection to a vertex still outside the tree.
 
-| Priority queue | Total running time |
-| :--- | :--- |
-| Binary min-heap | $\Theta(|E| \log |V|)$ |
-| Fibonacci heap | $\Theta(|E| + |V| \log |V|)$ |
+With a **binary min-heap**:
 
-Note that $\log |E| = \Theta(\log |V|)$ for simple graphs (since $|E| \le |V|^2$), so these bounds can be written interchangeably in terms of either $|V|$ or $|E|$ inside the logarithm.
+- $|V|$ extractions cost $\Theta(|V| \log |V|)$;
+- up to $|E|$ successful key decreases cost $\Theta(|E| \log |V|)$.
 
-For dense graphs ($|E| = \Theta(|V|^2)$) the Fibonacci heap gives $\Theta(|V|^2)$, which is better than $\Theta(|V|^2 \log |V|)$ from the binary heap. For sparse graphs ($|E| = \Theta(|V|)$) both heaps give $\Theta(|V| \log |V|)$.
+So the total running time is
+
+$$\Theta(|E| \log |V|).$$
+
+With a **Fibonacci heap**, `DECREASE-KEY` is $O(1)$ amortized, so the total becomes
+
+$$\Theta(|E| + |V| \log |V|).$$
+
+An additional useful bound appears in worst-case traces. Let $n = |V|$. In the worst case, the total number of successful `DECREASE-KEY` operations can be
+
+$$1 + 2 + \cdots + (n - 1) = \frac{n(n-1)}{2}.$$
+
+Why? The second extracted vertex can be improved once before it is chosen, the third can be improved twice, and in general the vertex extracted in position $j$ can be improved up to $j-1$ times before leaving the queue. A carefully weighted complete graph can realise this bound.
 
 ##### **1.4 Disjoint-Set Data Structures**
 
-###### **1.4.1 Motivation and Interface**
+###### **1.4.1 Motivation and Operations**
 
-Many applications maintain a dynamic collection of **disjoint** (non-overlapping) sets over a universe of elements and need two operations:
+Many applications maintain a family of **pairwise disjoint sets** and repeatedly ask two kinds of questions:
 
-- determine which set contains a given element;
-- merge two sets.
+- which set contains a given element?
+- how do we merge two sets into one?
 
-The **disjoint-set** (also called **union–find** or **DSU**) abstract data type supports exactly these operations. Formally, it provides:
+The **disjoint-set data structure** (also called **union-find** or **DSU**) supports exactly this with three operations:
 
-- `MAKE-SET(x)` — create a new singleton set $\{x\}$.
-- `FIND-SET(x)` — return a pointer to the **representative** of the set containing $x$. All elements of the same set always return the same representative.
-- `UNION(x, y)` — merge the sets containing $x$ and $y$ into one set.
+- `MAKE-SET(x)` creates a singleton set $\{x\}$;
+- `FIND-SET(x)` returns the **representative** of the set containing $x$;
+- `UNION(x, y)` merges the sets containing $x$ and $y$.
 
-The representative is an arbitrary element chosen to identify a set. It is crucial that `FIND-SET` returns the *same* pointer for every element of a set; otherwise, checking whether two elements are in the same set by comparing their representatives would not work.
-
-DSU structures appear in: connected components of undirected graphs, Kruskal's MST algorithm, equivalence classes in symbolic computation, image segmentation, and congruence closure in SMT solvers.
+The representative is simply an element chosen to identify the set. The crucial invariant is that all elements in the same set must return the same representative, so equality of representatives becomes a constant-time test for membership in the same component.
 
 ###### **1.4.2 Linked-List Representation**
 
-The simplest implementation represents each set as a **singly linked list**. The head of the list serves as the representative; each list node stores its element, a pointer to the next node, and a **back pointer** to the head (representative).
+In the simplest representation, each set is a linked list. The head of the list is the representative, and every node stores a pointer to that head.
 
-- `MAKE-SET(x)`: create a one-element list — $O(1)$.
-- `FIND-SET(x)`: follow $x$'s back pointer to the head — $O(1)$.
-- `UNION(x, y)`: append the list of one set to the other and update back pointers of all appended nodes.
+- `MAKE-SET` is $O(1)$.
+- `FIND-SET` is $O(1)$ because the representative pointer is stored directly.
+- `UNION` may be expensive because if one list is appended to another, the representative pointer of every node in the appended list must be updated.
 
-The cost of `UNION` in the naïve version is $\Theta(n)$ in the worst case: if we always append the longer list to the shorter, the update traversal can touch every element.
+In the worst case, one `UNION` can therefore cost $\Theta(n)$.
 
-**Weighted union (union by size).** To improve `UNION`, always append the *shorter* list to the *longer* list, updating back pointers only for the shorter side.
+###### **1.4.3 Weighted Union (Union by Size)**
 
-**Theorem.** Using linked lists with union by size, each element's representative pointer is updated at most $\lfloor \log_2 n \rfloor$ times over its lifetime, where $n$ is the total number of elements.
+To improve linked-list DSU, store the size of each list and always append the **shorter** list to the **longer** one. Then only the smaller side needs representative-pointer updates.
 
-*Proof idea.* A pointer update happens only when the element's set is the smaller side in a `UNION`. After the update, the element belongs to a set of size at least *double* what its old set had. Since the total size is bounded by $n$, this doubling can happen at most $\log_2 n$ times per element. $\square$
+This yields a standard amortized bound: each element's representative pointer is updated at most $\lfloor \log_2 n \rfloor$ times over the entire sequence of operations. The reason is doubling: whenever an element's pointer changes, it moves from a smaller list into a set of at least twice the previous size. That doubling cannot happen more than $\log_2 n$ times.
 
-As a consequence, a sequence of $n$ `MAKE-SET` operations followed by any number of `UNION` operations incurs at most $O(n \log n)$ pointer updates in total, so the amortized cost per `UNION` is $O(\log n)$.
+As a result, linked lists with union by size support `UNION` in $O(\log n)$ amortized time while keeping `FIND-SET` at $O(1)$.
 
-###### **1.4.3 Disjoint-Set Forests**
+###### **1.4.4 Forest Representation**
 
-A more efficient approach represents each set as a **rooted tree**, where the **root** is the representative. Every non-root node stores only a pointer to its **parent**; roots point to themselves.
+A more powerful representation stores each set as a rooted tree. The root is the representative, and every node stores only a parent pointer. A root points to itself.
 
-**Naïve tree operations:**
+- `MAKE-SET(x)`: create a one-node tree with `parent[x] = x`.
+- `FIND-SET(x)`: follow parent pointers to the root.
+- `UNION(x, y)`: link one root under the other.
 
-- `MAKE-SET(x)`: set $\text{parent}[x] = x$ — $O(1)$.
-- `FIND-SET(x)`: walk parent pointers until reaching a root — $O(\text{depth})$.
-- `UNION(x, y)`: attach the root of one tree under the root of the other — $O(1)$ once the roots are known.
+Without balancing, repeated unions may produce a long chain of height $\Theta(n)$, making `FIND-SET` very slow.
 
-Without any balancing, repeated `UNION` operations can produce a chain (path graph) of height $\Theta(n)$, making `FIND-SET` $\Theta(n)$ in the worst case.
+###### **1.4.5 Union by Rank**
 
-###### **1.4.4 Union by Rank**
+To keep forest trees shallow, store a **rank** at each root. When merging two sets:
 
-**Union by rank** keeps a **rank** value at each root, which is an upper bound on the height of its subtree. When merging two trees:
+- if the ranks differ, attach the lower-rank root under the higher-rank root;
+- if the ranks are equal, choose one root as the new root and increment its rank by 1.
 
-- If the ranks differ, attach the root with smaller rank under the root with larger rank (the larger-rank tree becomes the new root).
-- If the ranks are equal, choose either root as the new root and **increment its rank by 1**.
+The core theorem is that a root of rank $k$ must have at least $2^k$ nodes in its tree. Therefore a tree on $n$ nodes has rank at most $\lfloor \log_2 n \rfloor$, and so its height is also $O(\log n)$ when path compression is not used.
 
-**Lemma.** With union by rank (and no path compression), a tree with root of rank $k$ has at least $2^k$ nodes.
+Hence union by rank alone gives
 
-*Proof.* By induction on $k$. For $k=0$, the tree has exactly 1 node. When two rank-$k$ trees are merged, the combined tree has at least $2^k + 2^k = 2^{k+1}$ nodes and receives rank $k+1$. When trees of ranks $j < k$ are merged, the combined tree inherits rank $k$ and has at least $2^j + 2^k \ge 2^k$ nodes. $\square$
+$$FIND\text{-}SET,\ UNION = O(\log n) \text{ worst case.}$$
 
-**Corollary.** With union by rank alone, any tree has height at most $\lfloor \log_2 n \rfloor$, so `FIND-SET` and `UNION` each cost $O(\log n)$ in the worst case.
+###### **1.4.6 Path Compression**
 
-###### **1.4.5 Path Compression**
-
-**Path compression** optimizes `FIND-SET` by flattening the search path: after finding the root for element $x$, redirect every node visited along the path to point directly to the root. Future finds for these nodes will take $O(1)$ time.
+**Path compression** speeds up `FIND-SET(x)` by making every node on the search path point directly to the root.
 
 ```{dot}
 //| fig-height: 2.8
@@ -227,420 +250,849 @@ digraph pathcomp {
 }
 ```
 
-*Left: chain before path compression. Right: after `FIND-SET(g)`, nodes $g$, $d$, and $b$ all point directly to root $a$.*
+The effect is dramatic in long operation sequences: once a path has been compressed, future finds on those nodes become much cheaper. Path compression does not recompute ranks exactly; after compression, ranks remain safe upper bounds rather than exact heights.
 
-Note that path compression does not update rank values — ranks may become stale overestimates of tree height, but they remain valid upper bounds and union by rank continues to work correctly.
+###### **1.4.7 Combined Complexity and Practical Augmentation**
 
-###### **1.4.6 Combined Complexity: Rank + Path Compression**
+With **union by rank** together with **path compression**, the amortized complexity of both `FIND-SET` and `UNION` is
 
-When union by rank and path compression are used together, the amortized cost per operation is $O(\alpha(n))$, where $\alpha$ is the **inverse Ackermann function** (see Section 1.6). For all practical purposes $\alpha(n) \le 4$, making each operation effectively constant time.
+$$O(\alpha(n)),$$
 
-**Pseudocode:**
+where $\alpha(n)$ is the **inverse Ackermann function**. This function grows so slowly that for every practical input size, $\alpha(n) \le 4$.
 
-```text
-MAKE-SET(x)
-1  x.p    = x
-2  x.rank = 0
+An important practical idea is that DSU can be **augmented** with aggregate information stored only at representatives. For example, if each set must answer:
 
-FIND-SET(x)                         // path compression
-1  if x ≠ x.p
-2      x.p = FIND-SET(x.p)
-3  return x.p
+- the total weight or sum of values in the component;
+- the number of elements in the component;
+- the average value of elements in the component;
 
-UNION(x, y)
-1  LINK(FIND-SET(x), FIND-SET(y))
+then each representative can store fields such as
 
-LINK(x, y)                          // union by rank
-1  if x.rank > y.rank
-2      y.p = x
-3  else x.p = y
-4      if x.rank == y.rank
-5          y.rank = y.rank + 1
+- `sum[root]`;
+- `size[root]`.
+
+When two sets are merged, the new root updates these in $O(1)$ extra time:
+
+```java
+sum[newRoot] = sum[root1] + sum[root2];
+size[newRoot] = size[root1] + size[root2];
 ```
 
-The recursive call in `FIND-SET` at line 2 is where path compression occurs: on the way back up from the root, each node's parent pointer is set to the root found by the recursive call.
+Then the average for the component containing $x$ is
 
-###### **1.4.7 Comparison of Representations**
+$$\frac{\mathrm{sum}[\mathrm{FIND\text{-}SET}(x)]}{\mathrm{size}[\mathrm{FIND\text{-}SET}(x)]}.$$
+
+The asymptotic complexity does not change, because the extra bookkeeping is constant-time per merge.
+
+###### **1.4.8 Comparison of Main DSU Variants**
 
 | Representation | `MAKE-SET` | `FIND-SET` | `UNION` |
 | :--- | :--- | :--- | :--- |
-| Lists (naïve union) | $\Theta(1)$ | $\Theta(1)$ | $\Theta(n)$ worst |
+| Lists (naive union) | $\Theta(1)$ | $\Theta(1)$ | $\Theta(n)$ worst |
 | Lists (union by size) | $\Theta(1)$ | $\Theta(1)$ | $O(\log n)$ amort. |
-| Forest (naïve) | $\Theta(1)$ | $\Theta(n)$ worst | $\Theta(n)$ worst |
+| Forest (naive) | $\Theta(1)$ | $\Theta(n)$ worst | $\Theta(n)$ worst |
 | Forest (union by rank) | $\Theta(1)$ | $O(\log n)$ | $O(\log n)$ |
 | Forest (rank + path compression) | $\Theta(1)$ | $O(\alpha(n))$ amort. | $O(\alpha(n))$ amort. |
 
-The forest with both heuristics is the standard choice in practice (Cormen et al. 2022, §19.3–19.4).
+For algorithm design and implementation, the final row is almost always the best choice.
 
 ##### **1.5 Kruskal's Algorithm**
 
-###### **1.5.1 Overview**
+###### **1.5.1 Idea**
 
-**Kruskal's algorithm** finds the MST by processing edges in non-decreasing order of weight and greedily adding each edge to the forest if it connects two previously disconnected components. A DSU structure is used to check connectivity and merge components efficiently.
+**Kruskal's algorithm** grows the MST in the opposite direction from Prim's algorithm. Instead of expanding one tree from a root, it starts with $|V|$ isolated vertices and repeatedly joins components using the lightest available edge.
 
-**Algorithm:**
+The algorithm is:
 
-1. Initialize $|V|$ singleton sets — one for each vertex: `MAKE-SET(v)` for all $v \in V$.
-2. Sort all edges by non-decreasing weight: $O(|E| \log |E|)$.
-3. For each edge $(u, v)$ in sorted order:
-   - if `FIND-SET(u)` $\neq$ `FIND-SET(v)`, the edge connects two different components — add it to the MST and call `UNION(u, v)`.
-4. Stop when $|V| - 1$ edges have been added (for a connected graph this always happens).
+1. create one singleton set for each vertex;
+2. sort all edges by non-decreasing weight;
+3. process edges in that order;
+4. add an edge $(u, v)$ if and only if `FIND-SET(u) \ne FIND-SET(v)`.
 
-**Correctness.** Each edge added is safe by the cut property: it is the light edge for the cut separating the component of $u$ from the component of $v$ at the time of processing (no cheaper cross-edge between these components exists, because all cheaper edges were processed first and would have been added unless they created a cycle within one component).
+If the edge's endpoints already lie in the same DSU component, adding the edge would create a cycle, so the edge is skipped.
 
-###### **1.5.2 Running Time**
+###### **1.5.2 Why Kruskal's Algorithm is Correct**
 
-- **Sorting:** $O(|E| \log |E|) = O(|E| \log |V|)$, since $|E| \le |V|^2$ implies $\log |E| \le 2 \log |V|$.
-- **DSU operations:** $O(|E|)$ calls to `FIND-SET` and `UNION`, each $O(\alpha(|V|))$ amortized, giving $O(|E|\, \alpha(|V|))$.
-- **Overall:** sorting dominates in general, so the total is $O(|E| \log |V|)$.
-- **Special case:** if edges are already sorted (e.g., integer weights allowing radix sort), the DSU step dominates and the total becomes $O(|E|\, \alpha(|V|))$.
+At any moment, the edges already accepted by Kruskal form a forest. Consider the next accepted edge $(u, v)$. Its endpoints lie in different components of that forest, so these components define a cut. Since all lighter edges were processed earlier, any lighter crossing edge would already have been added if it connected distinct components. Therefore the current edge is a light edge for that cut, and by the cut property it is safe.
 
-###### **1.5.3 Example Execution**
+Repeating this argument shows that every accepted edge preserves the possibility of extending to an MST. Once $|V|-1$ edges have been accepted, the forest has become a spanning tree, and it must be minimum.
 
-Starting with the same 6-vertex graph ($A$–$F$) and processing edges in non-decreasing weight order:
+###### **1.5.3 Running Time**
 
-| Step | Edge | Weight | Action |
-| :--- | :--- | :--- | :--- |
-| 1 | $A$–$D$ | 4 | Different components — add |
-| 2 | $C$–$E$ | 5 | Different components — add |
-| 3 | $A$–$B$ | 6 | Different components — add |
-| 4 | $C$–$F$ | 6 | Different components — add |
-| 5 | $B$–$D$ | 7 | Same component as $A$–$D$ — skip |
-| 6 | $B$–$E$ | 7 | Different components — add (connects $\{A,B,D\}$ to $\{C,E,F\}$) |
+The running time has two parts:
 
-After step 6, all 6 vertices are connected with 5 edges: MST weight $= 4+5+6+6+7 = \mathbf{28}$.
+- sorting the edges;
+- DSU operations during the scan.
+
+Sorting costs
+
+$$O(|E| \log |E|) = O(|E| \log |V|),$$
+
+because in a simple graph $|E| \le |V|^2$, so $\log |E| = O(\log |V|)$.
+
+The DSU part performs $O(|E|)$ finds and unions, each costing $O(\alpha(|V|))$ amortized. Therefore the total DSU work is
+
+$$O(|E|\,\alpha(|V|)).$$
+
+In general, sorting dominates, so the overall complexity is
+
+$$O(|E| \log |V|).$$
+
+If the edges are already sorted, or can be sorted in linear time, then the DSU term dominates and the bound improves to
+
+$$O(|E|\,\alpha(|V|)).$$
+
+Tie-breaking matters for *execution traces*: if equal-weight edges exist, the order of accepted edges and the exact final DSU parent structure need not be unique. However, every valid run still produces a minimum spanning tree (or forest) of the same total weight.
 
 ##### **1.6 The Ackermann Function and Its Inverse**
 
-###### **1.6.1 Definition**
+###### **1.6.1 Ackermann Function**
 
-The **Ackermann function** $A_k(j)$ is defined by the following double recursion (Cormen et al. 2022, §19.4):
+The **Ackermann function** is defined recursively by
 
-$$A_k(j) = \begin{cases} j + 1 & \text{if } k = 0, \\ A_{k-1}^{(j+1)}(j) & \text{if } k > 0, \end{cases}$$
+$$A_k(j) = \begin{cases}
+j + 1 & \text{if } k = 0, \\
+A_{k-1}^{(j+1)}(j) & \text{if } k > 0,
+\end{cases}$$
 
-where $A_k^{(i)}(j)$ denotes $i$ nested applications of $A_k$ starting from $j$:
+where $A_k^{(i)}(j)$ means applying $A_k$ exactly $i$ times, starting from $j$:
 
-$$A_k^{(i)}(j) = \underbrace{A_k(A_k(\cdots(A_k(j))\cdots))}_{\text{exactly } i \text{ calls}}.$$
+$$A_k^{(i)}(j) = \underbrace{A_k(A_k(\cdots(A_k(j))\cdots))}_{\text{exactly } i \text{ applications}}.$$
 
-Intuitively, $A_0$ is the successor function; $A_1$ iterates $A_0$ giving $A_1(j) = 2j + 1$; $A_2$ iterates $A_1$ giving exponential growth; $A_3$ iterates $A_2$ giving tower-exponential growth; and so on. Each level grows *astronomically* faster than the previous.
+This family grows extraordinarily quickly:
 
-**Key values:**
+$$A_0(1)=2,\qquad A_1(1)=3,\qquad A_2(1)=7,\qquad A_3(1)=2047,$$
 
-$$A_0(1) = 2, \quad A_1(1) = 3, \quad A_2(1) = 7, \quad A_3(1) = 2047, \quad A_4(1) \gg 2^{2^{2^{\cdots^{2047}}}}.$$
+and $A_4(1)$ is already an unimaginably large tower-exponential number.
 
-###### **1.6.2 The Inverse Ackermann Function**
+###### **1.6.2 Inverse Ackermann Function**
 
-The **inverse Ackermann function** $\alpha(n)$ is the minimum $k$ such that $A_k(1) \ge n$:
+The **inverse Ackermann function** is
 
-$$\alpha(n) = \min\{k \mid A_k(1) \ge n\}.$$
+$$\alpha(n) = \min \{k \mid A_k(1) \ge n\}.$$
 
-From the table of values above:
+Using the values above:
 
-$$\alpha(n) = \begin{cases} 0 & 0 \le n \le 2, \\ 1 & n = 3, \\ 2 & 4 \le n \le 7, \\ 3 & 8 \le n \le 2047, \\ 4 & 2048 \le n \le A_4(1). \end{cases}$$
+$$\alpha(n) = \begin{cases}
+0 & 0 \le n \le 2, \\
+1 & n = 3, \\
+2 & 4 \le n \le 7, \\
+3 & 8 \le n \le 2047, \\
+4 & 2048 \le n \le A_4(1).
+\end{cases}$$
 
-Since $A_4(1)$ is an astronomically large number (a tower of 2047 twos), $\alpha(n) \le 4$ for every $n$ that could possibly arise in practice (e.g., for $n \le 2^{65536}$). For all intents and purposes, $\alpha(n)$ is a constant, which is why the amortized complexity $O(\alpha(n))$ for DSU operations is treated as essentially $O(1)$ in practice.
+Because $A_4(1)$ is astronomically large, we effectively have $\alpha(n) \le 4$ for all practical values of $n$. That is why DSU operations with rank and path compression are often treated as "almost constant time" in practice.
 
 ---
 
 #### **2. Definitions**
 
-*   **Optimization problem**: a problem requiring the selection of a solution with minimum (or maximum) cost among all feasible solutions.
-*   **Greedy algorithm**: an algorithm that builds a solution step by step, making the locally cheapest choice at each step and never backtracking.
-*   **Spanning tree**: for a connected undirected graph $G = (V, E)$, a subset $T \subseteq E$ such that $(V, T)$ is connected and acyclic; it has exactly $|V| - 1$ edges.
-*   **Minimum spanning tree (MST)**: a spanning tree of minimum total edge weight.
-*   **Spanning forest**: for a disconnected graph, a maximal acyclic subgraph — a union of spanning trees, one per connected component.
-*   **Weight of a spanning tree**: $w(T) = \sum_{e \in T} w(e)$.
-*   **Cut $(S, V \setminus S)$**: a partition of $V$ into two non-empty disjoint subsets.
-*   **Cut respects $A$**: no edge in $A$ has one endpoint in $S$ and one in $V \setminus S$.
+*   **Optimization problem**: a problem in which the goal is to choose a feasible solution of minimum or maximum value.
+*   **Greedy algorithm**: an algorithm that builds a solution step by step by making a locally optimal-looking choice at each stage.
+*   **Spanning tree**: for a connected undirected graph $G = (V, E)$, a connected acyclic edge set $T \subseteq E$ containing all vertices.
+*   **Minimum spanning tree (MST)**: a spanning tree whose total edge weight is minimum among all spanning trees of the graph.
+*   **Spanning forest**: a maximal acyclic subgraph of a disconnected graph; equivalently, a union of spanning trees, one per connected component.
+*   **Weight of a spanning tree**: the sum $w(T) = \sum_{e \in T} w(e)$ of the weights of its edges.
+*   **Cut $(S, V \setminus S)$**: a partition of the vertex set into two non-empty disjoint subsets.
 *   **Light edge**: a minimum-weight edge crossing a given cut.
-*   **Cut property**: if $A \subseteq E$ is contained in some MST and $(S, V \setminus S)$ respects $A$, then any light edge for this cut can be safely added to $A$ while maintaining the MST invariant.
-*   **Prim's algorithm**: a greedy MST algorithm that grows a single tree by repeatedly adding the cheapest edge from the tree to a non-tree vertex; uses a priority queue of vertices keyed by minimum connection cost.
-*   **Key** (in Prim's): $v.\text{key}$ is the minimum weight of any edge connecting $v$ to the current MST.
-*   **Predecessor** $v.\pi$: the vertex in the MST that provides $v$'s minimum-weight connection.
-*   **Disjoint-set data structure (DSU / union–find)**: an ADT that maintains a partition of a universe into disjoint sets and supports `MAKE-SET`, `FIND-SET`, and `UNION`.
-*   **Representative**: a designated element of a set used as the set's identifier; `FIND-SET(x)` returns the representative of the set containing $x$.
-*   **Rank**: in a DSU forest, an upper bound on the height of a subtree rooted at a node; used by union by rank to keep trees balanced.
-*   **Union by rank**: attach the lower-rank root under the higher-rank root; increment the new root's rank only when the two ranks are equal.
-*   **Path compression**: during `FIND-SET(x)`, redirect every node on the find path to point directly to the root, flattening future traversals.
-*   **Kruskal's algorithm**: a greedy MST algorithm that sorts edges by weight and adds each edge to the forest if it joins two different components (using a DSU to track components).
-*   **Ackermann function** $A_k(j)$: a recursively defined function that grows faster than any primitive-recursive function; defined as $A_0(j) = j+1$ and $A_k(j) = A_{k-1}^{(j+1)}(j)$ for $k > 0$.
-*   **Inverse Ackermann function** $\alpha(n)$: $\alpha(n) = \min\{k \mid A_k(1) \ge n\}$; grows so slowly that $\alpha(n) \le 4$ for all practical values of $n$.
+*   **Cut property**: the theorem stating that a light edge crossing a cut that respects the current partial solution is safe to add to some MST.
+*   **Prim's algorithm**: a greedy MST algorithm that grows one tree from a root by repeatedly extracting the non-tree vertex with smallest connection key.
+*   **Key** (in Prim's algorithm): the weight of the currently cheapest known edge connecting a non-tree vertex to the current tree.
+*   **Predecessor** $v.\pi$: the vertex that currently gives $v$ its best known connection into the MST.
+*   **Disjoint-set data structure (DSU / union-find)**: a data structure that maintains a partition of elements into disjoint sets and supports `MAKE-SET`, `FIND-SET`, and `UNION`.
+*   **Representative**: the designated element or root used to identify a DSU set.
+*   **Union by size**: a linked-list DSU heuristic that appends the shorter list to the longer list.
+*   **Forest representation**: a DSU representation in which each set is a rooted tree and the root is the representative.
+*   **Rank**: an upper bound on subtree height stored at DSU roots and used by union by rank.
+*   **Union by rank**: the heuristic that attaches the lower-rank root under the higher-rank root, incrementing rank only when the two ranks are equal.
+*   **Path compression**: the optimization that makes every node on a `FIND-SET` path point directly to the root.
+*   **Representative metadata**: aggregate information stored only at the root of a DSU set, such as component size or component sum.
+*   **Kruskal's algorithm**: a greedy MST algorithm that scans edges in non-decreasing weight order and adds an edge exactly when it connects two different DSU components.
+*   **Ackermann function** $A_k(j)$: a rapidly growing recursively defined function given by $A_0(j)=j+1$ and $A_k(j)=A_{k-1}^{(j+1)}(j)$ for $k>0$.
+*   **Inverse Ackermann function** $\alpha(n)$: the minimum $k$ such that $A_k(1) \ge n$.
 
 ---
 
 #### **3. Formulas**
 
-*   **MST weight:** $w(T) = \displaystyle\sum_{e \in T} w(e)$
-*   **Prim's algorithm — binary heap:** $\Theta(|E| \log |V|)$
-*   **Prim's algorithm — Fibonacci heap:** $\Theta(|E| + |V| \log |V|)$
-*   **Weighted union update bound:** each element's representative pointer is updated at most $\lfloor \log_2 n \rfloor$ times over all operations.
-*   **Union by rank — tree size lower bound:** a root of rank $k$ has at least $2^k$ nodes in its subtree.
-*   **Union by rank — height bound:** with union by rank (no path compression), tree height $\le \lfloor \log_2 n \rfloor$.
-*   **Kruskal's algorithm — general:** $O(|E| \log |V|)$ (sorting dominates)
-*   **Kruskal's algorithm — pre-sorted edges:** $O(|E|\,\alpha(|V|))$ (DSU dominates)
-*   **Ackermann function base case:** $A_0(j) = j + 1$
-*   **Ackermann function recursion:** $A_k(j) = A_{k-1}^{(j+1)}(j)$ for $k > 0$
-*   **Ackermann level 1:** $A_1(j) = 2j + 1$ for all $j \ge 1$
-*   **Ackermann level 2:** $A_2(j) = 2^{j+1}(j+1) - 1$ for all $j \ge 1$
-*   **Inverse Ackermann function:** $\alpha(n) = \min\{k \mid A_k(1) \ge n\}$
+*   **MST weight**: $w(T) = \displaystyle\sum_{e \in T} w(e)$
+*   **Prim's algorithm with binary heap**: $\Theta(|E| \log |V|)$
+*   **Prim's algorithm with Fibonacci heap**: $\Theta(|E| + |V| \log |V|)$
+*   **Worst-case successful `DECREASE-KEY` calls in Prim on $n$ vertices**: $\displaystyle\sum_{i=1}^{n-1} i = \frac{n(n-1)}{2}$
+*   **Weighted-union pointer-update bound**: each element's representative pointer changes at most $\lfloor \log_2 n \rfloor$ times
+*   **Union-by-rank size lower bound**: a root of rank $k$ has at least $2^k$ nodes
+*   **Union-by-rank height bound**: $\text{height} \le \lfloor \log_2 n \rfloor$
+*   **Component average in an augmented DSU**: $\displaystyle\frac{\texttt{sum[root]}}{\texttt{size[root]}}$
+*   **Kruskal's algorithm, general case**: $O(|E| \log |V|)$
+*   **Kruskal's algorithm with linear-time sorting**: $O(|E|\,\alpha(|V|))$
+*   **Ackermann base case**: $A_0(j) = j + 1$
+*   **Ackermann recursion**: $A_k(j) = A_{k-1}^{(j+1)}(j)$ for $k > 0$
+*   **Level-1 Ackermann closed form**: $A_1(j) = 2j + 1$
+*   **Level-2 Ackermann closed form**: $A_2(j) = 2^{j+1}(j+1) - 1$
+*   **Inverse Ackermann function**: $\alpha(n) = \min \{ k \mid A_k(1) \ge n \}$
 
 ---
 
 #### **4. Practice**
 
-##### **4.1. Trace Prim's Algorithm on a Weighted Graph** (Lecture 11, Example 1)
+##### **4.1. Maximize `DECREASE-KEY` Calls in Prim's Algorithm** (Problem Set 12, Task 1)
 
-Apply the naïve "smallest edge" heuristic and Prim's algorithm to the graph from Section 1.2.2, demonstrating how the priority queue evolves.
+Consider Prim's algorithm on a connected undirected graph with source vertex $S$.
 
-<details>
-<summary>Click to see the solution</summary>
+```{dot}
+//| fig-height: 3.2
+//| fig-width: 6.5
+graph prim_worst_case {
+  node [shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d",
+        fontcolor="#1f2d3d", fontsize=12, width=0.55]
+  edge [color="#355c7d", fontsize=10, fontcolor="#1f2d3d"]
 
-**Naïve heuristic** (starting from $A$, queue contains *edges* from the frontier):
-
-| Step | Vertex added | Edge used | Queue after extraction (candidate edges) |
-| :--- | :--- | :--- | :--- |
-| 0 | — | — | $\{A\text{–}B(6),\, A\text{–}D(4)\}$ |
-| 1 | $D$ | $A$–$D$ (4) | $\{A\text{–}B(6),\, D\text{–}B(7),\, D\text{–}E(12)\}$ (C–D: 8 added) |
-| 2 | $A$–$B$ (6) wins | $A$–$B$ (6) | ... |
-| 3 | $C$–$E$ (5) wins from $B$'s new edge set | ... | ... |
-
-(The full trace produces the MST edges $A$–$D$, $A$–$B$, $B$–$E$, $C$–$E$, $C$–$F$ with total weight 28.)
-
-**Key complexity observation.** The naïve approach inserts up to $\deg(u)$ new edges after each extraction. The priority queue can grow to $O(|E|)$ entries, and the total cost is:
-$$\sum_{u} \bigl[O(\log|E|) + \deg(u) \cdot O(\log|E|)\bigr] = O\bigl((|V| + |E|)\log|V|\bigr) = O(|E|\log|V|).$$
-
-**Prim's algorithm** (starting from $A$, queue contains *vertices* keyed by cheapest known connection):
-
-| Step | `EXTRACT-MIN` | Key used | Neighbors relaxed |
-| :--- | :--- | :--- | :--- |
-| 0 | $A$ ($\text{key}=0$) | — | $B.\text{key} \leftarrow 6$, $D.\text{key} \leftarrow 4$ |
-| 1 | $D$ ($\text{key}=4$) | $A$–$D$ (4) | $B.\text{key}$ stays 6; $C.\text{key} \leftarrow 8$; $E.\text{key} \leftarrow 12$ |
-| 2 | $C$–$E$ has key 5 but $C$ has key 8 at this point; next min is $B$ (6) | $A$–$B$ (6) | $C.\text{key}$ unchanged (10 > 8); $E.\text{key} \leftarrow 7$ |
-| 3 | Next min: $C$–$E$ feeds... actually $C.\text{key}=8$, $E.\text{key}=7$; min is $E$ (7) | $B$–$E$ (7) | $C.\text{key} \leftarrow 5$ (via $C$–$E$) |
-| 4 | $C$ ($\text{key}=5$) | $C$–$E$ (5) | $F.\text{key} \leftarrow 6$ |
-| 5 | $F$ ($\text{key}=6$) | $C$–$F$ (6) | — |
-
-MST edges: $A$–$D$ (4), $A$–$B$ (6), $B$–$E$ (7), $C$–$E$ (5), $C$–$F$ (6). Total weight = $\mathbf{28}$. ✓
-
-Because each vertex enters the queue exactly once and `DECREASE-KEY` is called at most once per edge, the total number of priority-queue operations is $O(|V| + |E|)$, giving the improved bound $O(|E| \log |V|)$ with a binary heap.
-
-</details>
-
-##### **4.2. Apply the Naïve MST Heuristic Starting from Vertex A** (Lecture 11, Example 2)
-
-Apply the naïve "smallest edge" heuristic to the graph from Section 1.2.2 (vertices $A$–$F$ with the given weights), starting from vertex $A$. List the edges added at each step and the state of the priority queue (edges). Then identify which data structure is required to implement this algorithm efficiently.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Setup.** We start from $A$. The priority queue initially contains all edges incident to $A$:
-
-$$Q = \{A\text{–}D(4),\, A\text{–}B(6)\}.$$
-
-**Step 1.** Extract minimum: $A$–$D$ (weight 4). Add $D$ to the tree. Insert edges from $D$ to non-tree vertices: $D$–$B$ (7), $D$–$E$ (12), $D$–$C$ (8). Also $D$–$A$ is already in the tree — skip.
-
-$$Q = \{A\text{–}B(6),\, D\text{–}C(8),\, D\text{–}B(7),\, D\text{–}E(12)\}.$$
-
-Tree edges so far: $\{A\text{–}D\}$.
-
-**Step 2.** Extract minimum: $A$–$B$ (weight 6). Add $B$ to the tree. Insert edges from $B$ to non-tree vertices: $B$–$C$ (10), $B$–$E$ (7). (Edge $B$–$D$ skipped — $D$ already in tree.)
-
-$$Q = \{D\text{–}B(7),\, B\text{–}E(7),\, D\text{–}C(8),\, B\text{–}C(10),\, D\text{–}E(12)\}.$$
-
-Tree edges: $\{A\text{–}D,\, A\text{–}B\}$.
-
-**Step 3.** Extract minimum: $D$–$B$ (weight 7). But $B$ is *already in the tree* — discard this edge.
-
-Extract next: $B$–$E$ (weight 7). Add $E$ to the tree. Insert edges from $E$: $E$–$C$ (5). (Edge $E$–$D$: skip, $D$ in tree.)
-
-$$Q = \{E\text{–}C(5),\, D\text{–}C(8),\, B\text{–}C(10),\, D\text{–}E(12)\}.$$
-
-Tree edges: $\{A\text{–}D,\, A\text{–}B,\, B\text{–}E\}$.
-
-**Step 4.** Extract minimum: $E$–$C$ (weight 5). Add $C$ to the tree. Insert edges from $C$: $C$–$F$ (6). (Edges $C$–$D$, $C$–$B$: skip.)
-
-$$Q = \{C\text{–}F(6),\, D\text{–}C(8),\, B\text{–}C(10),\, D\text{–}E(12)\}.$$
-
-Tree edges: $\{A\text{–}D,\, A\text{–}B,\, B\text{–}E,\, C\text{–}E\}$.
-
-**Step 5.** Extract minimum: $C$–$F$ (weight 6). Add $F$ to the tree. No new edges from $F$ to non-tree vertices.
-
-$$Q = \{D\text{–}C(8),\, B\text{–}C(10),\, D\text{–}E(12)\}.$$
-
-Tree edges: $\{A\text{–}D,\, A\text{–}B,\, B\text{–}E,\, C\text{–}E,\, C\text{–}F\}$. All 6 vertices are in the tree — **done**.
-
-**MST weight:** $4 + 6 + 7 + 5 + 6 = \mathbf{28}$.
-
-**Required data structure.** A **min-priority queue** (e.g., binary min-heap) is needed to efficiently find and extract the minimum-weight edge at each step. With a binary heap, each `EXTRACT-MIN` and `INSERT` costs $O(\log |E|) = O(\log |V|)$, giving an overall complexity of $O(|E| \log |V|)$.
-
-</details>
-
-##### **4.3. Apply Prim's Algorithm Starting from Vertex L** (Lecture 11, Example 3)
-
-Apply Prim's algorithm to the 18-vertex graph used in Exercise 11.2 (vertices $A$ through $R$), starting from vertex $L$. Break ties lexicographically by neighbour name. Show the order in which vertices are extracted from the priority queue and the MST edge used to add each vertex.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Method (general procedure to apply).**
-
-1. Initialize: set $L.\text{key} = 0$, all other keys to $\infty$. Insert all vertices into the min-priority queue $Q$.
-2. **Extract $L$** (key 0). For each neighbour $v$ of $L$: if $w(L, v) < v.\text{key}$, update $v.\text{key} \leftarrow w(L, v)$ and $v.\pi \leftarrow L$. Call `DECREASE-KEY` for each updated neighbour.
-3. **Extract the vertex $u$ with minimum key** (break ties by smallest label). Finalize edge $(u.\pi, u)$ as part of the MST. For each neighbour $v$ of $u$ still in $Q$: if $w(u, v) < v.\text{key}$, update $v.\text{key}$ and $v.\pi$.
-4. Repeat until $Q = \emptyset$.
-
-**Key invariant at each step:** $u.\text{key}$ equals the minimum weight of any edge from $u$ to the already-finalized tree.
-
-**What to report:** at each extraction step, write down the vertex extracted, the MST edge used (i.e., the edge $(u.\pi, u)$ with weight $u.\text{key}$), and which neighbour keys were updated.
-
-**Tie-breaking rule:** when two vertices have the same key value, extract the one with the lexicographically smaller label. When scanning neighbours of $u$, if two neighbours have equal weight edges, the update is performed for both but the order does not affect which key values are set.
-
-**Answer:** the sequence of vertices extracted from $Q$ and the corresponding MST edges depend on the specific edge weights of the 18-vertex graph; apply the procedure above step by step following the tie-breaking rule to obtain the full MST.
-
-</details>
-
-##### **4.4. Prove Height Bound with Union by Rank** (Lecture 11, Example 4)
-
-Prove that if only union by rank is used (no path compression), any tree in the forest has height at most $\lfloor \log_2 n \rfloor$, where $n$ is the total number of nodes in all trees combined.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Claim.** With union by rank (no path compression), a tree whose root has rank $k$ contains at least $2^k$ nodes.
-
-**Proof by induction on $k$.**
-
-*Base case ($k = 0$).* A freshly created node $x$ (via `MAKE-SET`) has $x.\text{rank} = 0$ and is a single-node tree. The tree has $1 = 2^0$ nodes. ✓
-
-*Inductive step.* Suppose the claim holds for all ranks $0, 1, \ldots, k - 1$. Consider a tree rooted at $r$ with rank $k$. Rank $k$ can only be achieved by a `LINK` operation that merges two trees of equal rank $k - 1$ (since rank is incremented only in the equal-rank case). At the time of this merge, each of the two trees had at least $2^{k-1}$ nodes (by the inductive hypothesis). After the merge, the combined tree has at least $2^{k-1} + 2^{k-1} = 2^k$ nodes. The tree's size only grows after that (further `UNION` operations only add more nodes), so the current tree has at least $2^k$ nodes. $\square$
-
-**Corollary: height bound.** Since the tree has at most $n$ nodes in total and at least $2^k$ nodes when its root has rank $k$, we get $2^k \le n$, which gives $k \le \log_2 n$. Because $k$ is an integer, $k \le \lfloor \log_2 n \rfloor$.
-
-Rank is an upper bound on height (this is easily shown: rank equals height when path compression is absent, since rank is incremented only when trees of the same height are merged, producing a tree one level taller). Therefore:
-
-$$\text{height of any tree} \le \text{rank of its root} \le \lfloor \log_2 n \rfloor.$$
-
-Hence `FIND-SET` walks at most $\lfloor \log_2 n \rfloor$ parent pointers, costing $O(\log n)$. And `UNION` performs two `FIND-SET` calls plus $O(1)$ work for `LINK`, so it also costs $O(\log n)$. $\square$
-
-</details>
-
-##### **4.5. Find Connected Components Using DSU** (Lecture 11, Example 5)
-
-Let $G = (V, E)$ be an undirected graph with $n$ vertices and $m$ edges. Design an algorithm using the disjoint-set data structure to find the number of connected components of $G$. Compute the time complexity. Additionally, describe how to modify the algorithm to output the size of each connected component.
-
-<details>
-<summary>Click to see the solution</summary>
-
-**Algorithm.**
-
-```text
-CONNECTED-COMPONENTS(G)
-1  for each vertex v in G.V
-2      MAKE-SET(v)
-3  for each edge (u, v) in G.E
-4      if FIND-SET(u) ≠ FIND-SET(v)
-5          UNION(u, v)
-6  // count distinct representatives
-7  components = 0
-8  for each vertex v in G.V
-9      if FIND-SET(v) == v          // v is a root
-10         components = components + 1
-11 return components
+  S -- A [label="10"]
+  S -- B [label="20"]
+  S -- C [label="30"]
+  S -- D [label="40"]
+  A -- B [label="9"]
+  A -- C [label="19"]
+  A -- D [label="29"]
+  B -- C [label="8"]
+  B -- D [label="18"]
+  C -- D [label="7"]
+}
 ```
 
-**Correctness.** After processing all edges, two vertices $u$ and $v$ are in the same DSU set if and only if there is a path between them in $G$ (i.e., they are in the same connected component). The number of components equals the number of distinct representatives, which equals the number of trees in the DSU forest.
+**(a)** Determine the worst-case number of successful `DECREASE-KEY` operations on an $n$-vertex graph.
+
+**(b)** Exhibit a concrete 5-vertex graph achieving that bound.
+
+**(c)** Run Prim's algorithm on that graph using a binary min-heap and report the heap after each step.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** In the worst case, a vertex can receive a new smaller key once for each earlier extracted vertex, so the total number of successful updates forms a triangular sum.
+
+Let $n = |V|$.
+
+**(a) Worst-case count.**
+
+The source is extracted first and never receives a decrease. Now focus on the remaining vertices in the order they are eventually extracted. The second extracted vertex can have its key decreased at most once before leaving the queue, the third can have its key decreased at most twice, and in general the vertex extracted in position $j$ can be improved at most $j-1$ times.
+
+Therefore the total worst-case number of successful `DECREASE-KEY` operations is
+
+$$1 + 2 + \cdots + (n-1) = \frac{n(n-1)}{2}.$$
+
+This bound is achievable by a carefully weighted complete graph in which every newly added vertex improves the key of every vertex still in the queue.
+
+**(b) A concrete 5-vertex construction.**
+
+Take the complete graph on vertices $\{S, A, B, C, D\}$ with source $S$ and edge weights:
+
+$$SA=10,\ SB=20,\ SC=30,\ SD=40,$$
+$$AB=9,\ AC=19,\ AD=29,\ BC=8,\ BD=18,\ CD=7.$$
+
+These weights force Prim's algorithm to extract vertices in the order
+
+$$S,\ A,\ B,\ C,\ D,$$
+
+and each extracted vertex improves the key of every later vertex.
+
+**(c) Binary-heap trace.**
+
+We use a standard binary min-heap, and we list the heap as an array of `(key, vertex)` pairs after processing each extracted vertex.
+
+Initial heap:
+
+$$[(0,S),\ (\infty,A),\ (\infty,B),\ (\infty,C),\ (\infty,D)].$$
+
+| Step | Vertex added | Edge used | Heap after processing | Successful `DECREASE-KEY` calls |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | $S$ | source | `[(10,A), (20,B), (30,C), (40,D)]` | 4 |
+| 2 | $A$ | $SA$ | `[(9,B), (19,C), (29,D)]` | 3 |
+| 3 | $B$ | $AB$ | `[(8,C), (18,D)]` | 2 |
+| 4 | $C$ | $BC$ | `[(7,D)]` | 1 |
+| 5 | $D$ | $CD$ | `[]` | 0 |
+
+The total is
+
+$$4 + 3 + 2 + 1 = 10 = \frac{5 \cdot 4}{2},$$
+
+which matches the general formula.
+
+**Answer:** The worst-case number of successful `DECREASE-KEY` calls is $\frac{n(n-1)}{2}$; the 5-vertex complete graph above realizes it, and its Prim trace performs exactly 10 such updates.
+
+</details>
+
+##### **4.2. Augment DSU to Answer Pool Average Queries** (Problem Set 12, Task 2)
+
+A CDN operator maintains caches $1,2,\dots,n$. Each cache $i$ has a positive stored-object count $w_i$. Initially each cache is its own pool. We must support:
+
+- merging the pools containing $a$ and $b$;
+- checking whether $a$ and $b$ are in the same pool;
+- reporting the average stored-object count in the pool containing $a$.
+
+Design a DSU variant that supports these operations efficiently.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Store aggregate data only at representatives, and update that metadata in constant extra time whenever two sets are merged.
+
+The right idea is to use the standard forest-based DSU with union by rank and path compression, and to store aggregate information only at representatives.
+
+**Data stored.**
+
+For each root $r$, maintain:
+
+- `sum[r]`: total stored-object count in the pool;
+- `size[r]`: number of caches in the pool.
+
+Initially, for every cache $i$:
+
+$$parent[i] = i,\qquad rank[i] = 0,\qquad sum[i] = w_i,\qquad size[i] = 1.$$
+
+**Merge operation.**
+
+To merge the pools containing $a$ and $b$:
+
+1. compute $r_a = FIND\text{-}SET(a)$ and $r_b = FIND\text{-}SET(b)$;
+2. if $r_a = r_b$, do nothing;
+3. otherwise perform union by rank;
+4. if the new root is $r$, update
+   $$sum[r] = sum[r_a] + sum[r_b],$$
+   $$size[r] = size[r_a] + size[r_b].$$
+
+All non-root nodes may keep stale `sum` and `size` values, because queries always go through the representative.
+
+**Same-pool query.**
+
+Return
+
+$$FIND\text{-}SET(a) = FIND\text{-}SET(b).$$
+
+**Average query.**
+
+Let $r = FIND\text{-}SET(a)$. Then the answer is
+
+$$\frac{sum[r]}{size[r]}.$$
+
+**Pseudocode.**
+
+```text
+MERGE(a, b):
+  ra = FIND-SET(a)
+  rb = FIND-SET(b)
+  if ra == rb:
+    return
+  r = UNION(ra, rb)          // returns the new representative
+  if r == ra:
+    sum[ra]  = sum[ra]  + sum[rb]
+    size[ra] = size[ra] + size[rb]
+  else:
+    sum[rb]  = sum[ra]  + sum[rb]
+    size[rb] = size[ra] + size[rb]
+
+SAME-POOL(a, b):
+  return FIND-SET(a) == FIND-SET(b)
+
+AVERAGE(a):
+  r = FIND-SET(a)
+  return sum[r] / size[r]
+```
+
+**Complexity.**
+
+With union by rank and path compression:
+
+- `MERGE` performs two finds, one union, and $O(1)$ extra metadata updates;
+- `SAME-POOL` performs two finds;
+- `AVERAGE` performs one find and one division.
+
+So each operation costs
+
+$$O(\alpha(n)) \text{ amortized},$$
+
+and a sequence of $q$ operations costs
+
+$$O(q\,\alpha(n)).$$
+
+**Answer:** Use a rank-and-compression DSU augmented with `sum[root]` and `size[root]`; then `MERGE`, `SAME-POOL`, and `AVERAGE` all run in $O(\alpha(n))$ amortized time.
+
+</details>
+
+##### **4.3. Run Kruskal's Algorithm and Inspect the Final DSU State** (Problem Set 12, Task 3)
+
+Consider the following weighted undirected graph on vertices $A$ through $L$:
+
+```{dot}
+//| fig-height: 4.7
+//| fig-width: 8.5
+graph kruskal_ps12 {
+  layout=neato
+  overlap=false
+  splines=true
+  node [shape=circle, style=filled, fillcolor="#e8f4f8", color="#355c7d",
+        fontcolor="#1f2d3d", fontsize=12, width=0.55]
+  edge [color="#355c7d", fontsize=10, fontcolor="#1f2d3d"]
+
+  B [pos="0,4!"]; C [pos="2,4.5!"]; D [pos="4,4!"]; H [pos="6,4!"];
+  I [pos="7.5,2.5!"]; K [pos="6,-0.3!"]; L [pos="4,-0.8!"]; F [pos="0.5,-0.8!"];
+  A [pos="1,2.4!"]; G [pos="4.1,2.3!"]; J [pos="7,1.1!"]; E [pos="2.4,1.1!"];
+
+  G -- H [label="3"];
+  A -- E [label="8"];
+  C -- G [label="7"];
+  E -- G [label="5"];
+  H -- I [label="10"];
+  F -- L [label="13"];
+  A -- C [label="3"];
+  K -- L [label="3"];
+  C -- D [label="2"];
+  A -- B [label="1"];
+  E -- L [label="12"];
+  E -- K [label="11"];
+  I -- K [label="7"];
+  B -- C [label="4"];
+  A -- F [label="9"];
+  B -- F [label="8"];
+  A -- G [label="9"];
+  D -- H [label="9"];
+  I -- J [label="5"];
+  J -- K [label="8"];
+  G -- J [label="11"];
+  D -- G [label="8"];
+  G -- K [label="9"];
+  E -- F [label="4"];
+}
+```
+
+Assume Kruskal uses a forest-based DSU with union by rank and path compression. Break weight ties lexicographically by the ordered pair of endpoint labels.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Kruskal sorts edges by weight and accepts exactly those edges whose endpoints are in different DSU components; skipped edges are precisely the ones that would create cycles.
+
+**Step 1: Sort edges by weight.**
+
+The beginning of the sorted list is:
+
+$$AB(1),\ CD(2),\ AC(3),\ GH(3),\ KL(3),\ BC(4),\ EF(4),\ EG(5),\ IJ(5),\ CG(7),\ IK(7),\dots$$
+
+**Step 2: Scan edges in order and accept only those joining different components.**
+
+| Edge | Weight | Action | Reason |
+| :--- | :--- | :--- | :--- |
+| $AB$ | 1 | add | different components |
+| $CD$ | 2 | add | different components |
+| $AC$ | 3 | add | joins $\{A,B\}$ with $\{C,D\}$ |
+| $GH$ | 3 | add | different components |
+| $KL$ | 3 | add | different components |
+| $BC$ | 4 | skip | $B$ and $C$ already connected through $A$ and $C$ |
+| $EF$ | 4 | add | different components |
+| $EG$ | 5 | add | joins $\{E,F\}$ with $\{G,H\}$ |
+| $IJ$ | 5 | add | different components |
+| $CG$ | 7 | add | joins $\{A,B,C,D\}$ with $\{E,F,G,H\}$ |
+| $IK$ | 7 | add | joins $\{I,J\}$ with $\{K,L\}$ |
+| $AE$ | 8 | skip | endpoints already in the same component |
+| $BF$ | 8 | skip | endpoints already in the same component |
+| $DG$ | 8 | skip | endpoints already in the same component |
+| $JK$ | 8 | skip | endpoints already in the same component |
+| $AF$ | 9 | skip | endpoints already in the same component |
+| $AG$ | 9 | skip | endpoints already in the same component |
+| $DH$ | 9 | skip | endpoints already in the same component |
+| $GK$ | 9 | add | joins the left 8-vertex component with $\{I,J,K,L\}$ |
+
+After $GK(9)$, all 12 vertices are connected, so Kruskal stops. The minimum spanning tree (equivalently, MSF here because the graph is connected) consists of:
+
+$$AB,\ CD,\ AC,\ GH,\ KL,\ EF,\ EG,\ IJ,\ CG,\ IK,\ GK.$$
+
+Its total weight is
+
+$$1 + 2 + 3 + 3 + 3 + 4 + 5 + 5 + 7 + 7 + 9 = 49.$$
+
+**Final DSU state.**
+
+Using the stated tie-breaking rule and choosing the root of the first endpoint's set when ranks are equal, one valid final state after a full round of path compression is:
+
+| Vertex | Parent | Rank |
+| :--- | :--- | :--- |
+| A | A | 3 |
+| B | A | 0 |
+| C | A | 1 |
+| D | A | 0 |
+| E | A | 2 |
+| F | A | 0 |
+| G | A | 1 |
+| H | A | 0 |
+| I | A | 2 |
+| J | A | 0 |
+| K | A | 1 |
+| L | A | 0 |
+
+All parents become $A$ because path compression flattens the forest when final finds are performed. The rank values are *not* recomputed during path compression, so they remain historical upper bounds from the union process.
+
+**Are these answers unique?**
+
+Not completely. The set of accepted edges is forced here by the tie-breaking rule, but in general Kruskal traces can vary when equal-weight edges are processed in a different order. Likewise, the exact DSU parent and rank arrays are not unique because equal-rank unions may choose different roots. What remains invariant is the existence of a minimum spanning tree with the same total weight.
+
+**Answer:** The accepted edges are $AB, CD, AC, GH, KL, EF, EG, IJ, CG, IK, GK$ in that order, the total MSF weight is $49$, and one valid final compressed DSU state has every vertex pointing to root $A$ with ranks as listed above.
+
+</details>
+
+##### **4.4. Trace Prim's Algorithm on a Weighted Graph** (Lecture 11, Example 1)
+
+Apply both the naive edge-based heuristic and Prim's algorithm to the graph from Section 1.2.2, starting from vertex $A$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The naive method keeps frontier edges in the queue, while Prim keeps one queue entry per frontier vertex; both find the same MST, but Prim avoids obsolete edge entries.
+
+We use the 6-vertex graph from Section 1.2.2, whose MST weight is 28.
+
+**Naive edge-based heuristic.**
+
+The priority queue stores frontier **edges**.
+
+| Step | Action | Queue after the step |
+| :--- | :--- | :--- |
+| Start | Tree contains only $A$ | $\{A\text{–}D(4),\ A\text{–}B(6)\}$ |
+| 1 | Extract $A$–$D(4)$, add $D$ | $\{A\text{–}B(6),\ D\text{–}B(7),\ D\text{–}C(8),\ D\text{–}E(12)\}$ |
+| 2 | Extract $A$–$B(6)$, add $B$ | $\{D\text{–}B(7),\ B\text{–}E(7),\ D\text{–}C(8),\ B\text{–}C(10),\ D\text{–}E(12)\}$ |
+| 3 | Extract $D$–$B(7)$, discard (both ends already in tree); then extract $B$–$E(7)$, add $E$ | $\{E\text{–}C(5),\ D\text{–}C(8),\ B\text{–}C(10),\ D\text{–}E(12)\}$ |
+| 4 | Extract $E$–$C(5)$, add $C$ | $\{C\text{–}F(6),\ D\text{–}C(8),\ B\text{–}C(10),\ D\text{–}E(12)\}$ |
+| 5 | Extract $C$–$F(6)$, add $F$ | done |
+
+The resulting tree edges are
+
+$$A\text{–}D,\ A\text{–}B,\ B\text{–}E,\ E\text{–}C,\ C\text{–}F,$$
+
+with total weight $28$.
+
+**Prim's algorithm.**
+
+Now the priority queue stores **vertices** keyed by their cheapest known connection to the tree.
+
+| Step | Extracted vertex | Edge added | Key updates |
+| :--- | :--- | :--- | :--- |
+| 1 | $A$ | source | $B \leftarrow 6$, $D \leftarrow 4$ |
+| 2 | $D$ | $A$–$D(4)$ | $C \leftarrow 8$, $E \leftarrow 12$ |
+| 3 | $B$ | $A$–$B(6)$ | $E \leftarrow 7$ |
+| 4 | $E$ | $B$–$E(7)$ | $C \leftarrow 5$ |
+| 5 | $C$ | $E$–$C(5)$ | $F \leftarrow 6$ |
+| 6 | $F$ | $C$–$F(6)$ | none |
+
+So Prim produces the same MST:
+
+$$A\text{–}D,\ A\text{–}B,\ B\text{–}E,\ E\text{–}C,\ C\text{–}F,$$
+
+again with total weight $\mathbf{28}$.
+
+The key implementation improvement is that every vertex appears only once in the queue. Old candidate edges do not accumulate, so the algorithm is cleaner and easier to analyze.
+
+**Answer:** Both traces produce the MST $AD, AB, BE, EC, CF$ of total weight $28$, but Prim's vertex-based queue gives the cleaner and standard implementation.
+
+</details>
+
+##### **4.5. Apply the Naive MST Heuristic Starting from Vertex A** (Lecture 11, Example 2)
+
+Apply the naive "smallest edge from the current tree to the outside" heuristic to the graph from Section 1.2.2, starting from $A$. Show the queue evolution and identify the data structure needed for an efficient implementation.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The heuristic repeatedly extracts the cheapest edge leaving the current tree, so the only required data structure is a min-priority queue over frontier edges.
+
+This is the same trace as in Example 4.4, but written from the data-structure point of view.
+
+Initial queue:
+
+$$Q = \{A\text{–}D(4),\ A\text{–}B(6)\}.$$
+
+**Step 1.** Extract $A$–$D(4)$, add $D$, and insert edges from $D$ to non-tree vertices:
+
+$$Q = \{A\text{–}B(6),\ D\text{–}B(7),\ D\text{–}C(8),\ D\text{–}E(12)\}.$$
+
+**Step 2.** Extract $A$–$B(6)$, add $B$, and insert edges from $B$ to non-tree vertices:
+
+$$Q = \{D\text{–}B(7),\ B\text{–}E(7),\ D\text{–}C(8),\ B\text{–}C(10),\ D\text{–}E(12)\}.$$
+
+**Step 3.** Extract $D$–$B(7)$ and discard it, because both endpoints are already in the tree. Then extract $B$–$E(7)$, add $E$, and insert $E$–$C(5)$:
+
+$$Q = \{E\text{–}C(5),\ D\text{–}C(8),\ B\text{–}C(10),\ D\text{–}E(12)\}.$$
+
+**Step 4.** Extract $E$–$C(5)$, add $C$, and insert $C$–$F(6)$:
+
+$$Q = \{C\text{–}F(6),\ D\text{–}C(8),\ B\text{–}C(10),\ D\text{–}E(12)\}.$$
+
+**Step 5.** Extract $C$–$F(6)$ and add $F$. All vertices are now in the tree.
+
+So the algorithm returns the MST
+
+$$\{A\text{–}D,\ A\text{–}B,\ B\text{–}E,\ E\text{–}C,\ C\text{–}F\},$$
+
+with total weight $28$.
+
+The required data structure is a **min-priority queue** of edges, typically implemented as a binary min-heap. It supports repeated extraction of the minimum-weight candidate edge in $O(\log |E|)$ time.
+
+**Answer:** Starting from $A$, the heuristic selects $AD, AB, BE, EC, CF$ and returns an MST of weight $28$; an efficient implementation uses a min-priority queue of edges.
+
+</details>
+
+##### **4.6. Apply Prim's Algorithm Starting from Vertex L** (Lecture 11, Example 3)
+
+Consider the undirected weighted graph on vertices $A$ through $R$ with edges
+
+$$AP(5),\ AJ(4),\ AR(2),\ AE(1),\ AK(6),\ AG(2),$$
+$$GM(6),\ GK(1),\ KM(2),\ KB(5),\ MB(2),\ BH(1),\ BQ(2),$$
+$$QK(4),\ QE(5),\ QF(4),\ FN(3),\ NB(6),\ NH(5),\ NC(1),$$
+$$CF(3),\ CE(5),\ CL(6),\ CI(3),\ IL(4),\ IF(3),\ IO(5),$$
+$$OD(2),\ DI(1),\ DL(5),\ DR(3),\ DJ(4),\ JR(3).$$
+
+Run Prim's algorithm from source vertex $L$, breaking ties lexicographically by vertex label.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Prim's algorithm repeatedly finalizes the smallest current key, and every key decrease records a cheaper connection from the current tree to an outside vertex.
+
+We maintain a min-priority queue of vertices keyed by their current best connection to the growing tree.
+
+| Step | Extracted vertex | Edge added | Key | Newly improved vertices |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | $L$ | source | 0 | $C \leftarrow 6$, $D \leftarrow 5$, $I \leftarrow 4$ |
+| 2 | $I$ | $L$–$I$ | 4 | $C \leftarrow 3$, $D \leftarrow 1$, $F \leftarrow 3$, $O \leftarrow 5$ |
+| 3 | $D$ | $I$–$D$ | 1 | $J \leftarrow 4$, $O \leftarrow 2$, $R \leftarrow 3$ |
+| 4 | $O$ | $D$–$O$ | 2 | none |
+| 5 | $C$ | $I$–$C$ | 3 | $E \leftarrow 5$, $N \leftarrow 1$ |
+| 6 | $N$ | $C$–$N$ | 1 | $B \leftarrow 6$, $H \leftarrow 5$ |
+| 7 | $F$ | $I$–$F$ | 3 | $Q \leftarrow 4$ |
+| 8 | $R$ | $D$–$R$ | 3 | $A \leftarrow 2$, $J \leftarrow 3$ |
+| 9 | $A$ | $R$–$A$ | 2 | $E \leftarrow 1$, $G \leftarrow 2$, $K \leftarrow 6$, $P \leftarrow 5$ |
+| 10 | $E$ | $A$–$E$ | 1 | none |
+| 11 | $G$ | $A$–$G$ | 2 | $K \leftarrow 1$, $M \leftarrow 6$ |
+| 12 | $K$ | $G$–$K$ | 1 | $B \leftarrow 5$, $M \leftarrow 2$ |
+| 13 | $M$ | $K$–$M$ | 2 | $B \leftarrow 2$ |
+| 14 | $B$ | $M$–$B$ | 2 | $H \leftarrow 1$, $Q \leftarrow 2$ |
+| 15 | $H$ | $B$–$H$ | 1 | none |
+| 16 | $Q$ | $B$–$Q$ | 2 | none |
+| 17 | $J$ | $R$–$J$ | 3 | none |
+| 18 | $P$ | $A$–$P$ | 5 | none |
+
+Therefore the Prim extraction order is
+
+$$L,\ I,\ D,\ O,\ C,\ N,\ F,\ R,\ A,\ E,\ G,\ K,\ M,\ B,\ H,\ Q,\ J,\ P.$$
+
+The MST edges chosen are
+
+$$LI,\ ID,\ DO,\ IC,\ CN,\ IF,\ DR,\ RA,\ AE,\ AG,\ GK,\ KM,\ MB,\ BH,\ BQ,\ RJ,\ AP.$$
+
+Their total weight is
+
+$$4+1+2+3+1+3+3+2+1+2+1+2+2+1+2+3+5 = 38.$$
+
+**Answer:** The extraction order is $L, I, D, O, C, N, F, R, A, E, G, K, M, B, H, Q, J, P$, and the resulting MST has total weight $38$.
+
+</details>
+
+##### **4.7. Prove Height Bound with Union by Rank** (Lecture 11, Example 4)
+
+Prove that if only union by rank is used, and path compression is not used, then every DSU tree on at most $n$ nodes has height at most $\lfloor \log_2 n \rfloor$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Under union by rank, rank can grow only when two equally ranked trees are merged, which forces the subtree size to at least double.
+
+The key statement is:
+
+**Claim.** A root of rank $k$ has at least $2^k$ nodes in its tree.
+
+We prove this by induction on $k$.
+
+**Base case $k=0$.** A rank-0 tree is a singleton created by `MAKE-SET`, so it has exactly one node, and
+
+$$1 = 2^0.$$
+
+**Inductive step.** Assume every rank-$k$ root has at least $2^k$ nodes. Consider how a root can obtain rank $k+1$. This happens only when two roots of equal rank $k$ are linked. By the inductive hypothesis, each of those trees contains at least $2^k$ nodes, so after the union the new tree contains at least
+
+$$2^k + 2^k = 2^{k+1}$$
+
+nodes.
+
+Thus the claim holds for all $k$.
+
+Now let a tree have root rank $r$. Since the whole structure contains at most $n$ nodes,
+
+$$2^r \le n,$$
+
+so
+
+$$r \le \log_2 n.$$
+
+Because $r$ is an integer,
+
+$$r \le \lfloor \log_2 n \rfloor.$$
+
+Without path compression, the rank is an upper bound on the tree height, so
+
+$$\text{height} \le \lfloor \log_2 n \rfloor.$$
+
+Consequently, both `FIND-SET` and `UNION` run in $O(\log n)$ worst-case time when only union by rank is used.
+
+**Answer:** Any DSU tree built using only union by rank has height at most $\lfloor \log_2 n \rfloor$, so both `FIND-SET` and `UNION` are $O(\log n)$ in the worst case.
+
+</details>
+
+##### **4.8. Find Connected Components Using DSU** (Lecture 11, Example 5)
+
+Design an algorithm using DSU to compute the number of connected components of an undirected graph $G = (V, E)$. Also explain how to output the size of each component.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** DSU merges the endpoints of every edge, so after all unions, each representative corresponds exactly to one connected component.
+
+The algorithm mirrors the definition of connected components.
+
+```text
+CONNECTED-COMPONENTS(G):
+  for each vertex v in G.V:
+    MAKE-SET(v)
+
+  for each edge (u, v) in G.E:
+    if FIND-SET(u) != FIND-SET(v):
+      UNION(u, v)
+
+  count = 0
+  for each vertex v in G.V:
+    if FIND-SET(v) == v:
+      count = count + 1
+
+  return count
+```
+
+**Why it works.**
+
+Whenever an edge $(u, v)$ is processed, the DSU merges the sets containing its endpoints. After all edges have been processed, two vertices lie in the same DSU set if and only if they are connected by a path in $G$. Therefore each DSU root corresponds to one connected component.
 
 **Time complexity.**
 
-- Line 1–2: $n$ calls to `MAKE-SET`, each $O(1)$: total $O(n)$.
-- Lines 3–5: $m$ iterations, each performing two `FIND-SET` calls and possibly one `UNION`. With union by rank and path compression, each such operation costs $O(\alpha(n))$ amortized: total $O(m\,\alpha(n))$.
-- Lines 7–10: $n$ calls to `FIND-SET`: total $O(n\,\alpha(n))$.
+- `MAKE-SET` is called $|V|$ times: $O(|V|)$.
+- The edge scan performs $O(|E|)$ finds and unions: $O(|E|\,\alpha(|V|))$ amortized.
+- The final root count performs $|V|$ finds: $O(|V|\,\alpha(|V|))$.
 
-**Overall:** $O((n + m)\,\alpha(n))$, which is effectively $O(n + m)$ in practice.
+So the total complexity is
 
-**Modification for component sizes.** Maintain an additional array `size[v]` initialized to 1 for each vertex. During `UNION(x, y)`, after identifying the roots $r_x = \text{FIND-SET}(x)$ and $r_y = \text{FIND-SET}(y)$, add:
+$$O((|V| + |E|)\,\alpha(|V|)).$$
 
-```text
-size[new_root] = size[r_x] + size[r_y]
-```
+**How to output component sizes.**
 
-where `new_root` is whichever root becomes the new combined root. At the end, for each root $v$ (i.e., each $v$ with `FIND-SET(v) == v`), `size[v]` holds the size of its connected component. This adds only $O(1)$ extra work per `UNION`, so the overall complexity is unchanged.
+Store an additional field `size[root]`, initialized to 1 for each singleton set. Whenever two components are united, update the size of the new root by adding the two old sizes. At the end, each root stores the size of its connected component.
+
+**Answer:** Process all edges with DSU unions, then count distinct roots; this yields $O((|V|+|E|)\alpha(|V|))$ time, and storing `size[root]` additionally gives each component size.
 
 </details>
 
-##### **4.6. Apply Kruskal's Algorithm to a Weighted Graph** (Lecture 11, Example 6)
+##### **4.9. Apply Kruskal's Algorithm to the 18-Vertex Graph** (Lecture 11, Example 6)
 
-Apply Kruskal's algorithm to the 18-vertex graph used in Exercise 11.2. Show the order in which edges are processed, which edges are added to the MST, which are rejected (because they connect already-joined components), and the state of the DSU structure after each operation.
+Apply Kruskal's algorithm to the 18-vertex graph from Example 4.6. Break ties lexicographically by endpoint labels.
 
 <details>
 <summary>Click to see the solution</summary>
 
-**Procedure to apply.**
+**Key Concept:** Kruskal's algorithm is a cut-property-driven greedy scan: the next accepted edge is always the lightest edge that connects two different current components.
 
-1. **Initialize:** call `MAKE-SET(v)` for every vertex $v$ (18 singleton sets).
-2. **Sort edges** by non-decreasing weight. If two edges have equal weight, their relative order does not affect the MST weight (there may be multiple MSTs).
-3. **Scan edges in sorted order.** For each edge $(u, v)$:
-   - Compute $r_u = \text{FIND-SET}(u)$ and $r_v = \text{FIND-SET}(v)$.
-   - If $r_u \ne r_v$: add $(u, v)$ to the MST; call `UNION(u, v)`.
-   - If $r_u = r_v$: reject $(u, v)$ (it would form a cycle within one component).
-4. **Termination.** Stop after adding 17 edges (for a connected 18-vertex graph). If the graph is connected, this always happens before all edges are exhausted.
+We process the edges in non-decreasing order of weight and add an edge exactly when it connects two different DSU components.
 
-**What to track:** after each accepted edge, note the two components that were merged and the new component structure.
+| Edge | Weight | Action | Reason |
+| :--- | :--- | :--- | :--- |
+| $AE$ | 1 | add | different components |
+| $BH$ | 1 | add | different components |
+| $CN$ | 1 | add | different components |
+| $DI$ | 1 | add | different components |
+| $GK$ | 1 | add | different components |
+| $AG$ | 2 | add | joins $\{A,E\}$ with $\{G,K\}$ |
+| $AR$ | 2 | add | adds $R$ to the $A$-component |
+| $BM$ | 2 | add | adds $M$ to the $B$-component |
+| $BQ$ | 2 | add | adds $Q$ to the $B$-component |
+| $DO$ | 2 | add | adds $O$ to the $D$-component |
+| $KM$ | 2 | add | joins the $A$-side with the $B$-side |
+| $CF$ | 3 | add | adds $F$ to the $C$-component |
+| $CI$ | 3 | add | joins the $C$-side with the $D$-side |
+| $DR$ | 3 | add | joins the left and right large components |
+| $FI$ | 3 | skip | endpoints already connected |
+| $FN$ | 3 | skip | endpoints already connected |
+| $JR$ | 3 | add | adds $J$ |
+| $AJ$ | 4 | skip | endpoints already connected |
+| $DJ$ | 4 | skip | endpoints already connected |
+| $FQ$ | 4 | skip | endpoints already connected |
+| $IL$ | 4 | add | adds $L$ |
+| $KQ$ | 4 | skip | endpoints already connected |
+| $AP$ | 5 | add | adds $P$ and completes the tree |
 
-**Correctness check:** the resulting set of 17 edges should form a spanning tree (connected, acyclic), and its total weight should be minimal — verified by confirming no lighter cross-edge was skipped (all lighter cross-edges between the same pair of components must have been processed first, since we process edges in non-decreasing weight order).
+At this point all 18 vertices belong to one component, so the MST is complete. The accepted edges are
 
-Apply this procedure to the given 18-vertex graph step by step using the sorted edge list.
+$$AE,\ BH,\ CN,\ DI,\ GK,\ AG,\ AR,\ BM,\ BQ,\ DO,\ KM,\ CF,\ CI,\ DR,\ JR,\ IL,\ AP.$$
+
+Their total weight is
+
+$$1+1+1+1+1+2+2+2+2+2+2+3+3+3+3+4+5 = 38.$$
+
+This illustrates the main logic of Kruskal's algorithm: equal-weight edges may appear in different orders, but every accepted edge must connect two currently different components, and every skipped edge would form a cycle.
+
+**Answer:** With lexicographic tie-breaking, Kruskal accepts $AE, BH, CN, DI, GK, AG, AR, BM, BQ, DO, KM, CF, CI, DR, JR, IL, AP$ and obtains an MST of weight $38$.
 
 </details>
 
-##### **4.7. Compute Ackermann Function Values** (Lecture 11, Example 7)
+##### **4.10. Compute Ackermann Function Values** (Lecture 11, Example 7)
 
-Compute $A_k(1)$ for $k = 0, 1, 2, 3, 4$ using the definition $A_0(j) = j + 1$ and $A_k(j) = A_{k-1}^{(j+1)}(j)$ for $k > 0$.
+Compute $A_k(1)$ for $k = 0,1,2,3,4$.
 
 <details>
 <summary>Click to see the solution</summary>
 
-Recall: $A_k^{(i)}(j)$ means applying $A_k$ exactly $i$ times starting from $j$. The recursion for $k > 0$ says: apply $A_{k-1}$ exactly $j + 1$ times starting from $j$.
+**Key Concept:** Each Ackermann level is defined by iterating the previous level many times, so even the first few values grow extremely quickly.
 
-**$k = 0$:**
-$$A_0(1) = 1 + 1 = \mathbf{2}.$$
+We use the definition
 
-**$k = 1$:**
-$$A_1(1) = A_0^{(1+1)}(1) = A_0^{(2)}(1) = A_0(A_0(1)) = A_0(2) = 3.$$
+$$A_0(j) = j + 1,\qquad A_k(j) = A_{k-1}^{(j+1)}(j)\ \text{for } k>0.$$
 
-**Verification using the closed form** $A_1(j) = 2j + 1$: $A_1(1) = 2 \cdot 1 + 1 = 3$. ✓
+**For $k=0$:**
 
-**$k = 2$:**
-$$A_2(1) = A_1^{(1+1)}(1) = A_1^{(2)}(1) = A_1(A_1(1)) = A_1(3) = 2 \cdot 3 + 1 = 7.$$
+$$A_0(1) = 2.$$
 
-Alternatively: $A_1^{(2)}(1)$ applies $A_1$ twice starting from 1:
+**For $k=1$:**
 
-- First application: $A_1(1) = 3$.
-- Second application: $A_1(3) = 7$.
+$$A_1(1) = A_0^{(2)}(1) = A_0(A_0(1)) = A_0(2) = 3.$$
 
-Result: $A_2(1) = \mathbf{7}$.
+**For $k=2$:**
 
-**$k = 3$:**
-$$A_3(1) = A_2^{(1+1)}(1) = A_2^{(2)}(1) = A_2(A_2(1)) = A_2(7).$$
+$$A_2(1) = A_1^{(2)}(1) = A_1(A_1(1)) = A_1(3).$$
 
-Now compute $A_2(7)$ using $A_2(j) = A_1^{(j+1)}(j)$:
-$$A_2(7) = A_1^{(8)}(7).$$
+Since $A_1(j) = 2j+1$,
 
-Apply $A_1(j) = 2j + 1$ eight times starting from 7:
-$$7 \xrightarrow{A_1} 15 \xrightarrow{A_1} 31 \xrightarrow{A_1} 63 \xrightarrow{A_1} 127 \xrightarrow{A_1} 255 \xrightarrow{A_1} 511 \xrightarrow{A_1} 1023 \xrightarrow{A_1} 2047.$$
+$$A_2(1) = 2 \cdot 3 + 1 = 7.$$
 
-Result: $A_3(1) = \mathbf{2047}$.
+**For $k=3$:**
 
-**$k = 4$:**
-$$A_4(1) = A_3^{(2)}(1) = A_3(A_3(1)) = A_3(2047).$$
+$$A_3(1) = A_2^{(2)}(1) = A_2(A_2(1)) = A_2(7).$$
 
-Now $A_3(2047) = A_2^{(2048)}(2047)$: apply $A_2$ exactly 2048 times starting from 2047. Since $A_2(j) \ge 2^j$ for large $j$, after the first application we get a number at least $2^{2047}$; after the second at least $2^{2^{2047}}$; and so on. After 2048 applications:
+Now $A_2(7)=A_1^{(8)}(7)$, so starting from 7 and repeatedly applying $A_1(j)=2j+1$ gives
 
-$$A_4(1) > \underbrace{2^{2^{2^{\cdots^{2047}}}}}_{\text{a tower of 2047 twos}}.$$
+$$7 \to 15 \to 31 \to 63 \to 127 \to 255 \to 511 \to 1023 \to 2047.$$
 
-This number is so enormous that it cannot be expressed in ordinary mathematical notation. For all practical purposes, $A_4(1) > 2^{65536}$, which exceeds the estimated number of atoms in the observable universe.
+Hence
 
-**Summary table:**
+$$A_3(1)=2047.$$
+
+**For $k=4$:**
+
+$$A_4(1)=A_3^{(2)}(1)=A_3(A_3(1))=A_3(2047).$$
+
+This means applying $A_2$ exactly 2048 times starting from 2047. The value is astronomically larger than any ordinary exponential; in particular it dominates a tower of 2047 twos.
+
+So the key values are:
 
 | $k$ | $A_k(1)$ |
 | :--- | :--- |
@@ -650,16 +1102,16 @@ This number is so enormous that it cannot be expressed in ordinary mathematical 
 | 3 | 2047 |
 | 4 | unimaginably large |
 
-**Inverse Ackermann function values:**
+Therefore:
 
-| Range of $n$ | $\alpha(n)$ |
-| :--- | :--- |
-| $0 \le n \le 2$ | 0 |
-| $n = 3$ | 1 |
-| $4 \le n \le 7$ | 2 |
-| $8 \le n \le 2047$ | 3 |
-| $2048 \le n \le A_4(1)$ | 4 |
+$$\alpha(n)=0 \text{ for } 0 \le n \le 2,$$
+$$\alpha(n)=1 \text{ for } n=3,$$
+$$\alpha(n)=2 \text{ for } 4 \le n \le 7,$$
+$$\alpha(n)=3 \text{ for } 8 \le n \le 2047,$$
+$$\alpha(n)=4 \text{ for } 2048 \le n \le A_4(1).$$
 
-For any $n$ that could ever be encountered in a computation, $\alpha(n) \le 4$.
+This is why the inverse Ackermann function is treated as essentially constant in real implementations.
+
+**Answer:** The values are $A_0(1)=2$, $A_1(1)=3$, $A_2(1)=7$, $A_3(1)=2047$, and $A_4(1)$ is astronomically large; consequently, $\alpha(n)\le 4$ for every practical input size.
 
 </details>
