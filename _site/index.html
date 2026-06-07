@@ -1490,7 +1490,7 @@ Andrey Frolov
 </table>
 </div>
 <div class="inn-home-last-updated">
-Last updated: June 4, 2026 at 16:53
+Last updated: June 7, 2026 at 15:19
 </div>
 
 
@@ -2239,7 +2239,7 @@ Last updated: June 4, 2026 at 16:53
 			margin: 0;
 			padding: 0;
 			box-sizing: border-box;
-			overflow-x: clip;
+			overflow-x: visible;
 		}
 
 		body.inn-custom-nav main#quarto-document-content {
@@ -2248,7 +2248,7 @@ Last updated: June 4, 2026 at 16:53
 			max-width: calc(100% - var(--inn-nav-width));
 			padding: 1.4rem 2.15rem 3rem;
 			box-sizing: border-box;
-			overflow-x: clip;
+			overflow-x: visible;
 			view-transition-name: inn-main-content;
 		}
 
@@ -2435,7 +2435,7 @@ Last updated: June 4, 2026 at 16:53
 			box-sizing: border-box;
 			font-size: 0.86rem;
 			min-width: 0;
-			overflow-x: clip;
+			overflow-x: visible;
 		}
 
 		body.inn-custom-nav-mobile #title-block-header {
@@ -3471,7 +3471,7 @@ Last updated: June 4, 2026 at 16:53
 			});
 		};
 
-		const innUseSpaNav = () => !window.__innIsBakedPage?.();
+		const innUseSpaNav = () => true;
 		const navigateTo = (href, options = {}) => {
 			if (!innUseSpaNav()) {
 				window.__innMarkStaticNav?.();
@@ -3482,7 +3482,12 @@ Last updated: June 4, 2026 at 16:53
 				}
 				return Promise.resolve();
 			}
-			return navigateInternal(href, options);
+			const spaNavigate = window.__innNavigateInternal;
+			if (typeof spaNavigate !== 'function') {
+				window.location.assign(href);
+				return Promise.resolve();
+			}
+			return spaNavigate(href, options);
 		};
 
 		const getPathKey = () => window.location.pathname.replace(/index\.html$/, '');
@@ -3584,20 +3589,29 @@ Last updated: June 4, 2026 at 16:53
 			title: payload.title,
 			main: payload.main.cloneNode(true),
 			assets: { ...payload.assets },
+			mathjaxStyles: payload.mathjaxStyles || '',
 		});
+		const swapMathjaxStyles = (cssText) => {
+			const normalized = String(cssText || '').trim();
+			const existing = document.getElementById('inn-mathjax-chtml-styles');
+			if (!normalized) {
+				existing?.remove();
+				return;
+			}
+			const style = existing || document.createElement('style');
+			style.id = 'inn-mathjax-chtml-styles';
+			style.textContent = normalized;
+			if (!existing) document.head.appendChild(style);
+		};
 		const collectPageAssets = (doc, pageHref) => {
 			const collectUrls = (selector, attr) => Array.from(doc.querySelectorAll(selector))
 				.map((node) => node.getAttribute(attr))
 				.filter(Boolean)
 				.map((value) => new URL(value, pageHref).href);
-			const collectInlineStyles = () => Array.from(doc.head.querySelectorAll('style'))
-				.map((node) => node.textContent || '')
-				.map((value) => value.trim())
-				.filter(Boolean);
 			return {
-				stylesheets: collectUrls('link[rel="stylesheet"][href]', 'href'),
-				inlineStyles: collectInlineStyles(),
-				mathScripts: collectUrls('script[src*="mathjax"]', 'src'),
+				stylesheets: collectUrls('link[rel="stylesheet"][href*="quarto-diagram/mermaid.css"]', 'href'),
+				inlineStyles: [],
+				mathScripts: [],
 				mermaidScripts: collectUrls('script[src*="quarto-diagram/mermaid.min.js"]', 'src'),
 				mermaidStyles: collectUrls('link[rel="stylesheet"][href*="quarto-diagram/mermaid.css"]', 'href'),
 			};
@@ -3725,11 +3739,13 @@ Last updated: June 4, 2026 at 16:53
 			const main = doc.querySelector('main#quarto-document-content');
 			if (!main) return null;
 			const titleMatch = html.match(TITLE_RE);
+			const fullDoc = new DOMParser().parseFromString(html, 'text/html');
 			const payload = {
 				title: titleMatch?.[1]?.trim() || doc.title,
 				main,
+				mathjaxStyles: fullDoc.getElementById('inn-mathjax-chtml-styles')?.textContent || '',
 				assets: collectPageAssets(
-					mainFragment ? new DOMParser().parseFromString(html, 'text/html') : doc,
+					mainFragment ? fullDoc : doc,
 					url.href,
 				),
 			};
@@ -4061,6 +4077,8 @@ Last updated: June 4, 2026 at 16:53
 		rememberPage(getPageCacheKey(window.location.href), {
 			title: document.title,
 			main: document.querySelector('main#quarto-document-content')?.cloneNode(true),
+			mathjaxStyles: document.getElementById('inn-mathjax-chtml-styles')?.textContent || '',
+			assets: {},
 		});
 
 		function innNormalizePathForLang(pathname) {
@@ -4567,25 +4585,10 @@ Last updated: June 4, 2026 at 16:53
 						}
 					};
 
-					const applySwap = async () => {
-						const currentMain = document.querySelector('main#quarto-document-content');
-						if (!currentMain) {
-							hideLoader();
-							window.location.assign(url.href);
-							return;
-						}
-						currentMain.replaceWith(nextMain);
-						document.title = payload.title;
-						if (replace) {
-							window.history.replaceState({}, '', url.href);
-						} else {
-							window.history.pushState({}, '', url.href);
-						}
-						advanceLoader(68);
-						applyArticleUI();
-						updateActiveNavState();
-						advanceLoader(78);
-						const swappedMain = document.querySelector('main#quarto-document-content');
+					await ensurePageAssets(payload.assets);
+					swapMathjaxStyles(payload.mathjaxStyles);
+
+					const applyScrollAfterSwap = () => {
 						const applyScrollRestore = () => {
 							if (savedF == null) return;
 							innApplyScrollFraction(savedF);
@@ -4599,28 +4602,41 @@ Last updated: June 4, 2026 at 16:53
 						} else {
 							window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 						}
-						await runAfterSwap();
-						hideLoader();
 					};
 
-					if (document.startViewTransition) {
-						let vt;
-						try {
-							vt = document.startViewTransition(() => applySwap());
-						} catch {
-							await applySwap();
-							vt = null;
+					const performDomSwap = () => {
+						const currentMain = document.querySelector('main#quarto-document-content');
+						if (!currentMain) return false;
+						const importedMain = document.importNode(nextMain.cloneNode(true), true);
+						currentMain.replaceWith(importedMain);
+						document.title = payload.title;
+						if (replace) {
+							window.history.replaceState({}, '', url.href);
+						} else {
+							window.history.pushState({}, '', url.href);
 						}
-						if (vt?.finished) {
-							await vt.finished.catch(() => {});
-						}
-					} else {
-						await applySwap();
+						advanceLoader(68);
+						applyArticleUI();
+						updateActiveNavState();
+						advanceLoader(78);
+						applyScrollAfterSwap();
+						return true;
+					};
+
+					const swapped = performDomSwap();
+					if (!swapped) {
+						hideLoader();
+						window.location.assign(url.href);
+						return;
 					}
+
+					await runAfterSwap();
+					hideLoader();
 				} finally {
 					window._innNavigating = false;
 				}
 			};
+			window.__innNavigateInternal = navigateInternal;
 
 			const queueIdlePrefetch = () => {};
 
