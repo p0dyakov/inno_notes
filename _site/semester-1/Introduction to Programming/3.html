@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<html data-inn-baked="true" xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.8.24">
@@ -4318,34 +4318,8 @@ Click to see the solution
 
 		const getReadStorageKey = (value) => `read_${normalizePath(value)}`;
 		const applyProgressiveContent = () => {};
-		const containsMathContent = (root) => {
-			if (!root) return false;
-			if (root.querySelector('span.math, div.math, .math.display, .math.inline, script[type^="math/tex"]')) return true;
-			const html = root.innerHTML || '';
-			return /\\\(|\\\[|\$\$/.test(html);
-		};
-		const typesetMathContent = async (root) => {
-			if (!root || !containsMathContent(root)) return;
-			for (let attempt = 0; attempt < 80 && !window.MathJax && !window.katex; attempt += 1) {
-				await new Promise((resolve) => window.setTimeout(resolve, 120));
-			}
-			if (window.MathJax?.startup?.promise) {
-				try {
-					await window.MathJax.startup.promise;
-				} catch {}
-			}
-			try {
-				if (typeof window.MathJax?.typesetPromise === 'function') {
-					await window.MathJax.typesetPromise([root]);
-					return;
-				}
-				if (typeof window.Quarto?.typesetMath === 'function') {
-					window.Quarto.typesetMath(root);
-				}
-			} catch {}
-		};
-		const fitDisplayMath = () => {};
-		const scheduleFitDisplayMath = () => {};
+
+		// Math/Mermaid are baked at `quarto render` (scripts/bake-static-html.mjs).
 		const pageCache = new Map();
 		const maxPageCacheEntries = 24;
 		const assetLoadCache = new Map();
@@ -4434,6 +4408,59 @@ Click to see the solution
 				...(assets.mermaidScripts || []).map((src) => ensureScriptAsset(src)),
 			]);
 		};
+		const rewriteMainRelativeUrls = (root, pageHref) => {
+			if (!root || !pageHref) return;
+			const selectors = [
+				['a[href]', 'href'],
+				['img[src]', 'src'],
+				['source[src]', 'src'],
+				['source[srcset]', 'srcset'],
+				['img[srcset]', 'srcset'],
+				['video[poster]', 'poster'],
+				['audio[src]', 'src'],
+				['iframe[src]', 'src'],
+			];
+			const rewriteUrlAttr = (node, attr) => {
+				const raw = node.getAttribute(attr);
+				if (!raw || raw.startsWith('#') || /^(?:[a-z]+:|\/\/)/i.test(raw)) return;
+				try {
+					node.setAttribute(attr, new URL(raw, pageHref).href);
+				} catch {
+					/* ignore */
+				}
+			};
+			const rewriteSrcSet = (node, attr) => {
+				const raw = node.getAttribute(attr);
+				if (!raw) return;
+				const rewritten = raw
+					.split(',')
+					.map((part) => {
+						const trimmed = part.trim();
+						if (!trimmed) return trimmed;
+						const [urlPart, descriptor] = trimmed.split(/\s+/, 2);
+						if (!urlPart || /^(?:[a-z]+:|\/\/)/i.test(urlPart) || urlPart.startsWith('#')) {
+							return trimmed;
+						}
+						try {
+							const abs = new URL(urlPart, pageHref).href;
+							return descriptor ? `${abs} ${descriptor}` : abs;
+						} catch {
+							return trimmed;
+						}
+					})
+					.join(', ');
+				node.setAttribute(attr, rewritten);
+			};
+			selectors.forEach(([selector, attr]) => {
+				root.querySelectorAll(selector).forEach((node) => {
+					if (attr === 'srcset') {
+						rewriteSrcSet(node, attr);
+					} else {
+						rewriteUrlAttr(node, attr);
+					}
+				});
+			});
+		};
 		const fetchPagePayload = async (value) => {
 			const url = new URL(value, window.location.href);
 			const key = getPageCacheKey(url.href);
@@ -4453,10 +4480,11 @@ Click to see the solution
 				main,
 				assets: collectPageAssets(doc, url.href),
 			};
+			rewriteMainRelativeUrls(payload.main, url.href);
 			rememberPage(key, payload);
 			return clonePagePayload(payload);
 		};
-		const prefetchPage = async () => {};
+		const prefetchPage = () => {};
 
 		const syncSidebarReadState = () => {
 			document.querySelectorAll('.sidebar-item-text.sidebar-link[href]:not([data-nav-section-toggle="true"])').forEach(link => {
@@ -4658,69 +4686,6 @@ Click to see the solution
 			return `${url.pathname}${url.search}${hash ? `#${hash}` : ''}`;
 		};
 
-		const sanitizeMermaidSource = (value) => (value || '')
-			.split('\n')
-			.filter((line) => !line.trim().startsWith('%%|'))
-			.join('\n')
-			.trim();
-		const sanitizeMermaidBlocks = (root = document) => {
-			root.querySelectorAll('pre.mermaid, pre.mermaid-js').forEach((block) => {
-				const sanitized = sanitizeMermaidSource(block.textContent || '');
-				if (sanitized && sanitized !== (block.textContent || '').trim()) {
-					block.textContent = sanitized;
-				}
-			});
-		};
-		const getMermaidBlocks = (root = document) => Array.from(root.querySelectorAll('pre.mermaid, pre.mermaid-js, .mermaid-js'));
-		const rerenderMermaid = async (root = document) => {
-			const mermaidBlocks = getMermaidBlocks(root);
-			if (!mermaidBlocks.length) return;
-			for (let attempt = 0; attempt < 40 && !window.mermaid; attempt += 1) {
-				await new Promise((resolve) => window.setTimeout(resolve, 120));
-			}
-			if (!window.mermaid) return;
-			try {
-				if (typeof window.mermaid.initialize === 'function') {
-					window.mermaid.initialize({ startOnLoad: false });
-				}
-				for (let index = 0; index < mermaidBlocks.length; index += 1) {
-					const block = mermaidBlocks[index];
-					const raw = sanitizeMermaidSource(block.textContent || '');
-					if (!raw) continue;
-					if (typeof window.mermaid.render === 'function') {
-						const id = `inn-mermaid-${Date.now()}-${index}`;
-						const renderResult = await window.mermaid.render(id, raw);
-						const host = document.createElement('div');
-						host.className = 'mermaid';
-						host.innerHTML = typeof renderResult === 'string' ? renderResult : renderResult.svg;
-						block.replaceWith(host);
-						if (typeof renderResult?.bindFunctions === 'function') {
-							renderResult.bindFunctions(host);
-						}
-					} else {
-						block.textContent = raw;
-						block.removeAttribute('data-processed');
-						if (typeof window.mermaid.run === 'function') {
-							await window.mermaid.run({ nodes: [block] });
-						} else if (typeof window.mermaid.init === 'function') {
-							window.mermaid.init(undefined, [block]);
-						}
-					}
-				}
-			} catch {}
-		};
-		const ensureMermaidRendered = async (root = document) => {
-			if (!getMermaidBlocks(root).length) return;
-			sanitizeMermaidBlocks(root);
-			for (let attempt = 0; attempt < 4; attempt += 1) {
-				await rerenderMermaid(root);
-				if (!getMermaidBlocks(root).some((block) => /^(PRE|DIV)$/.test(block.tagName) && /^(mermaid|mermaid-js)$/.test(block.className.trim()))) {
-					return;
-				}
-				await new Promise((resolve) => window.setTimeout(resolve, 180));
-			}
-		};
-
 		const escapeHtml = (value) => (value || '')
 			.replace(/&/g, '&amp;')
 			.replace(/</g, '&lt;')
@@ -4836,11 +4801,6 @@ Click to see the solution
 
 			applyProgressiveContent(document.querySelector('main#quarto-document-content'));
 			syncSidebarReadState();
-			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
-			if (innPageFullyLoaded) {
-				ensureMermaidRendered(document.querySelector('main#quarto-document-content'));
-			}
-
 			innFixTcsBreadcrumbs();
 			syncPageFooterVisibility();
 		};
@@ -5313,60 +5273,7 @@ Click to see the solution
 				});
 			};
 
-			const rewriteMainRelativeUrls = (root, pageHref) => {
-				if (!root || !pageHref) return;
-				const selectors = [
-					['a[href]', 'href'],
-					['img[src]', 'src'],
-					['source[src]', 'src'],
-					['source[srcset]', 'srcset'],
-					['img[srcset]', 'srcset'],
-					['video[poster]', 'poster'],
-					['audio[src]', 'src'],
-					['iframe[src]', 'src'],
-				];
-				const rewriteUrlAttr = (node, attr) => {
-					const raw = node.getAttribute(attr);
-					if (!raw || raw.startsWith('#') || /^(?:[a-z]+:|\/\/)/i.test(raw)) return;
-					try {
-						node.setAttribute(attr, new URL(raw, pageHref).href);
-					} catch {
-						/* ignore */
-					}
-				};
-				const rewriteSrcSet = (node, attr) => {
-					const raw = node.getAttribute(attr);
-					if (!raw) return;
-					const rewritten = raw
-						.split(',')
-						.map((part) => {
-							const trimmed = part.trim();
-							if (!trimmed) return trimmed;
-							const [urlPart, descriptor] = trimmed.split(/\s+/, 2);
-							if (!urlPart || /^(?:[a-z]+:|\/\/)/i.test(urlPart) || urlPart.startsWith('#')) {
-								return trimmed;
-							}
-							try {
-								const abs = new URL(urlPart, pageHref).href;
-								return descriptor ? `${abs} ${descriptor}` : abs;
-							} catch {
-								return trimmed;
-							}
-						})
-						.join(', ');
-					node.setAttribute(attr, rewritten);
-				};
-				selectors.forEach(([selector, attr]) => {
-					root.querySelectorAll(selector).forEach((node) => {
-						if (attr === 'srcset') {
-							rewriteSrcSet(node, attr);
-						} else {
-							rewriteUrlAttr(node, attr);
-						}
-					});
-				});
-			};
-
+	
 			const navigateInternal = async (href, { replace = false, restoreScrollFraction = null } = {}) => {
 				window._innNavigating = true;
 				try {
@@ -5389,32 +5296,21 @@ Click to see the solution
 					}
 					setLoaderNudgeCeiling(68);
 					advanceLoader(44);
-					await ensurePageAssets(payload.assets);
 					setLoaderNudgeCeiling(86);
 					advanceLoader(58);
 					const nextMain = payload.main;
-					rewriteMainRelativeUrls(nextMain, url.href);
 
 					const savedF =
 						typeof restoreScrollFraction === 'number' && Number.isFinite(restoreScrollFraction)
 							? Math.min(1, Math.max(0, restoreScrollFraction))
 							: null;
 
-					const runAfterSwap = async (swappedMain) => {
+					const runAfterSwap = async () => {
 						setLoaderNudgeCeiling(96);
-						advanceLoader(72);
-						await typesetMathContent(swappedMain);
-						advanceLoader(84);
-						await ensureMermaidRendered(swappedMain);
 						advanceLoader(94);
-						scheduleFitDisplayMath(swappedMain);
-						const applyScrollRestore = () => {
-							if (savedF == null) return;
-							innApplyScrollFraction(savedF);
-						};
 						if (savedF != null) {
-							applyScrollRestore();
-							window.requestAnimationFrame(applyScrollRestore);
+							innApplyScrollFraction(savedF);
+							window.requestAnimationFrame(() => innApplyScrollFraction(savedF));
 						}
 					};
 
@@ -5450,7 +5346,7 @@ Click to see the solution
 						} else {
 							window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 						}
-						await runAfterSwap(swappedMain);
+						await runAfterSwap();
 						hideLoader();
 					};
 
@@ -5891,26 +5787,7 @@ Click to see the solution
 			return true;
 		};
 		applyArticleUI();
-		sanitizeMermaidBlocks(document);
-		const runInitialDynamicRender = async () => {
-			innPageFullyLoaded = true;
-			const mainContent = document.querySelector('main#quarto-document-content');
-			if (!mainContent) return;
-			await typesetMathContent(mainContent);
-			await ensureMermaidRendered(mainContent);
-			scheduleFitDisplayMath(mainContent);
-		};
-		window.requestAnimationFrame(() => {
-			runInitialDynamicRender();
-		});
-		window.addEventListener('load', () => {
-			window.requestAnimationFrame(() => {
-				runInitialDynamicRender();
-			});
-		}, { once: true });
-		window.addEventListener('resize', () => {
-			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
-		});
+		innPageFullyLoaded = true;
 
 		const sidebar = document.querySelector('#quarto-sidebar');
 		if (!sidebar) return;
@@ -6153,7 +6030,7 @@ Click to see the solution
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/innonotes\.ru");
+        var filterRegex = new RegExp('/' + window.location.host + '/');
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
