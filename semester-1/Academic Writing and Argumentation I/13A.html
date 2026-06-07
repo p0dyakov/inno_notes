@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<html data-inn-baked="true" xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.8.24">
@@ -144,7 +144,9 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 	} catch {
 		/* ignore */
 	}
-	document.documentElement.classList.add("inn-ui-booting");
+	if (!document.documentElement.hasAttribute("data-inn-baked")) {
+		document.documentElement.classList.add("inn-ui-booting");
+	}
 })();
 </script>
 
@@ -1534,13 +1536,43 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 //   render:start  – shows render overlay
 //   render:stop   – hides render overlay
 //   reload        – reloads / replaces location
-// All three are suppressed while window._innNavigating is true.
-// onclose (socket disconnect) is also suppressed to prevent spurious reload.
+// Suppress render/reload WebSocket messages during SPA nav, static page hops,
+// and on pre-baked pages (see scripts/preview.sh --render all).
 (function () {
 	if (!window.WebSocket) return;
-	document.documentElement.classList.add('inn-ui-booting');
-	if (document.body) document.body.classList.add('inn-ui-booting');
-	if (!document.getElementById('inn-page-loader') && document.body) {
+	const innIsBakedPage = () => document.documentElement.hasAttribute('data-inn-baked');
+	window.__innIsBakedPage = innIsBakedPage;
+	const innSuppressPreviewRenderMsg = () => {
+		if (innIsBakedPage()) return true;
+		if (window._innNavigating) return true;
+		try {
+			return sessionStorage.getItem('inn-static-nav') === '1';
+		} catch {
+			return false;
+		}
+	};
+	window.__innSuppressPreviewRenderMsg = innSuppressPreviewRenderMsg;
+	const innMarkStaticNav = () => {
+		try {
+			sessionStorage.setItem('inn-static-nav', '1');
+		} catch {
+			/* ignore */
+		}
+	};
+	window.__innMarkStaticNav = innMarkStaticNav;
+	const innClearStaticNav = () => {
+		try {
+			sessionStorage.removeItem('inn-static-nav');
+		} catch {
+			/* ignore */
+		}
+	};
+	window.__innClearStaticNav = innClearStaticNav;
+	if (!innIsBakedPage()) {
+		document.documentElement.classList.add('inn-ui-booting');
+		if (document.body) document.body.classList.add('inn-ui-booting');
+	}
+	if (!document.getElementById('inn-page-loader') && document.body && !innIsBakedPage()) {
 		var bootLoader = document.createElement('div');
 		bootLoader.id = 'inn-page-loader';
 		bootLoader.className = 'is-active is-booting';
@@ -1560,9 +1592,15 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			set: function (fn) {
 				_om = fn;
 				ws.addEventListener('message', function (e) {
-					if (window._innNavigating &&
-						typeof e.data === 'string' &&
-						(e.data.startsWith('reload') || e.data.startsWith('render:'))) return;
+					if (typeof e.data === 'string') {
+						if (e.data.startsWith('render:stop')) {
+							window.__innClearStaticNav?.();
+						}
+						if (window.__innSuppressPreviewRenderMsg?.() &&
+							(e.data.startsWith('reload') || e.data.startsWith('render:'))) {
+							return;
+						}
+					}
 					fn.call(ws, e);
 				});
 			}
@@ -2235,7 +2273,7 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			margin: 0;
 			padding: 0;
 			box-sizing: border-box;
-			overflow-x: clip;
+			overflow-x: visible;
 		}
 
 		body.inn-custom-nav main#quarto-document-content {
@@ -2244,7 +2282,7 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			max-width: calc(100% - var(--inn-nav-width));
 			padding: 1.4rem 2.15rem 3rem;
 			box-sizing: border-box;
-			overflow-x: clip;
+			overflow-x: visible;
 			view-transition-name: inn-main-content;
 		}
 
@@ -2431,7 +2469,7 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			box-sizing: border-box;
 			font-size: 0.86rem;
 			min-width: 0;
-			overflow-x: clip;
+			overflow-x: visible;
 		}
 
 		body.inn-custom-nav-mobile #title-block-header {
@@ -3450,6 +3488,13 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			}, 180);
 		};
 		const finishInitialBoot = () => {
+			if (window.__innIsBakedPage?.()) {
+				document.documentElement.classList.remove('inn-ui-booting');
+				document.body?.classList.remove('inn-ui-booting');
+				loaderEl.classList.remove('is-active', 'is-booting');
+				setLoaderProgress(0);
+				return;
+			}
 			advanceLoader(100);
 			window.requestAnimationFrame(() => {
 				window.requestAnimationFrame(() => {
@@ -3458,6 +3503,25 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 					hideLoader();
 				});
 			});
+		};
+
+		const innUseSpaNav = () => true;
+		const navigateTo = (href, options = {}) => {
+			if (!innUseSpaNav()) {
+				window.__innMarkStaticNav?.();
+				if (options.replace) {
+					window.location.replace(href);
+				} else {
+					window.location.assign(href);
+				}
+				return Promise.resolve();
+			}
+			const spaNavigate = window.__innNavigateInternal;
+			if (typeof spaNavigate !== 'function') {
+				window.location.assign(href);
+				return Promise.resolve();
+			}
+			return spaNavigate(href, options);
 		};
 
 		const getPathKey = () => window.location.pathname.replace(/index\.html$/, '');
@@ -3536,34 +3600,8 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 
 		const getReadStorageKey = (value) => `read_${normalizePath(value)}`;
 		const applyProgressiveContent = () => {};
-		const containsMathContent = (root) => {
-			if (!root) return false;
-			if (root.querySelector('span.math, div.math, .math.display, .math.inline, script[type^="math/tex"]')) return true;
-			const html = root.innerHTML || '';
-			return /\\\(|\\\[|\$\$/.test(html);
-		};
-		const typesetMathContent = async (root) => {
-			if (!root || !containsMathContent(root)) return;
-			for (let attempt = 0; attempt < 80 && !window.MathJax && !window.katex; attempt += 1) {
-				await new Promise((resolve) => window.setTimeout(resolve, 120));
-			}
-			if (window.MathJax?.startup?.promise) {
-				try {
-					await window.MathJax.startup.promise;
-				} catch {}
-			}
-			try {
-				if (typeof window.MathJax?.typesetPromise === 'function') {
-					await window.MathJax.typesetPromise([root]);
-					return;
-				}
-				if (typeof window.Quarto?.typesetMath === 'function') {
-					window.Quarto.typesetMath(root);
-				}
-			} catch {}
-		};
-		const fitDisplayMath = () => {};
-		const scheduleFitDisplayMath = () => {};
+
+		// Math/Mermaid are baked at `quarto render` (scripts/bake-static-html.mjs).
 		const pageCache = new Map();
 		const maxPageCacheEntries = 24;
 		const assetLoadCache = new Map();
@@ -3585,20 +3623,29 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			title: payload.title,
 			main: payload.main.cloneNode(true),
 			assets: { ...payload.assets },
+			mathjaxStyles: payload.mathjaxStyles || '',
 		});
+		const swapMathjaxStyles = (cssText) => {
+			const normalized = String(cssText || '').trim();
+			const existing = document.getElementById('inn-mathjax-chtml-styles');
+			if (!normalized) {
+				existing?.remove();
+				return;
+			}
+			const style = existing || document.createElement('style');
+			style.id = 'inn-mathjax-chtml-styles';
+			style.textContent = normalized;
+			if (!existing) document.head.appendChild(style);
+		};
 		const collectPageAssets = (doc, pageHref) => {
 			const collectUrls = (selector, attr) => Array.from(doc.querySelectorAll(selector))
 				.map((node) => node.getAttribute(attr))
 				.filter(Boolean)
 				.map((value) => new URL(value, pageHref).href);
-			const collectInlineStyles = () => Array.from(doc.head.querySelectorAll('style'))
-				.map((node) => node.textContent || '')
-				.map((value) => value.trim())
-				.filter(Boolean);
 			return {
-				stylesheets: collectUrls('link[rel="stylesheet"][href]', 'href'),
-				inlineStyles: collectInlineStyles(),
-				mathScripts: collectUrls('script[src*="mathjax"]', 'src'),
+				stylesheets: collectUrls('link[rel="stylesheet"][href*="quarto-diagram/mermaid.css"]', 'href'),
+				inlineStyles: [],
+				mathScripts: [],
 				mermaidScripts: collectUrls('script[src*="quarto-diagram/mermaid.min.js"]', 'src'),
 				mermaidStyles: collectUrls('link[rel="stylesheet"][href*="quarto-diagram/mermaid.css"]', 'href'),
 			};
@@ -3652,6 +3699,61 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 				...(assets.mermaidScripts || []).map((src) => ensureScriptAsset(src)),
 			]);
 		};
+		const rewriteMainRelativeUrls = (root, pageHref) => {
+			if (!root || !pageHref) return;
+			const selectors = [
+				['a[href]', 'href'],
+				['img[src]', 'src'],
+				['source[src]', 'src'],
+				['source[srcset]', 'srcset'],
+				['img[srcset]', 'srcset'],
+				['video[poster]', 'poster'],
+				['audio[src]', 'src'],
+				['iframe[src]', 'src'],
+			];
+			const rewriteUrlAttr = (node, attr) => {
+				const raw = node.getAttribute(attr);
+				if (!raw || raw.startsWith('#') || /^(?:[a-z]+:|\/\/)/i.test(raw)) return;
+				try {
+					node.setAttribute(attr, new URL(raw, pageHref).href);
+				} catch {
+					/* ignore */
+				}
+			};
+			const rewriteSrcSet = (node, attr) => {
+				const raw = node.getAttribute(attr);
+				if (!raw) return;
+				const rewritten = raw
+					.split(',')
+					.map((part) => {
+						const trimmed = part.trim();
+						if (!trimmed) return trimmed;
+						const [urlPart, descriptor] = trimmed.split(/\s+/, 2);
+						if (!urlPart || /^(?:[a-z]+:|\/\/)/i.test(urlPart) || urlPart.startsWith('#')) {
+							return trimmed;
+						}
+						try {
+							const abs = new URL(urlPart, pageHref).href;
+							return descriptor ? `${abs} ${descriptor}` : abs;
+						} catch {
+							return trimmed;
+						}
+					})
+					.join(', ');
+				node.setAttribute(attr, rewritten);
+			};
+			selectors.forEach(([selector, attr]) => {
+				root.querySelectorAll(selector).forEach((node) => {
+					if (attr === 'srcset') {
+						rewriteSrcSet(node, attr);
+					} else {
+						rewriteUrlAttr(node, attr);
+					}
+				});
+			});
+		};
+		const MAIN_FRAGMENT_RE = /<main\b[^>]*\bid=["']quarto-document-content["'][^>]*>[\s\S]*?<\/main>/i;
+		const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
 		const fetchPagePayload = async (value) => {
 			const url = new URL(value, window.location.href);
 			const key = getPageCacheKey(url.href);
@@ -3663,18 +3765,29 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			const response = await fetch(url.href, { credentials: 'same-origin' });
 			if (!response.ok) return null;
 			const html = await response.text();
-			const doc = new DOMParser().parseFromString(html, 'text/html');
+			const mainFragment = html.match(MAIN_FRAGMENT_RE)?.[0];
+			const doc = new DOMParser().parseFromString(
+				mainFragment || html,
+				'text/html',
+			);
 			const main = doc.querySelector('main#quarto-document-content');
 			if (!main) return null;
+			const titleMatch = html.match(TITLE_RE);
+			const fullDoc = new DOMParser().parseFromString(html, 'text/html');
 			const payload = {
-				title: doc.title,
+				title: titleMatch?.[1]?.trim() || doc.title,
 				main,
-				assets: collectPageAssets(doc, url.href),
+				mathjaxStyles: fullDoc.getElementById('inn-mathjax-chtml-styles')?.textContent || '',
+				assets: collectPageAssets(
+					mainFragment ? fullDoc : doc,
+					url.href,
+				),
 			};
+			rewriteMainRelativeUrls(payload.main, url.href);
 			rememberPage(key, payload);
 			return clonePagePayload(payload);
 		};
-		const prefetchPage = async () => {};
+		const prefetchPage = () => {};
 
 		const syncSidebarReadState = () => {
 			document.querySelectorAll('.sidebar-item-text.sidebar-link[href]:not([data-nav-section-toggle="true"])').forEach(link => {
@@ -3876,69 +3989,6 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			return `${url.pathname}${url.search}${hash ? `#${hash}` : ''}`;
 		};
 
-		const sanitizeMermaidSource = (value) => (value || '')
-			.split('\n')
-			.filter((line) => !line.trim().startsWith('%%|'))
-			.join('\n')
-			.trim();
-		const sanitizeMermaidBlocks = (root = document) => {
-			root.querySelectorAll('pre.mermaid, pre.mermaid-js').forEach((block) => {
-				const sanitized = sanitizeMermaidSource(block.textContent || '');
-				if (sanitized && sanitized !== (block.textContent || '').trim()) {
-					block.textContent = sanitized;
-				}
-			});
-		};
-		const getMermaidBlocks = (root = document) => Array.from(root.querySelectorAll('pre.mermaid, pre.mermaid-js, .mermaid-js'));
-		const rerenderMermaid = async (root = document) => {
-			const mermaidBlocks = getMermaidBlocks(root);
-			if (!mermaidBlocks.length) return;
-			for (let attempt = 0; attempt < 40 && !window.mermaid; attempt += 1) {
-				await new Promise((resolve) => window.setTimeout(resolve, 120));
-			}
-			if (!window.mermaid) return;
-			try {
-				if (typeof window.mermaid.initialize === 'function') {
-					window.mermaid.initialize({ startOnLoad: false });
-				}
-				for (let index = 0; index < mermaidBlocks.length; index += 1) {
-					const block = mermaidBlocks[index];
-					const raw = sanitizeMermaidSource(block.textContent || '');
-					if (!raw) continue;
-					if (typeof window.mermaid.render === 'function') {
-						const id = `inn-mermaid-${Date.now()}-${index}`;
-						const renderResult = await window.mermaid.render(id, raw);
-						const host = document.createElement('div');
-						host.className = 'mermaid';
-						host.innerHTML = typeof renderResult === 'string' ? renderResult : renderResult.svg;
-						block.replaceWith(host);
-						if (typeof renderResult?.bindFunctions === 'function') {
-							renderResult.bindFunctions(host);
-						}
-					} else {
-						block.textContent = raw;
-						block.removeAttribute('data-processed');
-						if (typeof window.mermaid.run === 'function') {
-							await window.mermaid.run({ nodes: [block] });
-						} else if (typeof window.mermaid.init === 'function') {
-							window.mermaid.init(undefined, [block]);
-						}
-					}
-				}
-			} catch {}
-		};
-		const ensureMermaidRendered = async (root = document) => {
-			if (!getMermaidBlocks(root).length) return;
-			sanitizeMermaidBlocks(root);
-			for (let attempt = 0; attempt < 4; attempt += 1) {
-				await rerenderMermaid(root);
-				if (!getMermaidBlocks(root).some((block) => /^(PRE|DIV)$/.test(block.tagName) && /^(mermaid|mermaid-js)$/.test(block.className.trim()))) {
-					return;
-				}
-				await new Promise((resolve) => window.setTimeout(resolve, 180));
-			}
-		};
-
 		const escapeHtml = (value) => (value || '')
 			.replace(/&/g, '&amp;')
 			.replace(/</g, '&lt;')
@@ -4054,11 +4104,6 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 
 			applyProgressiveContent(document.querySelector('main#quarto-document-content'));
 			syncSidebarReadState();
-			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
-			if (innPageFullyLoaded) {
-				ensureMermaidRendered(document.querySelector('main#quarto-document-content'));
-			}
-
 			innFixTcsBreadcrumbs();
 			syncPageFooterVisibility();
 		};
@@ -4066,6 +4111,8 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 		rememberPage(getPageCacheKey(window.location.href), {
 			title: document.title,
 			main: document.querySelector('main#quarto-document-content')?.cloneNode(true),
+			mathjaxStyles: document.getElementById('inn-mathjax-chtml-styles')?.textContent || '',
+			assets: {},
 		});
 
 		function innNormalizePathForLang(pathname) {
@@ -4531,60 +4578,7 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 				});
 			};
 
-			const rewriteMainRelativeUrls = (root, pageHref) => {
-				if (!root || !pageHref) return;
-				const selectors = [
-					['a[href]', 'href'],
-					['img[src]', 'src'],
-					['source[src]', 'src'],
-					['source[srcset]', 'srcset'],
-					['img[srcset]', 'srcset'],
-					['video[poster]', 'poster'],
-					['audio[src]', 'src'],
-					['iframe[src]', 'src'],
-				];
-				const rewriteUrlAttr = (node, attr) => {
-					const raw = node.getAttribute(attr);
-					if (!raw || raw.startsWith('#') || /^(?:[a-z]+:|\/\/)/i.test(raw)) return;
-					try {
-						node.setAttribute(attr, new URL(raw, pageHref).href);
-					} catch {
-						/* ignore */
-					}
-				};
-				const rewriteSrcSet = (node, attr) => {
-					const raw = node.getAttribute(attr);
-					if (!raw) return;
-					const rewritten = raw
-						.split(',')
-						.map((part) => {
-							const trimmed = part.trim();
-							if (!trimmed) return trimmed;
-							const [urlPart, descriptor] = trimmed.split(/\s+/, 2);
-							if (!urlPart || /^(?:[a-z]+:|\/\/)/i.test(urlPart) || urlPart.startsWith('#')) {
-								return trimmed;
-							}
-							try {
-								const abs = new URL(urlPart, pageHref).href;
-								return descriptor ? `${abs} ${descriptor}` : abs;
-							} catch {
-								return trimmed;
-							}
-						})
-						.join(', ');
-					node.setAttribute(attr, rewritten);
-				};
-				selectors.forEach(([selector, attr]) => {
-					root.querySelectorAll(selector).forEach((node) => {
-						if (attr === 'srcset') {
-							rewriteSrcSet(node, attr);
-						} else {
-							rewriteUrlAttr(node, attr);
-						}
-					});
-				});
-			};
-
+	
 			const navigateInternal = async (href, { replace = false, restoreScrollFraction = null } = {}) => {
 				window._innNavigating = true;
 				try {
@@ -4607,54 +4601,28 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 					}
 					setLoaderNudgeCeiling(68);
 					advanceLoader(44);
-					await ensurePageAssets(payload.assets);
 					setLoaderNudgeCeiling(86);
 					advanceLoader(58);
 					const nextMain = payload.main;
-					rewriteMainRelativeUrls(nextMain, url.href);
 
 					const savedF =
 						typeof restoreScrollFraction === 'number' && Number.isFinite(restoreScrollFraction)
 							? Math.min(1, Math.max(0, restoreScrollFraction))
 							: null;
 
-					const runAfterSwap = async (swappedMain) => {
+					const runAfterSwap = async () => {
 						setLoaderNudgeCeiling(96);
-						advanceLoader(72);
-						await typesetMathContent(swappedMain);
-						advanceLoader(84);
-						await ensureMermaidRendered(swappedMain);
 						advanceLoader(94);
-						scheduleFitDisplayMath(swappedMain);
-						const applyScrollRestore = () => {
-							if (savedF == null) return;
-							innApplyScrollFraction(savedF);
-						};
 						if (savedF != null) {
-							applyScrollRestore();
-							window.requestAnimationFrame(applyScrollRestore);
+							innApplyScrollFraction(savedF);
+							window.requestAnimationFrame(() => innApplyScrollFraction(savedF));
 						}
 					};
 
-					const applySwap = async () => {
-						const currentMain = document.querySelector('main#quarto-document-content');
-						if (!currentMain) {
-							hideLoader();
-							window.location.assign(url.href);
-							return;
-						}
-						currentMain.replaceWith(nextMain);
-						document.title = payload.title;
-						if (replace) {
-							window.history.replaceState({}, '', url.href);
-						} else {
-							window.history.pushState({}, '', url.href);
-						}
-						advanceLoader(68);
-						applyArticleUI();
-						updateActiveNavState();
-						advanceLoader(78);
-						const swappedMain = document.querySelector('main#quarto-document-content');
+					await ensurePageAssets(payload.assets);
+					swapMathjaxStyles(payload.mathjaxStyles);
+
+					const applyScrollAfterSwap = () => {
 						const applyScrollRestore = () => {
 							if (savedF == null) return;
 							innApplyScrollFraction(savedF);
@@ -4668,28 +4636,41 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 						} else {
 							window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 						}
-						await runAfterSwap(swappedMain);
-						hideLoader();
 					};
 
-					if (document.startViewTransition) {
-						let vt;
-						try {
-							vt = document.startViewTransition(() => applySwap());
-						} catch {
-							await applySwap();
-							vt = null;
+					const performDomSwap = () => {
+						const currentMain = document.querySelector('main#quarto-document-content');
+						if (!currentMain) return false;
+						const importedMain = document.importNode(nextMain.cloneNode(true), true);
+						currentMain.replaceWith(importedMain);
+						document.title = payload.title;
+						if (replace) {
+							window.history.replaceState({}, '', url.href);
+						} else {
+							window.history.pushState({}, '', url.href);
 						}
-						if (vt?.finished) {
-							await vt.finished.catch(() => {});
-						}
-					} else {
-						await applySwap();
+						advanceLoader(68);
+						applyArticleUI();
+						updateActiveNavState();
+						advanceLoader(78);
+						applyScrollAfterSwap();
+						return true;
+					};
+
+					const swapped = performDomSwap();
+					if (!swapped) {
+						hideLoader();
+						window.location.assign(url.href);
+						return;
 					}
+
+					await runAfterSwap();
+					hideLoader();
 				} finally {
 					window._innNavigating = false;
 				}
 			};
+			window.__innNavigateInternal = navigateInternal;
 
 			const queueIdlePrefetch = () => {};
 
@@ -4890,7 +4871,7 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 							results.classList.remove('is-open');
 							results.classList.remove('is-empty');
 							updateSearchButtonState();
-							navigateInternal(new URL(targetPath, window.location.origin).href, {
+							navigateTo(new URL(targetPath, window.location.origin).href, {
 								restoreScrollFraction: innGetScrollFraction(),
 							});
 						}
@@ -4909,27 +4890,37 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 				if (link.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 				const href = link.getAttribute('href') || '';
 				if (!href || href === '#' || (/^(?:https?:)?\/\//.test(href) && !href.startsWith(window.location.origin))) return;
-				event.preventDefault();
 				closeMobileNav();
 				closeMobileSearch();
 				results.classList.remove('is-open');
 				results.classList.remove('is-empty');
 				updateSearchButtonState();
-				navigateInternal(link.href);
+				if (!innUseSpaNav()) {
+					window.__innMarkStaticNav?.();
+					return;
+				}
+				event.preventDefault();
+				navigateTo(link.href);
 			});
-			window.addEventListener('popstate', () => {
-				navigateInternal(window.location.href, { replace: true });
-			});
+			if (innUseSpaNav()) {
+				window.addEventListener('popstate', () => {
+					navigateTo(window.location.href, { replace: true });
+				});
+			}
 			mobileSearchPanel?.addEventListener('click', (event) => {
 				const link = event.target.closest('.inn-site-nav__results a[href]');
 				if (!link) return;
 				if (link.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-				event.preventDefault();
 				closeMobileSearch();
 				results.classList.remove('is-open');
 				results.classList.remove('is-empty');
 				updateSearchButtonState();
-				navigateInternal(link.href);
+				if (!innUseSpaNav()) {
+					window.__innMarkStaticNav?.();
+					return;
+				}
+				event.preventDefault();
+				navigateTo(link.href);
 			});
 
 			const sections = nav.querySelectorAll('li.sidebar-item-section');
@@ -5096,9 +5087,9 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 					if (!pair) return;
 					const cur = normalizePath(getPathKey());
 					if (pref === 'ru' && !pair.isRu && cur === normalizePath(pair.enHref)) {
-						void navigateInternal(new URL(pair.ruHref, window.location.origin).href, { replace: true });
+						void navigateTo(new URL(pair.ruHref, window.location.origin).href, { replace: true });
 					} else if (pref === 'en' && pair.isRu && cur === normalizePath(pair.ruHref)) {
-						void navigateInternal(new URL(pair.enHref, window.location.origin).href, { replace: true });
+						void navigateTo(new URL(pair.enHref, window.location.origin).href, { replace: true });
 					}
 				};
 				void syncInitialLanguage();
@@ -5109,26 +5100,7 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 			return true;
 		};
 		applyArticleUI();
-		sanitizeMermaidBlocks(document);
-		const runInitialDynamicRender = async () => {
-			innPageFullyLoaded = true;
-			const mainContent = document.querySelector('main#quarto-document-content');
-			if (!mainContent) return;
-			await typesetMathContent(mainContent);
-			await ensureMermaidRendered(mainContent);
-			scheduleFitDisplayMath(mainContent);
-		};
-		window.requestAnimationFrame(() => {
-			runInitialDynamicRender();
-		});
-		window.addEventListener('load', () => {
-			window.requestAnimationFrame(() => {
-				runInitialDynamicRender();
-			});
-		}, { once: true });
-		window.addEventListener('resize', () => {
-			scheduleFitDisplayMath(document.querySelector('main#quarto-document-content'));
-		});
+		innPageFullyLoaded = true;
 
 		const sidebar = document.querySelector('#quarto-sidebar');
 		if (!sidebar) return;
@@ -5371,7 +5343,7 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/innonotes\.ru");
+        var filterRegex = new RegExp('/' + window.location.host + '/');
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
