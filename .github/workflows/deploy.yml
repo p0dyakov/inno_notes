@@ -1,0 +1,45 @@
+name: deploy-site
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'semester-4/**/*.qmd'
+      - 'semester-1/**/*.qmd'
+      - 'semester-2/**/*.qmd'
+      - '_quarto.yml'
+      - 'styles/**'
+      - 'scripts/**'
+      - 'index.qmd'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: quarto-dev/quarto-actions/setup@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci --silent || npm install --silent
+      - run: python3 -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
+      - run: quarto render
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          cname: innonotes.ru
+          enable_jekyll: false
