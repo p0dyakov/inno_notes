@@ -1,0 +1,68 @@
+name: agent-generate-semester4
+on:
+  repository_dispatch:
+    types: [inno-files-update]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'inno_files sha to process'
+        required: false
+        default: ''
+      dry_run:
+        description: 'dry run (no push)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-semester4
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout inno_files at sha
+        run: |
+          SHA="${{ github.event.client_payload.sha || inputs.sha }}"
+          if [ -z "$SHA" ]; then SHA=$(git ls-remote https://github.com/p0dyakov/inno_files.git HEAD | cut -f1); fi
+          echo "INNO_FILES_SHA=$SHA" >> $GITHUB_ENV
+          rm -rf /tmp/inno_files
+          git clone https://github.com/p0dyakov/inno_files.git /tmp/inno_files
+          git -C /tmp/inno_files checkout "$SHA"
+          echo "Checked out $SHA"
+          ls /tmp/inno_files/semester-4/ | head -n 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: quarto-dev/quarto-actions/setup@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci --silent || npm install --silent
+      - run: pip install httpx pymupdf beautifulsoup4 2>&1 | tail -n 5
+      - name: Generate semester-4 articles
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          INNO_FILES_SHA: ${{ env.INNO_FILES_SHA }}
+        run: |
+          python3 scripts/agent/generate.py --inno-files /tmp/inno_files --sha "$INNO_FILES_SHA" ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+      - name: Commit and push if changed (semester-4 only)
+        run: |
+          git config user.name "inno-notes-agent"
+          git config user.email "agent@innonotes.ru"
+          git status --short -- semester-4/ _quarto.yml 2>&1 | head -n 50
+          if git diff --quiet -- semester-4/ _quarto.yml; then
+            echo "No semester-4 changes to push."
+            exit 0
+          fi
+          git add -A -- semester-4/ _quarto.yml
+          git commit -m "agent: semester-4 update from inno_files $INNO_FILES_SHA
+
+          Co-authored-by: inno-notes-agent"
+          git push origin HEAD:main
