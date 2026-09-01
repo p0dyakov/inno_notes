@@ -89,7 +89,7 @@ SOURCE_RE = re.compile(
     r'|Mock Midterm|Assignment|Problem Set)'
     r'(?:\s+([^,]+))?,\s+'
     r'(?:(Example|Task|Tasks)\s+([\w\.\-& ]+)'
-    r'|([^,]+))$'  # topic-style: Chapter 1, Substitution / Exercises, Convergence of Series
+    r'|(.+))$'  # topic-style: Chapter 1, Substitution / Exercises, Convergence of Series
 )
 FORBIDDEN_TITLE_WORD_RE = re.compile(
     r'\b(?:Lecture\s+\d+|Chapter\s+\d+|Lab\s+\d+|Tutorial\s+\d+|Homework\s+\d+|Slide|Slides)\b'
