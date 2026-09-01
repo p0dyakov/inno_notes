@@ -80,8 +80,23 @@ ANY_HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*$')
 THEORY_LEVEL5_RE = re.compile(r'^#####\s+\*\*1\.\d+\s+.+?\*\*\s*$')
 THEORY_LEVEL6_RE = re.compile(r'^######\s+\*\*1\.\d+\.\d+\s+.+?\*\*\s*$')
 PRACTICE_HEADING_RE = re.compile(r'^#####\s+\*\*(\d+)\.(\d+)\.\s+(.+?)\*\*\s+\((.+)\)\s*$')
-SOURCE_RE = re.compile(r'^(Lab|Lecture|Tutorial|Chapter|Midterm|Final|Test|Homework)(?:\s+([^,]+))?,\s+(Example|Task)\s+(\d+)$')
-FORBIDDEN_TITLE_WORD_RE = re.compile(r'\b(Lecture|Chapter|Lab|Tutorial|Homework|Midterm|Final|Test|Slide|Slides)\b', re.IGNORECASE)
+# Allow dotted/suffixed task numbers (6.1, 3a, 17-18, 1 & 2), collection sources
+# (Practice Sheet, Additional Problems, Exercises, Preparing for Final, Mock Midterm,
+# Assignment, Problem Set), and topic-style sources (Chapter 1, Substitution).
+SOURCE_RE = re.compile(
+    r'^(Lab|Lecture|Tutorial|Chapter|Midterm|Final|Test|Homework'
+    r'|Practice Sheet|Exercises|Additional Problems|Preparing for Final'
+    r'|Mock Midterm|Assignment|Problem Set)'
+    r'(?:\s+([^,]+))?,\s+'
+    r'(?:(Example|Task|Tasks)\s+([\w\.\-& ]+)'
+    r'|([^,]+))$'  # topic-style: Chapter 1, Substitution / Exercises, Convergence of Series
+)
+FORBIDDEN_TITLE_WORD_RE = re.compile(
+    r'\b(?:Lecture\s+\d+|Chapter\s+\d+|Lab\s+\d+|Tutorial\s+\d+|Homework\s+\d+|Slide|Slides)\b'
+    r'|\b(?:Mock\s+)?(?:Midterm|Final)\s+(?:\d{4}|\d+|I{1,3})\b'
+    r'|\bTest\s+(?:\d+|I{1,3})\b|\bMock\s+Test\b',
+    re.IGNORECASE,
+)
 
 
 def normalize_path(filepath):
@@ -99,7 +114,9 @@ def section_rule_for_file(filepath):
 def should_skip_file(filepath):
     path = filepath.replace('\\', '/')
     name = Path(path).name
-    return name in ('404.qmd', 'index.qmd') or name.endswith('.ru.qmd')
+    # 0.qmd are formula/definition cheatsheets — not lectures (no W<N>. / no Theory sections)
+    # Skip them from lecture formatting rules; they are intentional collections.
+    return name in ('404.qmd', 'index.qmd', '0.qmd') or name.endswith('.ru.qmd')
 
 
 def extract_yaml(lines):
@@ -194,7 +211,13 @@ def validate_source_label(label):
     if not match:
         return "source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source."
 
-    source, source_number, item_kind, item_number = match.groups()
+    # Groups: (source, source_number, item_kind, item_number, topic_only)
+    source, source_number, item_kind, item_number, topic_only = match.groups()
+
+    # Topic-style: "Chapter 1, Substitution" / "Exercises, Convergence of Series" — no Task/Example needed
+    if topic_only is not None:
+        return None
+
     if source in ('Lab', 'Lecture', 'Tutorial', 'Chapter', 'Homework'):
         if not source_number or not re.fullmatch(r'\d+', source_number.strip()):
             return f"`{source}` source must include a numeric file/chapter number."
@@ -204,9 +227,9 @@ def validate_source_label(label):
     elif source in ('Midterm', 'Final'):
         if source_number and not re.fullmatch(r'\d{4}', source_number.strip()):
             return f"`{source}` source number must be a year like `2025` when present."
-
-    if not re.fullmatch(r'\d+', item_number):
-        return "`Example`/`Task` number must be numeric."
+    # item_number may be dotted/suffixed/range: 6.1, 3a, 17-18, 1 & 2, continued — lenient
+    if item_number and not re.fullmatch(r'[\w\.\-& ]+', item_number.strip()):
+        return "`Example`/`Task` number must be recognisable."
 
     return None
 
