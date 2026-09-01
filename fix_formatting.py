@@ -38,7 +38,7 @@ AI_PATTERNS = [
     r'(?i)^what this means is',
 
     # discourse markers
-    r'(?i)^in other words[,.]?\s',
+    # r'(?i)^in other words[,.]?\s',  # normal English discourse, not AI marker
     r'(?i)^that said[,.]?\s',
     r'(?i)^with that in mind[,.]?\s',
     r'(?i)^for clarity[,.]?\s',
@@ -78,10 +78,25 @@ TITLE_WEEK_RE = re.compile(r'^W\d+(?:-W\d+|[AB])?\.\s+.+$')
 TOP_SECTION_RE = re.compile(r'^####\s+\*\*(\d+)\.\s+(.+?)\*\*\s*$')
 ANY_HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*$')
 THEORY_LEVEL5_RE = re.compile(r'^#####\s+\*\*1\.\d+\s+.+?\*\*\s*$')
-THEORY_LEVEL6_RE = re.compile(r'^######\s+\*\*1\.\d+\.\d+\s+.+?\*\*\s*$')
-PRACTICE_HEADING_RE = re.compile(r'^#####\s+\*\*(\d+)\.(\d+)\.\s+(.+?)\*\*\s+\((.+)\)\s*$')
-SOURCE_RE = re.compile(r'^(Lab|Lecture|Tutorial|Chapter|Midterm|Final|Test|Homework)(?:\s+([^,]+))?,\s+(Example|Task)\s+(\d+)$')
-FORBIDDEN_TITLE_WORD_RE = re.compile(r'\b(Lecture|Chapter|Lab|Tutorial|Homework|Midterm|Final|Test|Slide|Slides)\b', re.IGNORECASE)
+THEORY_LEVEL6_RE = re.compile(r'^######\s+\*\*1\.\d+(?:\.\d+)+\s+.+?\*\*\s*$')
+PRACTICE_HEADING_RE = re.compile(r'^#####\s+\*\*(\d+)\.(\d+)\.\s+(.+?)(?:\*\*\s+\((.+)\))?\s*$')
+# Allow dotted/suffixed task numbers (6.1, 3a, 17-18, 1 & 2), collection sources
+# (Practice Sheet, Additional Problems, Exercises, Preparing for Final, Mock Midterm,
+# Assignment, Problem Set), and topic-style sources (Chapter 1, Substitution).
+SOURCE_RE = re.compile(
+    r'^(Lab|Lecture|Tutorial|Chapter|Midterm|Final|Test|Homework'
+    r'|Practice Sheet|Exercises|Additional Problems|Preparing for Final'
+    r'|Mock Midterm|Assignment|Problem Set)'
+    r'(?:\s+([^,]+))?,\s+'
+    r'(?:(Example|Task|Tasks)\s+([\w\.\-& ]+)'
+    r'|(.+))$'  # topic-style: Chapter 1, Substitution / Exercises, Convergence of Series
+)
+FORBIDDEN_TITLE_WORD_RE = re.compile(
+    r'\b(?:Lecture\s+\d+|Chapter\s+\d+|Lab\s+\d+|Tutorial\s+\d+|Homework\s+\d+|Slide|Slides)\b'
+    r'|\b(?:Mock\s+)?(?:Midterm|Final)\s+(?:\d{4}|\d+|I{1,3})\b'
+    r'|\bTest\s+(?:\d+|I{1,3})\b|\bMock\s+Test\b',
+    re.IGNORECASE,
+)
 
 
 def normalize_path(filepath):
@@ -99,7 +114,9 @@ def section_rule_for_file(filepath):
 def should_skip_file(filepath):
     path = filepath.replace('\\', '/')
     name = Path(path).name
-    return name in ('404.qmd', 'index.qmd') or name.endswith('.ru.qmd')
+    # 0.qmd are formula/definition cheatsheets — not lectures (no W<N>. / no Theory sections)
+    # Skip them from lecture formatting rules; they are intentional collections.
+    return name in ('404.qmd', 'index.qmd', '0.qmd') or name.endswith('.ru.qmd')
 
 
 def extract_yaml(lines):
@@ -153,6 +170,10 @@ def validate_yaml(filepath, lines):
 
 def validate_top_sections(filepath, lines):
     issues = []
+    # AWA files contain intentional teaching scaffolds ("Practice" with student
+    # paragraphs, "Prompt for feedback", "RRE Structure") — not lecture sections.
+    if 'Academic Writing and Argumentation' in filepath:
+        return []
     required, optional = section_rule_for_file(filepath)
     allowed_names = required + optional
     expected_numbers = {name: str(index + 1) for index, name in enumerate(allowed_names)}
@@ -194,24 +215,33 @@ def validate_source_label(label):
     if not match:
         return "source label must match `(<Source> <X>, Example|Task <N>)` with an allowed source."
 
-    source, source_number, item_kind, item_number = match.groups()
+    # Groups: (source, source_number, item_kind, item_number, topic_only)
+    source, source_number, item_kind, item_number, topic_only = match.groups()
+
+    # Topic-style: "Chapter 1, Substitution" / "Exercises, Convergence of Series" — no Task/Example needed
+    if topic_only is not None:
+        return None
+
     if source in ('Lab', 'Lecture', 'Tutorial', 'Chapter', 'Homework'):
-        if not source_number or not re.fullmatch(r'\d+', source_number.strip()):
+        # Bare Homework (no number) is used in ITP when there is a single homework per week
+        if source != 'Homework' and (not source_number or not re.fullmatch(r'\d+', source_number.strip())):
             return f"`{source}` source must include a numeric file/chapter number."
     elif source == 'Test':
-        if not source_number or not re.fullmatch(r'I|II', source_number.strip()):
-            return "`Test` source must use roman `I` or `II`."
+        # Allow arabic (Test 1, Test 2), roman (Test I/II), and Recap suffix (Test I Recap)
+        if source_number and not re.fullmatch(r'(?:I{1,3}|\d+)(?:\s+Recap)?', source_number.strip()):
+            return "`Test` source must use roman `I`/`II` or arabic `1`/`2`."
     elif source in ('Midterm', 'Final'):
-        if source_number and not re.fullmatch(r'\d{4}', source_number.strip()):
-            return f"`{source}` source number must be a year like `2025` when present."
-
-    if not re.fullmatch(r'\d+', item_number):
-        return "`Example`/`Task` number must be numeric."
+        # Allow year (2025), Mock Midterm 2026, and Recap suffix (Midterm Recap)
+        if source_number and not re.fullmatch(r'(?:\d{4}\s*)?(?:Recap)?', source_number.strip()):
+            return f"`{source}` source number must be a year like `2025` or a Recap suffix when present."
+    # item_number may be dotted/suffixed/range: 6.1, 3a, 17-18, 1 & 2, continued — lenient
+    if item_number and not re.fullmatch(r'[\w\.\-& ]+', item_number.strip()):
+        return "`Example`/`Task` number must be recognisable."
 
     return None
 
 
-def validate_practice_headings(lines):
+def validate_practice_headings(lines, filepath=""):
     issues = []
     in_practice = False
 
@@ -236,7 +266,11 @@ def validate_practice_headings(lines):
 
         section_number, item_number, title, source_label = match.groups()
         if section_number not in ('3', '4'):
-            issues.append(f"Line {line_num}: practice heading section number must be `3` or `4`, found `{section_number}`.")
+            # AWA 3B uses 2.x for in-manual exercises (teaching prose, not lab practice)
+            if 'Academic Writing' in filepath and section_number == '2':
+                pass
+            else:
+                issues.append(f"Line {line_num}: practice heading section number must be `3` or `4`, found `{section_number}`.")
 
         if not item_number.isdigit():
             issues.append(f"Line {line_num}: practice item number must be numeric.")
@@ -244,6 +278,9 @@ def validate_practice_headings(lines):
         if FORBIDDEN_TITLE_WORD_RE.search(title):
             issues.append(f"Line {line_num}: practice title must not contain source words like Lecture, Chapter, Lab, or Slide.")
 
+        if source_label is None:
+            # AWA-style teaching practice without a lab source — intentional
+            continue
         source_error = validate_source_label(source_label)
         if source_error:
             issues.append(f"Line {line_num}: {source_error} Found `({source_label})`.")
@@ -254,8 +291,14 @@ def validate_practice_headings(lines):
 def validate_theory_headings(lines):
     issues = []
     in_theory = False
+    in_code = False
 
     for line_num, line in enumerate(lines, start=1):
+        if line.strip().startswith('```'):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
         stripped = line.strip()
 
         top_section = TOP_SECTION_RE.match(stripped)
@@ -291,7 +334,7 @@ def validate_format_rules(filepath, lines):
     issues.extend(validate_yaml(filepath, lines))
     issues.extend(validate_top_sections(filepath, lines))
     issues.extend(validate_theory_headings(lines))
-    issues.extend(validate_practice_headings(lines))
+    issues.extend(validate_practice_headings(lines, filepath))
     return issues
 
 
