@@ -28,6 +28,12 @@ INNO_NOTES = ROOT
 PROMPT_MD = ROOT / "prompt.md"
 RULES_MD = ROOT / "rules.md"
 COURSE_MAP_JSON = Path(__file__).parent / "course_map.json"
+SEM4_REGISTRY_JSON = ROOT / "semester-4" / "course_map.json"
+PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+# Same shape as fix_formatting.py TITLE_WEEK_RE (kept in sync manually —
+# fix_formatting.py runs on import, so it cannot be imported here).
+TITLE_WEEK_RE = re.compile(r"^W\d+(?:-W\d+|[AB])?\.\s+.+$")
 
 INNO_FILES_DEFAULT = Path("/tmp/inno_files")
 GEMINI_MODEL = "gemini-3.8-flash"
@@ -71,24 +77,83 @@ def load_course_map() -> dict:
     return {}
 
 
-def resolve_author(folder: str) -> str:
-    # Try exact, then fallback
+def load_sem4_registry() -> dict:
+    if SEM4_REGISTRY_JSON.exists():
+        try:
+            return json.loads(SEM4_REGISTRY_JSON.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def sem4_course_entry(key: str) -> dict:
+    """Lookup registry entry by short code (inno_files folder) or full name."""
+    courses = load_sem4_registry().get("courses", {})
+    if key in courses:
+        return courses[key]
+    for code, entry in courses.items():
+        if entry.get("name") == key:
+            return entry
+    return {}
+
+
+def sem4_canon_code(folder: str) -> str:
+    """Normalize full folder name back to short inno_files code when known."""
+    courses = load_sem4_registry().get("courses", {})
+    if folder in courses:
+        return folder
+    for code, entry in courses.items():
+        if entry.get("name") == folder:
+            return code
+    return folder
+
+
+def short_to_full(code: str) -> str:
+    entry = sem4_course_entry(code)
+    return entry.get("name", code)
+
+
+def extract_author_from_transcript(transcript: str) -> str:
+    """First-page author fallback: Instructor:/Lecturer: lines or bold name header."""
+    lines = transcript.splitlines()
+    head = "\n".join(lines[:40])
+    m = re.search(
+        r"(?:Course Instructor|Prime Instructor|Instructor|Lecturer|Professor)\s*:?\s*(?:Dr\.?\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})",
+        head,
+    )
+    if m:
+        return m.group(1).strip()
+    first = lines[:20]
+    if any("innopolis" in ln.lower() for ln in first):
+        for ln in first:
+            mm = re.match(r"\s*\*\*([A-Z][a-z]+ [A-Z][a-z]+(?: [A-Z][a-z]+)?)\*\*\s*$", ln)
+            if mm and "university" not in mm.group(1).lower():
+                return mm.group(1).strip()
+    return ""
+
+
+def resolve_author(folder: str, transcript: str = "") -> str:
+    """Priority: Moodle-sourced registry entry -> transcript first page -> fallback table."""
+    entry = sem4_course_entry(folder)
+    if entry and entry.get("teachers") and entry.get("teacher_source", "").startswith("moodle"):
+        return ", ".join(entry["teachers"])
+    if transcript:
+        found = extract_author_from_transcript(transcript)
+        if found:
+            return found
+    if entry and entry.get("teachers"):
+        return ", ".join(entry["teachers"])
     if folder in AUTHOR_MAP:
         return AUTHOR_MAP[folder]
-    # Semester-4 defaults from prompt analogy
-    defaults = {
-        "OS": "Artem Burmyakov",
-        "Phy I": "Artem Burmyakov",
-        "AI": "Manuel Mazzara",
-        "DE": "Mohammad Alkousa",
-        "ITO": "Mohammad Alkousa",
-        "ProbStat": "Mohammad Alkousa",
-    }
-    return defaults.get(folder, "Mohammad Alkousa")
+    code = sem4_canon_code(folder)
+    if code in AUTHOR_MAP:
+        return AUTHOR_MAP[code]
+    return "Mohammad Alkousa"
 
 
 def section_rule_for_folder(folder: str) -> tuple[list[str], bool]:
     """Return (required_top_sections, has_formulas) per rules.md."""
+    folder = sem4_canon_code(folder)
     # rules.md mapping
     map_ = {
         "ProbStat": (["Theory", "Definitions", "Formulas", "Practice"], True),
@@ -157,39 +222,75 @@ def gemini_section(
     raise last_err
 
 
-def _build_section_prompt(section: str, transcript: str, style_context: str, target_info: str) -> str:
-    # Pull the relevant prompt/rules excerpt per section to keep the call focused
-    rules = RULES_MD.read_text(encoding="utf-8") if RULES_MD.exists() else ""
-    base = PROMPT_MD.read_text(encoding="utf-8") if PROMPT_MD.exists() else ""
+def _section_instruction(section: str) -> str:
+    p = PROMPTS_DIR / f"{section.lower()}.md"
+    if p.exists():
+        return p.read_text(encoding="utf-8")
+    return section
 
-    section_instructions = {
-        "Theory": (
-            "Write the Theory section (#### **1. Theory** plus #####/###### subsections). "
-            "Teach from zero, cover every TOC topic, explain what/why/how/pitfalls, "
-            "use paragraphs, bold first term introductions, LaTeX for math."
-        ),
-        "Definitions": (
-            "Write the Definitions section (#### **2. Definitions**) as a compact glossary: "
-            "`*   **Term**: Definition.` One sentence per term, self-contained."
-        ),
-        "Formulas": (
-            "Write the Formulas section (#### **3. Formulas**) — only if mathematically meaningful: "
-            "`*   **Formula Name**: $...$` with conditions/domains. Skip if the material has no stable formulas."
-        ),
-        "Practice": (
-            "Write the Practice section (#### **4. Practice** or 3 if Formulas omitted) with "
-            "`##### **N.M. Title** (Source, Task/Example)` headings in canonical source order "
-            "Lab→Homework→Assignment→Exercises→Lecture→Tutorial→Chapter→Recap→Test→Midterm→Final, "
-            "each with <details> solution (very detailed, step-by-step, no skipping)."
-        ),
-    }
+
+def _title_rules() -> str:
+    p = PROMPTS_DIR / "title.md"
+    return p.read_text(encoding="utf-8") if p.exists() else ""
+
+
+def validate_title(title: str) -> bool:
+    """Post-validation for lecture titles (mirrors fix_formatting TITLE_WEEK_RE + BAD list)."""
+    if not title or not TITLE_WEEK_RE.match(title):
+        return False
+    if re.search(r"—\s*lecture|lecture\s*\d+\s*$", title, re.IGNORECASE):
+        return False
+    after_dot = title.split(".", 1)[1].strip() if "." in title else title
+    if re.match(r"^(OS|DE|ITO|Phy I|ProbStat|AI)\b", after_dot):
+        return False
+    return True
+
+
+def clean_heading_topic(heading: str) -> str:
+    h = re.sub(r"^#+\s*", "", heading).strip()
+    h = re.sub(r"^(Lecture|Chapter|Tutorial)\s*\d+\s*[:\-–—.]?\s*", "", h, flags=re.IGNORECASE)
+    h = re.sub(r"\s*[:\-–—]\s*(Lecture|Chapter)\s*\d+.*$", "", h, flags=re.IGNORECASE)
+    h = re.sub(r"\s+Chapter\s+[\d.\-&, ]+$", "", h, flags=re.IGNORECASE)
+    return h.strip()
+
+
+def infer_topic(transcript: str, week: str, api_key: str) -> str:
+    """Ask Gemini for ONE short topic noun phrase per prompts/title.md, then validate."""
+    rules = _title_rules()
+    head = "\n".join(transcript.splitlines()[:120])[:6000]
+    prompt = (
+        "Read this lecture transcript opening and return ONLY the article title, nothing else.\n\n"
+        f"Title rules:\n{rules}\n\n"
+        f"The week number is {week} (use it as the W-prefix).\n\n"
+        f"Transcript opening:\n{head}\n"
+    )
+    try:
+        raw = _call_gemini(prompt, api_key, GEMINI_MODEL)
+        topic = raw.strip().strip('"').splitlines()[0].strip()
+        topic = re.sub(r"^W\d+(?:-W\d+)?\.\s*", "", topic).strip()
+        if topic and validate_title(f"W{week}. {topic}"):
+            return topic
+        print(f"  topic rejected by validation: {raw.strip()[:100]}")
+    except Exception as e:  # noqa: BLE001
+        print(f"  topic inference failed: {e}")
+    for line in transcript.splitlines():
+        if line.strip().startswith("#"):
+            topic = clean_heading_topic(line)
+            if topic and validate_title(f"W{week}. {topic}"):
+                return topic
+    return f"Week {week} Notes"
+
+
+def _build_section_prompt(section: str, transcript: str, style_context: str, target_info: str) -> str:
+    # Section instructions live in scripts/agent/prompts/*.md (single source of truth)
+    rules = RULES_MD.read_text(encoding="utf-8") if RULES_MD.exists() else ""
 
     preamble = (
         f"You are writing a single section of a Quarto study article. Output ONLY that section's markdown, "
         f"including its #### header and all subheadings/content. Do not add YAML or other sections.\n\n"
         f"Target: {target_info}\n"
         f"Section to write: {section}\n"
-        f"Instruction: {section_instructions.get(section, section)}\n\n"
+        f"Instruction:\n{_section_instruction(section)}\n\n"
         f"Local style context (3 neighboring articles' headings/structure — follow their density, heading style, diagram palette if any):\n"
         f"{style_context[:6000]}\n\n"
         f"Rules excerpt (relevant part of rules.md — must be satisfied for format checks):\n"
@@ -280,11 +381,11 @@ def gather_changed_lectures(inno_files: Path, since_sha: str | None = None) -> l
 
 
 def md_to_qmd_target(md: Path, inno_files: Path) -> Path:
-    """Map inno_files/semester-4/<Course>/<N>/Lecture.md -> inno_notes/semester-4/<Course>/<N>.qmd"""
+    """Map inno_files/semester-4/<ShortCode>/<N>/Lecture.md -> inno_notes/semester-4/<Full Name>/<N>.qmd"""
     rel = md.relative_to(inno_files / "semester-4")
-    # rel is <Course>/<N>/Lecture.md or <Course>/<N>/Lecture.mmd etc
+    # rel is <ShortCode>/<N>/Lecture.md or <ShortCode>/<N>/Lecture.mmd etc
     parts = rel.parts
-    course = parts[0]
+    course = short_to_full(parts[0])
     week = parts[1] if len(parts) > 2 else "1"
     # week is a folder like "12" or "10-11" etc — keep as is for W-number
     # But the qmd naming is per lecture: 1.qmd, 2.qmd, etc. We map Lecture.md in week folder to <N>.qmd
@@ -318,9 +419,16 @@ def generate_article(
     style_context: str,
 ) -> str:
     today = datetime.now().strftime("%B %d, %Y")
-    author = resolve_author(course)
+    full_name = short_to_full(sem4_canon_code(course))
+    author = resolve_author(course, transcript)
+    topic = infer_topic(transcript, week, api_key)
+    title = f"W{week}. {topic}"
+    assert validate_title(title), f"generated title failed validation: {title!r}"
     required, has_formulas = section_rule_for_folder(course)
-    target_info = f"Course {course} (semester-4), week W{week}, author {author}, date {today}, required sections {required}"
+    target_info = (
+        f"Course {full_name} (semester-4), week W{week}, author {author}, date {today}, "
+        f"required sections {required}. Article title is {title!r} — do not restate it in section bodies."
+    )
 
     sections = [s for s in SECTION_ORDER if s in required]
 
@@ -352,7 +460,7 @@ def generate_article(
     yaml_front = textwrap.dedent(
         f"""\
         ---
-        title: "W{week}. {course} — Lecture {week}"
+        title: "{title}"
         author: "{author}"
         date: "{today}"
         format: html
@@ -387,7 +495,7 @@ def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False)
             # But also check fix_formatting would not change it
             pass
 
-    style = collect_style_context(course)
+    style = collect_style_context(short_to_full(course))
 
     # Generate
     max_iters = 3
@@ -525,40 +633,70 @@ def main() -> None:
     update_sidebar()
 
 
+def _ensure_course_section(text: str, course: str) -> str:
+    """Add a missing `- section: "<full course name>"` block at the end of Semester IV."""
+    marker = f'- section: "{course}"'
+    if marker in text:
+        return text
+    anchor = '      - section: "Semester I"'
+    block = (
+        f'        - section: "{course}"\n'
+        f"          contents: []\n"
+    )
+    if anchor in text:
+        return text.replace(anchor, block + anchor, 1)
+    return text
+
+
 def update_sidebar() -> None:
-    """Ensure every semester-4 qmd is listed in _quarto.yml sidebar."""
+    """Ensure every semester-4 qmd is listed in _quarto.yml sidebar (full Moodle names)."""
     yml = ROOT / "_quarto.yml"
     text = yml.read_text(encoding="utf-8")
+    for entry in load_sem4_registry().get("courses", {}).values():
+        text = _ensure_course_section(text, entry.get("name", ""))
     # Find all semester-4 qmds on disk
     qmds = sorted((ROOT / "semester-4").rglob("*.qmd"))
     added = 0
     for qmd in qmds:
         rel = str(qmd.relative_to(ROOT))
         if rel not in text:
-            # Insert into the appropriate course section — for now, just after Semester IV header
-            # Minimal: append to the course's contents list if found, else add generic entry
-            # Simpler: append a file entry under the course section by string replace
             course = qmd.parent.name
-            # Find the course section block
+            text = _ensure_course_section(text, course)
             marker = f'- section: "{course}"'
-            if marker in text:
-                # Insert file line after the marker's contents: line
-                # Find marker + next lines
-                import re as _re
-
-                pattern = re.compile(re.escape(marker) + r"\s*\n\s+contents:\s*\n")
-                m = _re.search(pattern, text)
-                if m:
-                    insert_at = m.end()
-                    text = text[:insert_at] + f'            - file: "{rel}"\n' + text[insert_at:]
-                    added += 1
+            pattern = re.compile(re.escape(marker) + r"\s*\n\s+contents:\s*\n")
+            m = pattern.search(text)
+            if m:
+                insert_at = m.end()
+                text = text[:insert_at] + f'            - file: "{rel}"\n' + text[insert_at:]
+                added += 1
             else:
-                # Course not in sidebar yet — append under Semester IV
-                if "- file:" in rel:
-                    pass
+                # Empty `contents: []` form — expand it
+                empty = re.compile(re.escape(marker) + r"\s*\n\s+contents: \[\]")
+                m2 = empty.search(text)
+                if m2:
+                    text = (
+                        text[: m2.end()]
+                        + f'\n            - file: "{rel}"'
+                        + text[m2.end():]
+                    )
+                    # fix the `contents: []` line into a list header
+                    text = text.replace(
+                        f'{marker}\n          contents: []\n            - file: "{rel}"',
+                        f'{marker}\n          contents:\n            - file: "{rel}"',
+                        1,
+                    )
+                    added += 1
     if added:
         yml.write_text(text, encoding="utf-8")
         print(f"Updated _quarto.yml with {added} new file(s)")
+    # Refresh the home-page course table so new courses/semesters appear automatically
+    updater = ROOT / "scripts" / "update_index.py"
+    if updater.exists():
+        res = run([sys.executable, str(updater)], cwd=str(ROOT))
+        if res.returncode != 0:
+            print(f"  update_index.py failed: {(res.stderr or '')[:500]}")
+        else:
+            print("  index.qmd course table refreshed")
 
 
 if __name__ == "__main__":
