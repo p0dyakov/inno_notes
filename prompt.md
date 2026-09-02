@@ -494,10 +494,10 @@ Use this only when the folder context does not already make the author obvious.
 | Theoretical Computer Science | Manuel Mazzara |
 | Computer Architecture | Artem Burmyakov |
 | Operating Systems | Artem Burmyakov (fallback — verify against Moodle when instructor block appears) |
-| Philosophy II (Introduction to AI) | Manuel Mazzara (fallback — verify against Moodle when instructor block appears) |
+| Introduction to AI | Manuel Mazzara (fallback — verify against Moodle when instructor block appears) |
 | Differential Equations | Anna Maslovskaya (Moodle F26 + transcript) |
 | Introduction to Optimization | Mohammad Reza Bahrami (Moodle F26 Prime Instructor) |
-| Physics I (Mechanics) | Artem Burmyakov (fallback — verify against Moodle when instructor block appears) |
+| Physics I | Artem Burmyakov (fallback — verify against Moodle when instructor block appears) |
 | Probability and Statistics | Ramil Nasibullin (Moodle F26 Prime Instructor) |
 
 Semester-4 teachers are resolved from `semester-4/course_map.json` first (Moodle fetch),
