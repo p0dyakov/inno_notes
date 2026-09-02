@@ -395,6 +395,42 @@ def md_to_qmd_target(md: Path, inno_files: Path) -> Path:
     return INNO_NOTES / f"semester-4/{course}/{n}.qmd"
 
 
+SOURCE_KINDS = ["Lab", "Homework", "Assignment", "Exercises", "Lecture", "Tutorial",
+                "Chapter", "Recap", "Test", "Midterm", "Final"]
+
+
+def source_kind(md_name: str) -> str:
+    """Canonical Practice source label from transcript filename (Lecture.md -> Lecture)."""
+    stem = Path(md_name).stem.lower()
+    for kind in SOURCE_KINDS:
+        if kind.lower() in stem:
+            return kind
+    return Path(md_name).stem
+
+
+def group_lectures(mds: list[Path], inno_files: Path) -> list[tuple[Path, list[Path]]]:
+    """Group transcript MDs by their qmd target: one article per (course, week).
+
+    A week folder often holds several sources (Lecture.md + Tutorial.md + Lab.md);
+    they must be stitched into ONE article, never overwrite each other.
+    """
+    groups: dict[Path, list[Path]] = {}
+    for md in sorted(mds):
+        qmd = md_to_qmd_target(md, inno_files)
+        groups.setdefault(qmd, []).append(md)
+    return sorted(groups.items(), key=lambda kv: str(kv[0]))
+
+
+def combine_transcripts(mds: list[Path]) -> str:
+    """Join one week's sources with explicit SOURCE headers for Practice labels."""
+    parts = []
+    for md in mds:
+        txt = md.read_text(encoding="utf-8")
+        if txt.strip():
+            parts.append(f"# SOURCE FILE: {md.name} (cite as: {source_kind(md.name)})\n\n{txt.strip()}")
+    return "\n\n---\n\n".join(parts)
+
+
 def collect_style_context(course: str, max_files: int = 3) -> str:
     """Grab up to 3 neighboring articles in the same course folder for style."""
     course_dir = INNO_NOTES / f"semester-4/{course}"
@@ -417,6 +453,7 @@ def generate_article(
     week: str,
     api_key: str,
     style_context: str,
+    sources: list[str] | None = None,
 ) -> str:
     today = datetime.now().strftime("%B %d, %Y")
     full_name = short_to_full(sem4_canon_code(course))
@@ -425,9 +462,17 @@ def generate_article(
     title = f"W{week}. {topic}"
     assert validate_title(title), f"generated title failed validation: {title!r}"
     required, has_formulas = section_rule_for_folder(course)
+    src_note = ""
+    if sources:
+        kinds = ", ".join(f"{s} ({source_kind(s)})" for s in sources)
+        src_note = (
+            f" This article combines {len(sources)} transcript sources: {kinds}. "
+            f"Cover all of them; in Practice headings cite these exact source names "
+            f"in canonical order Lab→Homework→Assignment→Exercises→Lecture→Tutorial→Chapter→Recap→Test→Midterm→Final."
+        )
     target_info = (
         f"Course {full_name} (semester-4), week W{week}, author {author}, date {today}, "
-        f"required sections {required}. Article title is {title!r} — do not restate it in section bodies."
+        f"required sections {required}. Article title is {title!r} — do not restate it in section bodies.{src_note}"
     )
 
     sections = [s for s in SECTION_ORDER if s in required]
@@ -472,27 +517,30 @@ def generate_article(
 
 
 def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False) -> bool:
-    qmd = md_to_qmd_target(md, inno_files)
-    course = md.relative_to(inno_files / "semester-4").parts[0]
-    week = re.match(r"(\d+)", md.relative_to(inno_files / "semester-4").parts[1]).group(1) if len(md.relative_to(inno_files / "semester-4").parts) > 1 else "1"
+    """Legacy single-file entry kept for tests; delegates to process_week."""
+    return process_week(md_to_qmd_target(md, inno_files), [md], inno_files, api_key, dry_run)
+
+
+def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry_run: bool = False) -> bool:
+    first = mds[0]
+    course = first.relative_to(inno_files / "semester-4").parts[0]
+    week = re.match(r"(\d+)", first.relative_to(inno_files / "semester-4").parts[1]).group(1) if len(first.relative_to(inno_files / "semester-4").parts) > 1 else "1"
 
     # Guard: never touch semester-1/2/3
     if any(s in str(qmd) for s in SKIP_OLD):
-        print(f"  Skip old semester {md}")
+        print(f"  Skip old semester {first}")
         return False
 
-    transcript = md.read_text(encoding="utf-8")
+    transcript = combine_transcripts(mds)
     if not transcript.strip():
-        print(f"  Skip empty transcript {md}")
+        print(f"  Skip empty transcripts {mds}")
         return False
 
-    # If qmd exists and transcript unchanged (compare md hash vs qmd's source hash comment), skip
-    # For now, skip if qmd exists and its transcript hash matches (stored in transcript_state-like comment)
-    # Simpler: always regenerate if md newer than qmd, else skip
+    # If qmd exists and is newer than every source transcript, regeneration still
+    # runs (cheap compared to a stale article); mtime check kept for logging only.
     if qmd.exists():
-        # Check if qmd is newer than transcript — skip
-        if qmd.stat().st_mtime > md.stat().st_mtime:
-            # But also check fix_formatting would not change it
+        newest = max(md.stat().st_mtime for md in mds)
+        if qmd.stat().st_mtime > newest:
             pass
 
     style = collect_style_context(short_to_full(course))
@@ -502,7 +550,7 @@ def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False)
     for it in range(1, max_iters + 1):
         print(f"Generating {qmd} iteration {it}/{max_iters} ...")
         try:
-            article = generate_article(transcript, course, week, api_key, style)
+            article = generate_article(transcript, course, week, api_key, style, [md.name for md in mds])
         except Exception as e:
             print(f"  Gemini failed: {e}")
             if it == max_iters:
@@ -544,7 +592,7 @@ def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False)
                 print(f"  Formatting violations remain, feeding back (attempt {it})...")
                 # Extract snippet
                 violations = "\n".join(l for l in txt.splitlines() if qmd.name in l or "Line" in l)[:4000]
-                style = f"Previous attempt had formatting violations:\n{violations}\n\nFix these exactly per rules.md. Original transcript:\n{transcript[:3000]}"
+                style = f"Previous attempt had formatting violations:\n{violations}\n\nFix these exactly per rules.md. Original transcript(s):\n{transcript[:3000]}"
                 continue
 
     print(f"  Exhausted iterations for {qmd}, removing failed draft so it never pushes")
@@ -602,29 +650,28 @@ def main() -> None:
         print("No semester-4 transcript changes to process. Exiting (nothing to change).")
         return
 
-    if args.limit:
-        mds = mds[: args.limit]
-
-    print(f"Found {len(mds)} semester-4 transcript(s) to process:")
-    for p in mds:
-        print(f"  {p.relative_to(args.inno_files)} -> {md_to_qmd_target(p, args.inno_files).relative_to(ROOT)}")
+    groups = group_lectures(mds, args.inno_files)
+    print(f"Found {len(mds)} semester-4 transcript(s) in {len(groups)} article group(s):")
+    for qmd, group in groups:
+        srcs = ", ".join(p.relative_to(args.inno_files).as_posix() for p in group)
+        print(f"  {srcs} -> {qmd.relative_to(ROOT)}")
 
     if args.dry_run:
         print("Dry run — not generating.")
         return
 
     failed: list[Path] = []
-    for md in mds:
+    for qmd, group in (groups[: args.limit] if args.limit else groups):
         try:
-            ok = process_one(md, args.inno_files, api_key, dry_run=args.dry_run)
+            ok = process_week(qmd, group, args.inno_files, api_key, dry_run=args.dry_run)
             if not ok:
-                failed.append(md)
+                failed.extend(group)
         except Exception as e:
-            print(f"ERROR processing {md}: {e}", file=sys.stderr)
-            failed.append(md)
+            print(f"ERROR processing {qmd}: {e}", file=sys.stderr)
+            failed.extend(group)
 
     if failed:
-        print(f"{len(failed)} lecture(s) failed validation, failing the run so broken articles never push:", file=sys.stderr)
+        print(f"{len(failed)} transcript(s) failed validation, failing the run so broken articles never push:", file=sys.stderr)
         for md in failed:
             print(f"  FAILED: {md}", file=sys.stderr)
         sys.exit(2)
