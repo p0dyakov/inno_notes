@@ -2,7 +2,7 @@
 """Generate semester-4 qmd articles from inno_files transcript MDs.
 
 Only touches semester-4. Early exit if nothing to generate/update.
-Uses gemini-3.1-pro-preview per section (Theory, Definitions, Formulas, Practice)
+Uses gemini-3.8-flash per section (Theory, Definitions, Formulas, Practice)
 in parallel, then stitches per prompt.md/rules.md.
 Iterates until fix_formatting.py + quarto render pass (up to 3 attempts).
 """
@@ -30,8 +30,8 @@ RULES_MD = ROOT / "rules.md"
 COURSE_MAP_JSON = Path(__file__).parent / "course_map.json"
 
 INNO_FILES_DEFAULT = Path("/tmp/inno_files")
-GEMINI_MODEL = "gemini-3.1-pro-preview"
-GEMINI_FALLBACKS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview"]
+GEMINI_MODEL = "gemini-3.8-flash"
+GEMINI_FALLBACKS = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
 GOLDEN_W = 3  # for initial semester-4 week numbering starting at 1
 
 # Only semester-4 is allowed to be touched by the agent
@@ -439,8 +439,22 @@ def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False)
                 style = f"Previous attempt had formatting violations:\n{violations}\n\nFix these exactly per rules.md. Original transcript:\n{transcript[:3000]}"
                 continue
 
-    print(f"  Exhausted iterations for {qmd}, leaving last version (may need manual fix)")
-    return True
+    print(f"  Exhausted iterations for {qmd}, removing failed draft so it never pushes")
+    try:
+        if qmd.exists():
+            # Only remove if this run created it (untracked or modified in this run).
+            # Keep pre-existing committed versions untouched: restore from git if tracked.
+            tracked = run(["git", "ls-files", "--error-unmatch", str(qmd)], cwd=str(ROOT))
+            if tracked.returncode == 0:
+                run(["git", "checkout", "--", str(qmd)], cwd=str(ROOT))
+            else:
+                qmd.unlink()
+            tmp = qmd.with_suffix(".qmd.tmp")
+            if tmp.exists():
+                tmp.unlink()
+    except Exception as e:  # noqa: BLE001
+        print(f"  cleanup failed for {qmd}: {e}")
+    return False
 
 
 def main() -> None:
@@ -491,11 +505,21 @@ def main() -> None:
         print("Dry run — not generating.")
         return
 
+    failed: list[Path] = []
     for md in mds:
         try:
-            process_one(md, args.inno_files, api_key, dry_run=args.dry_run)
+            ok = process_one(md, args.inno_files, api_key, dry_run=args.dry_run)
+            if not ok:
+                failed.append(md)
         except Exception as e:
             print(f"ERROR processing {md}: {e}", file=sys.stderr)
+            failed.append(md)
+
+    if failed:
+        print(f"{len(failed)} lecture(s) failed validation, failing the run so broken articles never push:", file=sys.stderr)
+        for md in failed:
+            print(f"  FAILED: {md}", file=sys.stderr)
+        sys.exit(2)
 
     # Update _quarto.yml sidebar for new files (add missing entries)
     update_sidebar()

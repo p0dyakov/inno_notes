@@ -1,0 +1,62 @@
+name: repair-on-deploy-failure
+on:
+  workflow_run:
+    workflows: [deploy-site]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: repair-on-deploy-failure
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download failed deploy log
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ github.event.workflow_run.id }}"
+          echo "Failed run: $RUN_ID"
+          gh run view "$RUN_ID" --log-failed > /tmp/deploy_fail.log 2>&1 || gh run view "$RUN_ID" --log > /tmp/deploy_fail.log 2>&1 || true
+          tail -n 120 /tmp/deploy_fail.log
+          echo "---"
+          grep -iE "error|failed|not found|entity|Rscript|quarto|yaml" /tmp/deploy_fail.log | head -n 40 || true
+      - name: Classify failure and auto-fix known cases
+        run: |
+          python3 scripts/agent/repair_deploy.py --log /tmp/deploy_fail.log
+      - name: Verify fix compiles
+        run: |
+          python3 fix_formatting.py
+          if ! grep -q "No format-rule violations detected" formatting_report.md; then
+            echo "::warning::formatting still has violations after repair — see report"
+            head -n 40 formatting_report.md
+          fi
+          pip install pyyaml --quiet
+          python3 -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
+      - name: Commit repair if changed
+        run: |
+          git config user.name "inno-notes-agent"
+          git config user.email "agent@innonotes.ru"
+          git add -A -- _quarto.yml scripts/ semester-4/ .github/workflows/
+          if git diff --cached --quiet; then
+            echo "Repair made no file changes."
+            exit 0
+          fi
+          git status --short
+          git commit -m "fix(deploy): auto-repair after failed deploy run ${{ github.event.workflow_run.id }}
+
+          Co-authored-by: inno-notes-agent"
+          git push origin HEAD:main
