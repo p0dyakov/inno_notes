@@ -381,7 +381,7 @@ def get_section_header(lines, line_num):
 
 
 def process_file(filepath):
-    with open(filepath) as f:
+    with open(filepath, encoding="utf-8") as f:
         content = f.read()
     lines = content.split('\n')
 
@@ -516,7 +516,7 @@ def process_file(filepath):
     new_content = '\n'.join(result)
     changed = new_content != content
     if changed:
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding="utf-8") as f:
             f.write(new_content)
 
     return removed, added + separators_added, ai_found, changed, format_issues
