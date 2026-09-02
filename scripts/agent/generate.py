@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 import time
+import textwrap
 from datetime import datetime
 from pathlib import Path
 
@@ -30,7 +31,7 @@ COURSE_MAP_JSON = Path(__file__).parent / "course_map.json"
 
 INNO_FILES_DEFAULT = Path("/tmp/inno_files")
 GEMINI_MODEL = "gemini-3.1-pro-preview"
-GEMINI_FALLBACKS = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
+GEMINI_FALLBACKS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview"]
 GOLDEN_W = 3  # for initial semester-4 week numbering starting at 1
 
 # Only semester-4 is allowed to be touched by the agent
@@ -139,16 +140,19 @@ def gemini_section(
     last_err: Exception | None = None
     models = [model] + GEMINI_FALLBACKS
     for m in models:
-        try:
-            return _call_gemini(prompt, api_key, m)
-        except Exception as e:
-            last_err = e
-            msg = str(e)
-            if "429" in msg or "503" in msg or "overload" in msg.lower():
-                print(f"  {section}: {m} failed ({msg[:120]}), trying fallback...")
-                time.sleep(2)
-                continue
-            raise
+        for attempt in range(1, 4):
+            try:
+                return _call_gemini(prompt, api_key, m)
+            except Exception as e:
+                last_err = e
+                msg = str(e)
+                if "429" in msg or "503" in msg or "overload" in msg.lower():
+                    wait = min(2 ** attempt * 5, 60)
+                    print(f"  {section}: {m} failed ({msg[:120]}), retry {attempt}/3 in {wait}s...")
+                    time.sleep(wait)
+                    continue
+                raise
+        print(f"  {section}: {m} exhausted, trying next model...")
     assert last_err is not None
     raise last_err
 
