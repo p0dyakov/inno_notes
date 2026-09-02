@@ -1,16 +1,14 @@
 name: deploy-site
+# Dumb deploy: this workflow installs NOTHING (no Python/Node/R/Quarto).
+# The site is built locally (`quarto render`, see scripts/publish.sh) and
+# committed under _site/. Here we only smoke-check and publish _site/
+# to gh-pages. Typical run time: under a minute.
 on:
   push:
     branches: [main]
     paths:
-      - 'semester-4/**/*.qmd'
-      - 'semester-1/**/*.qmd'
-      - 'semester-2/**/*.qmd'
-      - '_quarto.yml'
-      - 'styles/**'
-      - 'scripts/**'
-      - 'index.qmd'
-      - '.github/workflows/**'
+      - '_site/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:
@@ -18,76 +16,20 @@ permissions:
 
 concurrency:
   group: deploy-site
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  precheck:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Validate formatting (must be 0 violations before deploy)
-        run: |
-          python3 fix_formatting.py
-          cat formatting_report.md | head -n 30
-          if ! grep -q "No format-rule violations detected" formatting_report.md; then
-            echo "::error::fix_formatting found violations — deploy blocked. Run python3 fix_formatting.py locally."
-            exit 1
-          fi
-          if ! grep -q "No potential AI artifacts detected" formatting_report.md; then
-            echo "::error::AI artifacts detected — deploy blocked."
-            exit 1
-          fi
-          echo "precheck: formatting clean"
-      - name: Validate quarto config
-        run: |
-          pip install pyyaml --quiet
-          python3 -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
-
-  deploy:
-    # Heavy build (R packages + full quarto render) runs on Windows:
-    # CRAN/P3M serve Windows binaries, so the install takes minutes
-    # instead of an hour of from-source compilation on Linux.
-    runs-on: windows-latest
-    needs: precheck
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - uses: quarto-dev/quarto-actions/setup@v2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Setup R (required by knitr engine)
-        uses: r-lib/actions/setup-r@v2
-        with:
-          # Pinned to 4.5: matches the P3M snapshot below (R 4.5 binaries).
-          r-version: '4.5'
-      - name: Install R dependencies (Windows binaries via P3M snapshot)
-        run: |
-          # knitr 1.51+ rejects '#|' chunk options in non-R engines (mermaid/tikz);
-          # the repo uses '#|' in 27 files, so pin the locally verified pair.
-          # P3M snapshot 2025-08-01 serves exactly knitr 1.50 + rmarkdown 2.29
-          # (+ igraph 2.1.4) as Windows binaries for R 4.5 — no compilation.
-          Rscript -e 'options(repos=c(CRAN="https://packagemanager.posit.co/cran/2025-08-01")); install.packages(c("knitr", "rmarkdown", "igraph")); stopifnot(as.character(packageVersion("knitr")) == "1.50", as.character(packageVersion("rmarkdown")) == "2.29"); cat("R pkgs ok:", as.character(packageVersion("knitr")), as.character(packageVersion("rmarkdown")), as.character(packageVersion("igraph")), "\n")'
-      - run: npm ci --silent || npm install --silent
-      - run: pip install pyyaml --quiet && python3 -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
-      - name: Render site
-        run: quarto render
+          fetch-depth: 1
       - name: Smoke check built site
+        shell: bash
         run: |
-          test -f _site/index.html || (echo "::error::_site/index.html missing after render" && exit 1)
-          test -f _site/search.json || echo "::warning::search.json missing"
+          test -f _site/index.html || (echo "::error::_site/index.html missing — run scripts/publish.sh locally first" && exit 1)
+          test -f _site/CNAME || echo "::warning::_site/CNAME missing"
           echo "smoke: _site ok, $(find _site -name '*.html' | wc -l) html pages"
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
