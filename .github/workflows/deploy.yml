@@ -70,7 +70,10 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libuv1-dev
       - name: Install R dependencies
         run: |
-          Rscript -e 'for (pkg in c("knitr", "rmarkdown", "igraph")) if (!requireNamespace(pkg, quietly=TRUE)) install.packages(pkg, repos="https://cloud.r-project.org")'
+          # knitr 1.51+ rejects '#|' chunk options in non-R engines (mermaid/tikz);
+          # the repo uses '#|' in 27 files, so pin knitr 1.50 (verified locally).
+          # rmarkdown is installed afterwards and reuses knitr 1.50 (>= 1.43 required).
+          Rscript -e 'options(repos=c(CRAN="https://cloud.r-project.org")); install.packages("https://cran.r-project.org/src/contrib/Archive/knitr/knitr_1.50.tar.gz", repos=NULL, type="source"); for (pkg in c("rmarkdown", "igraph")) if (!requireNamespace(pkg, quietly=TRUE)) install.packages(pkg)'
       - run: npm ci --silent || npm install --silent
       - run: pip install pyyaml --quiet && python3 -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
       - name: Render site
