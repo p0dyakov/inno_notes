@@ -45,10 +45,10 @@ def ensure_r_in_deploy() -> bool:
         "      - name: Setup R (required by knitr engine)\n"
         "        uses: r-lib/actions/setup-r@v2\n"
         "        with:\n"
-        "          r-version: 'release'\n"
-        "      - name: Install R dependencies\n"
+        "          r-version: '4.5'\n"
+        "      - name: Install R dependencies (Windows binaries via P3M snapshot)\n"
         "        run: |\n"
-        '          Rscript -e \'for (pkg in c("knitr", "rmarkdown", "igraph")) if (!requireNamespace(pkg, quietly=TRUE)) install.packages(pkg, repos="https://cloud.r-project.org")\'\n'
+        '          Rscript -e \'options(repos=c(CRAN="https://packagemanager.posit.co/cran/2025-08-01")); install.packages(c("knitr", "rmarkdown", "igraph"))\'\n'
     )
     if anchor not in t:
         print("repair: deploy.yml anchor not found, skipping R insert")
@@ -67,7 +67,7 @@ def ask_gemini_for_patch(log: str, api_key: str) -> str:
         "(exact file path + unified diff or precise edit instructions). "
         "Only suggest changes inside: .github/workflows/deploy.yml, _quarto.yml, scripts/agent/. "
         "Never suggest touching semester-1/2/3 content. "
-        "If the failure is missing Rscript, say: ensure r-lib/actions/setup-r. If knitr/rmarkdown are missing, say: install them in the Install R dependencies step. "
+        "The deploy job runs on windows-latest with R 4.5 and a P3M snapshot (2025-08-01) that pins knitr 1.50 + rmarkdown 2.29 as binaries; never suggest Linux-only steps (apt-get) or unpinned latest R packages. "
         "Keep the answer under 40 lines.\n\n"
         f"LOG:\n{log[-12000:]}"
     )
