@@ -48,7 +48,7 @@ def ensure_r_in_deploy() -> bool:
         "          r-version: 'release'\n"
         "      - name: Install R dependencies\n"
         "        run: |\n"
-        '          Rscript -e \'if (!requireNamespace("igraph", quietly=TRUE)) install.packages("igraph", repos="https://cloud.r-project.org")\'\n'
+        '          Rscript -e \'for (pkg in c("knitr", "rmarkdown", "igraph")) if (!requireNamespace(pkg, quietly=TRUE)) install.packages(pkg, repos="https://cloud.r-project.org")\'\n'
     )
     if anchor not in t:
         print("repair: deploy.yml anchor not found, skipping R insert")
@@ -67,7 +67,7 @@ def ask_gemini_for_patch(log: str, api_key: str) -> str:
         "(exact file path + unified diff or precise edit instructions). "
         "Only suggest changes inside: .github/workflows/deploy.yml, _quarto.yml, scripts/agent/. "
         "Never suggest touching semester-1/2/3 content. "
-        "If the failure is missing Rscript, say: ensure r-lib/actions/setup-r. "
+        "If the failure is missing Rscript, say: ensure r-lib/actions/setup-r. If knitr/rmarkdown are missing, say: install them in the Install R dependencies step. "
         "Keep the answer under 40 lines.\n\n"
         f"LOG:\n{log[-12000:]}"
     )
