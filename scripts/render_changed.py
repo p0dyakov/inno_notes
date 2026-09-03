@@ -66,6 +66,10 @@ def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT), **kwargs)
 
 
+def base_valid(base: str) -> bool:
+    return run(["git", "rev-parse", "--verify", "--quiet", base]).returncode == 0
+
+
 def changed_files(base: str) -> list[str]:
     out: set[str] = set()
     st = run(["git", "status", "--porcelain=v1", "--untracked-files=all"])
@@ -75,7 +79,7 @@ def changed_files(base: str) -> list[str]:
             path = path.split(" -> ")[1].strip().strip('"')
         if code.strip() not in ("", "!!"):
             out.add(path)
-    if run(["git", "rev-parse", "--verify", "--quiet", base]).returncode == 0:
+    if base_valid(base):
         diff = run(["git", "diff", "--name-only", f"{base}...HEAD"])
         out.update(p.strip() for p in diff.stdout.splitlines() if p.strip())
     return sorted(p for p in out if p)
@@ -208,6 +212,11 @@ def main() -> None:
     except Exception as e:  # noqa: BLE001
         print(f"WARN: update_sidebar skipped ({e})")
 
+    if not base_valid(args.base):
+        # Unknown base (e.g. manual dispatch with empty `before`): safest is
+        # a full render rather than a silent no-op.
+        print(f"WARN: base ref {args.base!r} not found, falling back to full render")
+        args.full = True
     changed = changed_files(args.base)
     qmds = [p for p in changed if p.endswith(".qmd") and not p.startswith("_site/")]
     deleted_qmds = [p for p in qmds if not (ROOT / p).exists()]

@@ -28,6 +28,8 @@ concurrency:
 
 jobs:
   build:
+    # Only genuinely missing tools are installed: Quarto, TinyTeX and R.
+    # Python/Node/Git-Bash come preinstalled on the runner and are NOT set up here.
     runs-on: windows-latest
     env:
       PYTHONUTF8: '1'
@@ -38,15 +40,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
       - uses: quarto-dev/quarto-actions/setup@v2
       - name: Install TinyTeX (pdflatex for tikz figures)
         run: quarto install tinytex --no-prompt
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
       - name: Setup R 4.5 (required by knitr engine)
         uses: r-lib/actions/setup-r@v2
         with:
@@ -56,23 +52,19 @@ jobs:
           # knitr 1.51+ rejects '#|' chunk options in non-R engines (mermaid/tikz);
           # the repo uses '#|' in 27 files, so pin the verified pair.
           # P3M snapshot 2025-08-01 serves exactly knitr 1.50 + rmarkdown 2.29
-          # (+ igraph) as Windows binaries for R 4.5 — no compilation.
+          # (+ igraph, magick, pdftools) as Windows binaries for R 4.5.
           Rscript -e 'options(repos=c(CRAN="https://packagemanager.posit.co/cran/2025-08-01")); install.packages(c("knitr", "rmarkdown", "igraph", "magick", "pdftools")); stopifnot(as.character(packageVersion("knitr")) == "1.50", as.character(packageVersion("rmarkdown")) == "2.29"); cat("R pkgs ok:", as.character(packageVersion("knitr")), as.character(packageVersion("rmarkdown")), as.character(packageVersion("igraph")), "\n")'
       - run: npm ci --silent || npm install --silent
-      - name: Refresh generated bits (idempotent, backup if quarto pre-render misses)
+      - run: python -m pip install --quiet pyyaml httpx
+      - name: Validate quarto config
+        run: python -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
+      - name: Incremental render (only changed files, parallel)
+        run: python scripts/render_changed.py --base "${{ github.event.before }}" --jobs 4
+      - name: Gate on formatting report
         run: |
-          python scripts/update_index.py
-          python -c "import datetime; print('timestamp via update_last_updated on render')"
-      - name: Validate formatting (must be 0 violations before render)
-        run: |
-          python fix_formatting.py
           grep -q "No format-rule violations detected" formatting_report.md || (echo "::error::fix_formatting found violations" && exit 1)
           grep -q "No potential AI artifacts detected" formatting_report.md || (echo "::error::AI artifacts detected" && exit 1)
           echo "precheck: formatting clean"
-      - name: Validate quarto config
-        run: python -c "import yaml" 2>/dev/null || python -m pip install pyyaml --quiet; python -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
-      - name: Render site
-        run: quarto render
       - name: Smoke check built site
         run: |
           test -f _site/index.html || (echo "::error::_site/index.html missing after render" && exit 1)
