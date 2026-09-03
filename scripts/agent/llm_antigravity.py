@@ -347,6 +347,82 @@ class Hub:
         return n1 == n2 and state == "running"
 
 
+def spawn_ls(proxy: str = "", headless: bool = False,
+             extra_flags: list | None = None) -> dict:
+    """Spawn a personal headless-capable hub LS sharing this machine's auth.
+
+    Returns {"pid", "address", "csrf"}. The child survives the parent
+    (start_new_session). Point Hub at it via AGY_LS_ADDRESS/AGY_CSRF_TOKEN.
+    `proxy` (e.g. http://127.0.0.1:18081, see xproxy.py) is passed through
+    HTTPS_PROXY/HTTP_PROXY for the LS's own Google egress.
+    """
+    import secrets
+    csrf = secrets.token_hex(16)
+    logf = open("/tmp/agy_spawned_ls.log", "ab", buffering=0)
+    if sys.platform == "win32":
+        exe = str(Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+                  / "Antigravity" / "resources" / "bin" / "language_server.exe")
+    else:
+        exe = "/Applications/Antigravity.app/Contents/Resources/bin/language_server"
+    args = [exe, "--standalone", "--subclient_type", "hub",
+            "--override_ide_name", "antigravity", "--override_ide_version", "2.11.0",
+            "--override_user_agent_name", "antigravity",
+            "--https_server_port", "0", "--http_server_port", "0",
+            "--csrf_token", csrf, "--app_data_dir", "antigravity",
+            "--api_server_url", "https://generativelanguage.googleapis.com",
+            "--cloud_code_endpoint", "https://daily-cloudcode-pa.googleapis.com",
+            "--enable_sidecars"]
+    # Copy the running hub's host_bridge so project mapping keeps working.
+    for cl in _hub_cmdlines():
+        m1 = re.search(r"--host_bridge_url=(\S+)", cl)
+        if m1 and "override_model_name" not in cl and "headless" not in cl:
+            args += [f"--host_bridge_url={m1.group(1)}"]
+            m2 = re.search(r"--host_bridge_token=(\S+)", cl)
+            if m2:
+                args += [f"--host_bridge_token={m2.group(1)}"]
+            break
+    if headless:
+        args.append("--headless")
+    args += extra_flags or []
+    env = dict(os.environ)
+    if proxy:
+        env["HTTPS_PROXY"] = proxy
+        env["HTTP_PROXY"] = proxy
+        env["NO_PROXY"] = "127.0.0.1,localhost"
+    proc = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=logf,
+                            stderr=subprocess.STDOUT, start_new_session=True, env=env)
+    # Wait for the API port (plain HTTP answers on it).
+    import time as _time
+    address = ""
+    for _ in range(60):
+        _time.sleep(1)
+        try:
+            out = subprocess.run(
+                ["lsof", "-p", str(proc.pid), "-iTCP", "-sTCP:LISTEN", "-P", "-n"]
+                if sys.platform != "win32" else ["netstat", "-ano", "-p", "TCP"],
+                capture_output=True, text=True, timeout=15).stdout
+            ports = [int(m.group(1)) for m in re.finditer(r"127\.0\.0\.1:(\d+)", out)]
+            for port in ports:
+                try:
+                    r = httpx.post(
+                        f"http://127.0.0.1:{port}/{SERVICE}/GetConversationMetadata",
+                        headers={"Content-Type": "application/json", CSRF_HEADER: csrf},
+                        json={"conversation_id": "00000000-0000-0000-0000-000000000000"},
+                        timeout=5)
+                    if "trajectory not found" in r.text:
+                        address = f"http://127.0.0.1:{port}"
+                        break
+                except Exception:
+                    continue
+            if address:
+                break
+        except Exception:
+            continue
+    if not address:
+        raise AntigravityError("spawned LS did not open its API port in time")
+    return {"pid": proc.pid, "address": address, "csrf": csrf}
+
+
 def gemini_pro_preview_available() -> bool:
     """Catalog check: is a Pro-tier Gemini servable right now (quota>0)?"""
     try:

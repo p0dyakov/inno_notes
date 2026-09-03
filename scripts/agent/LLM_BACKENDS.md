@@ -55,3 +55,33 @@ refuses many calls: `503 No capacity` (flash_lite, transient) and
 The module classifies them (`TransientError` → retried with backoff,
 `FatalError` → fail fast) — just re-run later; nothing is committed on
 failure (`process_week` restores/deletes drafts).
+
+## Proxy wrapper (`xproxy.py` + spawned LS)
+
+Google API entry points that are DNS-gated resolve differently through
+`https://xbox-dns.ru/dns-query` (DoH) than through system DNS — notably
+`generativelanguage.googleapis.com` (xbox returns relay IPs, system returns
+the gated edge). `scripts/agent/xproxy.py` is a local CONNECT forwarder:
+
+- Google API hosts are dialed via the xbox-DNS answers (SNI preserved);
+- everything else goes direct;
+- per-connection logging (`CONN host:port via ip`) shows exactly which egress
+  each upstream call used.
+
+Run it, then spawn a personal hub LS whose own Google egress rides the proxy:
+
+```sh
+python3 scripts/agent/xproxy.py  # logs to stdout; 127.0.0.1:18081
+python3 - <<'EOF'
+import sys; sys.path.insert(0, 'scripts/agent')
+from llm_antigravity import spawn_ls
+print(spawn_ls(proxy='http://127.0.0.1:18081'))
+EOF
+# -> {"pid": ..., "address": "http://127.0.0.1:PORT", "csrf": "..."}
+AGY_LS_ADDRESS=http://127.0.0.1:PORT AGY_CSRF_TOKEN=... \
+  LLM_BACKEND=antigravity python3 scripts/agent/generate.py --regen-theory ...
+```
+
+`spawn_ls` copies the running hub's `--host_bridge_*` flags so project
+mapping keeps working, shares `~/.gemini` auth state, and waits until the
+Connect API answers. Kill stray instances with `kill <pid>` when done.
