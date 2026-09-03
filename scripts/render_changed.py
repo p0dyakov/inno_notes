@@ -20,20 +20,46 @@ Usage: python3 scripts/render_changed.py [--base origin/main] [--full] [--dry-ru
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
+import html as html_module
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
+import time
+from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(os.environ.get("INNO_NOTES_ROOT", Path(__file__).resolve().parents[1]))
 SITE = ROOT / "_site"
 SEARCH = SITE / "search.json"
 QUARTO_YML = ROOT / "_quarto.yml"
-POST_RENDER_LINE = "    - bash scripts/bake-static-html.sh"
+SUPPRESSED_LINES = [
+    "    - scripts/update_last_updated.py\n",
+    "    - scripts/update_index.py\n",
+    "    - bash scripts/bake-static-html.sh\n",
+]
+
+
+def suppress_yml(text: str) -> str:
+    """Drop pre/post-render script lines; drop headers left completely empty
+    (quarto rejects `pre-render:` with a null value, comments don't count)."""
+    body = [ln for ln in text.splitlines(keepends=True) if ln not in SUPPRESSED_LINES]
+    res: list[str] = []
+    i = 0
+    while i < len(body):
+        if body[i] in ("  pre-render:\n", "  post-render:\n"):
+            j = i + 1
+            while j < len(body) and body[j].startswith("    - "):
+                j += 1
+            if j == i + 1:
+                i += 1
+                continue
+        res.append(body[i])
+        i += 1
+    return "".join(res)
 
 
 def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
@@ -66,26 +92,93 @@ def snapshot_search() -> dict[str, dict] | None:
         return None
 
 
-def merge_search(snapshot: dict[str, dict]) -> int:
-    """Fold current (partial) _site/search.json entries into the snapshot."""
-    if not SEARCH.exists():
-        return 0
-    try:
-        data = json.loads(SEARCH.read_text(encoding="utf-8"))
-        entries = data if isinstance(data, list) else data.get("articles", [])
-    except Exception:
-        return 0
-    n = 0
-    for e in entries:
-        if e.get("href"):
-            snapshot[e["href"]] = e
-            n += 1
-    SEARCH.write_text(json.dumps(list(snapshot.values()), ensure_ascii=False), encoding="utf-8")
-    return n
-
-
 def qmd_to_html(rel: str) -> Path:
     return SITE / Path(rel).with_suffix(".html")
+
+
+class _MainText(HTMLParser):
+    """Collect visible text inside <main>, skipping nav/script/style/header."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.depth = 0
+        self.skip = 0
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        if tag == "main":
+            self.depth += 1
+        elif self.depth and tag in ("nav", "script", "style", "header"):
+            self.skip += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "main" and self.depth:
+            self.depth -= 1
+        elif self.depth and tag in ("nav", "script", "style", "header") and self.skip:
+            self.skip -= 1
+        elif self.depth and not self.skip and tag in (
+            "p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "div", "section",
+            "details", "summary", "figure", "table", "tr", "blockquote", "pre",
+        ):
+            self.parts.append("\n\n")
+
+    def handle_data(self, data: str) -> None:
+        if self.depth and not self.skip:
+            text = data.strip()
+            if text:
+                self.parts.append(text + " ")
+
+
+def sidebar_crumbs() -> dict[str, list[str]]:
+    """Map sidebar file path -> [Semester, Course] via _quarto.yml indentation."""
+    mapping: dict[str, list[str]] = {}
+    semester = course = ""
+    for line in (ROOT / "_quarto.yml").read_text(encoding="utf-8").splitlines():
+        m = re.match(r'^ {6}- section: "Semester ([IVX]+)"', line)
+        if m:
+            semester, course = "Semester " + m.group(1), ""
+            continue
+        m = re.match(r'^ {8}- section: "(.+)"', line)
+        if m:
+            course = m.group(1)
+            continue
+        m = re.match(r'^\s+- file: "(.+\.qmd)"', line)
+        if m and m.group(1) != "index.qmd" and semester:
+            mapping[m.group(1)] = [semester, course]
+    return mapping
+
+
+def qmd_title(rel: str) -> str:
+    for line in (ROOT / rel).read_text(encoding="utf-8").splitlines()[1:12]:
+        if line == "---":
+            break
+        m = re.match(r'title:\s*"(.*)"', line)
+        if m:
+            return m.group(1)
+    if rel == "index.qmd":
+        m = re.search(r'^project:\s*\n(?:  \S.*\n)*?  title: "([^"]+)"',
+                      (ROOT / "_quarto.yml").read_text(encoding="utf-8"), re.M)
+        if m:
+            return m.group(1)
+    return Path(rel).stem
+
+
+def build_search_entry(rel: str, crumbs_map: dict[str, list[str]]) -> dict:
+    """Reconstruct quarto's search entry for a freshly rendered page.
+
+    Same shape as quarto's own entries (href/title/section/text/crumbs);
+    text comes from pre-bake HTML, exactly what quarto itself indexes.
+    """
+    href = Path(rel).with_suffix(".html").as_posix()
+    parser = _MainText()
+    parser.feed((SITE / href).read_text(encoding="utf-8"))
+    text = html_module.unescape(re.sub(r"\n{3,}", "\n\n", re.sub(r"[^\S\n]+", " ", "".join(parser.parts)))).strip()
+    if rel == "index.qmd":
+        crumbs = ["Home"]
+    else:
+        crumbs = crumbs_map.get(rel, []) + [qmd_title(rel)]
+    return {"objectID": href, "href": href, "title": qmd_title(rel),
+            "section": "", "text": text, "crumbs": crumbs}
 
 
 def main() -> None:
@@ -93,6 +186,7 @@ def main() -> None:
     ap.add_argument("--base", default="origin/main")
     ap.add_argument("--full", action="store_true", help="force full quarto render")
     ap.add_argument("--dry-run", action="store_true", help="print plan, change nothing")
+    ap.add_argument("--jobs", type=int, default=4, help="parallel quarto renders")
     args = ap.parse_args()
 
     if args.dry_run:
@@ -105,6 +199,7 @@ def main() -> None:
         print("fix_formatting.py failed, aborting", file=sys.stderr)
         sys.exit(1)
     run([sys.executable, str(ROOT / "scripts" / "update_index.py")])
+    run([sys.executable, str(ROOT / "scripts" / "update_last_updated.py")])
     try:
         sys.path.insert(0, str(ROOT / "scripts" / "agent"))
         from generate import update_sidebar  # noqa: E402
@@ -142,27 +237,54 @@ def main() -> None:
         res = subprocess.run(["quarto", "render"], cwd=str(ROOT))
         sys.exit(res.returncode)
 
-    # Suppress project post-render during per-file renders; bake manually after.
+    # Suppress project pre/post-render during parallel renders: update scripts
+    # already ran once above (serially, race-free); bake runs per file after.
     yml_text = QUARTO_YML.read_text(encoding="utf-8")
-    suppressed = POST_RENDER_LINE in yml_text
+    stripped = suppress_yml(yml_text)
+    suppressed = stripped != yml_text
     if suppressed:
-        QUARTO_YML.write_text(yml_text.replace(POST_RENDER_LINE + "\n", ""), encoding="utf-8")
+        QUARTO_YML.write_text(stripped, encoding="utf-8")
+
+    def render_one(rel: str) -> str:
+        # Concurrent quarto processes can collide copying shared site_libs
+        # (transient lstat race in copyToProjectFreezer) — retry a few times.
+        last_tail = ""
+        for attempt in range(1, 4):
+            res = subprocess.run(["quarto", "render", rel], cwd=str(ROOT),
+                                 capture_output=True, text=True)
+            if res.returncode == 0:
+                return rel
+            last_tail = (res.stderr or res.stdout or "")[-1500:]
+            print(f"  retry {attempt}/3 for {rel}")
+            time.sleep(2 * attempt)
+        raise RuntimeError(f"quarto render failed for {rel}:\n{last_tail}")
+
     rendered_html: list[str] = []
+    jobs = max(1, min(args.jobs, len(qmds))) if qmds else 1
     try:
-        for rel in qmds:
-            print(f"render: {rel}")
-            res = subprocess.run(["quarto", "render", rel], cwd=str(ROOT))
-            if res.returncode != 0:
-                print(f"ERROR rendering {rel}, aborting", file=sys.stderr)
-                sys.exit(res.returncode)
-            n = merge_search(snap)
-            print(f"  search entries merged: {n}")
-            html = qmd_to_html(rel)
-            if html.exists():
-                rendered_html.append(str(html.relative_to(SITE).as_posix()))
+        if qmds:
+            print(f"rendering {len(qmds)} file(s) with {jobs} parallel job(s) ...")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as ex:
+                for rel in ex.map(render_one, sorted(qmds)):
+                    html = qmd_to_html(rel)
+                    if html.exists():
+                        rendered_html.append(str(html.relative_to(SITE).as_posix()))
+                    print(f"  rendered {rel}")
     finally:
         if suppressed:
             QUARTO_YML.write_text(yml_text, encoding="utf-8")
+
+    # Rebuild search entries for rendered pages from built HTML (pre-bake,
+    # exactly what quarto itself indexes); drop stale href + href#* entries.
+    if rendered_html:
+        crumbs_map = sidebar_crumbs()
+        for rel in sorted(qmds):
+            href = Path(rel).with_suffix(".html").as_posix()
+            snap = {h: e for h, e in snap.items()
+                    if h != href and not h.startswith(href + "#")}
+            snap[href] = build_search_entry(rel, crumbs_map)
+        SEARCH.write_text(json.dumps(list(snap.values()), ensure_ascii=False), encoding="utf-8")
+        print(f"  search index rebuilt for {len(rendered_html)} page(s)")
 
     if rendered_html:
         baked = [str(SITE / h) for h in rendered_html]
@@ -215,7 +337,9 @@ def main() -> None:
     if dropped:
         snap2 = snapshot_search() or {}
         for rel in deleted_qmds:
-            snap2.pop(Path(rel).with_suffix(".html").as_posix(), None)
+            href = Path(rel).with_suffix(".html").as_posix()
+            for h in [h for h in snap2 if h == href or h.startswith(href + "#")]:
+                snap2.pop(h, None)
         SEARCH.write_text(json.dumps(list(snap2.values()), ensure_ascii=False), encoding="utf-8")
         print(f"dropped {dropped} stale outputs")
 
