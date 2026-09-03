@@ -1,22 +1,14 @@
 name: deploy-site
-# Build on Windows, then publish. Windows runners install R/Quarto packages
-# as binaries in minutes (Linux compiles igraph etc. from source for ~1h).
-# Flow per push to main:
-#   1. build job (windows-latest) renders the full site, commits _site/
-#      (+ index.qmd, _freeze cache) back to main. The push uses GITHUB_TOKEN
-#      and therefore does NOT retrigger workflows — no loop.
-#   2. deploy job (ubuntu, needs build) checks out fresh main and publishes
-#      _site/ to gh-pages. No toolchain installed here at all.
+# Primitive deploy only: publishes the prebuilt _site/ directory.
+# The site is built on a Windows machine (fast R/Quarto binaries) and
+# committed under _site/ — see scripts/publish.sh. This workflow installs
+# NOTHING (no Python/Node/R/Quarto/TeX) and finishes in about a minute.
 on:
   push:
     branches: [main]
     paths:
-      - 'semester-*/**/*.qmd'
-      - '_quarto.yml'
-      - 'styles/**'
-      - 'scripts/**'
-      - 'index.qmd'
-      - '.github/workflows/**'
+      - '_site/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:
@@ -27,76 +19,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: windows-latest
-    env:
-      PYTHONUTF8: '1'
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - uses: quarto-dev/quarto-actions/setup@v2
-      - name: Install TinyTeX (pdflatex for tikz figures)
-        run: quarto install tinytex --no-prompt
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Setup R 4.5 (required by knitr engine)
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.5'
-      - name: Install R dependencies (binaries via P3M snapshot)
-        run: |
-          # knitr 1.51+ rejects '#|' chunk options in non-R engines (mermaid/tikz);
-          # the repo uses '#|' in 27 files, so pin the verified pair.
-          # P3M snapshot 2025-08-01 serves exactly knitr 1.50 + rmarkdown 2.29
-          # (+ igraph) as Windows binaries for R 4.5 — no compilation.
-          Rscript -e 'options(repos=c(CRAN="https://packagemanager.posit.co/cran/2025-08-01")); install.packages(c("knitr", "rmarkdown", "igraph", "magick", "pdftools")); stopifnot(as.character(packageVersion("knitr")) == "1.50", as.character(packageVersion("rmarkdown")) == "2.29"); cat("R pkgs ok:", as.character(packageVersion("knitr")), as.character(packageVersion("rmarkdown")), as.character(packageVersion("igraph")), "\n")'
-      - run: npm ci --silent || npm install --silent
-      - name: Refresh generated bits (idempotent, backup if quarto pre-render misses)
-        run: |
-          python scripts/update_index.py
-          python -c "import datetime; print('timestamp via update_last_updated on render')"
-      - name: Validate formatting (must be 0 violations before render)
-        run: |
-          python fix_formatting.py
-          grep -q "No format-rule violations detected" formatting_report.md || (echo "::error::fix_formatting found violations" && exit 1)
-          grep -q "No potential AI artifacts detected" formatting_report.md || (echo "::error::AI artifacts detected" && exit 1)
-          echo "precheck: formatting clean"
-      - name: Validate quarto config
-        run: python -c "import yaml" 2>/dev/null || python -m pip install pyyaml --quiet; python -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
-      - name: Render site
-        run: quarto render
-      - name: Smoke check built site
-        run: |
-          test -f _site/index.html || (echo "::error::_site/index.html missing after render" && exit 1)
-          echo "smoke: _site ok, $(find _site -name '*.html' | wc -l) html pages"
-      - name: Commit built site back to main
-        run: |
-          git config user.name "inno-notes-agent"
-          git config user.email "agent@innonotes.ru"
-          git add -A -f -- _site/ index.qmd _freeze/
-          git diff --cached --quiet && echo "build: no changes to commit" && exit 0
-          git commit -m "build(site): refresh _site from $GITHUB_SHA"
-          git push origin HEAD:main || (git fetch origin main && git rebase origin/main && git push origin HEAD:main)
-
   deploy:
     runs-on: ubuntu-latest
-    needs: build
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
           fetch-depth: 1
       - name: Smoke check built site
+        shell: bash
         run: |
-          test -f _site/index.html || (echo "::error::_site/index.html missing — build did not commit it" && exit 1)
+          test -f _site/index.html || (echo "::error::_site/index.html missing — build on Windows and commit _site/ first (scripts/publish.sh)" && exit 1)
+          test -f _site/CNAME || echo "::warning::_site/CNAME missing"
           echo "smoke: _site ok, $(find _site -name '*.html' | wc -l) html pages"
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
