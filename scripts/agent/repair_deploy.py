@@ -67,7 +67,7 @@ def ask_gemini_for_patch(log: str, api_key: str) -> str:
         "(exact file path + unified diff or precise edit instructions). "
         "Only suggest changes inside: .github/workflows/deploy.yml, _quarto.yml, scripts/agent/. "
         "Never suggest touching semester-1/2/3 content. "
-        "Deploy (.github/workflows/deploy.yml) only publishes the prebuilt _site/ directory and installs no toolchain; never suggest adding setup-python/node/R/Quarto/apt steps there. If _site is missing or stale, say: build on Windows and commit _site/ via scripts/publish.sh, then push. "
+        "Deploy (.github/workflows/deploy.yml) has two jobs: build on windows-latest (R 4.5 + P3M snapshot 2025-08-01 pinning knitr 1.50 + rmarkdown 2.29 as binaries, TinyTeX, then quarto render, then commit _site/ back) and deploy on ubuntu (publishes _site/ to gh-pages, no toolchain). Never suggest Linux-only steps (apt-get) or unpinned latest R packages. "
         "Keep the answer under 40 lines.\n\n"
         f"LOG:\n{log[-12000:]}"
     )

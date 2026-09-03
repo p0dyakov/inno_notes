@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Incremental Windows build: re-renders ONLY changed files (seconds),
+# Local incremental build (same result as CI, but only changed files):
+# re-renders ONLY changed files (seconds),
 # fast-patches _includes into built HTML, then stages everything.
 # Full `quarto render` runs only when _quarto.yml itself changed.
 # CI just publishes the committed _site/ (~1 min).
