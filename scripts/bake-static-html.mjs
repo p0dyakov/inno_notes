@@ -15,8 +15,16 @@ import { AllPackages } from 'mathjax-full/js/input/tex/AllPackages.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
+// Optional per-file mode: `node bake-static-html.mjs <a.html> [<b.html> ...]`
+// (paths absolute or relative to the site dir). No args = whole site (legacy,
+// where argv[2] may additionally be an output dir).
+const rawArgs = process.argv.slice(2).filter((a) => a !== '--');
+const fileArgs = rawArgs.filter((a) => a.toLowerCase().endsWith('.html'));
+const perFileMode =
+	fileArgs.length > 0 && fileArgs.length === rawArgs.filter((a) => !a.startsWith('-')).length;
 const siteDir = path.resolve(
-	process.env.QUARTO_PROJECT_OUTPUT_DIR || process.argv[2] || path.join(repoRoot, '_site'),
+	process.env.QUARTO_PROJECT_OUTPUT_DIR ||
+		(!perFileMode && process.argv[2] ? process.argv[2] : path.join(repoRoot, '_site')),
 );
 
 if (!fs.existsSync(siteDir)) {
@@ -194,11 +202,15 @@ const markBaked = (html) => (/\bdata-inn-baked=/.test(html)
 	? html
 	: html.replace(/<html\b/i, '<html data-inn-baked="true"'));
 
-const htmlFiles = globSync('**/*.html', {
-	cwd: siteDir,
-	absolute: true,
-	ignore: ['**/site_libs/**'],
-});
+const htmlFiles = perFileMode
+	? fileArgs
+			.map((f) => (path.isAbsolute(f) ? f : path.resolve(siteDir, f)))
+			.filter((f) => fs.existsSync(f))
+		: globSync('**/*.html', {
+				cwd: siteDir,
+				absolute: true,
+				ignore: ['**/site_libs/**'],
+			});
 
 let totalMath = 0;
 let updated = 0;
@@ -214,7 +226,15 @@ for (const filePath of htmlFiles) {
 	MATH_SCRIPT_RE.lastIndex = 0;
 	SVG_MATH_RE.lastIndex = 0;
 
-	const mj = createMjDoc();
+	// Lazy MathJax init: creating the CHTML document is expensive, skip it
+	// for pages without TeX (pure string transforms below don't need it).
+	MATH_TAG_RE.lastIndex = 0;
+	MATH_SCRIPT_RE.lastIndex = 0;
+	const mayNeedMj =
+		MATH_TAG_RE.test(before) || MATH_SCRIPT_RE.test(before) || before.includes('mjx-container');
+	MATH_TAG_RE.lastIndex = 0;
+	MATH_SCRIPT_RE.lastIndex = 0;
+	const mj = mayNeedMj ? createMjDoc() : null;
 	const { html: baked, mathCount } = bakeMathInHtml(before, mj);
 	let after = baked.replace(SVG_FONT_SPRITE_RE, '');
 	if (mathCount > 0) {
