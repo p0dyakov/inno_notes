@@ -42,7 +42,15 @@ jobs:
           fetch-depth: 0
       - uses: quarto-dev/quarto-actions/setup@v2
       - name: Install TinyTeX (pdflatex for tikz figures)
-        run: quarto install tinytex --no-prompt
+        run: |
+          # quarto resolves the release via GitHub API, which sporadically
+          # answers 403 (rate limit) from shared runners — retry a few times.
+          for i in 1 2 3 4 5; do
+            quarto install tinytex --no-prompt && break
+            echo "tinytex install attempt $i failed, waiting 90s..."
+            sleep 90
+          done
+          quarto --version && command -v pdflatex && pdflatex --version | head -n 1
       - name: Setup R 4.5 (required by knitr engine)
         uses: r-lib/actions/setup-r@v2
         with:
