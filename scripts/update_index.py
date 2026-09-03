@@ -29,10 +29,10 @@ LEGACY_AUTHORS = {
     "Mathematical Analysis I": "Mohammad Alkousa",
     "Mathematical Analysis II": "Mohammad Alkousa",
     "Data Structures and Algorithms": "Nikolai Kudasov",
-    "Software Systems Analysis and Design": "Eugene Zouev, Munir Makhmutov",
+    "Software Systems Analysis and Design": "Eugene Zouev",
     "Theoretical Computer Science": "Manuel Mazzara",
     "Computer Architecture": "Artem Burmyakov",
-    "Introduction to Programming": "Eugene Zouev, Munir Makhmutov",
+    "Introduction to Programming": "Eugene Zouev",
     "Logic and Discrete Mathematics": "Andrey Frolov",
 }
 
@@ -83,10 +83,11 @@ def semester_courses(sem_dir: Path) -> list[tuple[str, str]]:
 
 
 def build_tbody() -> str:
+    # Chronological ascending: Semester I, II, IV — matches the sidebar order.
     sem_dirs = sorted(
         [d for d in ROOT.iterdir() if d.is_dir() and re.fullmatch(r"semester-\d+", d.name)],
         key=lambda d: int(d.name.split("-")[1]),
-        reverse=True,
+        reverse=False,
     )
     rows: list[str] = []
     for sem in sem_dirs:

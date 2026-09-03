@@ -95,6 +95,11 @@ def main() -> None:
 
     yml = (ROOT / "_quarto.yml").read_text(encoding="utf-8")
     index = (ROOT / "index.qmd").read_text(encoding="utf-8")
+    sidebar_order = re.findall(r'- section: "Semester ([IVX]+)"', yml)
+    check("sidebar chronological: I, II, IV", sidebar_order == ["I", "II", "IV"], str(sidebar_order))
+    tbody = index.split("<!-- COURSES:BEGIN -->")[1].split("<!-- COURSES:END -->")[0]
+    index_order = re.findall(r'rowspan="\d+"[^>]*>([IVX]+)<', tbody)
+    check("index chronological: I, II, IV", index_order == ["I", "II", "IV"], str(index_order))
     for code, entry in reg.items():
         check(f"sidebar section: {entry['name']}", f'- section: "{entry["name"]}"' in yml, code)
         check(f"index course: {entry['name']}", entry["name"] in index, code)
