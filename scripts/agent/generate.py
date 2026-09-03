@@ -22,7 +22,8 @@ import textwrap
 from datetime import datetime
 from pathlib import Path
 
-import httpx
+
+from llm import complete as llm_complete
 
 ROOT = Path(__file__).resolve().parents[2]
 INNO_NOTES = ROOT
@@ -351,57 +352,12 @@ def _build_section_prompt(section: str, transcript: str, style_context: str, tar
 
 
 def _call_gemini(prompt: str, api_key: str, model: str, timeout_s: int = 300) -> str:
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY missing")
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 65536},
-    }
-    last_err: Exception | None = None
-    for attempt in range(1, 4):
-        try:
-            with httpx.Client(timeout=httpx.Timeout(timeout_s, connect=20.0)) as client:
-                resp = client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                    headers={"Content-Type": "application/json", "X-goog-api-key": api_key},
-                    json=payload,
-                )
-            if resp.status_code in (429, 500, 502, 503, 504):
-                last_err = RuntimeError(f"Gemini HTTP {resp.status_code}: {resp.text[:500]}")
-                if attempt < 3:
-                    time.sleep(min(2 ** attempt, 30))
-                    continue
-                resp.raise_for_status()
-            resp.raise_for_status()
-            data = resp.json()
-            if "error" in data:
-                raise RuntimeError(f"Gemini API error: {data['error']}")
-            candidates = data.get("candidates") or []
-            if not candidates:
-                raise RuntimeError(f"No candidates: {json.dumps(data)[:800]}")
-            parts = (candidates[0].get("content") or {}).get("parts") or []
-            if not parts:
-                raise RuntimeError(f"Empty parts finish={candidates[0].get('finishReason')} raw={json.dumps(data)[:1000]}")
-            text = "\n".join(p.get("text", "") for p in parts if "text" in p).strip()
-            if not text:
-                raise RuntimeError(f"Empty text parts: {json.dumps(data)[:1000]}")
-            return text
-        except httpx.TimeoutException as e:
-            last_err = e
-            if attempt < 3:
-                time.sleep(min(2 ** attempt, 20))
-                continue
-            raise
-        except Exception as e:
-            last_err = e
-            if "HTTP 400" in str(e) or "HTTP 401" in str(e) or "HTTP 403" in str(e):
-                raise
-            if attempt < 3 and ("HTTP" in str(e) or "Timeout" in str(e) or "candidates" in str(e).lower()):
-                time.sleep(min(2 ** attempt, 20))
-                continue
-            raise
-    assert last_err is not None
-    raise last_err  # noqa: TRY201
+    """Single generation via the configured LLM backend (see llm.py).
+
+    antigravity backend ignores api_key (local hub auth); apikey backend
+    preserves the previous direct generativelanguage behavior for CI.
+    """
+    return llm_complete(prompt, model, api_key=api_key, timeout_s=timeout_s)
 
 
 def gather_changed_lectures(

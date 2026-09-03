@@ -21,7 +21,6 @@ import sys
 import time
 from pathlib import Path
 
-import httpx
 
 ROOT = Path(__file__).resolve().parents[2]
 GEMINI_MODEL = "gemini-3.8-flash"
@@ -60,7 +59,8 @@ def ensure_r_in_deploy() -> bool:
 
 
 def ask_gemini_for_patch(log: str, api_key: str) -> str:
-    """Ask Gemini 3.8 flash for a minimal fix suggestion. Returns text (may be empty)."""
+    """Ask the configured LLM backend for a minimal fix suggestion."""
+    from llm import complete as llm_complete
     prompt = (
         "You are a CI repair assistant for a Quarto website repo (inno_notes). "
         "Below is a failed deploy-site run log. Suggest the SMALLEST concrete fix "
@@ -71,35 +71,12 @@ def ask_gemini_for_patch(log: str, api_key: str) -> str:
         "Keep the answer under 40 lines.\n\n"
         f"LOG:\n{log[-12000:]}"
     )
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 2048},
-    }
-    last_err: Exception | None = None
-    for attempt in range(1, 4):
-        try:
-            with httpx.Client(timeout=httpx.Timeout(120.0, connect=20.0)) as client:
-                resp = client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
-                    headers={"Content-Type": "application/json", "X-goog-api-key": api_key},
-                    json=payload,
-                )
-            if resp.status_code in (429, 500, 502, 503, 504):
-                last_err = RuntimeError(f"Gemini HTTP {resp.status_code}: {resp.text[:300]}")
-                time.sleep(min(2 ** attempt * 5, 30))
-                continue
-            resp.raise_for_status()
-            data = resp.json()
-            cands = data.get("candidates") or []
-            if not cands:
-                return ""
-            parts = (cands[0].get("content") or {}).get("parts") or []
-            return "\n".join(p.get("text", "") for p in parts if "text" in p).strip()
-        except Exception as e:  # noqa: BLE001
-            last_err = e
-            time.sleep(min(2 ** attempt * 5, 30))
-    print(f"repair: Gemini suggestion unavailable: {last_err}")
-    return ""
+    try:
+        return llm_complete(prompt, GEMINI_MODEL, api_key=api_key,
+                            timeout_s=120, title="inno-repair")
+    except Exception as e:  # noqa: BLE001
+        print(f"repair: Gemini suggestion unavailable: {e}")
+        return ""
 
 
 def main() -> None:
