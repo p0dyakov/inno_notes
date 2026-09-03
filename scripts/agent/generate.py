@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Generate semester-4 qmd articles from inno_files transcript MDs.
+"""Generate semester-N qmd articles from inno_files transcript MDs.
 
-Only touches semester-4. Early exit if nothing to generate/update.
-Uses gemini-3.8-flash per section (Theory, Definitions, Formulas, Practice)
-in parallel, then stitches per prompt.md/rules.md.
+Works for ANY future semester: a semester is agent-managed iff it has a
+<semester>/course_map.json registry (folder full names + teachers).
+Only touches managed semesters. Early exit if nothing to generate/update.
+Theory always uses the Pro model; other sections use the flash model.
 Iterates until fix_formatting.py + quarto render pass (up to 3 attempts).
 """
 
@@ -28,7 +29,27 @@ INNO_NOTES = ROOT
 PROMPT_MD = ROOT / "prompt.md"
 RULES_MD = ROOT / "rules.md"
 COURSE_MAP_JSON = Path(__file__).parent / "course_map.json"
-SEM4_REGISTRY_JSON = ROOT / "semester-4" / "course_map.json"
+
+
+def registry_path(semester: str) -> Path:
+    return ROOT / semester / "course_map.json"
+
+
+def managed_semesters() -> list[str]:
+    """Semesters the agent may touch: any semester-N dir with course_map.json."""
+    out = []
+    for d in ROOT.iterdir():
+        if d.is_dir() and re.fullmatch(r"semester-\d+", d.name) and (d / "course_map.json").exists():
+            out.append(d.name)
+    return sorted(out, key=lambda s: int(s.split("-")[1]))
+
+
+SEMESTER_ROMAN = {"1": "I", "2": "II", "3": "III", "4": "IV",
+                  "5": "V", "6": "VI", "7": "VII", "8": "VIII"}
+
+
+def semester_roman(semester: str) -> str:
+    return SEMESTER_ROMAN.get(semester.split("-")[1], semester)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 # Same shape as fix_formatting.py TITLE_WEEK_RE (kept in sync manually —
@@ -42,11 +63,9 @@ GEMINI_FALLBACKS = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
 # Override with GEMINI_THEORY_MODEL env if the model id changes.
 GEMINI_THEORY_MODEL = os.environ.get("GEMINI_THEORY_MODEL", "gemini-3.1-pro-preview")
 GEMINI_THEORY_FALLBACKS = ["gemini-3.1-pro-preview", "gemini-3.8-flash"]
-GOLDEN_W = 3  # for initial semester-4 week numbering starting at 1
+GOLDEN_W = 3  # legacy week-numbering offset, kept for reference
 
-# Only semester-4 is allowed to be touched by the agent
-ALLOWED_SEMESTER = "semester-4"
-SKIP_OLD = {"semester-1", "semester-2", "semester-3"}
+# semesters without course_map.json (e.g. frozen legacy semester-1/2) are never touched
 
 SECTION_ORDER = ["Theory", "Definitions", "Formulas", "Practice"]
 
@@ -68,10 +87,6 @@ AUTHOR_MAP = {
     "ProbStat": "Mohammad Alkousa",
     "DE": "Mohammad Alkousa",
     "ITO": "Mohammad Alkousa",
-    # semester-4 specific fallbacks
-    "ProbStat": "Mohammad Alkousa",
-    "DE": "Mohammad Alkousa",
-    "ITO": "Mohammad Alkousa",
 }
 
 
@@ -81,18 +96,19 @@ def load_course_map() -> dict:
     return {}
 
 
-def load_sem4_registry() -> dict:
-    if SEM4_REGISTRY_JSON.exists():
+def load_registry(semester: str) -> dict:
+    path = registry_path(semester)
+    if path.exists():
         try:
-            return json.loads(SEM4_REGISTRY_JSON.read_text(encoding="utf-8"))
+            return json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             return {}
     return {}
 
 
-def sem4_course_entry(key: str) -> dict:
+def course_entry(semester: str, key: str) -> dict:
     """Lookup registry entry by short code (inno_files folder) or full name."""
-    courses = load_sem4_registry().get("courses", {})
+    courses = load_registry(semester).get("courses", {})
     if key in courses:
         return courses[key]
     for code, entry in courses.items():
@@ -101,9 +117,9 @@ def sem4_course_entry(key: str) -> dict:
     return {}
 
 
-def sem4_canon_code(folder: str) -> str:
+def canon_code(semester: str, folder: str) -> str:
     """Normalize full folder name back to short inno_files code when known."""
-    courses = load_sem4_registry().get("courses", {})
+    courses = load_registry(semester).get("courses", {})
     if folder in courses:
         return folder
     for code, entry in courses.items():
@@ -112,9 +128,22 @@ def sem4_canon_code(folder: str) -> str:
     return folder
 
 
-def short_to_full(code: str) -> str:
-    entry = sem4_course_entry(code)
+def short_to_full(code: str, semester: str = "semester-4") -> str:
+    entry = course_entry(semester, code)
     return entry.get("name", code)
+
+
+# Backward-compatible wrappers (default semester-4) for existing callers/tests.
+def load_sem4_registry() -> dict:
+    return load_registry("semester-4")
+
+
+def sem4_course_entry(key: str) -> dict:
+    return course_entry("semester-4", key)
+
+
+def sem4_canon_code(folder: str) -> str:
+    return canon_code("semester-4", folder)
 
 
 def extract_author_from_transcript(transcript: str) -> str:
@@ -136,28 +165,33 @@ def extract_author_from_transcript(transcript: str) -> str:
     return ""
 
 
-def resolve_author(folder: str, transcript: str = "") -> str:
-    """Priority: Moodle-sourced registry entry -> transcript first page -> fallback table."""
-    entry = sem4_course_entry(folder)
-    if entry and entry.get("teachers") and entry.get("teacher_source", "").startswith("moodle"):
+UNKNOWN_AUTHOR = "\u2014"  # em-dash: shown when the teacher could not be determined
+
+
+def resolve_author(folder: str, transcript: str = "", semester: str = "semester-4") -> str:
+    """Priority: Moodle/manual registry entry -> transcript first page -> curated table.
+
+    If the teacher cannot be determined with confidence at any step, returns
+    an em-dash — never invent a name.
+    """
+    entry = course_entry(semester, folder)
+    if entry and entry.get("teachers"):
         return ", ".join(entry["teachers"])
     if transcript:
         found = extract_author_from_transcript(transcript)
         if found:
             return found
-    if entry and entry.get("teachers"):
-        return ", ".join(entry["teachers"])
     if folder in AUTHOR_MAP:
         return AUTHOR_MAP[folder]
-    code = sem4_canon_code(folder)
+    code = canon_code(semester, folder)
     if code in AUTHOR_MAP:
         return AUTHOR_MAP[code]
-    return "Mohammad Alkousa"
+    return UNKNOWN_AUTHOR
 
 
-def section_rule_for_folder(folder: str) -> tuple[list[str], bool]:
+def section_rule_for_folder(folder: str, semester: str = "semester-4") -> tuple[list[str], bool]:
     """Return (required_top_sections, has_formulas) per rules.md."""
-    folder = sem4_canon_code(folder)
+    folder = canon_code(semester, folder)
     # rules.md mapping
     map_ = {
         "ProbStat": (["Theory", "Definitions", "Formulas", "Practice"], True),
@@ -360,44 +394,65 @@ def _call_gemini(prompt: str, api_key: str, model: str, timeout_s: int = 300) ->
     raise last_err  # noqa: TRY201
 
 
-def gather_changed_lectures(inno_files: Path, since_sha: str | None = None) -> list[Path]:
-    """Find semester-4 transcript MDs that are new or changed since SHA."""
-    # For simplicity, diff against origin/main~1 if no SHA, else scan semester-4
+def gather_changed_lectures(
+    inno_files: Path, since_sha: str | None = None, semesters: list[str] | None = None,
+) -> list[Path]:
+    """Find transcript MDs in managed semesters that are new or changed since SHA."""
+    semesters = semesters or managed_semesters()
+    managed = set(semesters)
     if since_sha:
-        res = run(["git", "-C", str(inno_files), "diff", "--name-only", f"{since_sha}..HEAD", "--", "semester-4"])
+        res = run(["git", "-C", str(inno_files), "diff", "--name-only", f"{since_sha}..HEAD", "--"] + semesters)
         # If that fails (shallow), fall back to full scan
         if res.returncode != 0 or not res.stdout.strip():
             pass
         else:
             files = [inno_files / p.strip() for p in res.stdout.splitlines() if p.strip().endswith(".md")]
-            # Filter to semester-4 only and existing files
-            return [p for p in files if p.exists() and ALLOWED_SEMESTER in str(p)]
+            # Keep only existing files inside managed semesters
+            return [p for p in files if p.exists() and md_semester_safe(p, inno_files) in managed]
 
-    # Full scan: every semester-4 Lecture.md that has no corresponding qmd or is newer
+    # Full scan: every transcript MD in managed semesters (Syllabus excluded)
     out: list[Path] = []
-    for md in sorted((inno_files / "semester-4").rglob("*.md")):
-        if not md.is_file():
-            continue
-        # Skip Syllabus etc? Only lab/lecture/tutorial sources that were transcripted
-        if md.name == "Syllabus.md":
-            continue
-        out.append(md)
+    for sem in semesters:
+        for md in sorted((inno_files / sem).rglob("*.md")):
+            if not md.is_file():
+                continue
+            # Skip Syllabus etc? Only lab/lecture/tutorial sources that were transcripted
+            if md.name == "Syllabus.md":
+                continue
+            out.append(md)
     return out
 
 
+def md_semester_safe(md: Path, inno_files: Path) -> str:
+    try:
+        return md_semester(md, inno_files)
+    except ValueError:
+        return ""
+
+
+def md_semester(md: Path, inno_files: Path) -> str:
+    """Derive the semester dir (semester-N) from a transcript path."""
+    rel = md.relative_to(inno_files)
+    for part in rel.parts:
+        if re.fullmatch(r"semester-\d+", part):
+            return part
+    raise ValueError(f"no semester dir in transcript path: {md}")
+
+
 def md_to_qmd_target(md: Path, inno_files: Path) -> Path:
-    """Map inno_files/semester-4/<ShortCode>/<N>/Lecture.md -> inno_notes/semester-4/<Full Name>/<N>.qmd"""
-    rel = md.relative_to(inno_files / "semester-4")
+    """Map inno_files/<sem>/<ShortCode>/<N>/Lecture.md -> inno_notes/<sem>/<Full Name>/<N>.qmd"""
+    semester = md_semester(md, inno_files)
+    rel = md.relative_to(inno_files / semester)
     # rel is <ShortCode>/<N>/Lecture.md or <ShortCode>/<N>/Lecture.mmd etc
     parts = rel.parts
-    course = short_to_full(parts[0])
+    course = short_to_full(parts[0], semester)
     week = parts[1] if len(parts) > 2 else "1"
     # week is a folder like "12" or "10-11" etc — keep as is for W-number
     # But the qmd naming is per lecture: 1.qmd, 2.qmd, etc. We map Lecture.md in week folder to <N>.qmd
     # where N is the numeric week folder name stripped to its first number
     m = re.match(r"(\d+)", week)
     n = m.group(1) if m else "1"
-    return INNO_NOTES / f"semester-4/{course}/{n}.qmd"
+    return INNO_NOTES / f"{semester}/{course}/{n}.qmd"
 
 
 SOURCE_KINDS = ["Lab", "Homework", "Assignment", "Exercises", "Lecture", "Tutorial",
@@ -436,9 +491,9 @@ def combine_transcripts(mds: list[Path]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-def collect_style_context(course: str, max_files: int = 3) -> str:
+def collect_style_context(course: str, max_files: int = 3, semester: str = "semester-4") -> str:
     """Grab up to 3 neighboring articles in the same course folder for style."""
-    course_dir = INNO_NOTES / f"semester-4/{course}"
+    course_dir = INNO_NOTES / f"{semester}/{course}"
     files = sorted(course_dir.glob("*.qmd"))[:max_files] if course_dir.exists() else []
     # Fallback: use semester-2 examples with similar course type
     if not files:
@@ -459,14 +514,15 @@ def generate_article(
     api_key: str,
     style_context: str,
     sources: list[str] | None = None,
+    semester: str = "semester-4",
 ) -> str:
     today = datetime.now().strftime("%B %d, %Y")
-    full_name = short_to_full(sem4_canon_code(course))
-    author = resolve_author(course, transcript)
+    full_name = short_to_full(canon_code(semester, course), semester)
+    author = resolve_author(course, transcript, semester)
     topic = infer_topic(transcript, week, api_key)
     title = f"W{week}. {topic}"
     assert validate_title(title), f"generated title failed validation: {title!r}"
-    required, has_formulas = section_rule_for_folder(course)
+    required, has_formulas = section_rule_for_folder(course, semester)
     src_note = ""
     if sources:
         kinds = ", ".join(f"{s} ({source_kind(s)})" for s in sources)
@@ -476,7 +532,7 @@ def generate_article(
             f"in canonical order Lab→Homework→Assignment→Exercises→Lecture→Tutorial→Chapter→Recap→Test→Midterm→Final."
         )
     target_info = (
-        f"Course {full_name} (semester-4), week W{week}, author {author}, date {today}, "
+        f"Course {full_name} ({semester}), week W{week}, author {author}, date {today}, "
         f"required sections {required}. Article title is {title!r} — do not restate it in section bodies.{src_note}"
     )
 
@@ -537,9 +593,10 @@ def theory_stats(body: str) -> tuple[int, int]:
 def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> bool:
     """Regenerate ONLY the Theory section of an existing article with the PRO model."""
     rel = qmd.relative_to(INNO_NOTES)
+    semester = rel.parts[0]
     course_full, week = rel.parts[1], Path(rel.parts[2]).stem
-    code = sem4_canon_code(course_full)
-    cdir = inno_files / "semester-4" / code
+    code = canon_code(semester, course_full)
+    cdir = inno_files / semester / code
     mds = [md for wd in sorted(cdir.iterdir()) if wd.is_dir()
            and (m := re.match(r"(\d+)", wd.name)) and m.group(1) == week
            for md in sorted(wd.glob("*.md")) if md.name != "Syllabus.md"]
@@ -547,15 +604,15 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
         print(f"  no transcripts for {qmd}")
         return False
     transcript = combine_transcripts(mds)
-    full_name = short_to_full(code)
-    author = resolve_author(code, transcript)
-    required, _ = section_rule_for_folder(code)
-    style = collect_style_context(course_full)
+    full_name = short_to_full(code, semester)
+    author = resolve_author(code, transcript, semester)
+    required, _ = section_rule_for_folder(code, semester)
+    style = collect_style_context(course_full, semester=semester)
     old = qmd.read_text(encoding="utf-8")
     mt = re.search(r'title: "(.*)"', old)
     title = mt.group(1) if mt else f"W{week}. Notes"
     target_info = (
-        f"Course {full_name} (semester-4), week W{week}, author {author}, "
+        f"Course {full_name} ({semester}), week W{week}, author {author}, "
         f"required sections {required}. Article title is {title!r} — do not restate it. "
         f"Regenerate ONLY the Theory section; keep full depth per the instruction."
     )
@@ -592,13 +649,14 @@ def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False)
 
 def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry_run: bool = False) -> bool:
     first = mds[0]
-    course = first.relative_to(inno_files / "semester-4").parts[0]
-    week = re.match(r"(\d+)", first.relative_to(inno_files / "semester-4").parts[1]).group(1) if len(first.relative_to(inno_files / "semester-4").parts) > 1 else "1"
-
-    # Guard: never touch semester-1/2/3
-    if any(s in str(qmd) for s in SKIP_OLD):
-        print(f"  Skip old semester {first}")
+    semester = md_semester(first, inno_files)
+    # Guard: only managed semesters (with course_map.json) are ever touched
+    if semester not in managed_semesters():
+        print(f"  Skip unmanaged semester {first}")
         return False
+    rel = first.relative_to(inno_files / semester)
+    course = rel.parts[0]
+    week = re.match(r"(\d+)", rel.parts[1]).group(1) if len(rel.parts) > 1 else "1"
 
     transcript = combine_transcripts(mds)
     if not transcript.strip():
@@ -612,14 +670,15 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
         if qmd.stat().st_mtime > newest:
             pass
 
-    style = collect_style_context(short_to_full(course))
+    style = collect_style_context(short_to_full(course, semester), semester=semester)
 
     # Generate
     max_iters = 3
     for it in range(1, max_iters + 1):
         print(f"Generating {qmd} iteration {it}/{max_iters} ...")
         try:
-            article = generate_article(transcript, course, week, api_key, style, [md.name for md in mds])
+            article = generate_article(transcript, course, week, api_key, style,
+                                       [md.name for md in mds], semester)
         except Exception as e:
             print(f"  Gemini failed: {e}")
             if it == max_iters:
@@ -682,10 +741,56 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
     return False
 
 
+def scaffold_semester(semester: str, inno_files: Path) -> Path:
+    """Create <semester>/course_map.json skeleton from inno_files folders.
+
+    Teachers start empty (teacher_source "unknown") so resolve_author falls
+    back to transcript extraction and finally an em-dash — never a guess.
+    Fill `name` with full Moodle course names and `teachers` once known.
+    """
+    if not re.fullmatch(r"semester-\d+", semester):
+        raise ValueError(f"bad semester dir: {semester}")
+    src = inno_files / semester
+    if not src.is_dir():
+        raise ValueError(f"no such inno_files semester: {src}")
+    target_dir = ROOT / semester
+    target_dir.mkdir(parents=True, exist_ok=True)
+    courses = {}
+    for code_dir in sorted(d for d in src.iterdir() if d.is_dir() and not d.name.startswith(".")):
+        courses[code_dir.name] = {
+            "name": code_dir.name,
+            "moodle_id": "",
+            "moodle_fullname": "",
+            "moodle_shortname": "",
+            "teachers": [],
+            "teacher_source": "unknown",
+            "teacher_note": "Scaffolded automatically; fill full Moodle name + teachers.",
+        }
+    out = {
+        "_meta": {
+            "semester": semester,
+            "comment": "Source of truth for folder names and teachers. Teacher priority: "
+                       "registry -> transcript first page -> em-dash (never guess).",
+            "teacher_source_priority": ["moodle", "manual", "transcript", "unknown"],
+        },
+        "courses": courses,
+    }
+    path = target_dir / "course_map.json"
+    path.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"scaffolded {path} with {len(courses)} course(s): {', '.join(courses)}")
+    print("Next: fill each `name` with the full Moodle course name and `teachers`;")
+    print("then run update_sidebar() (or generate once) to create sidebar sections.")
+    return path
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Generate semester-4 articles from inno_files transcripts")
+    ap = argparse.ArgumentParser(description="Generate semester articles from inno_files transcripts")
     ap.add_argument("--inno-files", type=Path, default=INNO_FILES_DEFAULT)
     ap.add_argument("--sha", type=str, default=None)
+    ap.add_argument("--semester", action="append", default=None,
+                    help="Managed semester to process (repeatable; default: all with course_map.json)")
+    ap.add_argument("--scaffold-semester", default=None,
+                    help="Create <semester>/course_map.json skeleton from inno_files, then exit")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0, help="Limit number of lectures to process (for testing)")
     ap.add_argument("--regen-theory", nargs="*", default=None,
@@ -699,6 +804,11 @@ def main() -> None:
         alt = Path(__file__).resolve().parents[2].parent / "inno_files"
         if alt.exists():
             args.inno_files = alt
+
+    if args.scaffold_semester:
+        scaffold_semester(args.scaffold_semester, args.inno_files)
+        update_sidebar()
+        return
 
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
     if not api_key:
@@ -715,6 +825,12 @@ def main() -> None:
         if not args.dry_run:
             sys.exit(1)
 
+    semesters = args.semester or managed_semesters()
+    if not semesters:
+        print("No managed semesters (no semester-N/course_map.json). "
+              "Run --scaffold-semester first. Exiting (nothing to change).")
+        return
+
     if args.regen_theory:
         ok_all = True
         for qp in args.regen_theory:
@@ -728,15 +844,13 @@ def main() -> None:
         update_sidebar()
         sys.exit(0 if ok_all else 2)
 
-    mds = gather_changed_lectures(args.inno_files, args.sha)
-    # Only semester-4; already filtered, but double-guard
-    mds = [p for p in mds if ALLOWED_SEMESTER in str(p)]
+    mds = gather_changed_lectures(args.inno_files, args.sha, semesters)
     if not mds:
-        print("No semester-4 transcript changes to process. Exiting (nothing to change).")
+        print(f"No transcript changes in {semesters} to process. Exiting (nothing to change).")
         return
 
     groups = group_lectures(mds, args.inno_files)
-    print(f"Found {len(mds)} semester-4 transcript(s) in {len(groups)} article group(s):")
+    print(f"Found {len(mds)} transcript(s) in {len(groups)} article group(s):")
     for qmd, group in groups:
         srcs = ", ".join(p.relative_to(args.inno_files).as_posix() for p in group)
         print(f"  {srcs} -> {qmd.relative_to(ROOT)}")
@@ -762,11 +876,32 @@ def main() -> None:
         sys.exit(2)
 
     # Update _quarto.yml sidebar for new files (add missing entries)
-    update_sidebar()
+    update_sidebar(semesters)
+
+
+def _ensure_course_section_in(text: str, course: str, semester: str) -> str:
+    """Add a missing course section inside the right Semester block."""
+    marker = f'- section: "{course}"'
+    if marker in text:
+        return text
+    sem_marker = f'- section: "Semester {semester_roman(semester)}"'
+    anchor = sem_marker + '\n        contents: []'
+    if anchor in text:
+        block = (f'{sem_marker}\n        contents:\n'
+                 f'        - section: "{course}"\n          contents: []\n')
+        return text.replace(anchor, block, 1)
+    # Semester block has contents: find its end (next same-indent section or execute:)
+    pat = re.compile(re.escape(sem_marker) + r"\n        contents:\n(.*?)(?=\n      - section:|\nexecute:\n)",
+                     re.DOTALL)
+    m = pat.search(text)
+    if m:
+        block = (f'        - section: "{course}"\n          contents: []\n')
+        return text[: m.end(1)] + block + text[m.end(1):]
+    return _ensure_course_section(text, course)
 
 
 def _ensure_course_section(text: str, course: str) -> str:
-    """Add a missing `- section: "<full course name>"` block at the end of Semester IV."""
+    """Add a missing `- section: "<full course name>"` block (legacy fallback)."""
     marker = f'- section: "{course}"'
     if marker in text:
         return text
@@ -785,14 +920,31 @@ def yml_rel(qmd: Path) -> str:
     return qmd.relative_to(ROOT).as_posix()
 
 
-def update_sidebar() -> None:
-    """Ensure every semester-4 qmd is listed in _quarto.yml sidebar (full Moodle names)."""
+def _ensure_semester_section(text: str, semester: str) -> str:
+    """Add a missing `- section: "Semester X"` block before the `execute:` key."""
+    roman = semester_roman(semester)
+    marker = f'- section: "Semester {roman}"'
+    if marker in text:
+        return text
+    anchor = "\nexecute:\n"
+    assert anchor in text, "_quarto.yml has no top-level execute: anchor"
+    block = f'      - section: "Semester {roman}"\n        contents: []\n'
+    return text.replace(anchor, "\n" + block + anchor.lstrip("\n"), 1)
+
+
+def update_sidebar(semesters: list[str] | None = None) -> None:
+    """Ensure every managed-semester qmd is listed in _quarto.yml sidebar."""
+    semesters = semesters or managed_semesters()
     yml = ROOT / "_quarto.yml"
-    text = yml.read_text(encoding="utf-8")
-    for entry in load_sem4_registry().get("courses", {}).values():
-        text = _ensure_course_section(text, entry.get("name", ""))
-    # Find all semester-4 qmds on disk
-    qmds = sorted((ROOT / "semester-4").rglob("*.qmd"))
+    original = yml.read_text(encoding="utf-8")
+    text = original
+    qmds: list[Path] = []
+    for sem in semesters:
+        text = _ensure_semester_section(text, sem)
+        for entry in load_registry(sem).get("courses", {}).values():
+            text = _ensure_course_section_in(text, entry.get("name", ""), sem)
+        # Find all qmds on disk for this semester
+        qmds.extend(sorted((ROOT / sem).rglob("*.qmd")))
     added = 0
     for qmd in qmds:
         rel = yml_rel(qmd)
@@ -823,9 +975,9 @@ def update_sidebar() -> None:
                         1,
                     )
                     added += 1
-    if added:
+    if text != original:
         yml.write_text(text, encoding="utf-8")
-        print(f"Updated _quarto.yml with {added} new file(s)")
+        print(f"Updated _quarto.yml: {added} new file(s), sidebar sections synced")
     # Refresh the home-page course table so new courses/semesters appear automatically
     updater = ROOT / "scripts" / "update_index.py"
     if updater.exists():

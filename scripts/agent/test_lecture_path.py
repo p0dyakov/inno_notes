@@ -64,6 +64,19 @@ def main() -> None:
         None,
     )
 
+    from generate import (  # noqa: E402
+        UNKNOWN_AUTHOR,
+        managed_semesters,
+        resolve_author as resolve_author_fn,
+    )
+
+    check("managed semesters discovered", "semester-4" in managed_semesters(), str(managed_semesters()))
+    check("unknown teacher is a dash, never a guess",
+          resolve_author_fn("SOME_FUTURE_COURSE_XYZ") == UNKNOWN_AUTHOR == "\u2014",
+          resolve_author_fn("SOME_FUTURE_COURSE_XYZ"))
+    check("empty registry teachers fall back, never guess",
+          resolve_author_fn("AI", "", "semester-4") in ("Munir Makhmutov", "\u2014"),
+          "")
     reg = load_sem4_registry()["courses"]
     check("registry has 6 courses", len(reg) == 6, str(sorted(reg)))
     for code, entry in reg.items():
