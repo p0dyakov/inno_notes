@@ -38,6 +38,10 @@ TITLE_WEEK_RE = re.compile(r"^W\d+(?:-W\d+|[AB])?\.\s+.+$")
 INNO_FILES_DEFAULT = Path("/tmp/inno_files")
 GEMINI_MODEL = "gemini-3.8-flash"
 GEMINI_FALLBACKS = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
+# Theory is the most important section: it is always written by the Pro model.
+# Override with GEMINI_THEORY_MODEL env if the model id changes.
+GEMINI_THEORY_MODEL = os.environ.get("GEMINI_THEORY_MODEL", "gemini-3.1-pro-preview")
+GEMINI_THEORY_FALLBACKS = ["gemini-3.1-pro-preview", "gemini-3.8-flash"]
 GOLDEN_W = 3  # for initial semester-4 week numbering starting at 1
 
 # Only semester-4 is allowed to be touched by the agent
@@ -199,11 +203,12 @@ def gemini_section(
     target_info: str,
     api_key: str,
     model: str = GEMINI_MODEL,
+    fallbacks: list[str] | None = None,
 ) -> str:
     """Call Gemini for a single section. Retries fall back across models."""
     prompt = _build_section_prompt(section, transcript, style_context, target_info)
     last_err: Exception | None = None
-    models = [model] + GEMINI_FALLBACKS
+    models = [model] + (fallbacks if fallbacks is not None else GEMINI_FALLBACKS)
     for m in models:
         for attempt in range(1, 4):
             try:
@@ -480,6 +485,13 @@ def generate_article(
     results: dict[str, str] = {}
 
     def task(section: str) -> tuple[str, str]:
+        if section == "Theory":
+            print(f"  Gemini {section} (PRO model) for {course}/{week} ...")
+            return section, gemini_section(
+                section, transcript, style_context, target_info, api_key,
+                model=GEMINI_THEORY_MODEL,
+                fallbacks=GEMINI_THEORY_FALLBACKS + GEMINI_FALLBACKS,
+            )
         print(f"  Gemini {section} for {course}/{week} ...")
         return section, gemini_section(section, transcript, style_context, target_info, api_key)
 
@@ -514,6 +526,63 @@ def generate_article(
         """
     )
     return yaml_front + "\n" + "\n\n".join(stitched_sections) + "\n"
+
+
+def theory_stats(body: str) -> tuple[int, int]:
+    """(total words, ##### subsection count) of a Theory section body."""
+    subs = re.split(r"^##### ", body, flags=re.M)[1:]
+    return sum(len(s.split()) for s in subs), len(subs)
+
+
+def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> bool:
+    """Regenerate ONLY the Theory section of an existing article with the PRO model."""
+    rel = qmd.relative_to(INNO_NOTES)
+    course_full, week = rel.parts[1], Path(rel.parts[2]).stem
+    code = sem4_canon_code(course_full)
+    cdir = inno_files / "semester-4" / code
+    mds = [md for wd in sorted(cdir.iterdir()) if wd.is_dir()
+           and (m := re.match(r"(\d+)", wd.name)) and m.group(1) == week
+           for md in sorted(wd.glob("*.md")) if md.name != "Syllabus.md"]
+    if not mds:
+        print(f"  no transcripts for {qmd}")
+        return False
+    transcript = combine_transcripts(mds)
+    full_name = short_to_full(code)
+    author = resolve_author(code, transcript)
+    required, _ = section_rule_for_folder(code)
+    style = collect_style_context(course_full)
+    old = qmd.read_text(encoding="utf-8")
+    mt = re.search(r'title: "(.*)"', old)
+    title = mt.group(1) if mt else f"W{week}. Notes"
+    target_info = (
+        f"Course {full_name} (semester-4), week W{week}, author {author}, "
+        f"required sections {required}. Article title is {title!r} — do not restate it. "
+        f"Regenerate ONLY the Theory section; keep full depth per the instruction."
+    )
+    best, best_score = "", -1
+    for it in range(1, tries + 1):
+        print(f"  Theory PRO attempt {it}/{tries} for {qmd.relative_to(ROOT)} ...")
+        body = gemini_section("Theory", transcript, style, target_info, api_key,
+                              model=GEMINI_THEORY_MODEL,
+                              fallbacks=GEMINI_THEORY_FALLBACKS + GEMINI_FALLBACKS).strip()
+        if not body.lstrip().startswith("####"):
+            body = "#### **1. Theory**\n\n" + body
+        words, subs = theory_stats(body)
+        print(f"    stats: {words} words, {subs} subsections")
+        if words > best_score:
+            best, best_score = body, words
+        if words >= 1200 and subs >= 4:
+            best = body
+            break
+        time.sleep(5)
+    new = re.sub(r"#### \*\*1\. Theory\*\*.*?(?=^#### )", best.rstrip() + "\n\n",
+                 old, count=1, flags=re.DOTALL | re.M)
+    assert new != old, "Theory splice failed"
+    qmd.write_text(new, encoding="utf-8")
+    run(["python3", "fix_formatting.py"], cwd=str(ROOT))
+    words, subs = theory_stats(best)
+    print(f"  Theory replaced: {words} words, {subs} subsections")
+    return True
 
 
 def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False) -> bool:
@@ -619,6 +688,9 @@ def main() -> None:
     ap.add_argument("--sha", type=str, default=None)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0, help="Limit number of lectures to process (for testing)")
+    ap.add_argument("--regen-theory", nargs="*", default=None,
+                    help="Regenerate ONLY Theory (PRO model) for given qmd path(s), then exit")
+    ap.add_argument("--tries", type=int, default=3)
     args = ap.parse_args()
 
     if args.inno_files and not args.inno_files.exists():
@@ -642,6 +714,19 @@ def main() -> None:
         print("GEMINI_API_KEY missing (env or inno_files config). Dry-run check only.", file=sys.stderr)
         if not args.dry_run:
             sys.exit(1)
+
+    if args.regen_theory:
+        ok_all = True
+        for qp in args.regen_theory:
+            qmd = Path(qp) if Path(qp).is_absolute() else ROOT / qp
+            try:
+                if not regen_theory(qmd, args.inno_files, api_key, tries=args.tries):
+                    ok_all = False
+            except Exception as e:
+                print(f"ERROR regen {qmd}: {e}", file=sys.stderr)
+                ok_all = False
+        update_sidebar()
+        sys.exit(0 if ok_all else 2)
 
     mds = gather_changed_lectures(args.inno_files, args.sha)
     # Only semester-4; already filtered, but double-guard
