@@ -138,6 +138,36 @@ def main() -> None:
         html = ROOT / "_site" / qmd.with_suffix(".html").relative_to(ROOT)
         check(f"built html present: {rel}", html.exists(), str(html))
 
+    # Repo-wide: top-level sections numbered sequentially among present
+    # sections (omitted section shifts the rest), practice tasks match.
+    TOP_RE = re.compile(r"^####\s+\*\*(\d+)\.\s+(.+?)\*\*\s*$")
+    TASK_RE = re.compile(r"^#####\s+\*\*(\d+)\.\d+\.")
+    CANON = ["Theory", "Definitions", "Formulas", "Practice"]
+    n_seq = 0
+    for qmd in sorted(ROOT.glob("semester-*/*/*.qmd")):
+        nm = qmd.name
+        if nm in ("404.qmd", "index.qmd", "0.qmd") or nm.endswith(".ru.qmd"):
+            continue
+        if "Academic Writing" in str(qmd):
+            continue
+        tops = [TOP_RE.match(l.strip()) for l in qmd.read_text(encoding="utf-8").splitlines()]
+        tops = [(m.group(1), m.group(2)) for m in tops if m and m.group(2) in CANON]
+        if not tops:
+            continue
+        want = [str(i + 1) for i in range(len(tops))]
+        got = [n for n, _ in tops]
+        check(f"sequential sections: {qmd.parent.parent.name}/{qmd.parent.name}/{nm}",
+              got == want and [n for _, n in tops] == sorted([n for _, n in tops], key=CANON.index),
+              f"got {tops}")
+        n_seq += 1
+        pnum = next((n for n, t in tops if t == "Practice"), None)
+        if pnum:
+            bad = [l.strip()[:40] for l in qmd.read_text(encoding="utf-8").splitlines()
+                   if (m := TASK_RE.match(l.strip())) and m.group(1) != pnum]
+            check(f"practice prefix ={pnum}: {qmd.parent.name}/{nm}", not bad, str(bad[:2]))
+            n_seq += 1
+    print(f"(sequential-numbering checks: {n_seq})")
+
     if args.live:
         def get(path: str) -> str:
             with urllib.request.urlopen(args.live_base + path, timeout=20) as r:

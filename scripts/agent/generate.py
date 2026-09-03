@@ -567,16 +567,21 @@ def generate_article(
             sec, body = fut.result()
             results[sec] = body.strip()
 
-    # Stitch in canonical order
+    # Stitch in canonical order. Numbers are SEQUENTIAL among the sections
+    # actually present in this article (no Formulas -> Practice is 3., etc.),
+    # never the position in the global SECTION_ORDER.
     stitched_sections = []
     for sec in sections:
         body = results.get(sec, "")
         if not body:
             continue
-        # Ensure each section starts with its #### header (Gemini sometimes omits it)
-        if not body.lstrip().startswith("####"):
-            # Prepend canonical header
-            idx = SECTION_ORDER.index(sec) + 1 if sec in SECTION_ORDER else 1
+        idx = sections.index(sec) + 1
+        mh = re.match(r"(\s*####\s+\*\*)(\d+)(\.\s+)", body)
+        if mh:
+            # Model emitted its own header — normalize the number, keep the rest
+            body = f"{mh.group(1)}{idx}{mh.group(3)}" + body[mh.end():]
+        else:
+            # Gemini sometimes omits the header — prepend canonical one
             body = f"#### **{idx}. {sec}**\n\n" + body
         stitched_sections.append(body.strip())
 

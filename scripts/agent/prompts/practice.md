@@ -1,6 +1,10 @@
 # Practice section prompt (STRICT layout — enforced exactly)
 
-Write the Practice section (#### **4. Practice**, or 3 if Formulas was omitted).
+Write the Practice section. Its number is SEQUENTIAL among the sections actually
+present in THIS article: `4.` if Theory + Definitions + Formulas are all present,
+`3.` if one of them was omitted, `2.` if two were omitted. Task headings use the
+same number (`##### **3.1. ...**` when Practice is section 3). When in doubt,
+count the sections you actually wrote, starting from 1.
 
 Task block layout (no deviations):
 

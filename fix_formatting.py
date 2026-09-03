@@ -71,6 +71,13 @@ COURSE_SECTION_RULES = [
     (r'/Academic Writing and Argumentation II/', ['Theory'], []),
     (r'/Logic and Discrete Mathematics/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
     (r'/Computer Architecture/', ['Theory', 'Definitions'], ['Practice']),
+    # semester-4 (full Moodle names; mirrors section_rule_for_folder in generate.py)
+    (r'/Probability and Statistics/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Differential Equations/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Introduction to Optimization/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Operating Systems/', ['Theory', 'Definitions', 'Practice'], []),
+    (r'/Introduction to AI/', ['Theory', 'Definitions', 'Practice'], []),
+    (r'/Physics I/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
 ]
 
 DEFAULT_ALLOWED_SECTIONS = ['Theory', 'Definitions', 'Formulas', 'Practice']
@@ -176,8 +183,9 @@ def validate_top_sections(filepath, lines):
         return []
     required, optional = section_rule_for_file(filepath)
     allowed_names = required + optional
-    expected_numbers = {name: str(index + 1) for index, name in enumerate(allowed_names)}
-    found = {}
+    canon = [n for n in ('Theory', 'Definitions', 'Formulas', 'Practice') if n in allowed_names]
+    found = []  # (line_num, number, name)
+    seen = {}
 
     for line_num, line in enumerate(lines, start=1):
         stripped = line.strip()
@@ -194,20 +202,82 @@ def validate_top_sections(filepath, lines):
             issues.append(f"Line {line_num}: forbidden top-level section `{name}`.")
             continue
 
-        expected_number = expected_numbers[name]
-        if number != expected_number:
-            issues.append(f"Line {line_num}: section `{name}` must be numbered `{expected_number}.`, found `{number}.`.")
+        if name in seen:
+            issues.append(f"Line {line_num}: duplicate top-level section `{name}`; first seen on line {seen[name]}.")
+            continue
+        seen[name] = line_num
+        found.append((line_num, number, name))
 
-        if name in found:
-            issues.append(f"Line {line_num}: duplicate top-level section `{name}`; first seen on line {found[name]}.")
-        else:
-            found[name] = line_num
+    names_in_file = [n for _, _, n in found]
+    if names_in_file != sorted(names_in_file, key=canon.index):
+        issues.append(f"Top-level sections out of canonical order: {names_in_file}; want {sorted(names_in_file, key=canon.index)}.")
+
+    # Sequential numbering among sections PRESENT in the file: an omitted
+    # section shifts everything after it (no Formulas -> Practice is 3.;
+    # no Definitions either -> Practice is 2.).
+    present_canon = sorted(set(names_in_file), key=canon.index)
+    expected = {n: str(i + 1) for i, n in enumerate(present_canon)}
+    for line_num, number, name in found:
+        if number != expected[name]:
+            issues.append(
+                f"Line {line_num}: section `{name}` must be numbered `{expected[name]}.`, "
+                f"found `{number}.` (numbering is sequential among present sections)."
+            )
 
     for name in required:
-        if name not in found:
-            issues.append(f"Missing required top-level section `{expected_numbers[name]}. {name}`.")
+        if name not in seen:
+            issues.append(f"Missing required top-level section `{name}`.")
 
     return issues
+
+
+def renumber_sections(lines, filepath):
+    """Auto-fix: renumber #### headers sequentially + practice ##### prefixes.
+
+    Returns (new_lines, changed). Skips AWA scaffolds, cheatsheets (0.qmd),
+    and files whose sections are out of canonical order (order is a human fix).
+    """
+    if should_skip_file(filepath) or 'Academic Writing and Argumentation' in filepath:
+        return lines, False
+    required, optional = section_rule_for_file(filepath)
+    allowed = set(required + optional)
+    canon = [n for n in ('Theory', 'Definitions', 'Formulas', 'Practice') if n in allowed]
+
+    tops = []  # (idx, name)
+    for idx, line in enumerate(lines):
+        m = TOP_SECTION_RE.match(line.strip())
+        if m and m.group(2) in allowed:
+            tops.append((idx, m.group(2)))
+    if not tops:
+        return lines, False
+    names = [n for _, n in tops]
+    if names != sorted(names, key=canon.index):
+        return lines, False  # wrong order — validator flags it, human reorders
+    numbers = {n: str(i + 1) for i, n in enumerate(sorted(set(names), key=canon.index))}
+
+    out = list(lines)
+    changed = False
+    in_practice = False
+    practice_num = numbers.get('Practice')
+    for idx, line in enumerate(out):
+        s = line.strip()
+        m = TOP_SECTION_RE.match(s)
+        if m and m.group(2) in allowed:
+            name = m.group(2)
+            new = re.sub(r'^(####\s+\*\*)\d+(\.\s+)', lambda mm: mm.group(1) + numbers[name] + mm.group(2), line, count=1)
+            in_practice = name == 'Practice'
+            if new != line:
+                out[idx] = new
+                changed = True
+            continue
+        if in_practice and practice_num is not None:
+            pm = PRACTICE_HEADING_RE.match(s)
+            if pm and pm.group(1) != practice_num:
+                new = re.sub(r'^(#####\s+\*\*)\d+(\.\d+\.)', lambda mm: mm.group(1) + practice_num + mm.group(2), line, count=1)
+                if new != line:
+                    out[idx] = new
+                    changed = True
+    return out, changed
 
 
 def validate_source_label(label):
@@ -244,6 +314,14 @@ def validate_source_label(label):
 def validate_practice_headings(lines, filepath=""):
     issues = []
     in_practice = False
+    # Expected task prefix (N. in N.M) comes from the actual Practice header —
+    # sequential among present sections, so it can be 2, 3, or 4.
+    practice_num = None
+    for line in lines:
+        m = TOP_SECTION_RE.match(line.strip())
+        if m and m.group(2) == 'Practice':
+            practice_num = m.group(1)
+            break
 
     for line_num, line in enumerate(lines, start=1):
         stripped = line.strip()
@@ -265,12 +343,13 @@ def validate_practice_headings(lines, filepath=""):
             continue
 
         section_number, item_number, title, source_label = match.groups()
-        if section_number not in ('3', '4'):
+        want = practice_num if practice_num is not None else '3'
+        if section_number != want:
             # AWA 3B uses 2.x for in-manual exercises (teaching prose, not lab practice)
             if 'Academic Writing' in filepath and section_number == '2':
                 pass
             else:
-                issues.append(f"Line {line_num}: practice heading section number must be `3` or `4`, found `{section_number}`.")
+                issues.append(f"Line {line_num}: practice heading section number must match the Practice section (`{want}`), found `{section_number}`.")
 
         if not item_number.isdigit():
             issues.append(f"Line {line_num}: practice item number must be numeric.")
@@ -384,6 +463,9 @@ def process_file(filepath):
     with open(filepath, encoding="utf-8") as f:
         content = f.read()
     lines = content.split('\n')
+
+    # Auto-fix: sequential #### numbers + practice ##### prefixes before validating
+    lines, _ = renumber_sections(lines, filepath)
 
     format_issues = validate_format_rules(filepath, lines)
 
