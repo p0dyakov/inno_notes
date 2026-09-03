@@ -74,29 +74,36 @@ def _app_support() -> Path:
     return home / ".config/Antigravity"
 
 
-def _hub_cmdline() -> str:
-    """Full cmdline of the hub language_server (secrets stay in this string)."""
+def _hub_cmdlines() -> list[str]:
+    """Full cmdlines of hub language_server processes (secrets stay in RAM)."""
     if sys.platform == "win32":
         out = subprocess.run(
             ["tasklist", "/FI", "IMAGENAME eq language_server.exe", "/FO", "CSV", "/V"],
             capture_output=True, text=True, timeout=30).stdout
-        for line in out.splitlines():
-            if "subclient_type" in line and "hub" in line:
-                return line
+        found = [line for line in out.splitlines()
+                 if "subclient_type" in line and "hub" in line]
+        if found:
+            return found
         out = subprocess.run(
             ["wmic", "process", "where", "name='language_server.exe'",
              "get", "CommandLine", "/format:list"],
             capture_output=True, text=True, timeout=30).stdout
-        for line in out.splitlines():
-            if "subclient_type" in line and "hub" in line:
-                return line
+        found = [line for line in out.splitlines()
+                 if "subclient_type" in line and "hub" in line]
+        if found:
+            return found
         raise AntigravityError("hub language_server process not found (is Antigravity running?)")
     out = subprocess.run(["ps", "-o", "args", "-ax"],
                          capture_output=True, text=True, timeout=30).stdout
-    for line in out.splitlines():
-        if "language_server" in line and "--subclient_type" in line and "hub" in line:
-            return line
-    raise AntigravityError("hub language_server process not found (is Antigravity running?)")
+    found = [line for line in out.splitlines()
+             if "language_server" in line and "--subclient_type" in line and "hub" in line]
+    if not found:
+        raise AntigravityError("hub language_server process not found (is Antigravity running?)")
+    return found
+
+
+def _hub_cmdline() -> str:
+    return _hub_cmdlines()[0]
 
 
 def _csrf_from_cmdline(cmdline: str) -> str:
@@ -167,11 +174,17 @@ def _project_id() -> str:
 class Hub:
     """Authenticated handle to the local Antigravity hub."""
 
-    def __init__(self) -> None:
-        cmdline = _hub_cmdline()
-        self._csrf = _csrf_from_cmdline(cmdline)
-        port = _scan_localhost_ports(self._csrf)
-        self._base = f"http://127.0.0.1:{port}/{SERVICE}"
+    def __init__(self, ls_address: str = "", csrf: str = "") -> None:
+        ls_address = ls_address or os.environ.get("AGY_LS_ADDRESS", "")
+        csrf = csrf or os.environ.get("AGY_CSRF_TOKEN", "")
+        if ls_address and csrf:
+            self._base = f"{ls_address.rstrip('/')}/{SERVICE}"
+            self._csrf = csrf
+        else:
+            cmdline = _hub_cmdline()
+            self._csrf = _csrf_from_cmdline(cmdline)
+            port = _scan_localhost_ports(self._csrf)
+            self._base = f"http://127.0.0.1:{port}/{SERVICE}"
         self._project = _project_id()
 
     def rpc(self, method: str, body: dict, timeout: float = 120) -> httpx.Response:
@@ -298,7 +311,10 @@ class Hub:
                     raise TransientError(f"conversation {cid[:8]} timed out")
                 state, detail = self.classify_db(cid)
                 if state == "fatal":
-                    raise FatalError(f"conversation {cid[:8]}: {detail}")
+                    # Region/account gates have been observed flapping
+                    # (capacity <-> region across hours), so treat them as
+                    # retryable inside a bounded run instead of failing fast.
+                    raise TransientError(f"conversation {cid[:8]}: {detail}")
                 if state == "transient":
                     raise TransientError(f"conversation {cid[:8]}: {detail}")
                 md = ""
