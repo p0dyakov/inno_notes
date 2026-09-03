@@ -303,13 +303,23 @@ def infer_topic(transcript: str, week: str, api_key: str) -> str:
         f"The week number is {week} (use it as the W-prefix).\n\n"
         f"Transcript opening:\n{head}\n"
     )
-    try:
-        raw = _call_gemini(prompt, api_key, GEMINI_MODEL)
+    def clean_topic(raw: str) -> str:
         topic = raw.strip().strip('"').splitlines()[0].strip()
-        topic = re.sub(r"^W\d+(?:-W\d+)?\.\s*", "", topic).strip()
+        return re.sub(r"^W\d+(?:-W\d+)?\.\s*", "", topic).strip()
+
+    try:
+        topic = clean_topic(_call_gemini(prompt, api_key, GEMINI_MODEL))
         if topic and validate_title(f"W{week}. {topic}"):
-            return topic
-        print(f"  topic rejected by validation: {raw.strip()[:100]}")
+            if len(f"W{week}. {topic}") <= 40:
+                return topic
+            print(f"  topic too long ({len(topic)} chars), one retry for shorter ...")
+            short = clean_topic(_call_gemini(
+                prompt + "\n\nPrevious answer was too long for one sidebar line. "
+                "Reply with a SHORTER title, 36 characters max total.", api_key, GEMINI_MODEL))
+            if short and validate_title(f"W{week}. {short}") and len(f"W{week}. {short}") <= 40:
+                return short
+            return topic  # keep the valid long one rather than nothing
+        print(f"  topic rejected by validation: {topic[:100]}")
     except Exception as e:  # noqa: BLE001
         print(f"  topic inference failed: {e}")
     for line in transcript.splitlines():
