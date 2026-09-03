@@ -695,6 +695,11 @@ def _ensure_course_section(text: str, course: str) -> str:
     return text
 
 
+def yml_rel(qmd: Path) -> str:
+    """Repo-relative path with forward slashes (Windows gives backslashes)."""
+    return qmd.relative_to(ROOT).as_posix()
+
+
 def update_sidebar() -> None:
     """Ensure every semester-4 qmd is listed in _quarto.yml sidebar (full Moodle names)."""
     yml = ROOT / "_quarto.yml"
@@ -705,7 +710,7 @@ def update_sidebar() -> None:
     qmds = sorted((ROOT / "semester-4").rglob("*.qmd"))
     added = 0
     for qmd in qmds:
-        rel = str(qmd.relative_to(ROOT))
+        rel = yml_rel(qmd)
         if rel not in text:
             course = qmd.parent.name
             text = _ensure_course_section(text, course)

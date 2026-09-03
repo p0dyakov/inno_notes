@@ -217,6 +217,15 @@ def main() -> None:
         # a full render rather than a silent no-op.
         print(f"WARN: base ref {args.base!r} not found, falling back to full render")
         args.full = True
+    try:
+        import yaml  # noqa: E402
+
+        yaml.safe_load(QUARTO_YML.read_text(encoding="utf-8"))
+    except ImportError:
+        pass
+    except Exception as e:  # noqa: BLE001
+        print(f"ERROR: _quarto.yml is invalid, aborting: {e}", file=sys.stderr)
+        sys.exit(1)
     changed = changed_files(args.base)
     qmds = [p for p in changed if p.endswith(".qmd") and not p.startswith("_site/")]
     deleted_qmds = [p for p in qmds if not (ROOT / p).exists()]

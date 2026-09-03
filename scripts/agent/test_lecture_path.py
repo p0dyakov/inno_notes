@@ -106,6 +106,12 @@ def main() -> None:
         for teacher in entry["teachers"]:
             check(f"index teacher {teacher} ({code})", teacher in index, code)
 
+    from generate import yml_rel  # noqa: E402
+
+    nested = ROOT / "semester-4" / "Operating Systems" / "1.qmd"
+    check("sidebar paths use forward slashes (Windows-safe)",
+          "\\" not in yml_rel(nested) and yml_rel(nested) == "semester-4/Operating Systems/1.qmd",
+          yml_rel(nested))
     qmds = sorted((ROOT / "semester-4").rglob("*.qmd"))
     check("articles exist", bool(qmds), "")
     for qmd in qmds:
