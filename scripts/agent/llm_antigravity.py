@@ -185,7 +185,11 @@ class Hub:
             self._csrf = _csrf_from_cmdline(cmdline)
             port = _scan_localhost_ports(self._csrf)
             self._base = f"http://127.0.0.1:{port}/{SERVICE}"
-        self._project = _project_id()
+        self._project = None
+        try:
+            self._project = _project_id()
+        except AntigravityError:
+            pass  # fresh login: created on demand by ensure_project()
 
     def rpc(self, method: str, body: dict, timeout: float = 120) -> httpx.Response:
         return httpx.post(f"{self._base}/{method}",
@@ -211,6 +215,22 @@ class Hub:
     def models(self) -> dict:
         return self.call("GetAvailableModels", {}, timeout=60).get("models", {})
 
+    def ensure_project(self, name: str = "inno-notes") -> str:
+        """Project id for agentapi calls; creates a dedicated one if missing."""
+        if self._project:
+            return self._project
+        try:
+            self._project = _project_id()
+            return self._project
+        except AntigravityError:
+            pass
+        resp = self.call("CreateProject", {"name": name}, timeout=60)
+        pid = (resp.get("project") or {}).get("id", "")
+        if not pid:
+            raise AntigravityError(f"CreateProject: unexpected response {str(resp)[:200]}")
+        self._project = pid
+        return pid
+
     def agentapi(self, *args: str, timeout: float = 600) -> dict:
         """Run the bundled `language_server agentapi` CLI against this hub."""
         if sys.platform == "win32":
@@ -221,7 +241,7 @@ class Hub:
         env = dict(os.environ,
                    ANTIGRAVITY_LS_ADDRESS=self._base.rsplit("/", 1)[0],
                    ANTIGRAVITY_CSRF_TOKEN=self._csrf,
-                   ANTIGRAVITY_PROJECT_ID=self._project)
+                   ANTIGRAVITY_PROJECT_ID=self.ensure_project())
         r = subprocess.run([exe, "agentapi", *args], capture_output=True, text=True,
                            env=env, timeout=timeout)
         try:
