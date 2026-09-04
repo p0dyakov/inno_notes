@@ -791,7 +791,8 @@ def main() -> None:
                 api_key = (cfg.get("gemini_api_key") or "").strip()
             except Exception:
                 pass
-    if not api_key:
+    from llm import BACKEND as _LLM_BACKEND
+    if not api_key and _LLM_BACKEND != "antigravity":
         print("GEMINI_API_KEY missing (env or inno_files config). Dry-run check only.", file=sys.stderr)
         if not args.dry_run:
             sys.exit(1)
