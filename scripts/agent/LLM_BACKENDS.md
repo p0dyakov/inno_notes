@@ -30,7 +30,11 @@ python3 scripts/agent/llm_antigravity.py   # hub discovery + quota buckets
 ## Replicating on Windows (your PC, not CI)
 
 CI runners cannot do the interactive Antigravity login, so generation stays
-local — run it on the Windows PC instead:
+local — run it on the Windows PC instead. The one-shot
+`scripts/agent/windows/setup.ps1` checks everything below (run plain for
+status, `powershell -ExecutionPolicy Bypass -File ... -Apply` elevated to
+apply: Yandex DoH policy + proxy exclusions; also enables Tailscale SSH so
+this machine becomes remotely manageable):
 
 1. Install Antigravity for Windows, log in with the same Google account.
 2. Ensure egress to Google (run Sota there, same as on the Mac).
