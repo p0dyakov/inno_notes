@@ -220,7 +220,7 @@ def quarto_render_one(qmd: Path) -> tuple[bool, str]:
 
 
 def fix_formatting_check() -> tuple[bool, str]:
-    res = run(["python3", "fix_formatting.py"], cwd=str(ROOT))
+    res = run([sys.executable, "fix_formatting.py"], cwd=str(ROOT))
     # fix_formatting writes formatting_report.md; check it
     report = ROOT / "formatting_report.md"
     if report.exists():
@@ -607,7 +607,7 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
                  old, count=1, flags=re.DOTALL | re.M)
     assert new != old, "Theory splice failed"
     qmd.write_text(new, encoding="utf-8")
-    run(["python3", "fix_formatting.py"], cwd=str(ROOT))
+    run([sys.executable, "fix_formatting.py"], cwd=str(ROOT))
     words, subs = theory_stats(best)
     print(f"  Theory replaced: {words} words, {subs} subsections")
     return True
@@ -664,11 +664,11 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
         tmp.replace(qmd)
 
         # Fix formatting + renumber
-        res = run(["python3", "fix_formatting.py"], cwd=str(ROOT))
+        res = run([sys.executable, "fix_formatting.py"], cwd=str(ROOT))
         if res.returncode != 0:
             print(f"  fix_formatting failed: {res.stderr[:500]}")
         # Renumber if needed (check if headings changed)
-        res2 = run(["python3", "renumber_examples.py", str(qmd)])
+        res2 = run([sys.executable, "renumber_examples.py", str(qmd)])
         if res2.returncode != 0:
             print(f"  renumber failed (non-fatal): {res2.stderr[:300]}")
 

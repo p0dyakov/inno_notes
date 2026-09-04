@@ -129,10 +129,14 @@ def main() -> None:
     check("articles exist", bool(qmds), "")
     for qmd in qmds:
         fm = front_matter(qmd)
-        check(f"title valid: {qmd.parent.name}/{qmd.name}", validate_title(fm.get("title", "")), fm.get("title", ""))
+        # Week articles (N.qmd) must carry W<N>. titles; companion pages
+        # (questions.qmd etc.) are exempt from the lecture title rule.
+        if qmd.stem.isdigit():
+            check(f"title valid: {qmd.parent.name}/{qmd.name}", validate_title(fm.get("title", "")), fm.get("title", ""))
         body = qmd.read_text(encoding="utf-8")
-        for sec in section_rule_for_folder(qmd.parent.name)[0]:
-            check(f"section {sec} in {qmd.parent.name}/{qmd.name}", f"#### **" in body and sec in body, sec)
+        if qmd.stem.isdigit():
+            for sec in section_rule_for_folder(qmd.parent.name)[0]:
+                check(f"section {sec} in {qmd.parent.name}/{qmd.name}", f"#### **" in body and sec in body, sec)
         rel = str(qmd.relative_to(ROOT))
         check(f"sidebar lists {rel}", rel in yml, "")
         html = ROOT / "_site" / qmd.with_suffix(".html").relative_to(ROOT)
