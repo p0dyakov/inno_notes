@@ -234,8 +234,13 @@ class Hub:
     def agentapi(self, *args: str, timeout: float = 600) -> dict:
         """Run the bundled `language_server agentapi` CLI against this hub."""
         if sys.platform == "win32":
-            exe = str(Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
-                      / "Antigravity" / "resources" / "bin" / "language_server.exe")
+            cands = [
+                Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "antigravity"
+                / "resources" / "bin" / "language_server.exe",
+                Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+                / "Antigravity" / "resources" / "bin" / "language_server.exe",
+            ]
+            exe = str(next((c for c in cands if c.exists()), cands[0]))
         else:
             exe = "/Applications/Antigravity.app/Contents/Resources/bin/language_server"
         env = dict(os.environ,
