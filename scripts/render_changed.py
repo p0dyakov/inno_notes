@@ -230,6 +230,19 @@ def main() -> None:
     qmds = [p for p in changed if p.endswith(".qmd") and not p.startswith("_site/")]
     deleted_qmds = [p for p in qmds if not (ROOT / p).exists()]
     qmds = [p for p in qmds if (ROOT / p).exists()]
+    # Self-healing (backstop of the pre-bake rule): pages listed in the nav
+    # whose baked HTML is absent from _site (e.g. they landed via a failed
+    # build and no later push touches them) are rendered now as well.
+    try:
+        nav = QUARTO_YML.read_text(encoding="utf-8")
+    except OSError:
+        nav = ""
+    for rel in sorted(set(re.findall(r'file:\s*"([^"]+\.qmd)"', nav))):
+        if rel in qmds or not (ROOT / rel).is_file():
+            continue
+        if not qmd_to_html(rel).exists():
+            print(f"heal: {rel} listed in nav but unbaked, adding to render")
+            qmds.append(rel)
     includes = [p for p in changed if p.startswith("_includes/") and (ROOT / p).exists()]
     styles = [p for p in changed if p.startswith("styles/") and (ROOT / p).exists()]
     assets = [p for p in changed
