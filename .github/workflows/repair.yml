@@ -47,12 +47,14 @@ jobs:
           pip install pyyaml --quiet
           python3 -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
       - name: Commit repair if changed
+        id: commit
         run: |
           git config user.name "inno-notes-agent"
           git config user.email "agent@innonotes.ru"
           git add -A -- _quarto.yml index.qmd scripts/ semester-4/ .github/workflows/
           if git diff --cached --quiet; then
             echo "Repair made no file changes."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git status --short
@@ -60,10 +62,11 @@ jobs:
 
           Co-authored-by: inno-notes-agent"
           git push origin HEAD:main
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
       # GITHUB_TOKEN pushes do not retrigger workflows, so kick a fresh
       # deploy-site run explicitly (needs a PAT with workflow scope).
       - name: Trigger deploy-site after repair
-        if: always()
+        if: steps.commit.outputs.pushed == 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.INNO_FILES_PAT }}

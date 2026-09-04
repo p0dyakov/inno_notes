@@ -101,6 +101,16 @@ foreach ($h in @('aistudio.google.com', 'alkalimakersuite-pa.clients6.google.com
 }
 
 
+Step '7b. Pre-push hook (format gate)'
+$hookSrc = Join-Path $RepoRoot 'scripts\agent\hooks\pre-push'
+foreach ($r in @($RepoRoot, $InnofilesRoot)) {
+  $dest = Join-Path $r '.git\hooks\pre-push'
+  if ((Test-Path $hookSrc) -and (Test-Path (Join-Path $r '.git'))) {
+    Copy-Item $hookSrc $dest -Force
+    Info "hook installed: $dest"
+  }
+}
+
 Step '8. Repos'
 foreach ($r in @($RepoRoot, $InnofilesRoot)) { if (Test-Path $r) { Ok $r } else { Warn "missing: $r" } }
 

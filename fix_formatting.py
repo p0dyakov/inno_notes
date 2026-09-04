@@ -30,7 +30,7 @@ AI_PATTERNS = [
     # meta reasoning / narration
     r'(?i)^let me (explain|walk you through|break this down)',
     r'(?i)^let me',
-    r'(?i)^wait',
+    r'(?i)^wait\b',
     r'(?i)^here’s how I (think about|approach) this',
     r'(?i)^the key point (is|here is)',
     r'(?i)^the important thing (is|to note)',
@@ -123,7 +123,10 @@ def should_skip_file(filepath):
     name = Path(path).name
     # 0.qmd are formula/definition cheatsheets — not lectures (no W<N>. / no Theory sections)
     # Skip them from lecture formatting rules; they are intentional collections.
-    return name in ('404.qmd', 'index.qmd', '0.qmd') or name.endswith('.ru.qmd')
+    # questions.qmd are exam banks with their own structure (chapters + quiz),
+    # not lecture articles — exempt like cheatsheets (render still applies).
+    return (name in ('404.qmd', 'index.qmd', '0.qmd')
+            or name.endswith('.ru.qmd') or name.endswith('questions.qmd'))
 
 
 def extract_yaml(lines):
@@ -469,11 +472,16 @@ def process_file(filepath):
 
     format_issues = validate_format_rules(filepath, lines)
 
-    # === Detect AI artifacts ===
+    # === Detect AI artifacts (fenced code blocks are exempt: listings and
+    # code comments legitimately contain flagged phrasing) ===
     ai_found = []
+    in_code = False
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if not stripped:
+        if stripped.startswith('```'):
+            in_code = not in_code
+            continue
+        if in_code or not stripped:
             continue
         for pattern in AI_PATTERNS:
             if re.match(pattern, stripped):
