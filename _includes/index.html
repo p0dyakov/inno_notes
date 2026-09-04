@@ -2568,6 +2568,57 @@
 
 					h5.appendChild(solvedButton);
 				});
+
+				// Exam question banks (e.g. Operating Systems/Questions): every
+				// `### Question N ...` heading gets its own Solved pill, same
+				// look and localStorage behavior as practice tasks above.
+				document.querySelectorAll('main#quarto-document-content h3').forEach(h3 => {
+					const rawText = (h3.textContent || '').trim();
+					if (!/^Question \d+/.test(rawText)) return;
+					if (h3.querySelector('.inn-pill--solved')) return;
+
+					h3.classList.add('problem-heading');
+
+					let textSpan = h3.querySelector('.problem-title-text');
+					if (!textSpan) {
+						textSpan = document.createElement('span');
+						textSpan.className = 'problem-title-text';
+						while (h3.firstChild) {
+							textSpan.appendChild(h3.firstChild);
+						}
+						h3.appendChild(textSpan);
+					}
+
+					const anchorId = h3.dataset.anchorId || h3.id || rawText;
+					const solvedKey = `solved_${pathKey}#${anchorId}`;
+					const solvedButton = createPill({
+						title: 'Solved',
+						meta: '',
+						variant: 'solved'
+					});
+
+					const applySolved = (isSolved) => {
+						h3.classList.toggle('is-solved', isSolved);
+						solvedButton.classList.toggle('is-active', isSolved);
+						setPillText(solvedButton, 'Solved', '');
+					};
+
+					applySolved(!!localStorage.getItem(solvedKey));
+
+					solvedButton.addEventListener('click', (event) => {
+						event.preventDefault();
+						event.stopPropagation();
+						const next = !localStorage.getItem(solvedKey);
+						if (next) {
+							localStorage.setItem(solvedKey, 'true');
+						} else {
+							localStorage.removeItem(solvedKey);
+						}
+						applySolved(next);
+					});
+
+					h3.appendChild(solvedButton);
+				});
 			}
 
 			applyProgressiveContent(document.querySelector('main#quarto-document-content'));
