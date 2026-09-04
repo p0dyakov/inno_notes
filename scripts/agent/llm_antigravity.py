@@ -224,10 +224,32 @@ class Hub:
             return self._project
         except AntigravityError:
             pass
-        resp = self.call("CreateProject", {"name": name}, timeout=60)
-        pid = (resp.get("project") or {}).get("id", "")
-        if not pid:
-            raise AntigravityError(f"CreateProject: unexpected response {str(resp)[:200]}")
+        # Projects are local files: ~/.gemini/config/projects/<uuid>.json
+        # (the hub resolves them by id). Write one directly — the RPC does
+        # not return the id of the project it creates.
+        import uuid as _uuid
+        pid = str(_uuid.uuid4())
+        workspace = Path(os.environ.get("INNO_NOTES_DIR", "") or Path.cwd())
+        try:
+            rel = workspace.resolve()
+        except Exception:
+            rel = workspace
+        doc = {"id": pid, "name": name,
+               "projectResources": {"resources": [{"gitFolder": {
+                   "folderUri": rel.as_uri(),
+                   "defaultBranch": "main"}}]},
+               "environments": {"environments": []},
+               "settings": {}, "isWorkspaceOnly": False}
+        dest = _gemini_dir() / "config" / "projects" / f"{pid}.json"
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(json.dumps(doc, indent=1), encoding="utf-8")
+        except OSError as e:
+            raise AntigravityError(f"cannot write project file: {e}")
+        try:
+            self.call("CreateProject", {"name": name}, timeout=60)
+        except AntigravityError:
+            pass  # record exists server-side already; file is what matters
         self._project = pid
         return pid
 
