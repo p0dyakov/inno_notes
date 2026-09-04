@@ -37,7 +37,7 @@ if ($ts) { $st = tailscale status 2>&1 | Out-String; ($st -split "`n" | Select-O
 else { Warn 'tailscale not found (install Tailscale, log in)' }
 
 Step '3. Sota VPN'
-$sota = @(Get-Process 'Sota Connect' -ErrorAction SilentlyContinue)
+$sota = @(Get-Process 'SotaVPN','Sota Connect' -ErrorAction SilentlyContinue)
 if ($sota.Count) { Ok "Sota Connect running ($($sota.Count) proc)" } else { Warn 'Sota Connect not running (start it; US exit per setup)' }
 
 Step '4. Antigravity (auth + hub)'
@@ -89,7 +89,7 @@ $DohCheck = {
   $q.AddRange([byte[]](0x00,0x00,0x01,0x00,0x01))
   $b64 = [Convert]::ToBase64String($q.ToArray()).TrimEnd('=').Replace('+','-').Replace('/','_')
   try {
-    $r = Invoke-WebRequest -Uri "$DohUrl?dns=$b64" -Headers @{ Accept = 'application/dns-message' } -TimeoutSec 12
+    $r = Invoke-WebRequest -UseBasicParsing -Uri "${DohUrl}?dns=${b64}" -Headers @{ Accept = 'application/dns-message' } -TimeoutSec 12
     $ips = [regex]::Matches([Text.Encoding]::GetEncoding('iso-8859-1').GetString($r.RawContentStream.ToArray()), '\x00\x04(.{4})', 'Singleline') |
       ForEach-Object { ($_.Groups[1].Value.ToCharArray() | ForEach-Object { [int]$_ }) -join '.' }
     return ($ips | Select-Object -Unique) -join ', '
