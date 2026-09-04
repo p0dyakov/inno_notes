@@ -60,3 +60,13 @@ jobs:
 
           Co-authored-by: inno-notes-agent"
           git push origin HEAD:main
+      # GITHUB_TOKEN pushes do not retrigger workflows, so kick a fresh
+      # deploy-site run explicitly (needs a PAT with workflow scope).
+      - name: Trigger deploy-site after repair
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.INNO_FILES_PAT }}
+        run: |
+          gh workflow run deploy-site --repo p0dyakov/inno_notes --ref main || \
+            echo "::warning::deploy-site dispatch needs a PAT with workflow scope in INNO_FILES_PAT"
