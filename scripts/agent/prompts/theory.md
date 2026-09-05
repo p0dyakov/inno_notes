@@ -10,11 +10,16 @@ This is the most important part of the article. Textbook writing, not notes.
 - Correct transcript errors and fill in missing logical links.
 
 ## Depth (hard requirements)
-- Each `#####` subsection holds 3+ full paragraphs, roughly 250–500 words.
-- Thin bullet dumps are FORBIDDEN. Bullets only when they genuinely
-  improve clarity; the default is full explanatory paragraphs.
+- Depth follows the INPUT, not a word quota: a small lecture yields a
+  compact article, a dense one yields a long article. There is no minimum
+  length — but there is a completeness bar (see Coverage): every input
+  topic must be explained, never merely mentioned.
+- Default to full explanatory paragraphs with textbook density. Thin
+  bullet dumps are FORBIDDEN. Bullets only when they genuinely improve
+  clarity (lists of properties, steps of an algorithm, cases).
 - For every concept explain: WHAT it is, WHY it matters, HOW it is used,
-  and what typical PITFALLS look like.
+  and what typical PITFALLS look like — scaled to the concept's weight
+  in the input, not padded beyond it.
 - Define terminology BEFORE first use. Name every theorem, substitution,
   identity or transformation you apply and explain why it is valid.
 - Never compress ("answer-key style"), never skip logical transitions,

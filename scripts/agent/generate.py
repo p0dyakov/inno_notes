@@ -507,15 +507,14 @@ def generate_article(
     results: dict[str, str] = {}
 
     def task(section: str) -> tuple[str, str]:
-        if section == "Theory":
-            print(f"  Gemini {section} (PRO model) for {course}/{week} ...")
-            return section, gemini_section(
-                section, transcript, style_context, target_info, api_key,
-                model=GEMINI_THEORY_MODEL,
-                fallbacks=GEMINI_THEORY_FALLBACKS + GEMINI_FALLBACKS,
-            )
-        print(f"  Gemini {section} for {course}/{week} ...")
-        return section, gemini_section(section, transcript, style_context, target_info, api_key)
+        # Every content section (Theory/Definitions/Formulas/Practice/...) is
+        # written by the PRO model; flash is only for title/shorten and fixes.
+        print(f"  Gemini {section} (PRO model) for {course}/{week} ...")
+        return section, gemini_section(
+            section, transcript, style_context, target_info, api_key,
+            model=GEMINI_THEORY_MODEL,
+            fallbacks=GEMINI_THEORY_FALLBACKS + GEMINI_FALLBACKS,
+        )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sections), 4)) as ex:
         futs = {ex.submit(task, s): s for s in sections}
@@ -604,9 +603,7 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
             break
         time.sleep(5)
     words, subs = theory_stats(best)
-    if words < 1200 or subs < 4:
-        print(f"  Theory REJECTED (thin: {words} words, {subs} subsections < 1200/4) — keeping old text")
-        return False
+    print(f"  Theory stats: {words} words, {subs} subsections (no minimum — depth follows input size)")
     replacement = best.rstrip() + "\n\n"
     new = re.sub(r"#### \*\*1\. Theory\*\*.*?(?=^#### )", lambda _: replacement,
                  old, count=1, flags=re.DOTALL | re.M)

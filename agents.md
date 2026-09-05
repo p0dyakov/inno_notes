@@ -31,10 +31,12 @@
      маппинг курсов — `config.json → course_name_map`);
    - `.ppt/.pptx → .pdf` (`office_convert.py`: PowerShell/LibreOffice);
    - транскрипты: для новых PDF + backfill пропущенных — Gemini
-     (`gemini_transcript.py`, модель по умолчанию `gemini-3.1-pro-preview`,
-     состояние — `transcript_state.json`, повторная генерация не делается);
-   - транскрибируются только нужные семестры (`transcript_skip_semesters`:
-     semester-1/2/3 пропущены; транскрибируется semester-4) и только учебные файлы
+     (повторная генерация не делается);
+   - транскрибируется ВСЁ входящее (`gemini_transcript.py`, Pro-модель `gemini-3.1-pro-preview`,
+     ключ `gemini_api_key` из env/config, состояние — `transcript_state.json`); скип-лист
+     `transcript_skip_semesters` держит только уже обработанные семестры (сейчас
+     semester-1/2/3 — по ним есть статьи; semester-4 и будущие идут полностью),
+     плюс только учебные файлы
      (лекции/лабы/туториалы/главы; скип по `skip_filename_patterns`: solution, рпд…);
 5. коммит + `git push` с 3 попытками (`auto_commit`/`auto_push` в `config.json`,
    включается через `deploy/enable_autopush.ps1`);
@@ -62,7 +64,7 @@
 2. `python3 scripts/agent/generate.py --inno-files /tmp/inno_files --sha …`:
    - только управляемые семестры (есть `<semester>/course_map.json`; semester-1/2/3 заморожены);
    - только изменившиеся транскрипты; ранний выход, если менять нечего;
-   - статьи пишутся посекционно **параллельно** (Theory — всегда Pro-модель, остальное — flash),
+   - статьи пишутся посекционно **параллельно**, каждая контентная секция — Pro-моделью (`gemini-3.1-pro-preview`), flash только для мелочей и автофиксов,
      контекст стиля — из соседних статей папки;
    - цикл до 3 попыток: `fix_formatting.py` + `renumber_examples.py` + рендер одного файла,
      ошибки скармливаются обратно модели; упавший черновик удаляется/откатывается —
@@ -145,7 +147,7 @@ Job `deploy` (ubuntu, после `build`): берёт свежий `main`, кл�
 | Посмотреть, что изменится, ничего не трогая | `python3 scripts/render_changed.py --dry-run` | Печатает список changed-файлов vs `origin/main` |
 | Принудительно всё перерендерить | `python3 scripts/render_changed.py --full` | Только если `_quarto.yml` менялся или инкремент разошёлся с полным |
 | Другой base / больше параллелизма | `--base <ref>`, `--jobs N` (default 4) | Параллельные рендеры с ретраями коллизий `site_libs` |
-| Сгенерировать/перегенерировать статью из транскриптов | `python3 scripts/agent/generate.py --inno-files <путь>` | Сам находит изменения; `--semester semester-4`, `--limit N` (тест), `--dry-run`, `--regen-theory <qmd> --tries 3` (только Theory Pro-моделью), `--scaffold-semester semester-N` (новый семестр) |
+| Сгенерировать/перегенерировать статью из транскриптов | `python3 scripts/agent/generate.py --inno-files <путь>` | Сам находит изменения; `--semester semester-4`, `--limit N` (тест), `--dry-run`, `--regen-theory <qmd> --tries 3` (Theory Pro-моделью), `--scaffold-semester semester-N` (новый семестр) |
 | Проверить здоровье Antigravity-хаба (без траты квоты) | `python3 scripts/agent/llm_antigravity.py` | Discovery хаба + квоты |
 | Починить форматирование всех qmd | `python3 fix_formatting.py` | + пишет `formatting_report.md`; CI гейтится на «No format-rule violations» |
 | Пересобрать таблицу курсов на главной | `python3 scripts/update_index.py` | Источник: `semester-*/course_map.json`; обычно вызывается сам (pre-render / render_changed) |
