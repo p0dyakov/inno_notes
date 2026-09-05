@@ -426,7 +426,12 @@ def spawn_ls(proxy: str = "", headless: bool = False,
             "--cloud_code_endpoint", "https://daily-cloudcode-pa.googleapis.com",
             "--enable_sidecars"]
     # Copy the running hub's host_bridge so project mapping keeps working.
-    for cl in _hub_cmdlines():
+    # Optional: a standalone spawn (no app running) proceeds without it.
+    try:
+        _hub_cls = _hub_cmdlines()
+    except AntigravityError:
+        _hub_cls = []
+    for cl in _hub_cls:
         m1 = re.search(r"--host_bridge_url=(\S+)", cl)
         if m1 and "override_model_name" not in cl and "headless" not in cl:
             args += [f"--host_bridge_url={m1.group(1)}"]

@@ -89,3 +89,29 @@ AGY_LS_ADDRESS=http://127.0.0.1:PORT AGY_CSRF_TOKEN=... \
 `spawn_ls` copies the running hub's `--host_bridge_*` flags so project
 mapping keeps working, shares `~/.gemini` auth state, and waits until the
 Connect API answers. Kill stray instances with `kill <pid>` when done.
+
+## US-egress masking via hostkey (Sep 2026, working path)
+
+Situation: direct/RU egress gets `400 User location is not supported` (fast),
+Sota VPN data path is stalled, xbox-dns relay keeps RU IPs (same 400).
+What works: a personal LS whose HTTPS egress rides a US exit:
+
+- `scripts/agent/us_egress/inno_connect_proxy.py` — stdlib-only HTTP CONNECT
+  proxy (single-threaded, selectors). Runs on the hostkey US box as systemd
+  unit `inno-connect-proxy` (localhost-only `127.0.0.1:18081`, allow-listed to
+  TCP/443 of Google API hosts, IPv4-first resolve). Deploy:
+  copy file to `/opt/inno-connect-proxy.py`, install the unit from the
+  docstring header, `systemctl enable --now inno-connect-proxy`.
+- Windows reaches it via `ssh -L 18081:127.0.0.1:18081` (task `InnoFwd`,
+  `scripts/agent/windows/start_fwd.ps1`; key `~/.ssh/hostkey_us`, hostkey IP
+  pinned via `route add 80.209.241.71 … 10.243.1.1` to bypass the dead Sota TUN).
+- Probe: `scripts/agent/windows/masked_probe2.py [tier] [timeout_s]`
+  (`INNO_PROXY` env overrides the proxy URL) — spawns a personal LS with
+  `HTTPS_PROXY` set, traces every poll, keeps the conversation for forensics.
+  Runner `run_masked4.ps1` (flash_lite, clean cwd `C:\Users\usful\agywork`).
+
+Observed (Sep 5): via US egress the region gate is GONE (no 400s, quota full)
+but serving is starved server-side — streams open (`streamGenerateContent`
+gets a ResponseID) then zero tokens for 600s+, all tiers (pro/flash/flash_lite),
+two accounts. Transport exonerated (96 MB/s bulk, byte-exact relay).
+`spawn_ls` needs no running app anymore (host_bridge copy is best-effort).
