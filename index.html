@@ -1739,7 +1739,7 @@ Ramil Nasibullin
 </table>
 </div>
 <div class="inn-home-last-updated">
-Last updated: September 5, 2026 at 10:17
+Last updated: September 5, 2026 at 10:37
 </div>
 
 
@@ -2146,6 +2146,22 @@ Last updated: September 5, 2026 at 10:17
 		display: block;
 
 		stroke: currentColor;
+
+	}
+
+
+
+	.inn-pill:not(.is-active) .inn-pill__icon {
+
+		background: transparent;
+
+	}
+
+
+
+	.inn-pill:not(.is-active) .inn-pill__icon svg {
+
+		display: none;
 
 	}
 
@@ -7839,6 +7855,10 @@ Last updated: September 5, 2026 at 10:17
 
 							section.classList.add('is-open');
 
+							// Invalidate pending animated toggles: styles below are final.
+
+							section._innNavEpoch = (section._innNavEpoch || 0) + 1;
+
 							const childList = Array.from(section.children).find((child) => child.matches?.('ul.sidebar-section'));
 
 							if (childList) {
@@ -8685,6 +8705,28 @@ Last updated: September 5, 2026 at 10:17
 
 
 
+				// OS-level reduced motion: skip the height animation and settle
+
+				// synchronously (with no transition, no transitionend ever fires).
+
+				const reduceMotion = () => {
+
+					try {
+
+						return typeof window.matchMedia === 'function'
+
+							&& window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+					} catch {
+
+						return false;
+
+					}
+
+				};
+
+
+
 				const finalizeOpen = (isOpen) => {
 
 					section.classList.toggle('is-open', isOpen);
@@ -8709,7 +8751,19 @@ Last updated: September 5, 2026 at 10:17
 
 				const applyOpen = (isOpen, animate = true) => {
 
-					if (!animate) {
+					// Epoch invalidates stale completions from superseded toggles:
+
+					// rapid clicks, SPA-nav style stomps, or interrupted transitions
+
+					// (Firefox reports those as transitioncancel, not transitionend).
+
+					const epoch = (section._innNavEpoch || 0) + 1;
+
+					section._innNavEpoch = epoch;
+
+					if (!animate || reduceMotion()) {
+
+						if (section._innNavEpoch !== epoch) return;
 
 						finalizeOpen(isOpen);
 
@@ -8745,13 +8799,55 @@ Last updated: September 5, 2026 at 10:17
 
 
 
-					const onEnd = (event) => {
+					let settled = false;
 
-						if (event.target !== childList || event.propertyName !== 'height') return;
+					let fallbackId = 0;
+
+					const cleanup = () => {
 
 						childList.removeEventListener('transitionend', onEnd);
 
+						childList.removeEventListener('transitioncancel', onEnd);
+
+						if (fallbackId) {
+
+							window.clearTimeout(fallbackId);
+
+							fallbackId = 0;
+
+						}
+
+					};
+
+					const finish = () => {
+
+						if (settled) return;
+
+						settled = true;
+
+						cleanup();
+
+						if (section._innNavEpoch !== epoch) return;
+
 						finalizeOpen(isOpen);
+
+					};
+
+					const onEnd = (event) => {
+
+						if (event.target !== childList) return;
+
+						if (event.type === 'transitioncancel') {
+
+							finish();
+
+							return;
+
+						}
+
+						if (event.propertyName !== 'height') return;
+
+						finish();
 
 					};
 
@@ -8759,9 +8855,27 @@ Last updated: September 5, 2026 at 10:17
 
 					childList.addEventListener('transitionend', onEnd);
 
+					childList.addEventListener('transitioncancel', onEnd);
+
+					// Fallback: a transition may never run (same-height toggle,
+
+					// hidden subtree, animations disabled) and then no event fires.
+
+					fallbackId = window.setTimeout(finish, 320);
+
 					section.classList.toggle('is-open', isOpen);
 
 					window.requestAnimationFrame(() => {
+
+						if (settled) return;
+
+						if (Math.abs(targetHeight - startHeight) < 0.5) {
+
+							finish();
+
+							return;
+
+						}
 
 						childList.style.height = `${targetHeight}px`;
 
