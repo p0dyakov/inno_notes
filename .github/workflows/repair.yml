@@ -1,8 +1,14 @@
 name: repair-on-deploy-failure
+# Auto-repair DISABLED (2026-09-05): API-key quota is reserved for article
+# generation; LLM-driven repair returns on the antigravity backend later.
+# Manual runs still possible via workflow_dispatch.
 on:
-  workflow_run:
-    workflows: [deploy-site]
-    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'failed deploy-site run id (empty = latest failed)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -28,8 +34,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RUN_ID="${{ github.event.workflow_run.id }}"
+          RUN_ID="${{ inputs.run_id }}"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list --workflow deploy-site --status failure --limit 1 --json databaseId -q '.[0].databaseId')
+          fi
           echo "Failed run: $RUN_ID"
+          echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
           gh run view "$RUN_ID" --log-failed > /tmp/deploy_fail.log 2>&1 || gh run view "$RUN_ID" --log > /tmp/deploy_fail.log 2>&1 || true
           tail -n 120 /tmp/deploy_fail.log
           echo "---"
@@ -58,7 +68,7 @@ jobs:
             exit 0
           fi
           git status --short
-          git commit -m "fix(deploy): auto-repair after failed deploy run ${{ github.event.workflow_run.id }}
+          git commit -m "fix(deploy): manual repair after failed deploy run $RUN_ID
 
           Co-authored-by: inno-notes-agent"
           git push origin HEAD:main

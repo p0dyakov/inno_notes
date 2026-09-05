@@ -2,8 +2,13 @@
 
 `LLM_BACKEND` env selects the provider (default `apikey`, so CI is unchanged):
 
-- `apikey` — Google AI Studio key from `GEMINI_API_KEY`/`GOOGLE_API_KEY`,
+- `apikey` — Google AI Studio key pool from `GEMINI_API_KEY` /
+  `GEMINI_API_KEY_2` / `GEMINI_API_KEY_3` / `GEMINI_API_KEYS` / `GOOGLE_API_KEY`
+  (plus `gemini_api_keys` / `gemini_api_key` from the `inno_files` config),
   direct `generativelanguage` calls. Used in CI (`.github/workflows/agent.yml`).
+  Round-robin with 60 s cooldown per key on HTTP 429. Keys MUST live in
+  DIFFERENT Cloud projects — limits are enforced per project, not per key,
+  so extra keys inside one project share a single quota.
 - `antigravity` — local Antigravity hub on the machine running the script
   (logged-in account, Google AI Pro subscription quota, **no key, no billing**).
   Conversations are created per call and deleted afterwards.

@@ -93,17 +93,21 @@ def main() -> None:
         if ensure_r_in_deploy():
             changed = True
 
-    # Deterministic fix 2: nothing else known yet — ask Gemini for advice (advisory only)
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
-    if api_key and ("ERROR" in log or "failed" in log.lower()):
+    # Deterministic fix 2: nothing else known yet — ask the LLM for advice
+    # (advisory only). API-key quota is reserved for article generation, so the
+    # LLM suggestion runs on the antigravity backend only (local subscription).
+    from llm import BACKEND as _LLM_BACKEND
+    if _LLM_BACKEND == "antigravity" and ("ERROR" in log or "failed" in log.lower()):
         try:
-            suggestion = ask_gemini_for_patch(log, api_key)
+            suggestion = ask_gemini_for_patch(log, "")
             if suggestion:
                 out = ROOT / "scripts/agent/last_repair_suggestion.md"
                 out.write_text(suggestion, encoding="utf-8")
-                print(f"repair: wrote Gemini suggestion to {out}")
+                print(f"repair: wrote suggestion to {out}")
         except Exception as e:  # noqa: BLE001
-            print(f"repair: Gemini suggestion failed: {e}")
+            print(f"repair: suggestion failed: {e}")
+    elif _LLM_BACKEND != "antigravity":
+        print("repair: LLM suggestion skipped (apikey backend reserved for generation)")
 
     if changed:
         print("repair: deterministic fixes applied")

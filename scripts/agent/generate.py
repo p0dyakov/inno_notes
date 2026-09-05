@@ -755,6 +755,44 @@ def scaffold_semester(semester: str, inno_files: Path) -> Path:
     return path
 
 
+def _collect_api_keys(inno_files: Path | None) -> str:
+    """All configured Gemini keys, comma-joined (rotation across projects).
+
+    Order: env (GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3,
+    GEMINI_API_KEYS, GOOGLE_API_KEY), then inno_files moodle_sync config
+    (gemini_api_keys / gemini_api_key). llm.py splits, dedups and
+    round-robins the pool on 429. Keys must live in DIFFERENT Cloud
+    projects — limits are per project, not per key.
+    """
+    parts: list[str] = []
+    for var in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3",
+                "GEMINI_API_KEYS", "GOOGLE_API_KEY"):
+        val = os.environ.get(var, "")
+        if val:
+            parts += re.split(r"[\s,;]+", val)
+    if inno_files is not None:
+        cfg_path = inno_files / "scripts/moodle_sync/config.json"
+        if cfg_path.exists():
+            try:
+                cfg = json.loads(cfg_path.read_text(encoding="utf-8-sig"))
+                for field in ("gemini_api_keys", "gemini_api_key"):
+                    val = cfg.get(field) or ""
+                    if isinstance(val, list):
+                        parts += [str(v) for v in val]
+                    else:
+                        parts += re.split(r"[\s,;]+", str(val))
+            except Exception:
+                pass
+    keys: list[str] = []
+    for piece in parts:
+        piece = piece.strip().strip('"').strip("'")
+        if piece and piece not in keys:
+            keys.append(piece)
+    if keys:
+        print(f"API key pool: {len(keys)} key(s) configured")
+    return ",".join(keys)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Generate semester articles from inno_files transcripts")
     ap.add_argument("--inno-files", type=Path, default=INNO_FILES_DEFAULT)
@@ -782,16 +820,7 @@ def main() -> None:
         update_sidebar()
         return
 
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
-    if not api_key:
-        # Try config file on inno_files
-        cfg_path = args.inno_files / "scripts/moodle_sync/config.json" if args.inno_files else None
-        if cfg_path and cfg_path.exists():
-            try:
-                cfg = json.loads(cfg_path.read_text(encoding="utf-8-sig"))
-                api_key = (cfg.get("gemini_api_key") or "").strip()
-            except Exception:
-                pass
+    api_key = _collect_api_keys(args.inno_files)
     from llm import BACKEND as _LLM_BACKEND
     if not api_key and _LLM_BACKEND != "antigravity":
         print("GEMINI_API_KEY missing (env or inno_files config). Dry-run check only.", file=sys.stderr)
