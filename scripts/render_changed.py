@@ -324,29 +324,69 @@ def main() -> None:
             print("per-file bake failed", file=sys.stderr)
             sys.exit(res.returncode)
 
-    # Fast _includes patch: replace old (BASE version) with new content in place.
-    for rel in includes:
-        new = (ROOT / rel).read_text(encoding="utf-8")
-        old_res = run(["git", "show", f"{args.base}:{rel}"])
-        if old_res.returncode != 0 or not old_res.stdout:
-            print(f"WARN: {rel} is new or unreadable at {args.base}; run full render if pages miss it")
+    # Self-healing _includes sync for the after-body include (_includes/index.html):
+    # quarto reformats whitespace when injecting (blank lines appear in baked
+    # article pages), so a literal old-block match misses almost every page and
+    # includes silently go stale. Match by anchors instead, compare
+    # whitespace-normalized, and rewrite whenever the content differs —
+    # regardless of which files triggered this build.
+    def norm_include(t: str) -> str:
+        return re.sub(r"\n\s*\n+", "\n", t).strip()
+
+    WS_PREFIX = re.compile(
+        r"(?:<script>\s*// Patch WebSocket BEFORE quarto-preview\.js.*?</script>\s*)+(?=<style>\s*\n\s*:root\s*\{)",
+        re.DOTALL,
+    )
+    AFTER_BODY = re.compile(
+        r"(<style>\s*\n\s*:root\s*\{[^}]*--inn-bg:.*?</script>)",
+        re.DOTALL,
+    )
+    for rel in sorted(set(includes) | {"_includes/index.html"}):
+        src = ROOT / rel
+        if not src.is_file():
             continue
-        old = old_res.stdout
-        if old == new:
+        new = src.read_text(encoding="utf-8").strip()
+        if rel != "_includes/index.html":
+            # Fallback for any other include file: literal old->new replace.
+            old_res = run(["git", "show", f"{args.base}:{rel}"])
+            if old_res.returncode != 0 or not old_res.stdout:
+                print(f"WARN: {rel} is new or unreadable at {args.base}; run full render if pages miss it")
+                continue
+            old = old_res.stdout
+            if old == new:
+                continue
+            patched, missed = 0, 0
+            for html in SITE.rglob("*.html"):
+                if "site_libs" in html.parts:
+                    continue
+                t = html.read_text(encoding="utf-8")
+                if old in t:
+                    html.write_text(t.replace(old, new), encoding="utf-8")
+                    patched += 1
+                else:
+                    missed += 1
+            print(f"inject {rel}: patched {patched} pages ({missed} without old block)")
+            if patched == 0:
+                print(f"WARN: {rel} matched no pages; run full render if needed")
             continue
-        patched, missed = 0, 0
+        new_norm = norm_include(new)
+        patched, fresh, missed = 0, 0, 0
         for html in SITE.rglob("*.html"):
             if "site_libs" in html.parts:
                 continue
             t = html.read_text(encoding="utf-8")
-            if old in t:
-                html.write_text(t.replace(old, new), encoding="utf-8")
-                patched += 1
-            else:
+            pm = WS_PREFIX.search(t)
+            sm = AFTER_BODY.match(t[pm.end():]) if pm else None
+            if not pm or not sm:
                 missed += 1
-        print(f"inject {rel}: patched {patched} pages ({missed} without old block)")
-        if patched == 0:
-            print(f"WARN: {rel} matched no pages; run full render if needed")
+                continue
+            span = t[pm.start():pm.end() + sm.end()]
+            if norm_include(span) == new_norm:
+                fresh += 1
+                continue
+            html.write_text(t[:pm.start()] + new + t[pm.end() + sm.end():], encoding="utf-8")
+            patched += 1
+        print(f"sync {rel}: patched {patched} pages ({fresh} already fresh, {missed} without include block)")
 
     for rel in styles + assets:
         dst = SITE / rel
