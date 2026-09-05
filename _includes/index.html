@@ -201,6 +201,14 @@
 		stroke: currentColor;
 	}
 
+	.inn-pill:not(.is-active) .inn-pill__icon {
+		background: transparent;
+	}
+
+	.inn-pill:not(.is-active) .inn-pill__icon svg {
+		display: none;
+	}
+
 	.inn-pill__label {
 		display: inline-flex;
 		align-items: baseline;
@@ -3045,6 +3053,8 @@
 						let section = link.closest('li.sidebar-item-section');
 						while (section) {
 							section.classList.add('is-open');
+							// Invalidate pending animated toggles: styles below are final.
+							section._innNavEpoch = (section._innNavEpoch || 0) + 1;
 							const childList = Array.from(section.children).find((child) => child.matches?.('ul.sidebar-section'));
 							if (childList) {
 								childList.hidden = false;
@@ -3468,6 +3478,17 @@
 					`;
 				});
 
+				// OS-level reduced motion: skip the height animation and settle
+				// synchronously (with no transition, no transitionend ever fires).
+				const reduceMotion = () => {
+					try {
+						return typeof window.matchMedia === 'function'
+							&& window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+					} catch {
+						return false;
+					}
+				};
+
 				const finalizeOpen = (isOpen) => {
 					section.classList.toggle('is-open', isOpen);
 					textToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
@@ -3480,7 +3501,13 @@
 				};
 
 				const applyOpen = (isOpen, animate = true) => {
-					if (!animate) {
+					// Epoch invalidates stale completions from superseded toggles:
+					// rapid clicks, SPA-nav style stomps, or interrupted transitions
+					// (Firefox reports those as transitioncancel, not transitionend).
+					const epoch = (section._innNavEpoch || 0) + 1;
+					section._innNavEpoch = epoch;
+					if (!animate || reduceMotion()) {
+						if (section._innNavEpoch !== epoch) return;
 						finalizeOpen(isOpen);
 						return;
 					}
@@ -3498,15 +3525,45 @@
 					childList.style.opacity = isOpen ? '0' : '1';
 					childList.style.pointerEvents = 'none';
 
-					const onEnd = (event) => {
-						if (event.target !== childList || event.propertyName !== 'height') return;
+					let settled = false;
+					let fallbackId = 0;
+					const cleanup = () => {
 						childList.removeEventListener('transitionend', onEnd);
+						childList.removeEventListener('transitioncancel', onEnd);
+						if (fallbackId) {
+							window.clearTimeout(fallbackId);
+							fallbackId = 0;
+						}
+					};
+					const finish = () => {
+						if (settled) return;
+						settled = true;
+						cleanup();
+						if (section._innNavEpoch !== epoch) return;
 						finalizeOpen(isOpen);
+					};
+					const onEnd = (event) => {
+						if (event.target !== childList) return;
+						if (event.type === 'transitioncancel') {
+							finish();
+							return;
+						}
+						if (event.propertyName !== 'height') return;
+						finish();
 					};
 
 					childList.addEventListener('transitionend', onEnd);
+					childList.addEventListener('transitioncancel', onEnd);
+					// Fallback: a transition may never run (same-height toggle,
+					// hidden subtree, animations disabled) and then no event fires.
+					fallbackId = window.setTimeout(finish, 320);
 					section.classList.toggle('is-open', isOpen);
 					window.requestAnimationFrame(() => {
+						if (settled) return;
+						if (Math.abs(targetHeight - startHeight) < 0.5) {
+							finish();
+							return;
+						}
 						childList.style.height = `${targetHeight}px`;
 						childList.style.opacity = isOpen ? '1' : '0';
 					});
