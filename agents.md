@@ -182,3 +182,29 @@ Job `deploy` (ubuntu, после `build`): берёт свежий `main`, кл�
 7. Pre-render `_quarto.yml` (`update_last_updated.py`, `update_index.py`) при каждом рендере
    трогает `index.qmd` (timestamp) — это штатно; post-render `bake-static-html.sh` печёт
    математику в статику для SPA-навигации.
+8. **Ожидание CI — только через хук, никакого опроса.** Запущенный ран (`deploy-site`
+   идёт ~10 мин) НЕЛЬЗЯ караулить циклом `gh run view` — это жжёт токены впустую.
+   Один раз взводится detached-хук, который сам следит за статусом; агент читает
+   файл итога один раз в конце (успех либо падение с ошибкой) и в промежутке
+   занимается другими задачами.
+   - Обычные `cmd &` / `nohup … &` из exec-вызовов умирают вместе с сессией —
+     хук обязан делать double-fork + `setsid` (проверено: только так переживает
+     завершение вызова; долгоживущее иначе — только через launchd).
+   - Рецепт (RUN_ID — id рана из `gh run list`):
+     ```bash
+     python3 - <<'EOF'
+     import os, subprocess, sys
+     run_id = 'RUN_ID'; log = '/tmp/inno_deploy_hook.log'
+     if os.fork() > 0: sys.exit(0)
+     os.setsid()
+     if os.fork() > 0: os._exit(0)
+     with open(log, 'w') as f:
+         r = subprocess.run(['gh', 'run', 'watch', run_id, '--exit-status'],
+                            stdout=f, stderr=subprocess.STDOUT, text=True, cwd='.')
+         f.write(f'HOOK_EXIT={r.returncode}\n')
+     EOF
+     ```
+   - `gh run watch` сам рефрешит статус каждые 3 с и возвращает ненулевой код,
+     если ран упал. Итог: `cat /tmp/inno_deploy_hook.log` → в конце `HOOK_EXIT=0|1`.
+   - Пока хук висит — не опрашивать файл в цикле; проверять редко (по готовности
+     других задач) или один раз в конце.
