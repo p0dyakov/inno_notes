@@ -30,5 +30,8 @@ This is the most important part of the article. Textbook writing, not notes.
 - Headings are concise noun phrases, never questions.
 - **Bold** the first introduction of each key term; *italics* sparingly.
 - Math in LaTeX (`$...$` / `$$...$$`), never backticks for math.
+- NEVER use horizontal dividers (`---`, `***`, `___`, `<hr>`) inside
+  Theory. Subsections are separated by headings alone. Dividers are
+  reserved exclusively for boundaries BETWEEN top-level `####` sections.
 - Match the paragraph density and heading style of the neighboring
   articles in the style context.

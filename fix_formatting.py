@@ -408,6 +408,53 @@ def validate_theory_headings(lines):
     return issues
 
 
+def is_hr_line(stripped):
+    if stripped in ('---', '***', '___'):
+        return True
+    return stripped.lower().startswith('<hr')
+
+
+def is_managed_file(filepath):
+    """Agent-managed semesters only: semester-N dir with course_map.json.
+
+    semester-1/2/3 are frozen legacy content — new structural rules (like
+    the divider rule) are enforced only where the agent generates.
+    """
+    parts = Path(filepath.replace('\\', '/')).parts
+    for i, part in enumerate(parts):
+        if re.fullmatch(r'semester-\d+', part):
+            root = Path(*parts[:i]) if i else Path('.')
+            return (root / part / 'course_map.json').exists()
+    return True
+
+
+def validate_dividers(filepath, lines):
+    """Horizontal dividers only between top-level #### sections, never inside one."""
+    issues = []
+    if not is_managed_file(filepath):
+        return issues
+    _, body_start = extract_yaml(lines)
+    in_code = False
+    for line_num, line in enumerate(lines, start=1):
+        if line_num <= body_start:
+            continue  # YAML front matter
+        s = line.strip()
+        if s.startswith('```'):
+            in_code = not in_code
+            continue
+        if in_code or not is_hr_line(s):
+            continue
+        nxt = line_num  # 0-based index of the next line
+        while nxt < len(lines) and lines[nxt].strip() == '':
+            nxt += 1
+        if nxt < len(lines) and TOP_SECTION_RE.match(lines[nxt].strip()):
+            continue  # divider directly before the next #### section — allowed
+        issues.append(
+            f"Line {line_num}: horizontal divider is allowed only between "
+            f"top-level `####` sections, never inside a section.")
+    return issues
+
+
 def validate_format_rules(filepath, lines):
     if should_skip_file(filepath):
         return []
@@ -417,6 +464,7 @@ def validate_format_rules(filepath, lines):
     issues.extend(validate_top_sections(filepath, lines))
     issues.extend(validate_theory_headings(lines))
     issues.extend(validate_practice_headings(lines, filepath))
+    issues.extend(validate_dividers(filepath, lines))
     return issues
 
 
