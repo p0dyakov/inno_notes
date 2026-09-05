@@ -607,7 +607,8 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
     if words < 1200 or subs < 4:
         print(f"  Theory REJECTED (thin: {words} words, {subs} subsections < 1200/4) — keeping old text")
         return False
-    new = re.sub(r"#### \*\*1\. Theory\*\*.*?(?=^#### )", best.rstrip() + "\n\n",
+    replacement = best.rstrip() + "\n\n"
+    new = re.sub(r"#### \*\*1\. Theory\*\*.*?(?=^#### )", lambda _: replacement,
                  old, count=1, flags=re.DOTALL | re.M)
     assert new != old, "Theory splice failed"
     qmd.write_text(new, encoding="utf-8")
