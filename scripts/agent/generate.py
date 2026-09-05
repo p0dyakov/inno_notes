@@ -603,12 +603,15 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
             best = body
             break
         time.sleep(5)
+    words, subs = theory_stats(best)
+    if words < 1200 or subs < 4:
+        print(f"  Theory REJECTED (thin: {words} words, {subs} subsections < 1200/4) — keeping old text")
+        return False
     new = re.sub(r"#### \*\*1\. Theory\*\*.*?(?=^#### )", best.rstrip() + "\n\n",
                  old, count=1, flags=re.DOTALL | re.M)
     assert new != old, "Theory splice failed"
     qmd.write_text(new, encoding="utf-8")
     run([sys.executable, "fix_formatting.py"], cwd=str(ROOT))
-    words, subs = theory_stats(best)
     print(f"  Theory replaced: {words} words, {subs} subsections")
     return True
 
@@ -804,6 +807,20 @@ def main() -> None:
         return
 
     if args.regen_theory:
+        # workflow dispatch passes space-separated paths; re-group tokens
+        # into existing files so names with spaces survive shell splitting.
+        grouped: list[str] = []
+        buf = ""
+        for tok in args.regen_theory:
+            cand = f"{buf} {tok}".strip() if buf else tok
+            if (ROOT / cand).exists() or Path(cand).exists():
+                grouped.append(cand)
+                buf = ""
+            else:
+                buf = cand
+        if buf:
+            grouped.append(buf)
+        args.regen_theory = grouped
         ok_all = True
         for qp in args.regen_theory:
             qmd = Path(qp) if Path(qp).is_absolute() else ROOT / qp

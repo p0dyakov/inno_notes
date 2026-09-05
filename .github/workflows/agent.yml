@@ -12,6 +12,10 @@ on:
         description: 'dry run (no push)'
         required: false
         default: 'false'
+      regen_theory:
+        description: 'space-separated qmd paths for --regen-theory (API-key backend)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -51,7 +55,12 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           INNO_FILES_SHA: ${{ env.INNO_FILES_SHA }}
         run: |
-          python3 scripts/agent/generate.py --inno-files /tmp/inno_files --sha "$INNO_FILES_SHA" ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+          if [ -n "${{ inputs.regen_theory }}" ]; then
+            # shellcheck disable=SC2086
+            python3 scripts/agent/generate.py --inno-files /tmp/inno_files --regen-theory ${{ inputs.regen_theory }} --tries 3
+          else
+            python3 scripts/agent/generate.py --inno-files /tmp/inno_files --sha "$INNO_FILES_SHA" ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+          fi
       - name: Commit and push if changed (semester-4 only)
         run: |
           git config user.name "inno-notes-agent"
