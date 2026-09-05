@@ -405,10 +405,16 @@ def spawn_ls(proxy: str = "", headless: bool = False,
     """
     import secrets
     csrf = secrets.token_hex(16)
-    logf = open("/tmp/agy_spawned_ls.log", "ab", buffering=0)
+    import tempfile as _tf
+    logf = open(Path(_tf.gettempdir()) / "agy_spawned_ls.log", "ab", buffering=0)
     if sys.platform == "win32":
-        exe = str(Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
-                  / "Antigravity" / "resources" / "bin" / "language_server.exe")
+        cands = [
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "antigravity"
+            / "resources" / "bin" / "language_server.exe",
+            Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+            / "Antigravity" / "resources" / "bin" / "language_server.exe",
+        ]
+        exe = next((str(c) for c in cands if c.is_file()), str(cands[0]))
     else:
         exe = "/Applications/Antigravity.app/Contents/Resources/bin/language_server"
     args = [exe, "--standalone", "--subclient_type", "hub",
@@ -486,7 +492,8 @@ def gemini_pro_preview_available() -> bool:
 
 if __name__ == "__main__":
     hub = Hub()
-    print("hub:", hub._base.rsplit("/", 1)[0], "| project:", hub._project[:8] + "...")
+    print("hub:", hub._base.rsplit("/", 1)[0], "| project:",
+          (hub._project[:8] + "...") if hub._project else "(none yet)")
     q = hub.quota()
     for g in q.get("groups", []):
         for b in g.get("buckets", []):
