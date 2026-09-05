@@ -61,6 +61,18 @@ jobs:
           else
             python3 scripts/agent/generate.py --inno-files /tmp/inno_files --sha "$INNO_FILES_SHA" ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
           fi
+      # Страховка правила «rerun с места падения» (см. agents.md): итог генерации
+      # сохраняется артефактом ДО пуша — упавший пуш не провоцирует повторный regen.
+      - name: Upload regen result as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regen-qmd
+          path: |
+            semester-4/**/*.qmd
+            index.qmd
+            _quarto.yml
+          retention-days: 7
       - name: Commit and push if changed (semester-4 only)
         run: |
           git config user.name "inno-notes-agent"
