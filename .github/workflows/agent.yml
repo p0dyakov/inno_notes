@@ -80,16 +80,33 @@ jobs:
           git config user.name "inno-notes-agent"
           git config user.email "agent@innonotes.ru"
           # Stage first so untracked new files count as changes
-          git add -A -- semester-4/ index.qmd _quarto.yml
-          if git diff --cached --quiet -- semester-4/ index.qmd _quarto.yml; then
+          git add -A -- semester-4/ index.qmd _quarto.yml formatting_report.md
+          if git diff --cached --quiet -- semester-4/ index.qmd _quarto.yml formatting_report.md; then
             echo "No semester-4 changes to push."
             exit 0
           fi
-          git status --short -- semester-4/ index.qmd _quarto.yml
+          git status --short -- semester-4/ index.qmd _quarto.yml formatting_report.md
           git commit -m "agent: semester-4 update from inno_files $INNO_FILES_SHA
 
           Co-authored-by: inno-notes-agent"
-          # main moves under us (CI site builds); integrate before push.
-          git fetch origin main
-          if ! git rebase origin/main; then git rebase --abort; echo REBASE_CONFLICT; exit 1; fi
-          git push origin HEAD:main
+          # Single-file quarto renders inside generate.py dirty _site/_freeze/
+          # and fix_formatting rewrites formatting_report.md — all outside the
+          # staged paths. Drop that dirt before rebasing or the rebase refuses
+          # to start ("unstaged changes") and the result is lost (Sept 5).
+          git checkout -- _site/ _freeze/ 2>/dev/null || true
+          git clean -fdq -- _site/ _freeze/ 2>/dev/null || true
+          # main moves under us (CI site builds); integrate before push with
+          # retries — a plain push loses the race and drops generated work.
+          for i in 1 2 3 4 5; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                echo "pushed on attempt $i"
+                break
+              fi
+            else
+              git rebase --abort || true
+            fi
+            if [ "$i" = 5 ]; then echo "PUSH_FAILED_AFTER_RETRIES"; exit 1; fi
+            sleep 15
+          done

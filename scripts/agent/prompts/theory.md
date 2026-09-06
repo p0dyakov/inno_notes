@@ -41,6 +41,17 @@ This is the most important part of the article. Textbook writing, not notes.
 - Never compress ("answer-key style"), never skip logical transitions,
   never pad with generic filler.
 
+## Order and fidelity
+- Follow the SOURCE's order (slides / chapter flow), not a reshuffled
+  "textbook-canonical" order — the lecture's framing is examinable.
+- Every date, name, number and spec comes from the transcript. NEVER
+  invent plausible-looking facts (ENIAC specs, cache sizes, coefficients).
+- When the source gives two framings of one idea (extended machine AND
+  resource manager; time AND space multiplexing), teach BOTH plus the
+  contrast — collapsing them into one loses exam points.
+- Bridge subsections with one logical sentence ("Raw speed comes from
+  overlap"); no abrupt jumps between `#####` blocks.
+
 ## Form
 - Top-level subsections: `##### **1.1 ...**`; nested: `###### **1.1.1 ...**`.
 - Headings are concise noun phrases, never questions.
@@ -49,5 +60,7 @@ This is the most important part of the article. Textbook writing, not notes.
 - NEVER use horizontal dividers (`---`, `***`, `___`, `<hr>`) inside
   Theory. Subsections are separated by headings alone. Dividers are
   reserved exclusively for boundaries BETWEEN top-level `####` sections.
+- After each concept, an inline `* **Why it matters:**` / `* **Key Pitfall:**`
+  / `* **Worked check:**` bullet where it genuinely teaches.
 - Match the paragraph density and heading style of the neighboring
   articles in the style context.
