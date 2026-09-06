@@ -596,6 +596,26 @@ def _clean_topic_line(s: str) -> str:
     return s.strip(" *-_").strip()
 
 
+_ADMIN_MARKERS = (
+    "grade breakdown", "assessment elements", "course structure",
+    "office hours", "bibliography", "course description",
+)
+
+
+def is_admin_only(transcript: str) -> bool:
+    """True when the source holds no teachable content (course admin slides:
+    schedule, grading, bibliography) — no article should be fabricated."""
+    low = transcript.lower()
+    words = re.findall(r"[a-z]{3,}", low)
+    if len(words) >= 600:
+        return False
+    signals = transcript.count("$") + len(re.findall(
+        r"\b(example|task|exercise|definition|theorem|proof)\b", low))
+    if signals >= 3:
+        return False
+    return sum(1 for m in _ADMIN_MARKERS if m in low) >= 2
+
+
 def transcript_topics(transcript: str) -> list[str]:
     """Checklist of examinable topics from the source.
 
