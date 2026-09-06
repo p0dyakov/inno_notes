@@ -560,6 +560,121 @@ def theory_stats(body: str) -> tuple[int, int]:
     return sum(len(s.split()) for s in subs), len(subs)
 
 
+
+
+_TOPIC_SKIP_RE = re.compile(
+    r"^(innopolis university|outline|contents|table of contents|references?|"
+    r"end of lecture|sources|syllabus|chapter\s+\d+)$", re.I)
+_STOPWORDS = frozenset(
+    "with from into over under what when where which while their there "
+    "these those have has had been were are and the for vii viii iii ii iv "
+    "aka etc via per our your its this that than then them they you we".split())
+
+
+def _sig_words(text: str) -> list[str]:
+    words = re.findall(r"[a-z]{3,}", text.lower())
+    seen, out = set(), []
+    for w in words:
+        if w not in _STOPWORDS and w not in seen:
+            seen.add(w)
+            out.append(w)
+    return out
+
+
+def _clean_topic_line(s: str) -> str:
+    s = s.strip()
+    s = re.sub(r"^\*\*|\*\*$", "", s).strip()
+    s = re.sub(r"^#{1,3}\s*", "", s)
+    s = re.sub(r"^\d+(?:\.\d+)*\.?\s+", "", s)
+    s = re.sub(r"^[\*\-\u2022]\s+", "", s)
+    s = re.sub(r"\s*(?:\.\s*){2,}\d+\s*$", "", s)
+    s = re.sub(r"\s*\.{2,}\s*\d+\s*$", "", s)
+    s = re.sub(r"\s*\*{0,2}\d+\s*\*{0,2}$", "", s)
+    s = re.sub(r"\s*\(\s*cite as:[^)]*\)\s*$", "", s, flags=re.I)
+    return s.strip(" *-_").strip()
+
+
+def transcript_topics(transcript: str) -> list[str]:
+    """Checklist of examinable topics from the source.
+
+    Prefers an explicit Contents/Outline block (dotted TOC lines or slide
+    bullets); falls back to markdown headers + per-page slide titles.
+    """
+    lines = transcript.splitlines()
+    topics: list[str] = []
+
+    def accept(raw: str) -> None:
+        c = _clean_topic_line(raw)
+        if c and not _TOPIC_SKIP_RE.match(c) and len(c) > 3:
+            topics.append(c)
+
+    for i, line in enumerate(lines):
+        if re.match(r"^\s*(#{1,3}\s*)?(contents|outline|table of contents|"
+                     r"\u043e\u0433\u043b\u0430\u0432\u043b\u0435\u043d\u0438\u0435|"
+                     r"\u0441\u043e\u0434\u0435\u0440\u0436\u0430\u043d\u0438\u0435)\s*$", line, re.I):
+            blanks = 0
+            for j in range(i + 1, min(i + 60, len(lines))):
+                s = lines[j].strip()
+                if s.startswith(("---", "## Page", "# SOURCE")):
+                    break
+                if re.match(r"^# ", s):
+                    break
+                if not s:
+                    blanks += 1
+                    if blanks >= 2 and topics:
+                        break
+                    continue
+                blanks = 0
+                accept(s)
+            break
+    if topics:
+        return topics
+
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if re.match(r"^#{1,3} ", s):
+            accept(s)
+            continue
+        if re.match(r"^## Page \d+", s):
+            for j in range(i + 1, min(i + 6, len(lines))):
+                s2 = lines[j].strip()
+                if not s2 or s2.startswith(("[Image", "---", "## Page", "# SOURCE")):
+                    continue
+                c = _clean_topic_line(s2)
+                if (c and not _TOPIC_SKIP_RE.match(c) and len(c) > 3
+                        and not re.fullmatch(r"[\d/ ]+", c)):
+                    topics.append(c)
+                break
+    seen, out = set(), []
+    for topic in topics:
+        key = topic.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(topic)
+    return out
+
+
+def coverage_gap(theory: str, topics: list[str]) -> list[str]:
+    """Topics from the source checklist missing in the Theory body."""
+    tokens = set(re.findall(r"[a-z]{3,}", theory.lower()))
+    low = theory.lower()
+    missing = []
+    for topic in topics:
+        sig = _sig_words(topic)
+        if not sig:
+            continue
+        need = len(sig) if len(sig) <= 2 else max(2, round(len(sig) * 0.6))
+
+        def hit(w: str) -> bool:
+            if w in low:
+                return True
+            return any(tok.startswith(w[:5]) for tok in tokens) if len(w) >= 5 else False
+
+        if sum(1 for w in sig if hit(w)) < need:
+            missing.append(topic)
+    return missing
+
+
 def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> bool:
     """Regenerate ONLY the Theory section of an existing article with the PRO model."""
     rel = qmd.relative_to(INNO_NOTES)
@@ -586,23 +701,37 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
         f"required sections {required}. Article title is {title!r} — do not restate it. "
         f"Regenerate ONLY the Theory section; keep full depth per the instruction."
     )
-    best, best_score = "", -1
+    topics = transcript_topics(transcript)
+    print(f"  coverage checklist: {len(topics)} topic(s)")
+    best, best_key = "", (10 ** 9, 0)
     for it in range(1, tries + 1):
         print(f"  Theory PRO attempt {it}/{tries} for {qmd.relative_to(ROOT)} ...")
-        body = gemini_section("Theory", transcript, style, target_info, api_key,
+        attempt_target = target_info
+        if it > 1 and missing:
+            attempt_target += (
+                "\nPrevious draft OMITTED these REQUIRED checklist topics — "
+                "each needs its own ##### 1.x subsection with full teaching "
+                "(definition, why, worked mini-example, pitfalls):\n- "
+                + "\n- ".join(missing))
+        body = gemini_section("Theory", transcript, style, attempt_target, api_key,
                               model=GEMINI_THEORY_MODEL,
                               fallbacks=GEMINI_THEORY_FALLBACKS + GEMINI_FALLBACKS).strip()
         if not body.lstrip().startswith("####"):
             body = "#### **1. Theory**\n\n" + body
         words, subs = theory_stats(body)
-        print(f"    stats: {words} words, {subs} subsections")
-        if words > best_score:
-            best, best_score = body, words
-        if words >= 1200 and subs >= 4:
-            best = body
+        missing = coverage_gap(body, topics)
+        print(f"    stats: {words} words, {subs} subsections, "
+              f"missing topics: {len(missing)}")
+        for m in missing:
+            print(f"      - MISSING: {m[:90]}")
+        key = (len(missing), -words)
+        if key < best_key:
+            best, best_key = body, key
+        if not missing:
             break
         time.sleep(5)
     words, subs = theory_stats(best)
+    missing = coverage_gap(best, topics)
     print(f"  Theory stats: {words} words, {subs} subsections (no minimum — depth follows input size)")
     replacement = best.rstrip() + "\n\n"
     new = re.sub(r"#### \*\*1\. Theory\*\*.*?(?=^#### )", lambda _: replacement,

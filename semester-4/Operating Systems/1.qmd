@@ -8,21 +8,77 @@ engine: knitr
 
 #### **1. Theory**
 
-##### **1.1 Operating System Fundamentals**
-An **operating system (OS)** is a large and complex software system that acts as an intermediary between computer hardware and application programs. The primary functions of an operating system can be broadly categorized into two major areas: **resource management** and **abstraction provision**. Resource management involves efficiently and fairly allocating hardware components such as the CPU, memory, storage devices, and input/output peripherals among competing programs and users. Abstraction provision involves hiding the complex, messy details of the bare metal hardware behind clean, elegant, and uniform interfaces (such as files, processes, and sockets), enabling programmers to write applications without needing to understand the low-level physical characteristics of the hardware.
+##### **1.1 What Is an Operating System**
+An **operating system (OS)** is the layer of software between application programs and the bare hardware. It has two complementary jobs, and every exam question about "what the OS does" reduces to one of them.
 
-##### **1.2 System Execution Modes and Protection**
-To prevent buggy or malicious user applications from destabilizing the entire computer, modern hardware architectures provide at least two distinct execution modes: **kernel mode** and **user mode**. In kernel mode, the executing code has complete, unrestricted access to the underlying hardware, allowing it to execute any CPU instruction and reference any physical or virtual memory address. Kernel mode is reserved for the most trusted, core components of the operating system. In contrast, in user mode, the executing code operates under strict hardware-enforced restrictions and cannot directly access physical hardware or arbitrary memory addresses. Any attempt by user-mode code to perform privileged operations triggers a hardware trap or exception, forcing a transition into the kernel via a controlled system call interface. This hardware-level isolation ensures that crashes or faults in user-mode applications are fully recoverable, whereas catastrophic failures in kernel mode typically result in system halts (such as a kernel panic or blue screen of death).
+Top-down, the OS is an **extended machine**. Real hardware is complicated and inconsistent: disks, network cards and printers all speak different low-level protocols. The OS hides this mess behind clean **abstractions** — files instead of disk blocks, sockets instead of wire packets, windows instead of video memory. A programmer reads and writes files; a **disk driver** inside the OS translates that into head movements and sector addresses.
 
-##### **1.3 Architectural Paradigms: Multiprogramming and Time-Sharing**
-Historically, computer systems evolved through different paradigms to maximize hardware utilization and user interactivity. **Multiprogramming** is a technique where multiple programs are loaded into main memory simultaneously so that when one program blocks waiting for an I/O operation, the CPU can immediately switch to execute another program, thereby preventing the CPU from sitting idle. **Time-sharing** (or multitasking) is a logical extension of multiprogramming that explicitly divides the CPU's execution time into rapid slices or quanta among multiple active users or processes, giving each user the illusion of dedicated access to the machine. It is a fundamental rule in computer architecture that all time-sharing systems are inherently multiprogramming systems, because multiple programs must reside in memory to be interleaved, but not all multiprogramming systems are time-sharing systems (for instance, a batch processing multiprogramming system might run jobs to completion without interactive time slices).
+Bottom-up, the OS is a **resource manager**. Many programs compete for the same CPU, memory and I/O devices, so the OS performs an orderly, controlled allocation of processors, memories and devices among them. Sharing (**multiplexing**) works in two ways. **Time multiplexing** lets programs take turns: the CPU executes one process for a few milliseconds, then another (printers work the same way — one job at a time). **Space multiplexing** splits the resource into parts used simultaneously: each program gets its own region of memory, each file its own disk blocks.
 
-##### **1.4 Hardware Metrics and Memory Hierarchy Performance**
-Modern computer systems organize memory into a hierarchical structure ranging from extremely fast, small, and expensive components (such as CPU **cache memory**) down to large, slow, and inexpensive persistent storage (such as **disk storage**), with **main memory (RAM)** sitting in the middle. The overall performance of a system depends heavily on how frequently data is found in the faster layers of the hierarchy, quantified by metrics such as the **cache hit rate** and **main memory hit rate**. When calculating the **average memory access time (AMAT)** in a multi-level hierarchy, access times are weighted by the cumulative probabilities of hitting or missing at each level. For example, given a cache access time $t_c$, a RAM access time $t_m$, and a disk access time $t_d$, with a cache hit rate $h_c$ and a secondary RAM hit rate $h_m$ (given a cache miss), the average access time is modeled as:
+* **Key Pitfall:** the two views answer different questions. "Why can I ignore the disk geometry?" — extended machine. "Why does my program slow down when ten others run?" — resource manager.
 
-$$\text{AMAT} = (h_c \cdot t_c) + ((1 - h_c) \cdot h_m \cdot t_m) + ((1 - h_c) \cdot (1 - h_m) \cdot t_d)$$
+##### **1.2 Kernel Mode and User Mode**
+Hardware would be defenceless if any program could execute any instruction: one buggy application could halt the machine or wipe a disk. Therefore most computers provide two execution modes. In **kernel mode** (supervisor mode) the OS runs with complete access to all hardware and may execute every instruction the machine supports. Everything else — browsers, mail readers, music players, the user interface itself — runs in **user mode**: only a subset of instructions is available, and anything affecting machine control or I/O is forbidden.
 
-Understanding these numerical trade-offs allows system architects to evaluate whether expensive hardware upgrades, such as adding video RAM or expanding physical memory, are economically and technically justified for specific computational workloads.
+A user program that needs a service (read a file, send a packet) cannot perform it directly; it issues a **system call (TRAP)**, which traps into the kernel, runs the OS routine with full privileges, and returns the result. Conceptually the machine is layered: hardware at the bottom, the OS in kernel mode above it, and user-mode programs on top.
+
+* **Why it matters:** isolation is what makes crashes survivable. A fault in a user-mode program kills only that program; the same fault in kernel mode halts the whole system (kernel panic / blue screen).
+* **Key Pitfall:** device drivers must live in the OS, precisely so they can run in kernel mode and touch controller registers — that is also why a bad driver can crash the machine.
+
+##### **1.3 History of Operating Systems**
+Each hardware generation forced a new kind of OS. Five dates and machines cover the whole story.
+
+**1st generation (1945–1955): vacuum tubes, plugboards.** Colossus (Turing) and ENIAC (Mauchly): huge, slow, power-hungry, air-conditioned rooms, kilobytes of storage at best, programmed in machine language by rewiring. There was no OS at all — one program owned the whole machine.
+
+**2nd generation (1955–1965): transistors, batch systems.** Transistors, core memory, magnetic tapes and disks; machines became smaller, cooler and cheaper. The first operating systems appeared to automate job sequencing on mainframes; programming moved to machine language and assembly.
+
+**3rd generation (1965–1980): integrated circuits.** SSI/MSI chips, low power draw, high-level languages (Honeywell-6000, PDP, IBM-360/370). Three OS ideas born here still run the world: **multiprogramming** (several jobs in memory, CPU switches when one waits), **spooling** and **timesharing**. The second half (1971–1980) added microprocessors (LSI/VLSI): portable computers, RAID storage, data communication, fast large memories — and early uses in parallel processing, simulation, speech recognition and artificial intelligence.
+
+**4th generation (1980–1990): personal computers.** LSI made a computer fit on a desk: the first microcomputer paired an Intel 8080 with an 8-inch floppy and ran CP/M (Control Program for Microcomputers), the first disk-based OS. IBM built the PC and contracted Bill Gates for its operating system.
+
+**5th generation (1990–present): mobile computers.** From brick phones to touchscreen smartphones: the computer became a battery-powered, always-networked personal device.
+
+* **How to remember:** hardware shrinks and multiplies, software centralises control — no OS, batch OS, multiprogramming OS, personal OS, mobile OS.
+
+##### **1.4 Computer Hardware Review**
+An OS is tied to the hardware it runs on: it extends the instruction set and manages the resources. Five hardware areas matter.
+
+###### **1.4.1 Processors**
+Every CPU repeats one cycle: **fetch** the next instruction into a buffer, **decode** the opcode and operands, **calculate** effective operand addresses, **fetch** operands from memory (register operands skip this), **execute**, **write** the result back. To hold the working state the CPU has registers: **general registers** for variables and temporaries, the **program counter** (address of the next instruction), the **stack pointer** (top of the in-memory stack), and the **PSW** (Program Status Word: comparison flags, CPU priority, kernel/user mode bit and other control bits).
+
+Raw speed comes from overlap. A three-stage **pipeline** (fetch → decode → execute units working on three instructions at once) and **superscalar** designs (parallel pipelines feeding parallel execute units through a holding buffer) do more per clock. **Multithreading (hyper-threading)** goes further: the CPU keeps the state of two threads and switches between them in nanoseconds, so when one thread stalls on a memory read the other runs — note this hides latency but is not true parallelism. True parallelism needs several cores: modern chips are **multicore** (a quad-core with a shared L2 cache versus separate L2 per core are the two textbook layouts), and a GPU is thousands of tiny cores for small parallel computations such as polygon rendering. Multicore hardware requires a multiprocessor OS.
+
+###### **1.4.2 Memory**
+Memory is a **hierarchy**: each higher layer is faster, smaller and more expensive per bit. The lecture's reference numbers are worth memorising: registers (~1 nsec, under 1 KB), cache (~2 nsec, ~4 MB), main memory (~10 nsec, 1–8 GB), magnetic disk (~10 msec, 1–4 TB).
+
+Main memory is divided into **cache lines** of typically 64 bytes; the hottest lines live in a cache inside the CPU. On a read, hardware checks the cache first: a **hit** costs about 2 clock cycles and no bus traffic, a **miss** goes to main memory. Machines often stack two or three cache levels, each slower and bigger. Cache design is four questions: when to insert, where to place, what to evict, and where the evicted item goes.
+
+Technologies differ in volatility. **RAM** serves whatever the cache cannot; **ROM** keeps factory-programmed contents without power (classically the bootstrap loader lives there); **EEPROM and flash** are also nonvolatile but erasable and rewritable — flash sits between RAM and disk in speed, backs phones and USB sticks, and wears out with writes. **CMOS** memory holds the clock, date and boot configuration such as which disk to boot from.
+
+* **Worked micro-example (average access time):** with cache hit rate $h_c = 0.9$ at $t_c = 2$ cycles, RAM hit rate $h_m = 0.8$ at $t_m = 20$ cycles on a miss, disk $t_d = 10^6$ cycles otherwise:
+$$\text{AMAT} = h_c t_c + (1 - h_c) h_m t_m + (1 - h_c)(1 - h_m) t_d = 1.8 + 1.6 + 20000 \approx 20003.$$
+The lesson: even a 2% trip to disk dominates everything — hierarchy performance is decided by miss rates, not by cache speed.
+
+###### **1.4.3 Disks**
+A hard disk is a stack of **platters**; each surface is divided into concentric **tracks**, each track into **sectors** (an arc of a track is a segment). An **actuator arm** swings the **read/write heads** over the surfaces. Every access pays three costs: **seek time** (moving the head), **rotation delay / latency** (waiting for the sector to spin under the head) and **transfer time** (the actual bit flow, i.e. data rate).
+
+###### **1.4.4 I/O Devices**
+Each device has two halves: a **controller** (electronics accepting OS commands) and the **device** itself (deliberately simple, standardised interface). The program that talks to the controller is the **device driver**; it must live in the OS to run in kernel mode. Controllers expose a few **registers**; the set of all of them is the **I/O port space**. Two addressing schemes exist: **memory-mapped I/O** (registers appear at ordinary memory addresses) and a **separate port space** with special IN/OUT instructions usable only in kernel mode.
+
+Getting data in and out has three generations. **Busy waiting (polling):** the driver starts the transfer and spins in a loop asking "done yet?" — simple, but the CPU is tied up. **Interrupts:** the driver starts the device, blocks the caller and does other work; on completion the controller raises an interrupt, the CPU vectors through the **interrupt vector** (a table mapping device numbers to handler addresses) into the handler, then returns to the user program. **DMA (Direct Memory Access):** a dedicated chip moves whole blocks between memory and controller with no CPU involvement; the CPU only programs the transfer and receives one interrupt at the end.
+
+* **Key Pitfall:** interrupts do not make I/O faster — they free the CPU while I/O is in flight. DMA then removes even the per-byte CPU cost.
+
+###### **1.4.5 Buses**
+Components meet at **buses**, and the OS must know every one for configuration. A **shared bus** (one set of wires, many devices) needs an **arbiter** deciding who transmits. A **parallel bus** spreads one word over many wires (classic PCI: 32 bits over 32 wires); a **serial bus** sends bits down one lane, scaling by adding lanes. Concrete buses: **DDR3/DDR4** (CPU–RAM), **PCIe** (graphics), **DMI** (bridge-to-bridge hub link), **SCSI/SATA** (disks), **USB** (centralised: the root device polls every peripheral for traffic). Before **Plug & Play**, each card hard-coded its interrupt line and register addresses, so two cards could collide; Plug & Play enumerates devices and centrally assigns interrupts and addresses.
+
+##### **1.5 Booting the Computer**
+Starting the machine is a relay race, in strict order. **BIOS**, a program on the motherboard with low-level I/O routines, runs first and performs **POST** (Power-On Self-Test): memory size, device presence, basic integrity. It then scans the buses to enumerate devices and picks the **boot device** from the list stored in **CMOS** memory. The first sector of that device — the **boot sector** — is loaded and executed; it reads the **partition table** at the sector's end to find the active partition. A **secondary boot loader** from that partition loads the OS itself. The newborn OS queries the BIOS for the hardware inventory, checks it has a driver per device, loads the drivers into the kernel, initialises its tables, spawns background processes, and finally starts a login prompt or GUI.
+
+* **Why the order matters:** each stage only knows how to load something slightly smarter than itself — ROM code cannot parse filesystems, so booting climbs BIOS → boot sector → loader → OS.
+
+##### **1.6 The OS Zoo**
+Different machines need different operating systems. **Mainframe OSs** (OS/360, OS/390) live in data centres and are tuned for hundreds of concurrent I/O-heavy jobs. **Server OSs** (UNIX, Linux, Windows Server, FreeBSD, Solaris) serve many users over a network, sharing hardware and software. **Multiprocessor OSs** coordinate several CPUs — today every PC and notebook OS qualifies (Linux, Windows). **Personal computer OSs** need a single-user interactive system (Windows, macOS, Linux, FreeBSD). **Handheld OSs** target phones and tablets (Android, iOS). **Embedded OSs** hide inside devices that take no installed software — microwaves, MP3 players, TVs, cars (Embedded Linux, QNX, VxWorks). **Sensor-node OSs** (TinyOS) run on motes that are complete tiny computers — CPU, RAM, ROM plus environmental sensors, meshed over wireless to a base station. **Real-time OSs** keep deadlines: **hard** real-time guarantees the action happens in time, always; **soft** real-time tolerates an occasional miss without damage (QNX). **Smart-card OSs** are the smallest of all: a CPU on a credit card, often holding a JVM interpreter so downloaded applets run on the card.
 
 ***
 
