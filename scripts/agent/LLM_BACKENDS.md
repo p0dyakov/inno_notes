@@ -56,6 +56,20 @@ this machine becomes remotely manageable):
    (project id) — same logic as on macOS (`_localhost_ports`,
    `_hub_cmdline`, `_project_id` in `llm_antigravity.py`).
 
+## Serving reality (September 2026, verified Sept 6)
+
+- Subscription serving is an EMPTY CATALOG, not a quota/egress/auth problem:
+  `new-conversation` answers "no available models found" for EVERY id (old
+  tiers, catalog ids from `Hub.models()`, pro/flash/lite) on Mac main hub,
+  Mac spawns and Windows spawns, on any egress. App shows 100% quota left.
+  Nothing to fix client-side — generation via subscription resumes only when
+  Google unfreezes the account pool. Do NOT re-chase model names.
+- OAuth for spawned LS: copy `~/.gemini/oauth_creds.json` (+`google_accounts.json`)
+  to the box's `%USERPROFILE%\.gemini\`; tier aliases map in `TIERS`
+  (`llm_antigravity.py`). Both are in place for the unfreeze day.
+- API keys: Pro free quota is `limit: 0` on all projects (billing is the only
+  instant fix); flash works via US egress only (`inno-connect-proxy`).
+
 ## Serving reality (September 2026)
 
 The subscription pool is full (weekly ~99.9%), but Google serving currently
