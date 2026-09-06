@@ -60,9 +60,11 @@ TITLE_WEEK_RE = re.compile(r"^W\d+(?:-W\d+|[AB])?\.\s+.+$")
 INNO_FILES_DEFAULT = Path("/tmp/inno_files")
 GEMINI_MODEL = "gemini-3.8-flash"
 GEMINI_FALLBACKS = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
-# Theory is the most important section: it is always written by the Pro model.
+# Theory is the most important section: Pro model preferred, strongest flash
+# while Pro free quota is limit:0 (Sept 2026). Pro stays first in fallbacks,
+# so it is picked up automatically if quota returns.
 # Override with GEMINI_THEORY_MODEL env if the model id changes.
-GEMINI_THEORY_MODEL = os.environ.get("GEMINI_THEORY_MODEL", "gemini-3.1-pro-preview")
+GEMINI_THEORY_MODEL = os.environ.get("GEMINI_THEORY_MODEL", "gemini-3.8-flash")
 GEMINI_THEORY_FALLBACKS = ["gemini-3.1-pro-preview", "gemini-3.8-flash"]
 GOLDEN_W = 3  # legacy week-numbering offset, kept for reference
 
