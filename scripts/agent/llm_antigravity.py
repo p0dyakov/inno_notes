@@ -285,9 +285,10 @@ class Hub:
                                 else "antigravity-ide") / "conversations"
 
     def new_conversation(self, prompt: str, tier: str = "pro", title: str = "inno-notes") -> str:
-        if tier not in TIERS:
-            raise ValueError(f"unknown tier {tier!r} (want one of {TIERS})")
-        resp = self.agentapi("new-conversation", f"--model={tier}", f"--title={title}", prompt)
+        model = TIERS.get(tier, tier)  # alias or raw catalog id
+        if tier not in TIERS and not re.match(r"^[a-z0-9][a-z0-9_.-]*$", tier):
+            raise ValueError(f"unknown tier {tier!r} (want one of {sorted(TIERS)} or a catalog id)")
+        resp = self.agentapi("new-conversation", f"--model={model}", f"--title={title}", prompt)
         try:
             return resp["newConversation"]["conversationId"]
         except KeyError:
