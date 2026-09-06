@@ -40,7 +40,14 @@ import httpx
 
 SERVICE = "exa.language_server_pb.LanguageServerService"
 CSRF_HEADER = "x-codeium-csrf-token"
-TIERS = ("flash_lite", "flash", "pro")
+# Tier aliases -> Antigravity model ids (catalog of LS 2.12; `Hub.models()`
+# lists the live catalog). Raw model ids are also accepted as-is.
+TIERS = {
+    "flash_lite": "gemini-3.1-flash-lite",
+    "flash": "gemini-3.8-flash-medium",
+    "pro": "gemini-3.1-pro-high",
+    "pro_low": "gemini-3.1-pro-low",
+}
 
 
 class AntigravityError(RuntimeError):
