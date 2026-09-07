@@ -288,6 +288,14 @@ const lazyMedia = (html) => {
 	return out;
 };
 
+// Videos are banned from pages (owner decision): strip any <video> block
+// that slipped through (e.g. a regenerated article). Files stay in repo,
+// nothing is fetched or rendered. Idempotent.
+const stripVideos = (html) => html.replace(
+	/<video\b[^>]*>[\s\S]*?<\/video\s*>/gi,
+	'',
+);
+
 const markBaked = (html) => (/\bdata-inn-baked=/.test(html)
 	? html
 	: html.replace(/<html\b/i, '<html data-inn-baked="true"'));
@@ -342,6 +350,7 @@ for (const filePath of htmlFiles) {
 	after = stripPolyfill(after);
 	after = injectPreconnect(after);
 	after = lazyMedia(after);
+	after = stripVideos(after);
 	after = markBaked(after);
 	if (/\bdata-inn-baked=/.test(after)) bakedCount += 1;
 	if (after !== before) {
