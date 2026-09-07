@@ -480,13 +480,20 @@ TASK_MARKER_RE = re.compile(
     r"(?i)(?:example|task|exercise|problem|вопрос|задач[аи]|пример)\s*\d"
     r"|(?:Example|Task|Exercise|Problem)\s+\d"
 )
+# Transcript section headings like "### Example" / "## Task" (singular item
+# headings, NOT topic titles like "Jobs Are Collections of Tasks" or prose
+# "for example, ..."): also explicit items. Lecture slides often number
+# nothing but still carry worked examples under such headings.
+TASK_HEADING_RE = re.compile(r"(?im)^#{1,4}\s*(example|task|exercise|problem)\b(?!s\b)")
 
 def transcript_has_explicit_tasks(transcript: str) -> bool:
-    """True only if the source transcript names explicit numbered tasks/examples.
+    """True only if the source transcript names explicit tasks/examples.
 
-    No explicit tasks -> the article gets NO Practice section at all (never
-    author synthetic tasks)."""
-    return bool(TASK_MARKER_RE.search(transcript))
+    Two shapes count: numbered markers ("Problem 7", "Task 3.1") and singular
+    item headings ("### Example"). No explicit tasks -> the article gets NO
+    Practice section at all (never author synthetic tasks)."""
+    return bool(TASK_MARKER_RE.search(transcript)
+                or TASK_HEADING_RE.search(transcript))
 
 
 def generate_article(
