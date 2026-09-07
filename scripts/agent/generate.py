@@ -781,6 +781,9 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
     course = rel.parts[0]
     week = re.match(r"(\d+)", rel.parts[1]).group(1) if len(rel.parts) > 1 else "1"
 
+    if qmd.exists() and "<!-- HANDWRITTEN -->" in qmd.read_text(encoding="utf-8")[:2000]:
+        print(f"  Skip hand-written article (locked) {qmd.relative_to(ROOT)}")
+        return False
     transcript = combine_transcripts(mds)
     if not transcript.strip():
         print(f"  Skip empty transcripts {mds}")
