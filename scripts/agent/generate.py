@@ -475,6 +475,20 @@ def collect_style_context(course: str, max_files: int = 3, semester: str = "seme
     return "\n\n".join(parts) if parts else "No neighboring articles yet — follow prompt.md and rules.md strictly."
 
 
+
+TASK_MARKER_RE = re.compile(
+    r"(?i)(?:example|task|exercise|problem|вопрос|задач[аи]|пример)\s*\d"
+    r"|(?:Example|Task|Exercise|Problem)\s+\d"
+)
+
+def transcript_has_explicit_tasks(transcript: str) -> bool:
+    """True only if the source transcript names explicit numbered tasks/examples.
+
+    No explicit tasks -> the article gets NO Practice section at all (never
+    author synthetic tasks)."""
+    return bool(TASK_MARKER_RE.search(transcript))
+
+
 def generate_article(
     transcript: str,
     course: str,
@@ -491,6 +505,9 @@ def generate_article(
     title = f"W{week}. {topic}"
     assert validate_title(title), f"generated title failed validation: {title!r}"
     required, has_formulas = section_rule_for_folder(course, semester)
+    if "Practice" in required and not transcript_has_explicit_tasks(transcript):
+        print(f"  {course}/{week}: no explicit tasks in transcript -> omitting Practice section")
+        required = [s for s in required if s != "Practice"]
     src_note = ""
     if sources:
         kinds = ", ".join(f"{s} ({source_kind(s)})" for s in sources)

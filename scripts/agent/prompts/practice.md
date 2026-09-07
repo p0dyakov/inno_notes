@@ -1,5 +1,9 @@
 # Practice section prompt (STRICT layout — enforced exactly)
 
+> Only write this section from EXPLICIT numbered tasks/examples stated in the
+> transcript. If the source names no explicit tasks, output nothing at all —
+> never invent synthetic tasks. (The pipeline omits Practice automatically.)
+
 Write the Practice section. Its number is SEQUENTIAL among the sections actually
 present in THIS article: `4.` if Theory + Definitions + Formulas are all present,
 `3.` if one of them was omitted, `2.` if two were omitted. Task headings use the

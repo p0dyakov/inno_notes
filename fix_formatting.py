@@ -59,25 +59,25 @@ AI_PATTERNS = [
 
 
 COURSE_SECTION_RULES = [
-    (r'/Mathematical Analysis I/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
-    (r'/Mathematical Analysis II/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
-    (r'/Software Systems Analysis and Design/', ['Theory', 'Definitions', 'Practice'], []),
-    (r'/Introduction to Programming/', ['Theory', 'Definitions', 'Practice'], []),
-    (r'/Theoretical Computer Science/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
-    (r'/Data Structures and Algorithms/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
-    (r'/Analytical Geometry and Linear Algebra I/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
-    (r'/Analytical Geometry and Linear Algebra II/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Mathematical Analysis I/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
+    (r'/Mathematical Analysis II/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
+    (r'/Software Systems Analysis and Design/', ['Theory', 'Definitions'], ['Practice']),
+    (r'/Introduction to Programming/', ['Theory', 'Definitions'], ['Practice']),
+    (r'/Theoretical Computer Science/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
+    (r'/Data Structures and Algorithms/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
+    (r'/Analytical Geometry and Linear Algebra I/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
+    (r'/Analytical Geometry and Linear Algebra II/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
     (r'/Academic Writing and Argumentation I/', ['Theory'], []),
     (r'/Academic Writing and Argumentation II/', ['Theory'], []),
-    (r'/Logic and Discrete Mathematics/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Logic and Discrete Mathematics/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
     (r'/Computer Architecture/', ['Theory', 'Definitions'], ['Practice']),
     # semester-4 (full Moodle names; mirrors section_rule_for_folder in generate.py)
-    (r'/Probability and Statistics/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
-    (r'/Differential Equations/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
-    (r'/Introduction to Optimization/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
-    (r'/Operating Systems/', ['Theory', 'Definitions', 'Practice'], []),
-    (r'/Introduction to AI/', ['Theory', 'Definitions', 'Practice'], []),
-    (r'/Physics I/', ['Theory', 'Definitions', 'Formulas', 'Practice'], []),
+    (r'/Probability and Statistics/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
+    (r'/Differential Equations/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
+    (r'/Introduction to Optimization/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
+    (r'/Operating Systems/', ['Theory', 'Definitions'], ['Practice']),
+    (r'/Introduction to AI/', ['Theory', 'Definitions'], ['Practice']),
+    (r'/Physics I/', ['Theory', 'Definitions', 'Formulas'], ['Practice']),
 ]
 
 DEFAULT_ALLOWED_SECTIONS = ['Theory', 'Definitions', 'Formulas', 'Practice']
@@ -230,6 +230,13 @@ def validate_top_sections(filepath, lines):
     for name in required:
         if name not in seen:
             issues.append(f"Missing required top-level section `{name}`.")
+
+    if 'Practice' in seen:
+        # A present Practice must carry real items — never an empty shell
+        # (sources without explicit tasks get no Practice section at all).
+        has_items = any(re.match(r'#####\s+\*\*\d+\.\d+\.', l.strip()) for l in lines)
+        if not has_items:
+            issues.append("Practice section present but has no `##### **N.M.` Task/Example items.")
 
     return issues
 

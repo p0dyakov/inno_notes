@@ -202,6 +202,45 @@ def _is_draft_qmd(qmd: Path) -> bool:
     return len(parts) >= 3 and re.search(r"(?m)^draft:\s*true\s*$", parts[1]) is not None
 
 
+
+def all_draft_qmds() -> list[str]:
+    """Every `draft: true` qmd in the source tree (repo-wide, not just changed)."""
+    out = []
+    for q in ROOT.glob("semester-*/*/*.qmd"):
+        try:
+            if _is_draft_qmd(q):
+                out.append(q.relative_to(ROOT).as_posix())
+        except OSError:
+            continue
+    return sorted(out)
+
+
+def purge_draft_outputs(drafts: list[str]) -> None:
+    """Delete baked HTML + search entries for hidden drafts.
+
+    A full `quarto render` still emits an (empty) HTML shell for `draft: true`
+    pages, so the purge must run on the full path too — not just incremental.
+    """
+    for rel in drafts:
+        html = qmd_to_html(rel)
+        if html.exists():
+            html.unlink()
+            print(f"dropped draft output: {html}")
+    if drafts and SEARCH.is_file():
+        try:
+            entries = json.loads(SEARCH.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN: draft search purge skipped ({e})")
+            return
+        hrefs = {Path(rel).with_suffix(".html").as_posix() for rel in drafts}
+        kept = [e for e in entries
+                if not any(h == (e.get("href") or "") or (e.get("href") or "").startswith(h + "#")
+                           for h in hrefs)]
+        if len(kept) != len(entries):
+            SEARCH.write_text(json.dumps(kept, ensure_ascii=False), encoding="utf-8")
+            print(f"dropped {len(entries) - len(kept)} draft search entries")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="origin/main")
@@ -255,7 +294,10 @@ def main() -> None:
     if draft_qmds:
         print(f"drafts skipped (hidden): {draft_qmds}")
     qmds = [p for p in qmds if p not in draft_qmds]
-    deleted_qmds = deleted_qmds + draft_qmds
+    # Purge outputs of ALL hidden drafts repo-wide (not just changed ones):
+    # a stale draft shell from an older full render must disappear even when
+    # the draft file itself is untouched by this push.
+    deleted_qmds = sorted(set(deleted_qmds) | set(draft_qmds) | set(all_draft_qmds()))
     # Self-healing (backstop of the pre-bake rule): pages listed in the nav
     # whose baked HTML is absent from _site (e.g. they landed via a failed
     # build and no later push touches them) are rendered now as well.
@@ -286,12 +328,16 @@ def main() -> None:
 
     if full_needed:
         res = subprocess.run(["quarto", "render"], cwd=str(ROOT))
+        if res.returncode == 0:
+            purge_draft_outputs(all_draft_qmds())
         sys.exit(res.returncode)
 
     snap = snapshot_search()
     if snap is None:
         print("WARN: _site/search.json missing, falling back to full render")
         res = subprocess.run(["quarto", "render"], cwd=str(ROOT))
+        if res.returncode == 0:
+            purge_draft_outputs(all_draft_qmds())
         sys.exit(res.returncode)
 
     # Suppress project pre/post-render during parallel renders: update scripts
