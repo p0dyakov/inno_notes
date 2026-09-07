@@ -67,8 +67,22 @@ jobs:
       - run: python -m pip install --quiet pyyaml httpx
       - name: Validate quarto config
         run: python -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
+      - name: Resolve render base (last green build, not push base)
+        id: renderbase
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A cancelled/superseded deploy leaves its changes unrendered; the next
+          # run keyed on push-base would skip them forever. Anchor on the newest
+          # SUCCESSFUL deploy-site head instead (fall back to push base).
+          BASE="${{ github.event.before }}"
+          for sha in $(gh run list --workflow deploy-site --status completed --limit 10               --json headSha,conclusion -q '.[] | select(.conclusion=="success") | .headSha' 2>/dev/null); do
+            if git merge-base --is-ancestor "$sha" HEAD 2>/dev/null; then BASE="$sha"; break; fi
+          done
+          echo "render base: $BASE"
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
       - name: Incremental render (only changed files, parallel)
-        run: python scripts/render_changed.py --base "${{ github.event.before }}" --jobs 4
+        run: python scripts/render_changed.py --base "${{ steps.renderbase.outputs.base }}" --jobs 4
       - name: Gate on formatting report
         run: |
           grep -q "No format-rule violations detected" formatting_report.md || (echo "::error::fix_formatting found violations" && exit 1)
