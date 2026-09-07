@@ -30,6 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Generation lands in dev (prod only via manual merge dev->main).
+          ref: dev
           fetch-depth: 0
       - name: Checkout inno_files at sha
         run: |
@@ -95,12 +97,12 @@ jobs:
           # to start ("unstaged changes") and the result is lost (Sept 5).
           git checkout -- _site/ _freeze/ 2>/dev/null || true
           git clean -fdq -- _site/ _freeze/ 2>/dev/null || true
-          # main moves under us (CI site builds); integrate before push with
-          # retries — a plain push loses the race and drops generated work.
+          # dev moves under us (parallel agent/human work); integrate before
+          # push with retries — a plain push loses the race and drops work.
           for i in 1 2 3 4 5; do
-            git fetch origin main
-            if git rebase origin/main; then
-              if git push origin HEAD:main; then
+            git fetch origin dev
+            if git rebase origin/dev; then
+              if git push origin HEAD:dev; then
                 echo "pushed on attempt $i"
                 break
               fi
