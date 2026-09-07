@@ -1102,6 +1102,20 @@ def _ensure_semester_section(text: str, semester: str) -> str:
     return text.replace(anchor, "\n" + block + anchor.lstrip("\n"), 1)
 
 
+def _is_draft_qmd(qmd: Path) -> bool:
+    """Hidden sample-based drafts (`draft: true` in YAML front matter).
+
+    Drafts keep their sources/solutions on disk but stay out of the sidebar,
+    the render set and search until real lec/tut transcripts land (see the
+    SAMPLE-BASED DRAFT comment inside such files for the regen path).
+    """
+    try:
+        parts = qmd.read_text(encoding="utf-8").split("---", 2)
+    except OSError:
+        return False
+    return len(parts) >= 3 and re.search(r"(?m)^draft:\s*true\s*$", parts[1]) is not None
+
+
 def update_sidebar(semesters: list[str] | None = None) -> None:
     """Ensure every managed-semester qmd is listed in _quarto.yml sidebar."""
     semesters = semesters or managed_semesters()
@@ -1117,6 +1131,8 @@ def update_sidebar(semesters: list[str] | None = None) -> None:
         qmds.extend(sorted((ROOT / sem).rglob("*.qmd")))
     added = 0
     for qmd in qmds:
+        if _is_draft_qmd(qmd):
+            continue
         rel = yml_rel(qmd)
         if rel not in text:
             course = qmd.parent.name

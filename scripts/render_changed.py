@@ -187,6 +187,20 @@ def build_search_entry(rel: str, crumbs_map: dict[str, list[str]]) -> dict:
             "section": "", "text": text, "crumbs": crumbs}
 
 
+def _is_draft_qmd(qmd: Path) -> bool:
+    """Hidden sample-based drafts (`draft: true` in YAML front matter).
+
+    Drafts keep their sources/solutions on disk but stay out of the sidebar,
+    the render set and search until real lec/tut transcripts land (see the
+    SAMPLE-BASED DRAFT comment inside such files for the regen path).
+    """
+    try:
+        parts = qmd.read_text(encoding="utf-8").split("---", 2)
+    except OSError:
+        return False
+    return len(parts) >= 3 and re.search(r"(?m)^draft:\s*true\s*$", parts[1]) is not None
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="origin/main")
@@ -233,6 +247,13 @@ def main() -> None:
     qmds = [p for p in changed if p.endswith(".qmd") and not p.startswith("_site/")]
     deleted_qmds = [p for p in qmds if not (ROOT / p).exists()]
     qmds = [p for p in qmds if (ROOT / p).exists()]
+    # Hidden sample-based drafts: never render; purge stale HTML + search
+    # entries (explicit `quarto render <file>` would bake them otherwise).
+    draft_qmds = [p for p in qmds if _is_draft_qmd(ROOT / p)]
+    if draft_qmds:
+        print(f"drafts skipped (hidden): {draft_qmds}")
+    qmds = [p for p in qmds if p not in draft_qmds]
+    deleted_qmds = deleted_qmds + draft_qmds
     # Self-healing (backstop of the pre-bake rule): pages listed in the nav
     # whose baked HTML is absent from _site (e.g. they landed via a failed
     # build and no later push touches them) are rendered now as well.
