@@ -41,6 +41,7 @@ QUARTO_YML = ROOT / "_quarto.yml"
 SUPPRESSED_LINES = [
     "    - scripts/update_last_updated.py\n",
     "    - scripts/update_index.py\n",
+    "    - scripts/subset_fonts.py\n",
     "    - bash scripts/bake-static-html.sh\n",
 ]
 
@@ -221,6 +222,7 @@ def main() -> None:
     run([sys.executable, str(ROOT / "scripts" / "update_index.py")])
     run([sys.executable, str(ROOT / "scripts" / "update_last_updated.py")])
     run([sys.executable, str(ROOT / "scripts" / "update_ru_manifest.py")])
+    run([sys.executable, str(ROOT / "scripts" / "subset_fonts.py")])
     try:
         sys.path.insert(0, str(ROOT / "scripts" / "agent"))
         from generate import update_sidebar  # noqa: E402
