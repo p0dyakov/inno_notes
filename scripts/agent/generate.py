@@ -265,6 +265,8 @@ def gemini_section(
 
 
 def _section_instruction(section: str) -> str:
+    if section == "Theory":
+        raise RuntimeError("Theory is stitched from map parts, never single-shot")
     p = PROMPTS_DIR / f"{section.lower()}.md"
     if p.exists():
         return p.read_text(encoding="utf-8")
@@ -331,6 +333,150 @@ def infer_topic(transcript: str, week: str, api_key: str) -> str:
             if topic and validate_title(f"W{week}. {topic}"):
                 return topic
     return f"Week {week} Notes"
+
+
+SELF_STUDY_GOAL = (
+    "Article goal: a reader who skipped the lecture learns EVERYTHING from "
+    "this article alone. Explain from scratch where the source is terse. "
+    "No water: every sentence must add understanding; generic filler is "
+    "forbidden. Lose no topic from the sources."
+)
+
+
+def gemini_custom(
+    name,
+    instruction,
+    payload,
+    style_context,
+    target_info,
+    api_key,
+    model=GEMINI_THEORY_MODEL,
+    fallbacks=None,
+):
+    """One free-form generation (maps, parts) with the shared goal + style."""
+    style_short = style_context[:4000]
+    prompt = f"""You are writing part of a Quarto study article. Output ONLY what the instruction asks (section markdown or a JSON array as specified) — no YAML, no extra sections, no commentary.
+
+Target: {target_info}
+
+Goal: {SELF_STUDY_GOAL}
+
+Instruction:
+{instruction}
+
+Style context (neighboring articles — follow density and heading style):
+{style_short}
+
+Payload:
+{payload}"""
+    return _call_with_fallbacks_helper(name, prompt, api_key, model, fallbacks)
+
+
+def _call_with_fallbacks_helper(name, prompt, api_key, model, fallbacks):
+    """Model+fallback chain with retries on 429/503/overload."""
+    last_err = None
+    models = [model] + (fallbacks if fallbacks is not None else GEMINI_FALLBACKS)
+    for m in models:
+        for attempt in range(1, 4):
+            try:
+                return _call_gemini(prompt, api_key, m)
+            except Exception as e:
+                last_err = e
+                msg = str(e)
+                if "429" in msg or "503" in msg or "overload" in msg.lower():
+                    wait = min(2 ** attempt * 5, 60)
+                    print(" ", name, ":", m, "failed, retry", attempt, "/3 in", wait + "s...")
+                    time.sleep(wait)
+                    continue
+                raise
+        print(" ", name, ":", m, "exhausted, trying next model...")
+    assert last_err is not None
+    raise last_err
+
+
+def _parse_json_list(text):
+    """First top-level JSON array in model output (tolerates fences/prose)."""
+    start = text.find("[")
+    if start < 0:
+        raise ValueError("no JSON array in model output")
+    obj, _ = json.JSONDecoder().raw_decode(text[start:])
+    if not isinstance(obj, list):
+        raise ValueError("map is not a list")
+    return obj
+
+
+def _gen_map(kind, transcript, style_context, target_info, api_key):
+    """Task/theory map with one strict-JSON repair retry."""
+    instruction = (PROMPTS_DIR / (kind + ".md")).read_text(encoding="utf-8")
+    extra = ""
+    last_err = None
+    for _ in (1, 2):
+        try:
+            out = gemini_custom(
+                kind, instruction + extra,
+                "FULL TRANSCRIPT (authoritative): " + transcript[:100000],
+                style_context, target_info, api_key,
+            )
+            items = _parse_json_list(out)
+            print(" ", kind, ":", len(items), "entries")
+            return items
+        except Exception as e:
+            last_err = e
+            print(" ", kind, "attempt failed, retrying with strict-JSON nudge...")
+            extra = "Return ONLY the JSON array. No prose, no fences."
+    assert last_err is not None
+    raise last_err
+
+
+def gen_task_map(transcript, style_context, target_info, api_key):
+    return _gen_map("taskmap", transcript, style_context, target_info, api_key)
+
+
+def gen_theory_map(transcript, style_context, target_info, api_key):
+    items = _gen_map("theorymap", transcript, style_context, target_info, api_key)
+    if not items:
+        raise ValueError("theory map is empty - refusing contentless Theory")
+    return items
+
+
+def force_part_heading(body, sec_num, idx, title):
+    """Enforce the map-order ##### heading on a theory part."""
+    want = "##### **" + str(sec_num) + "." + str(idx) + ". " + str(title) + "**"
+    out = []
+    done = False
+    for ln in body.splitlines():
+        s = ln.strip()
+        if (not done) and s.startswith("#####") and not s.startswith("######"):
+            out.append(want)
+            done = True
+        else:
+            out.append(ln)
+    if not done:
+        out = [want, ""] + out
+    return chr(10).join(out)
+
+
+def gen_theory_part(topic, siblings, sec_num, idx, transcript, style_context,
+                    target_info, api_key):
+    """Write one ##### theory part for a map topic."""
+    instruction = (PROMPTS_DIR / "theory_part.md").read_text(encoding="utf-8")
+    topic_json = json.dumps(topic, ensure_ascii=False)
+    sib_lines = []
+    for t in siblings:
+        sib_lines.append("- " + str(t))
+    payload = (
+        "YOUR TOPIC (heading must be exactly `##### **"
+        + str(sec_num) + "." + str(idx) + ". " + str(topic.get("title", "Topic"))
+        + "**`): " + chr(10) + topic_json + chr(10) + chr(10)
+        + "SIBLING TOPICS (covered separately - do not duplicate): " + chr(10)
+        + chr(10).join(sib_lines) + chr(10) + chr(10)
+        + "FULL TRANSCRIPT (source of facts): " + chr(10) + transcript[:100000]
+    )
+    body = gemini_custom(
+        "theory-" + str(sec_num) + "." + str(idx),
+        instruction, payload, style_context, target_info, api_key,
+    ).strip()
+    return force_part_heading(body, sec_num, idx, topic.get("title", "Topic"))
 
 
 def _build_section_prompt(section: str, transcript: str, style_context: str, target_info: str) -> str:
@@ -512,58 +658,130 @@ def generate_article(
     title = f"W{week}. {topic}"
     assert validate_title(title), f"generated title failed validation: {title!r}"
     required, has_formulas = section_rule_for_folder(course, semester)
-    if "Practice" in required and not transcript_has_explicit_tasks(transcript):
-        print(f"  {course}/{week}: no explicit tasks in transcript -> omitting Practice section")
-        required = [s for s in required if s != "Practice"]
     src_note = ""
     if sources:
         kinds = ", ".join(f"{s} ({source_kind(s)})" for s in sources)
         src_note = (
             f" This article combines {len(sources)} transcript sources: {kinds}. "
             f"Cover all of them; in Practice headings cite these exact source names "
-            f"in canonical order Lab→Homework→Assignment→Exercises→Lecture→Tutorial→Chapter→Recap→Test→Midterm→Final."
+            f"in canonical order Lab-Homework-Assignment-Exercises-Lecture-Tutorial-Chapter-Recap-Test-Midterm-Final."
         )
     target_info = (
         f"Course {full_name} ({semester}), week W{week}, author {author}, date {today}, "
-        f"required sections {required}. Article title is {title!r} — do not restate it in section bodies.{src_note}"
+        f"required sections {required}. Article title is {title!r} — do not restate it in section bodies.{src_note} "
+        f"Goal: self-study article readable from scratch: full theory, no fluff, no lost topics."
     )
-
     sections = [s for s in SECTION_ORDER if s in required]
 
-    results: dict[str, str] = {}
+    # ---- Stage A (parallel): maps + Definitions + Formulas ----
+    amaps = {}
+    asec = {}
 
-    def task(section: str) -> tuple[str, str]:
-        # Every content section (Theory/Definitions/Formulas/Practice/...) is
-        # written by the PRO model; flash is only for title/shorten and fixes.
-        print(f"  Gemini {section} (PRO model) for {course}/{week} ...")
-        return section, gemini_section(
-            section, transcript, style_context, target_info, api_key,
+    def run_defs():
+        return gemini_section(
+            "Definitions", transcript, style_context, target_info, api_key,
             model=GEMINI_THEORY_MODEL,
-            fallbacks=GEMINI_THEORY_FALLBACKS + GEMINI_FALLBACKS,
-        )
+            fallbacks=GEMINI_THEORY_FALLBACKS + GEMINI_FALLBACKS)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sections), 4)) as ex:
-        futs = {ex.submit(task, s): s for s in sections}
+    def run_forms():
+        return gemini_section(
+            "Formulas", transcript, style_context, target_info, api_key,
+            model=GEMINI_THEORY_MODEL,
+            fallbacks=GEMINI_THEORY_FALLBACKS + GEMINI_FALLBACKS)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {}
+        if "Definitions" in required:
+            futs[ex.submit(run_defs)] = ("sec", "Definitions")
+        if "Formulas" in required:
+            futs[ex.submit(run_forms)] = ("sec", "Formulas")
+        if "Practice" in required:
+            print(f"  task map (PRO model) for {course}/{week} ...")
+            futs[ex.submit(gen_task_map, transcript, style_context, target_info, api_key)] = ("map", "task")
+        if "Theory" in required:
+            print(f"  theory map (PRO model) for {course}/{week} ...")
+            futs[ex.submit(gen_theory_map, transcript, style_context, target_info, api_key)] = ("map", "theory")
         for fut in concurrent.futures.as_completed(futs):
-            sec, body = fut.result()
-            results[sec] = body.strip()
+            kind, name = futs[fut]
+            if kind == "sec":
+                asec[name] = fut.result().strip()
+            else:
+                amaps[name] = fut.result()
 
-    # Stitch in canonical order. Numbers are SEQUENTIAL among the sections
-    # actually present in this article (no Formulas -> Practice is 3., etc.),
-    # never the position in the global SECTION_ORDER.
-    stitched_sections = []
+    task_map = amaps.get("task", [])
+    theory_map = amaps.get("theory", [])
+    if "Practice" in required and not task_map:
+        print(f"  {course}/{week}: task map empty -> omitting Practice section")
+        required = [s for s in required if s != "Practice"]
+        sections = [s for s in SECTION_ORDER if s in required]
+
+    # ---- Stage B (parallel): Practice from map + Theory parts from map ----
+    practice_body = ""
+    part_bodies = []
+    bjobs = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        futs2 = {}
+        if "Practice" in required and task_map:
+            practice_instruction = (PROMPTS_DIR / "practice.md").read_text(encoding="utf-8")
+            practice_payload = (
+                "TASK MAP (authoritative item set, write every entry in map order): "
+                + chr(10) + json.dumps(task_map, ensure_ascii=False)
+                + chr(10) + chr(10)
+                + "FULL TRANSCRIPT (solution details): "
+                + chr(10) + transcript[:100000]
+            )
+            print(f"  Gemini Practice from map ({len(task_map)} items) for {course}/{week} ...")
+            futs2[ex.submit(
+                gemini_custom, "Practice", practice_instruction, practice_payload,
+                style_context, target_info, api_key)] = ("practice", -1)
+        if "Theory" in required and theory_map:
+            tidx = sections.index("Theory") + 1
+            siblings = [str(t.get("title", "Topic")) for t in theory_map]
+            for k, topic in enumerate(theory_map, start=1):
+                print(f"  Gemini theory-{tidx}.{k} ({str(topic.get('title', ''))[:50]}) for {course}/{week} ...")
+                futs2[ex.submit(
+                    gen_theory_part, topic, siblings, tidx, k,
+                    transcript, style_context, target_info, api_key)] = ("part", k)
+        for fut in concurrent.futures.as_completed(futs2):
+            kind, k = futs2[fut]
+            if kind == "practice":
+                practice_body = fut.result().strip()
+            else:
+                part_bodies.append((k, fut.result().strip()))
+    part_bodies.sort(key=lambda pair: pair[0])
+
+    # ---- Stage C: deterministic stitch, sequential numbering ----
+    # Numbers follow sections ACTUALLY present (EMPTY-dropped Formulas shifts
+    # everything after it — no gaps like a missing 3.).
+    results = dict(asec)
+    if "Practice" in required and practice_body:
+        results["Practice"] = practice_body
+    present = []
     for sec in sections:
+        if sec == "Theory":
+            if part_bodies:
+                present.append(sec)
+            continue
         body = results.get(sec, "")
         if not body:
             continue
-        idx = sections.index(sec) + 1
+        if body.strip() == "<!-- EMPTY -->":
+            continue
+        present.append(sec)
+    stitched_sections = []
+    for sec in present:
+        idx = present.index(sec) + 1
+        if sec == "Theory":
+            body = "#### **" + str(idx) + ". Theory**" + chr(10) + chr(10) + (chr(10) + chr(10)).join(
+                part for _, part in part_bodies)
+            stitched_sections.append(body.strip())
+            continue
+        body = results.get(sec, "")
         mh = re.match(r"(\s*####\s+\*\*)(\d+)(\.\s+)", body)
         if mh:
-            # Model emitted its own header — normalize the number, keep the rest
-            body = f"{mh.group(1)}{idx}{mh.group(3)}" + body[mh.end():]
+            body = mh.group(1) + str(idx) + mh.group(3) + body[mh.end():]
         else:
-            # Gemini sometimes omits the header — prepend canonical one
-            body = f"#### **{idx}. {sec}**\n\n" + body
+            body = "#### **" + str(idx) + ". " + sec + "**" + chr(10) + chr(10) + body
         stitched_sections.append(body.strip())
 
     yaml_front = textwrap.dedent(
@@ -577,7 +795,7 @@ def generate_article(
         ---
         """
     )
-    return yaml_front + "\n" + "\n\n".join(stitched_sections) + "\n"
+    return yaml_front + chr(10) + (chr(10) + chr(10)).join(stitched_sections) + chr(10)
 
 
 def theory_stats(body: str) -> tuple[int, int]:
@@ -722,15 +940,11 @@ def coverage_gap(theory: str, topics: list[str]) -> list[str]:
 
 
 def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> bool:
-    """Regenerate ONLY the Theory section of an existing article with the PRO model."""
     rel = qmd.relative_to(INNO_NOTES)
     semester = rel.parts[0]
     course_full, week = rel.parts[1], Path(rel.parts[2]).stem
     code = canon_code(semester, course_full)
-    cdir = inno_files / semester / code
-    mds = [md for wd in sorted(cdir.iterdir()) if wd.is_dir()
-           and (m := re.match(r"(\d+)", wd.name)) and m.group(1) == week
-           for md in sorted(wd.glob("*.md")) if md.name != "Syllabus.md"]
+    mds = _week_mds(code, week, inno_files, semester)
     if not mds:
         print(f"  no transcripts for {qmd}")
         return False
@@ -740,36 +954,39 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
     required, _ = section_rule_for_folder(code, semester)
     style = collect_style_context(course_full, semester=semester)
     old = qmd.read_text(encoding="utf-8")
-    mt = re.search(r'title: "(.*)"', old)
-    title = mt.group(1) if mt else f"W{week}. Notes"
+    title = f"W{week}. Notes"
+    for ln in old.splitlines():
+        s = ln.strip()
+        if s.startswith('title: "') and s.endswith('"') and len(s) > 9:
+            title = s[len('title: "'):-1]
+            break
     target_info = (
         f"Course {full_name} ({semester}), week W{week}, author {author}, "
-        f"required sections {required}. Article title is {title!r} — do not restate it. "
+        f"required sections {required}. Article title is {title!r} - do not restate it. "
         f"Regenerate ONLY the Theory section; keep full depth per the instruction."
     )
     topics = transcript_topics(transcript)
     print(f"  coverage checklist: {len(topics)} topic(s)")
     best, best_key = "", (10 ** 9, 0)
     for it in range(1, tries + 1):
-        print(f"  Theory PRO attempt {it}/{tries} for {qmd.relative_to(ROOT)} ...")
-        attempt_target = target_info
-        if it > 1 and missing:
-            attempt_target += (
-                "\nPrevious draft OMITTED these REQUIRED checklist topics — "
-                "each needs its own ##### 1.x subsection with full teaching "
-                "(definition, why, worked mini-example, pitfalls):\n- "
-                + "\n- ".join(missing))
-        body = gemini_section("Theory", transcript, style, attempt_target, api_key,
-                              model=GEMINI_THEORY_MODEL,
-                              fallbacks=GEMINI_THEORY_FALLBACKS + GEMINI_FALLBACKS).strip()
-        if not body.lstrip().startswith("####"):
-            body = "#### **1. Theory**\n\n" + body
+        print(f"  Theory map+parts attempt {it}/{tries} for {qmd.relative_to(ROOT)} ...")
+        tmap = gen_theory_map(transcript, style, target_info, api_key)
+        siblings = [str(t.get("title", "Topic")) for t in tmap]
+        parts = [None] * len(tmap)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(tmap), 6)) as ex:
+            futs = {}
+            for k, topic in enumerate(tmap, start=1):
+                futs[ex.submit(gen_theory_part, topic, siblings, 1, k,
+                               transcript, style, target_info, api_key)] = k
+            for fut in concurrent.futures.as_completed(futs):
+                parts[futs[fut] - 1] = fut.result().strip()
+        body = "#### **1. Theory**" + chr(10) + chr(10) + (chr(10) + chr(10)).join(parts)
         words, subs = theory_stats(body)
         missing = coverage_gap(body, topics)
         print(f"    stats: {words} words, {subs} subsections, "
               f"missing topics: {len(missing)}")
         for m in missing:
-            print(f"      - MISSING: {m[:90]}")
+            print("      - MISSING: " + str(m)[:90])
         key = (len(missing), -words)
         if key < best_key:
             best, best_key = body, key
@@ -778,15 +995,78 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
         time.sleep(5)
     words, subs = theory_stats(best)
     missing = coverage_gap(best, topics)
-    print(f"  Theory stats: {words} words, {subs} subsections (no minimum — depth follows input size)")
-    replacement = best.rstrip() + "\n\n"
-    new = re.sub(r"#### \*\*1\. Theory\*\*.*?(?=^#### )", lambda _: replacement,
-                 old, count=1, flags=re.DOTALL | re.M)
+    print(f"  Theory stats: {words} words, {subs} subsections (no minimum - depth follows input size)")
+    replacement = best.rstrip() + chr(10) + chr(10)
+    head = "#### **1. Theory**"
+    i = old.find(head)
+    assert i >= 0, "Theory header not found"
+    j = old.find(chr(10) + "#### ", i + len(head))
+    new = old[:i] + replacement + (old[j + 1:] if j >= 0 else "")
     assert new != old, "Theory splice failed"
     qmd.write_text(new, encoding="utf-8")
     run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT))
     print(f"  Theory replaced: {words} words, {subs} subsections")
     return True
+
+
+def _week_mds(code, week, inno_files, semester="semester-4"):
+    """Transcript .md files for one (course, week)."""
+    cdir = inno_files / semester / code
+    if not cdir.is_dir():
+        return []
+    out = []
+    for wd in sorted(cdir.iterdir()):
+        if not wd.is_dir():
+            continue
+        digits = ""
+        for ch in wd.name:
+            if ch.isdigit():
+                digits = digits + ch
+            else:
+                break
+        if digits != str(week):
+            continue
+        for md in sorted(wd.glob("*.md")):
+            if md.name != "Syllabus.md":
+                out.append(md)
+    return out
+
+
+def regen_article(qmd, inno_files, api_key):
+    """Full regenerate of one article with the staged flow (maps + parts)."""
+    try:
+        rel = qmd.relative_to(INNO_NOTES)
+    except ValueError:
+        print(f"  {qmd} is outside the notes repo")
+        return False
+    if len(rel.parts) < 3:
+        print(f"  cannot infer course/week from {qmd}")
+        return False
+    semester = rel.parts[0]
+    course_full, week = rel.parts[1], Path(rel.parts[2]).stem
+    code = canon_code(semester, course_full)
+    mds = _week_mds(code, week, inno_files, semester)
+    if not mds:
+        print(f"  no transcripts for {qmd}")
+        return False
+    target = qmd if qmd.is_absolute() else ROOT / qmd
+    return process_week(target, mds, inno_files, api_key, dry_run=False)
+
+
+def _group_qmd_paths(tokens):
+    """Group shell-split tokens back into existing qmd paths (names with spaces)."""
+    grouped = []
+    buf = ""
+    for tok in tokens or []:
+        cand = (buf + " " + tok).strip() if buf else tok
+        if (ROOT / cand).exists() or Path(cand).exists():
+            grouped.append(cand)
+            buf = ""
+        else:
+            buf = cand
+    if buf:
+        grouped.append(buf)
+    return grouped
 
 
 def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False) -> bool:
@@ -983,6 +1263,8 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0, help="Limit number of lectures to process (for testing)")
     ap.add_argument("--regen-theory", nargs="*", default=None,
                     help="Regenerate ONLY Theory (PRO model) for given qmd path(s), then exit")
+    ap.add_argument("--regen-article", nargs="*", default=None,
+                    help="Regenerate WHOLE article(s) with the staged flow (maps + parts) for given qmd path(s), then exit")
     ap.add_argument("--tries", type=int, default=3)
     args = ap.parse_args()
 
@@ -1012,20 +1294,7 @@ def main() -> None:
         return
 
     if args.regen_theory:
-        # workflow dispatch passes space-separated paths; re-group tokens
-        # into existing files so names with spaces survive shell splitting.
-        grouped: list[str] = []
-        buf = ""
-        for tok in args.regen_theory:
-            cand = f"{buf} {tok}".strip() if buf else tok
-            if (ROOT / cand).exists() or Path(cand).exists():
-                grouped.append(cand)
-                buf = ""
-            else:
-                buf = cand
-        if buf:
-            grouped.append(buf)
-        args.regen_theory = grouped
+        args.regen_theory = _group_qmd_paths(args.regen_theory)
         ok_all = True
         for qp in args.regen_theory:
             qmd = Path(qp) if Path(qp).is_absolute() else ROOT / qp
@@ -1034,6 +1303,20 @@ def main() -> None:
                     ok_all = False
             except Exception as e:
                 print(f"ERROR regen {qmd}: {e}", file=sys.stderr)
+                ok_all = False
+        update_sidebar()
+        sys.exit(0 if ok_all else 2)
+
+    if args.regen_article:
+        args.regen_article = _group_qmd_paths(args.regen_article)
+        ok_all = True
+        for qp in args.regen_article:
+            qmd = Path(qp) if Path(qp).is_absolute() else ROOT / qp
+            try:
+                if not regen_article(qmd, args.inno_files, api_key):
+                    ok_all = False
+            except Exception as e:
+                print(f"ERROR regen-article {qmd}: {e}", file=sys.stderr)
                 ok_all = False
         update_sidebar()
         sys.exit(0 if ok_all else 2)

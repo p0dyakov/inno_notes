@@ -4,6 +4,11 @@
 > transcript. If the source names no explicit tasks, output nothing at all —
 > never invent synthetic tasks. (The pipeline omits Practice automatically.)
 
+You are given a TASK MAP (JSON list produced from the same transcript).
+Write Practice items for EVERY map entry, in map order, nothing added, nothing
+dropped. Each entry's statement is authoritative — solve exactly what it states.
+(The transcript is attached for solution details; the map defines the item set.)
+
 Write the Practice section. Its number is SEQUENTIAL among the sections actually
 present in THIS article: `4.` if Theory + Definitions + Formulas are all present,
 `3.` if one of them was omitted, `2.` if two were omitted. Task headings use the

@@ -7,3 +7,5 @@ which is the normal case).
 - One bullet per term: `*   **Term**: Definition.`
 - One sentence per term, self-contained (understandable without reading Theory).
 - Cover every key term introduced in Theory, no extras.
+
+- Goal: a reader meeting the term for the first time must grasp it from this one sentence — expand with the essential qualifier, never with filler.
