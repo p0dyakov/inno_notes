@@ -3,6 +3,9 @@
 Write ONE Theory subsection for the map topic given below (its number and
 title are fixed — use them exactly as the `#####` heading).
 
+Heading format (exact, note: NO dot after the number):
+`##### **2.4 Topic Title Here**`
+
 Goal: a reader who skipped the lecture learns this topic fully from your text.
 Textbook writing, not notes. You may add clarifying explanations, intuition
 and tiny worked illustrations that the source lacks — but every added sentence

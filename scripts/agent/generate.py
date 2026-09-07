@@ -19,6 +19,7 @@ import subprocess
 import sys
 import time
 import textwrap
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -65,12 +66,15 @@ GEMINI_FALLBACKS = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
 # so it is picked up automatically if quota returns.
 # Override with GEMINI_THEORY_MODEL env if the model id changes.
 GEMINI_THEORY_MODEL = os.environ.get("GEMINI_THEORY_MODEL", "gemini-3.8-flash")
-GEMINI_THEORY_FALLBACKS = ["gemini-3.1-pro-preview", "gemini-3.8-flash"]
+# Flash-only: Pro is limit:0 in practice, so it was dropped from every chain.
+GEMINI_THEORY_FALLBACKS = ["gemini-3.8-flash"]
 GOLDEN_W = 3  # legacy week-numbering offset, kept for reference
 
 # semesters without course_map.json (e.g. frozen legacy semester-1/2) are never touched
 
 SECTION_ORDER = ["Theory", "Definitions", "Formulas", "Practice"]
+# Serializes fix/validate/render across parallel articles (shared report).
+_VALIDATE_LOCK = threading.Lock()
 
 # Author map from prompt.md section 15 (fallback if course folder not in prompt)
 AUTHOR_MAP = {
@@ -441,7 +445,7 @@ def gen_theory_map(transcript, style_context, target_info, api_key):
 
 def force_part_heading(body, sec_num, idx, title):
     """Enforce the map-order ##### heading on a theory part."""
-    want = "##### **" + str(sec_num) + "." + str(idx) + ". " + str(title) + "**"
+    want = "##### **" + str(sec_num) + "." + str(idx) + " " + str(title) + "**"
     out = []
     done = False
     for ln in body.splitlines():
@@ -457,7 +461,7 @@ def force_part_heading(body, sec_num, idx, title):
 
 
 def gen_theory_part(topic, siblings, sec_num, idx, transcript, style_context,
-                    target_info, api_key):
+                    target_info, api_key, feedback=None):
     """Write one ##### theory part for a map topic."""
     instruction = (PROMPTS_DIR / "theory_part.md").read_text(encoding="utf-8")
     topic_json = json.dumps(topic, ensure_ascii=False)
@@ -466,11 +470,13 @@ def gen_theory_part(topic, siblings, sec_num, idx, transcript, style_context,
         sib_lines.append("- " + str(t))
     payload = (
         "YOUR TOPIC (heading must be exactly `##### **"
-        + str(sec_num) + "." + str(idx) + ". " + str(topic.get("title", "Topic"))
+        + str(sec_num) + "." + str(idx) + " " + str(topic.get("title", "Topic"))
         + "**`): " + chr(10) + topic_json + chr(10) + chr(10)
         + "SIBLING TOPICS (covered separately - do not duplicate): " + chr(10)
         + chr(10).join(sib_lines) + chr(10) + chr(10)
         + "FULL TRANSCRIPT (source of facts): " + chr(10) + transcript[:100000]
+        + (chr(10) + chr(10) + "FEEDBACK ON PREVIOUS DRAFT (fix exactly, keep everything else): "
+           + chr(10) + feedback[:3000] if feedback else "")
     )
     body = gemini_custom(
         "theory-" + str(sec_num) + "." + str(idx),
@@ -642,15 +648,8 @@ def transcript_has_explicit_tasks(transcript: str) -> bool:
                 or TASK_HEADING_RE.search(transcript))
 
 
-def generate_article(
-    transcript: str,
-    course: str,
-    week: str,
-    api_key: str,
-    style_context: str,
-    sources: list[str] | None = None,
-    semester: str = "semester-4",
-) -> str:
+def article_context(transcript, course, week, api_key, sources=None, semester="semester-4"):
+    """Title/author/sections/target block shared by fresh and retry generations."""
     today = datetime.now().strftime("%B %d, %Y")
     full_name = short_to_full(canon_code(semester, course), semester)
     author = resolve_author(course, transcript, semester)
@@ -668,13 +667,43 @@ def generate_article(
         )
     target_info = (
         f"Course {full_name} ({semester}), week W{week}, author {author}, date {today}, "
-        f"required sections {required}. Article title is {title!r} — do not restate it in section bodies.{src_note} "
+        f"required sections {required}. Article title is {title!r} - do not restate it in section bodies.{src_note} "
         f"Goal: self-study article readable from scratch: full theory, no fluff, no lost topics."
     )
+    return {"title": title, "author": author, "required": required,
+            "target_info": target_info, "today": today}
+
+
+def generate_article(
+    transcript,
+    course,
+    week,
+    api_key,
+    style_context,
+    sources=None,
+    semester="semester-4",
+    ctx=None,
+    task_map=None,
+    theory_map=None,
+    feedback=None,
+):
+    if ctx is None:
+        ctx = article_context(transcript, course, week, api_key, sources, semester)
+    title = ctx["title"]
+    author = ctx["author"]
+    required = list(ctx["required"])
+    target_info = ctx["target_info"]
+    today = ctx["today"]
+    if feedback is None and style_context.startswith("Previous attempt"):
+        feedback = style_context[:3000]
     sections = [s for s in SECTION_ORDER if s in required]
 
     # ---- Stage A (parallel): maps + Definitions + Formulas ----
     amaps = {}
+    if task_map is not None:
+        amaps["task"] = task_map
+    if theory_map is not None:
+        amaps["theory"] = theory_map
     asec = {}
 
     def run_defs():
@@ -695,11 +724,11 @@ def generate_article(
             futs[ex.submit(run_defs)] = ("sec", "Definitions")
         if "Formulas" in required:
             futs[ex.submit(run_forms)] = ("sec", "Formulas")
-        if "Practice" in required:
-            print(f"  task map (PRO model) for {course}/{week} ...")
+        if "Practice" in required and "task" not in amaps:
+            print(f"  task map (flash) for {course}/{week} ...")
             futs[ex.submit(gen_task_map, transcript, style_context, target_info, api_key)] = ("map", "task")
-        if "Theory" in required:
-            print(f"  theory map (PRO model) for {course}/{week} ...")
+        if "Theory" in required and "theory" not in amaps:
+            print(f"  theory map (flash) for {course}/{week} ...")
             futs[ex.submit(gen_theory_map, transcript, style_context, target_info, api_key)] = ("map", "theory")
         for fut in concurrent.futures.as_completed(futs):
             kind, name = futs[fut]
@@ -741,7 +770,7 @@ def generate_article(
                 print(f"  Gemini theory-{tidx}.{k} ({str(topic.get('title', ''))[:50]}) for {course}/{week} ...")
                 futs2[ex.submit(
                     gen_theory_part, topic, siblings, tidx, k,
-                    transcript, style_context, target_info, api_key)] = ("part", k)
+                    transcript, style_context, target_info, api_key, feedback=feedback)] = ("part", k)
         for fut in concurrent.futures.as_completed(futs2):
             kind, k = futs2[fut]
             if kind == "practice":
@@ -968,9 +997,13 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
     topics = transcript_topics(transcript)
     print(f"  coverage checklist: {len(topics)} topic(s)")
     best, best_key = "", (10 ** 9, 0)
-    for it in range(1, tries + 1):
-        print(f"  Theory map+parts attempt {it}/{tries} for {qmd.relative_to(ROOT)} ...")
+    try:
         tmap = gen_theory_map(transcript, style, target_info, api_key)
+    except Exception as e:
+        print(f"  theory map failed: {e}")
+        return False
+    for it in range(1, tries + 1):
+        print(f"  Theory parts attempt {it}/{tries} for {qmd.relative_to(ROOT)} ...")
         siblings = [str(t.get("title", "Topic")) for t in tmap]
         parts = [None] * len(tmap)
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(tmap), 6)) as ex:
@@ -1101,6 +1134,19 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
             pass
 
     style = collect_style_context(short_to_full(course, semester), semester=semester)
+    ctx = article_context(transcript, course, week, api_key,
+                          [md.name for md in mds], semester)
+    # Maps are built ONCE per article, not per retry iteration: retries re-roll
+    # parts only. A map failure falls back to per-iteration maps (None).
+    pre_task, pre_theory = None, None
+    try:
+        if "Practice" in ctx["required"]:
+            pre_task = gen_task_map(transcript, style, ctx["target_info"], api_key)
+        if "Theory" in ctx["required"]:
+            pre_theory = gen_theory_map(transcript, style, ctx["target_info"], api_key)
+    except Exception as e:
+        print("  maps failed, will rebuild per iteration...")
+        pre_task, pre_theory = None, None
 
     # Generate
     max_iters = 3
@@ -1108,7 +1154,9 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
         print(f"Generating {qmd} iteration {it}/{max_iters} ...")
         try:
             article = generate_article(transcript, course, week, api_key, style,
-                                       [md.name for md in mds], semester)
+                                       [md.name for md in mds], semester,
+                                       ctx=ctx, task_map=pre_task,
+                                       theory_map=pre_theory)
         except Exception as e:
             print(f"  Gemini failed: {e}")
             if it == max_iters:
@@ -1122,36 +1170,38 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
         tmp.write_text(article, encoding="utf-8")
         tmp.replace(qmd)
 
-        # Fix formatting + renumber
-        res = run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT))
-        if res.returncode != 0:
-            print(f"  fix_formatting failed: {res.stderr[:500]}")
-        # Renumber if needed (check if headings changed)
-        res2 = run([sys.executable, "scripts/renumber_examples.py", str(qmd)])
-        if res2.returncode != 0:
-            print(f"  renumber failed (non-fatal): {res2.stderr[:300]}")
+        # One article at a time here: fix/report/render share state.
+        with _VALIDATE_LOCK:
+            # Fix formatting + renumber
+            res = run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT))
+            if res.returncode != 0:
+                print(f"  fix_formatting failed: {res.stderr[:500]}")
+            # Renumber if needed (check if headings changed)
+            res2 = run([sys.executable, "scripts/renumber_examples.py", str(qmd)])
+            if res2.returncode != 0:
+                print(f"  renumber failed (non-fatal): {res2.stderr[:300]}")
 
-        # Validate fix_formatting report
-        report = ROOT / "scripts/formatting_report.md"
-        if report.exists():
-            txt = report.read_text(encoding="utf-8")
-            if "No format-rule violations detected" in txt:
-                # Try quarto render for this file only
-                ok, log = quarto_render_one(qmd)
-                if ok:
-                    print(f"  OK {qmd} (fix_formatting clean + quarto render ok)")
-                    return True
+            # Validate fix_formatting report
+            report = ROOT / "scripts/formatting_report.md"
+            if report.exists():
+                txt = report.read_text(encoding="utf-8")
+                if "No format-rule violations detected" in txt:
+                    # Try quarto render for this file only
+                    ok, log = quarto_render_one(qmd)
+                    if ok:
+                        print(f"  OK {qmd} (fix_formatting clean + quarto render ok)")
+                        return True
+                    else:
+                        print(f"  Quarto render failed for {qmd}, feeding back to Gemini (attempt {it})...")
+                        style = f"Previous attempt failed quarto render with:\n{log[:4000]}\n\nOriginal style context:\n{style[:2000]}"
+                        continue
                 else:
-                    print(f"  Quarto render failed for {qmd}, feeding back to Gemini (attempt {it})...")
-                    style = f"Previous attempt failed quarto render with:\n{log[:4000]}\n\nOriginal style context:\n{style[:2000]}"
+                    # Feed formatting violations back
+                    print(f"  Formatting violations remain, feeding back (attempt {it})...")
+                    # Extract snippet
+                    violations = "\n".join(l for l in txt.splitlines() if qmd.name in l or "Line" in l)[:4000]
+                    style = f"Previous attempt had formatting violations:\n{violations}\n\nFix these exactly per rules.md. Original transcript(s):\n{transcript[:3000]}"
                     continue
-            else:
-                # Feed formatting violations back
-                print(f"  Formatting violations remain, feeding back (attempt {it})...")
-                # Extract snippet
-                violations = "\n".join(l for l in txt.splitlines() if qmd.name in l or "Line" in l)[:4000]
-                style = f"Previous attempt had formatting violations:\n{violations}\n\nFix these exactly per rules.md. Original transcript(s):\n{transcript[:3000]}"
-                continue
 
     print(f"  Exhausted iterations for {qmd}, removing failed draft so it never pushes")
     try:
@@ -1337,14 +1387,27 @@ def main() -> None:
         return
 
     failed: list[Path] = []
-    for qmd, group in (groups[: args.limit] if args.limit else groups):
+    items = groups[: args.limit] if args.limit else groups
+
+    def _one(item):
+        qmd, group = item
         try:
             ok = process_week(qmd, group, args.inno_files, api_key, dry_run=args.dry_run)
             if not ok:
-                failed.extend(group)
+                return list(group)
         except Exception as e:
             print(f"ERROR processing {qmd}: {e}", file=sys.stderr)
-            failed.extend(group)
+            return list(group)
+        return []
+
+    if len(items) > 1:
+        print(f"Processing {len(items)} article(s) with 2 parallel workers (validate serializes) ...")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            for res in ex.map(_one, items):
+                failed.extend(res)
+    else:
+        for res in map(_one, items):
+            failed.extend(res)
 
     if failed:
         print(f"{len(failed)} transcript(s) failed validation, failing the run so broken articles never push:", file=sys.stderr)

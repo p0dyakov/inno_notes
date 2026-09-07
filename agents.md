@@ -66,18 +66,16 @@
    - только изменившиеся транскрипты; ранний выход, если менять нечего;
    - статьи пишутся staged-флоу (цель: self-study с нуля, без воды, без потерь тем).
      Стадия A **параллельно**: карта задач (JSON), карта теории (JSON), Definitions,
-     Formulas — сильнейшей доступной моделью (`gemini-3.8-flash` по умолчанию, Pro —
-     первым в fallback и вернётся сам при появлении квоты), flash только для мелочей
-     и автофиксов, контекст стиля — из соседних статей папки. Пустая карта задач =
-     нет секции Practice (выдумывать запрещено); `<!-- EMPTY -->` в Formulas = нет секции.
-     Стадия B **параллельно**: Practice строго по карте + каждая тема теории своим
-     запросом по своей части карты. Стадия C: детерминированная склейка со сквозной
-     нумерацией;
-   - цикл до 3 попыток: `fix_formatting.py` + `renumber_examples.py` + рендер одного файла,
-     ошибки скармливаются обратно модели; упавший черновик удаляется/откатывается —
-     **битые статьи никогда не пушатся**;
+     Formulas — только flash (`gemini-3.8-flash` + flash-фолбэки; Pro limit:0,
+     убран из цепочек), контекст стиля — из соседних статей папки. Пустая карта
+     задач = нет секции Practice (выдумывать запрещено); `<!-- EMPTY -->` в Formulas
+     = нет секции. Стадия B **параллельно**: Practice строго по карте + каждая тема
+     теории своим запросом по своей части карты. Стадия C: детерминированная склейка
+     со сквозной нумерацией; карты строятся ОДИН раз на статью (ретраи перекатывают
+     только части, с фидбэком о нарушениях); статьи идут пулом в 2 воркера
+     (валидация/рендер сериализованы локом);
    - в конце `update_sidebar()` дописывает новые файлы в `_quarto.yml`;
-3. коммит `semester-4/ + index.qmd + _quarto.yml` в `main` от `inno-notes-agent`.
+3. коммит `semester-4/ + index.qmd + _quarto.yml` в `dev` от `inno-notes-agent` (в прод — только мержем по запросу).
 
 Формат статей — жёсткий: `scripts/agent/prompts/prompt.md` (структура Theory/Definitions/Formulas/Practice,
 `Example`/`Task` с решениями в `<details>`), `rules.md` (нумерация `W<N>`, заголовки,
@@ -157,7 +155,7 @@ Job `deploy` (ubuntu, после `build`): берёт свежий `main`, кл�
 | Посмотреть, что изменится, ничего не трогая | `python3 scripts/render_changed.py --dry-run` | Печатает список changed-файлов vs `origin/main` |
 | Принудительно всё перерендерить | `python3 scripts/render_changed.py --full` | Только если `_quarto.yml` менялся или инкремент разошёлся с полным |
 | Другой base / больше параллелизма | `--base <ref>`, `--jobs N` (default 4) | Параллельные рендеры с ретраями коллизий `site_libs` |
-| Сгенерировать/перегенерировать статью из транскриптов | `python3 scripts/agent/generate.py --inno-files <путь>` | Сам находит изменения; `--semester semester-4`, `--limit N` (тест), `--dry-run`, `--regen-theory <qmd> --tries 3` (Theory сильнейшей доступной моделью), `--scaffold-semester semester-N` (новый семестр) |
+| Сгенерировать/перегенерировать статью из транскриптов | `python3 scripts/agent/generate.py --inno-files <путь>` | Сам находит изменения; `--semester semester-4`, `--limit N` (тест), `--dry-run`, `--regen-theory <qmd> --tries 3` (только Theory: карта + части), `--regen-article <qmd>` (целая статья staged-флоу), `--scaffold-semester semester-N` (новый семестр) |
 | Проверить здоровье Antigravity-хаба (без траты квоты) | `python3 scripts/agent/llm_antigravity.py` | Discovery хаба + квоты |
 | Починить форматирование всех qmd | `python3 scripts/fix_formatting.py` | + пишет `formatting_report.md`; CI гейтится на «No format-rule violations» |
 | Пересобрать таблицу курсов на главной | `python3 scripts/update_index.py` | Источник: `semester-*/course_map.json`; обычно вызывается сам (pre-render / render_changed) |
