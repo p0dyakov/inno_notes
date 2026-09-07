@@ -565,7 +565,7 @@ def theory_stats(body: str) -> tuple[int, int]:
 
 
 _TOPIC_SKIP_RE = re.compile(
-    r"^(innopolis university|outline|contents|table of contents|references?|"
+    r"^(innopolis university|outline|contents|table of contents|references?|pages?|"
     r"end of lecture|sources|syllabus|chapter\s+\d+)$", re.I)
 _STOPWORDS = frozenset(
     "with from into over under what when where which while their there "

@@ -1,0 +1,122 @@
+---
+title: "W5. Linear Programming"
+author: "Mohammad Reza Bahrami"
+date: "September 07, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Theory**
+
+Linear programming (LP) optimises a linear objective over linear constraints. Week 5 covers the complete classical pipeline: standard form, the geometry of basic solutions, the simplex tableau, the Big-M trick for awkward constraints, and the two-phase method — everything the test examines.
+
+##### **1.1 Standard and Equation Form**
+An LP maximises (or minimises) $z = c_1x_1 + \dots + c_nx_n$ subject to linear inequalities and $x_j \ge 0$. The simplex method needs **equation form**: every $\le$ constraint $a^Tx \le b$ gains a **slack variable** $s \ge 0$ ($a^Tx + s = b$); every $\ge$ constraint loses a **surplus variable** ($a^Tx - s = b$); equalities stay. Constraints that still lack an obvious starting basis get **artificial variables**, removed afterwards.
+* **Worked check:** $3x_1 + 2x_2 \ge 12$ becomes $3x_1 + 2x_2 - s_1 = 12$; $3x_1 + 8x_2 \le 24$ becomes $3x_1 + 8x_2 + s_2 = 24$.
+
+##### **1.2 Basic Solutions and Geometry**
+With $m$ equations and $n > m$ variables, fix $n - m$ variables at zero and solve for the rest: each choice of $m$ **basic variables** yields a **basic solution**. If it also satisfies all constraints (including nonnegativity), it is a **basic feasible solution (BFS)** — geometrically a corner (vertex) of the feasible polygon. The fundamental theorem: if an optimum exists, one sits at a BFS. Infeasible basic solutions are algebraically valid equation-solvers that violate some constraint — on a plot they are vertices of constraint lines lying outside the feasible region.
+* **Why it matters:** the simplex method never scans interiors; it hops from corner to corner, so the whole algorithm is a walk over BFSs.
+
+##### **1.3 The Simplex Tableau**
+The tableau tracks one BFS per iteration. The $z$-row holds reduced costs: for maximisation, a negative entry marks a variable whose increase improves $z$ — the most negative enters the basis. The **ratio test** (right-hand side divided by the positive entries of the entering column) picks the leaving variable: the smallest nonnegative ratio keeps feasibility. Pivot on that element and repeat; all $z$-row entries $\ge 0$ certify optimality.
+* **Worked check:** with $z$-row $(-6, -3, -2)$ the entering variable is $x_1$; ratios $48/8 = 6$ versus $8/2 = 4$ evict the second row — pivoting there preserves $s_1, s_2 \ge 0$.
+* **Key Pitfall:** the ratio test uses only strictly positive denominators; a nonpositive column means the objective is unbounded in that direction.
+
+##### **1.4 Graphical Method in Two Variables**
+With $x_1, x_2$ the feasible region draws directly: each inequality clips a half-plane, nonnegativity keeps the first quadrant. Level lines of $z$ slide parallel until the last touch with the polygon — that contact point is the optimum, and it always lands on a BFS corner. Infeasible basic solutions appear as line intersections outside the polygon — visually obvious once drawn.
+* **Why it matters:** the picture proves what the tableau computes; every simplex step is an edge-walk on this polygon.
+
+##### **1.5 Artificial Variables: Big-M and Two-Phase**
+Equalities and $\ge$ constraints give no ready-made basis. The **Big-M method** adds artificial variables with a huge penalty $-M$ (maximisation) in $z$ and substitutes them out of the $z$-row before iterating; the penalty expels them from any genuine optimum. The **two-phase method** splits the work: **Phase I** minimises the sum of artificials (writing it means building the auxiliary objective and its tableau row); reaching zero proves a feasible basis exists and the artificials drop out; **Phase II** restores the original objective. A positive Phase-I optimum certifies infeasibility.
+* **Key Pitfall:** forgetting to substitute artificials out of the $z$-row (Big-M) or to delete their columns after Phase I silently corrupts everything downstream.
+
+***
+
+#### **2. Definitions**
+
+*   **Linear program**: Optimisation of a linear objective subject to linear constraints and nonnegativity.
+*   **Slack variable**: Nonnegative variable turning $a^Tx \le b$ into an equation.
+*   **Surplus variable**: Nonnegative variable turning $a^Tx \ge b$ into an equation.
+*   **Artificial variable**: Temporary variable manufacturing an initial basis; must leave before the optimum.
+*   **Basic solution**: Solution with $n - m$ nonbasic variables fixed at zero.
+*   **Basic feasible solution (BFS)**: Basic solution satisfying all constraints; a corner of the feasible region.
+*   **Reduced cost**: $z$-row coefficient measuring objective gain per unit increase of a nonbasic variable.
+*   **Ratio test**: Minimum-ratio rule selecting the leaving variable while preserving feasibility.
+*   **Big-M method**: Artificial variables penalised by $\pm M$ in the objective.
+*   **Two-phase method**: Phase I (drive artificials to zero) then Phase II (original objective).
+
+***
+
+#### **3. Formulas**
+
+*   **Equation form**: $a^Tx \le b \to a^Tx + s = b$ (slack); $a^Tx \ge b \to a^Tx - s = b$ (surplus).
+*   **Basic solution**: $n - m$ nonbasics at zero; feasible iff all constraints hold.
+*   **Ratio test**: leaving row $= \arg\min\{b_i/a_{ik} : a_{ik} > 0\}$ for entering column $k$.
+*   **Optimality (max)**: all $z$-row entries $\ge 0$.
+*   **Big-M**: artificials penalised by $-M$ in $z$, substituted out before iterating.
+*   **Phase I**: $\min w = \sum a_i$; zero optimum yields a starting BFS.
+
+***
+
+#### **4. Practice**
+
+##### **4.1. Completing a Simplex Iteration** (Test 1, Task 1)
+
+Given tableau I (maximisation) with $z$-row $(-6, -3, -2, 0, 0 \mid 0)$, $s_1$-row $(8, 6, 1, 1, 0 \mid 48)$, $s_2$-row $(2, 2, 1, 0, 1 \mid 8)$: complete iteration II.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Most negative reduced cost enters; minimum ratio leaves.
+
+1.  **Pick entering and leaving variables.**
+    *   $x_1$ enters ($-6$ most negative); ratios $48/8 = 6$, $8/2 = 4$ — $s_2$ leaves; pivot on 2.
+    *   **Answer: pivot row $s_2$, column $x_1$; new $z$-row $(0, 3, 1, 0, 3 \mid 24)$.**
+</details>
+
+##### **4.2. Basic Solutions by Enumeration** (Test 1, Task 2)
+
+Maximise $z = -4x_1 - 3x_2$ subject to $3x_1 + 2x_2 \ge 12$, $3x_1 + 8x_2 \le 24$, $x_1, x_2 \ge 0$. (a) Give equation form. (b) Enumerate all basic solutions, feasible and infeasible. (c) Pick the optimum by direct substitution. (d) Verify graphically. (e) Show the infeasible ones on the plot.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Corners first, algebra and picture must agree.
+
+1.  **Rewrite with slack and surplus.**
+    *   $3x_1 + 2x_2 - s_1 = 12$, $3x_1 + 8x_2 + s_2 = 24$, all variables $\ge 0$.
+2.  **Enumerate corners and test.**
+    *   Intersections of constraint lines: $(4, 0)$ feasible, $(0, 6)$ violates (1), $(0, 3)$ violates (2)... checking each against all constraints splits the list into BFSs and infeasible points; $z$ is best at the feasible corner $(4,0)$ region — verify by substitution.
+    *   **Answer: optimum BFS gives $z = -16$ at $(4, 0)$; infeasible intersections lie outside the polygon.**
+</details>
+
+##### **4.3. Big-M Setup** (Test 1, Task 3)
+
+Maximise $z = 2x_1 + 3x_2 - 5x_3$ subject to $x_1 + x_2 + x_3 = 7$, $-5x_1 + x_2 + 10x_3 \ge 20$, $4x_1 + 3x_2 - 7x_3 \le 14$, $2x_1 - 5x_2 + x_3 \ge 10$, $x \ge 0$. (a) Equation form with artificials. (b) $z$-row after substituting artificials out (M-method).
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Artificials buy a basis; the $z$-row must forget them before iterating.
+
+1.  **Add slacks, surplus and artificials.**
+    *   Equality and both $\ge$ rows need artificials $a_1, a_2, a_3$; $\le$ row takes a slack; objective gains $-M(a_1 + a_2 + a_3)$.
+2.  **Eliminate artificials from $z$.**
+    *   Subtract $M$ times each artificial row from the $z$-row; the resulting coefficients drive the first pivots.
+    *   **Answer: equation form with 3 artificials; $z$-row expressed without them, penalty terms distributed.**
+</details>
+
+##### **4.4. Writing Phase I** (Test 1, Task 4)
+
+Minimise $z = -4x_1 - 2x_2 - 3x_3$ subject to $2x_1 + x_2 + 3x_3 \le 1$, $2x_1 + 4x_2 + 2x_3 = 6$, $3x_1 + 7x_2 + 2x_3 = 10$, $x \ge 0$. Write Phase I.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Phase I minimises artificial infeasibility, ignoring the real objective.
+
+1.  **Build the auxiliary problem.**
+    *   Add slack to the $\le$ row, artificials $a_1, a_2$ to the equalities; Phase-I objective $w = a_1 + a_2 \to \min$, then substitute the artificials out of the $w$-row using their constraint rows.
+    *   **Answer: $\min w = a_1 + a_2$ with $w$-row cleared of artificials; zero optimum hands a BFS to Phase II.**
+</details>
