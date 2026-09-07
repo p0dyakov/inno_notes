@@ -1,15 +1,19 @@
 name: deploy-site
 # Build on Windows, then publish. Windows runners install R/Quarto packages
 # as binaries in minutes (Linux compiles igraph etc. from source for ~1h).
-# Flow per push to main:
-#   1. build job (windows-latest) renders the full site, commits _site/
-#      (+ index.qmd, _freeze cache) back to main. The push uses GITHUB_TOKEN
-#      and therefore does NOT retrigger workflows — no loop.
-#   2. deploy job (ubuntu, needs build) checks out fresh main and publishes
-#      _site/ to gh-pages. No toolchain installed here at all.
+# Branch flow (dev-based, deploys only via merge to main on user request):
+#   - push to dev  -> check job only (fast ubuntu gate: quarto YAML +
+#     formatting rules, no render, no publish). Local render/test happens
+#     on the author's machine (render_changed.py --base main + serve _site).
+#   - merge dev->main (manual, on request) -> build job (windows-latest)
+#     renders incrementally, commits _site/ (+ index.qmd, _freeze) back to
+#     main. The push uses GITHUB_TOKEN and therefore does NOT retrigger
+#     workflows — no loop.
+#   - deploy job (ubuntu, needs build) checks out fresh main and publishes
+#     _site/ to gh-pages. No toolchain installed here at all.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - 'semester-*/**/*.qmd'
       - '_quarto.yml'
@@ -24,11 +28,28 @@ permissions:
   contents: write
 
 concurrency:
-  group: deploy-site
+  group: ${{ github.ref == 'refs/heads/dev' && 'dev-check' || 'deploy-site' }}
   cancel-in-progress: true
 
 jobs:
+  check:
+    # Fast gate for dev pushes: no toolchain, no render, no publish.
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate quarto config
+        run: python3 -c "import yaml; yaml.safe_load(open('_quarto.yml'))" && echo "yaml ok"
+      - name: Formatting gate (no render)
+        run: |
+          python3 fix_formatting.py
+          grep -q "No format-rule violations detected" formatting_report.md || (echo "::error::fix_formatting found violations" && exit 1)
+          echo "check: formatting clean"
+
   build:
+    if: github.ref == 'refs/heads/main'
     # Only genuinely missing tools are installed: Quarto, TinyTeX and R.
     # Python/Node/Git-Bash come preinstalled on the runner and are NOT set up here.
     runs-on: windows-latest
@@ -102,6 +123,7 @@ jobs:
           git push origin HEAD:main || (git fetch origin main && git rebase origin/main && git push origin HEAD:main)
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: build
     steps:
