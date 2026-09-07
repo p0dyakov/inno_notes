@@ -7,6 +7,8 @@ Flow:
      - _quarto.yml ................. full `quarto render` (nav/sidebar is global).
      - *.qmd ........................ render each file only (+ per-file bake).
      - _includes/* ................. fast in-place patch of _site HTML, no render.
+     - scripts/bake-static-html.mjs .. re-run bake over all _site HTML
+       (defer/img/preconnect/alternate transforms are post-render only).
      - styles/*, page assets ........ mirror-copy into _site (stable paths).
      - deleted sources ............. delete mirrored _site outputs.
   3. search.json is snapshotted before renders (single-file renders overwrite
@@ -394,6 +396,18 @@ def main() -> None:
             html.write_text(t[:pm.start()] + new + t[pm.end() + sm.end():], encoding="utf-8")
             patched += 1
         print(f"sync {rel}: patched {patched} pages ({fresh} already fresh, {missed} without include block)")
+
+    # Bake transforms (defer/polyfill/preconnect/lazy/alternates) live in
+    # post-render, so _includes-only pushes would otherwise ship pages with
+    # stale head/media markup. Re-running bake is idempotent and fast
+    # (regex-only for already-static pages), so refresh the whole site when
+    # the baker or the after-body include changed.
+    if "scripts/bake-static-html.mjs" in changed or "_includes/index.html" in changed:
+        res = subprocess.run(["node", str(ROOT / "scripts" / "bake-static-html.mjs")],
+                             cwd=str(ROOT))
+        if res.returncode != 0:
+            print("site-wide bake failed", file=sys.stderr)
+            sys.exit(res.returncode)
 
     if (ROOT / "ru-manifest.json").is_file():
         # Tiny EN<->RU manifest (see scripts/update_ru_manifest.py): not matched

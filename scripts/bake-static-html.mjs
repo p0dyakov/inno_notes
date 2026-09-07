@@ -224,6 +224,70 @@ const injectLangAlternates = (html, filePath) => {
 	return injectHeadLink(out, tags);
 };
 
+// Defer render-blocking classic scripts in <head>: our inline scripts only
+// touch these libs behind guards (`window.bootstrap?.Collapse`) or on
+// DOMContentLoaded (quarto init), which always runs after deferred scripts.
+// Sync survivors: module scripts (deferred by default), async (gtag),
+// inn-lang-redirect (must run pre-paint), inline code.
+const DEFER_SCRIPT_SUBSTR = [
+	'quarto-nav/quarto-nav.js',
+	'quarto-nav/headroom.min.js',
+	'clipboard/clipboard.min.js',
+	'quarto-search/autocomplete.umd.js',
+	'quarto-search/fuse.min.js',
+	'quarto-search/quarto-search.js',
+	'quarto-html/popper.min.js',
+	'quarto-html/tippy.umd.min.js',
+	'quarto-html/anchor.min.js',
+	'bootstrap/bootstrap.min.js',
+];
+const deferHeadScripts = (html) => html.replace(
+	/<script\b([^>]*\bsrc=["']([^"']+)["'][^>]*)>/gi,
+	(full, attrs, src) => {
+		if (/\bdefer\b/i.test(attrs) || /\basync\b/i.test(attrs) || /\btype=["']module["']/i.test(attrs)) return full;
+		if (!DEFER_SCRIPT_SUBSTR.some((s) => src.includes(s))) return full;
+		return `<script defer${attrs}>`;
+	},
+);
+
+// Dead weight: es6 polyfill from cdnjs (render-blocking, third-party).
+// The site already requires modern JS (`?.` in head scripts), MathJax
+// runtime is stripped at bake, so nothing needs it.
+const stripPolyfill = (html) => html.replace(
+	/<script\b[^>]*\bsrc=["'][^"']*polyfill[^"']*["'][^>]*>\s*<\/script>\s*/gi,
+	'',
+);
+
+// Warm up third-party connections discovered during parse. Idempotent.
+const injectPreconnect = (html) => {
+	let out = html;
+	if (!out.includes('href="https://www.googletagmanager.com"')) {
+		out = injectHeadLink(out, '<link rel="preconnect" href="https://www.googletagmanager.com">');
+	}
+	if (!out.includes('href="https://cdn.jsdelivr.net"')) {
+		out = injectHeadLink(out, '<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>');
+	}
+	return out;
+};
+
+// Below-the-fold media must not compete with first paint. First <img> in
+// document order stays eager; the rest lazy-load. Idempotent.
+const lazyMedia = (html) => {
+	let first = true;
+	let out = html.replace(/<img\b[^>]*>/gi, (tag) => {
+		if (/\bloading=/i.test(tag)) return tag;
+		if (first) {
+			first = false;
+			return tag;
+		}
+		return tag.replace(/<img\b/i, '<img loading="lazy" decoding="async"');
+	});
+	out = out.replace(/<video\b([^>]*)>/gi, (full, attrs) => (
+		/\bpreload=/i.test(attrs) ? full : `<video preload="none"${attrs}>`
+	));
+	return out;
+};
+
 const markBaked = (html) => (/\bdata-inn-baked=/.test(html)
 	? html
 	: html.replace(/<html\b/i, '<html data-inn-baked="true"'));
@@ -274,6 +338,10 @@ for (const filePath of htmlFiles) {
 	after = fixMermaidLayout(after);
 	after = injectMermaidCss(after, filePath);
 	after = injectLangAlternates(after, filePath);
+	after = deferHeadScripts(after);
+	after = stripPolyfill(after);
+	after = injectPreconnect(after);
+	after = lazyMedia(after);
 	after = markBaked(after);
 	if (/\bdata-inn-baked=/.test(after)) bakedCount += 1;
 	if (after !== before) {
