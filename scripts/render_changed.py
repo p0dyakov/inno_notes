@@ -204,6 +204,7 @@ def main() -> None:
         sys.exit(1)
     run([sys.executable, str(ROOT / "scripts" / "update_index.py")])
     run([sys.executable, str(ROOT / "scripts" / "update_last_updated.py")])
+    run([sys.executable, str(ROOT / "scripts" / "update_ru_manifest.py")])
     try:
         sys.path.insert(0, str(ROOT / "scripts" / "agent"))
         from generate import update_sidebar  # noqa: E402
@@ -334,11 +335,17 @@ def main() -> None:
         return re.sub(r"\n\s*\n+", "\n", t).strip()
 
     WS_PREFIX = re.compile(
-        r"(?:<script>\s*// Patch WebSocket BEFORE quarto-preview\.js.*?</script>\s*)+(?=<style>\s*\n\s*:root\s*\{)",
+        r"(?:<script>\s*// Patch WebSocket BEFORE quarto-preview\.js.*?</script>\s*)+"
+        r"(?=(?:<style>\s*\n\s*:root\s*\{|<script>\s*const initializeInnoNotesUI))",
         re.DOTALL,
     )
+    # The after-body include used to start with a big <style> block (custom UI
+    # styles); since the instant-first-paint fix those live in styles/styles.css
+    # and the include is two adjacent <script>s. Match both shapes so pages
+    # baked before the move still sync exactly once.
     AFTER_BODY = re.compile(
-        r"(<style>\s*\n\s*:root\s*\{[^}]*--inn-bg:.*?</script>)",
+        r"((?:<style>\s*\n\s*:root\s*\{[^}]*--inn-bg:[\s\S]*?</style>\s*)?"
+        r"<script>\s*const initializeInnoNotesUI[\s\S]*?</script>)",
         re.DOTALL,
     )
     for rel in sorted(set(includes) | {"_includes/index.html"}):
@@ -388,6 +395,14 @@ def main() -> None:
             patched += 1
         print(f"sync {rel}: patched {patched} pages ({fresh} already fresh, {missed} without include block)")
 
+    if (ROOT / "ru-manifest.json").is_file():
+        # Tiny EN<->RU manifest (see scripts/update_ru_manifest.py): not matched
+        # by the media-only `assets` filter, copy explicitly like styles.
+        dst = SITE / "ru-manifest.json"
+        src = ROOT / "ru-manifest.json"
+        if not dst.is_file() or dst.read_bytes() != src.read_bytes():
+            shutil.copy2(src, dst)
+            print("copied: ru-manifest.json")
     for rel in styles + assets:
         dst = SITE / rel
         dst.parent.mkdir(parents=True, exist_ok=True)

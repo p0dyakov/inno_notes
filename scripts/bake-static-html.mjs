@@ -198,6 +198,32 @@ const stripRuntimeScripts = (html) => html
 	.replace(/<script\b[^>]*\bsrc=["'][^"']*mathjax[^"']*["'][^>]*>\s*<\/script>\s*/gi, '')
 	.replace(/<script\b[^>]*\bsrc=["'][^"']*quarto-diagram\/mermaid[^"']*["'][^>]*>\s*<\/script>\s*/gi, '');
 
+const TCS_PAGE_RE = /^semester-2\/Theoretical Computer Science\/\d+(\.ru)?\.html$/i;
+
+// Pre-paint language redirect: runs synchronously in <head> before first
+// paint. If the stored lecture-language preference points at the sibling
+// (EN<->RU, TCS only), jump instantly via location.replace — no post-load
+// SPA navigation, no progress-bar flash, no content swap after paint.
+const LANG_REDIRECT_JS = `(function(){try{var p='en';try{p=localStorage.getItem('inn_lang_preference')==='ru'?'ru':'en';}catch(e){}var isRu=/\.ru\.html$/i.test(location.pathname);if((p==='ru')===isRu)return;var l=document.querySelector('link[rel="alternate"][hreflang="'+p+'"]');if(!l)return;var t=new URL(l.getAttribute('href'),location.href);if(t.pathname===location.pathname&&t.search===location.search)return;location.replace(t.href);}catch(e){}})();`;
+
+const stripLangAlternates = (html) => html
+	.replace(/<link\b[^>]*\bdata-inn-alternate=["']true["'][^>]*>\s*/gi, '')
+	.replace(/<script\b[^>]*\bid=["']inn-lang-redirect["'][^>]*>[\s\S]*?<\/script>\s*/gi, '');
+
+const injectLangAlternates = (html, filePath) => {
+	const rel = path.relative(siteDir, filePath).split(path.sep).join('/');
+	if (!TCS_PAGE_RE.test(rel)) return stripLangAlternates(html);
+	const isRu = /\.ru\.html$/i.test(rel);
+	const sibling = isRu ? rel.replace(/\.ru\.html$/i, '.html') : rel.replace(/\.html$/i, '.ru.html');
+	if (!fs.existsSync(path.join(siteDir, sibling))) return stripLangAlternates(html);
+	// Stable: never move already-injected tags (keeps re-bakes byte-identical).
+	if (html.includes('data-inn-alternate="true"') && html.includes('id="inn-lang-redirect"')) return html;
+	let out = stripLangAlternates(html);
+	const siblingFile = sibling.split('/').pop();
+	const tags = `<link rel="alternate" data-inn-alternate="true" hreflang="${isRu ? 'en' : 'ru'}" href="${siblingFile}">\n  <script id="inn-lang-redirect">${LANG_REDIRECT_JS}</script>`;
+	return injectHeadLink(out, tags);
+};
+
 const markBaked = (html) => (/\bdata-inn-baked=/.test(html)
 	? html
 	: html.replace(/<html\b/i, '<html data-inn-baked="true"'));
@@ -247,6 +273,7 @@ for (const filePath of htmlFiles) {
 	after = sanitizeMermaidForeignObjects(after);
 	after = fixMermaidLayout(after);
 	after = injectMermaidCss(after, filePath);
+	after = injectLangAlternates(after, filePath);
 	after = markBaked(after);
 	if (/\bdata-inn-baked=/.test(after)) bakedCount += 1;
 	if (after !== before) {
