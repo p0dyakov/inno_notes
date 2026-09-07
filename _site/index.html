@@ -29,22 +29,22 @@ ul.task-list li input[type="checkbox"] {
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
+<script defer src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script defer src="site_libs/quarto-nav/headroom.min.js"></script>
+<script defer src="site_libs/clipboard/clipboard.min.js"></script>
+<script defer src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script defer src="site_libs/quarto-search/fuse.min.js"></script>
+<script defer src="site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="./">
 <link href="./logo.svg" rel="icon" type="image/svg+xml">
 <script src="site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
+<script defer src="site_libs/quarto-html/popper.min.js"></script>
+<script defer src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script defer src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<script defer src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="site_libs/bootstrap/bootstrap-d55203e86ba1a699a1ae3c3642d34712.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
@@ -400,6 +400,8 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 
 
 <link rel="stylesheet" href="styles/styles.css">
+  <link rel="preconnect" href="https://www.googletagmanager.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 </head>
 
 <body class="nav-sidebar docked fullcontent quarto-light">
@@ -1646,6 +1648,12 @@ gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
  <span class="menu-text">W1. Kinematics</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./semester-4/Physics I/3.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">W3. Vectors</span></a>
+  </div>
+</li>
       </ul>
   </li>
           <li class="sidebar-item sidebar-item-section">
@@ -1852,7 +1860,7 @@ Ramil Nasibullin
 </table>
 </div>
 <div class="inn-home-last-updated">
-Last updated: September 7, 2026 at 08:49
+Last updated: September 7, 2026 at 12:13
 </div>
 
 
@@ -2828,7 +2836,69 @@ Last updated: September 7, 2026 at 08:49
 
 		};
 
-		const prefetchPage = () => {};
+		// Hover/intent prefetch into pageCache: the SPA reader then swaps
+
+		// instantly with zero network wait. Bounded (2 in flight), skips
+
+		// metered connections; one attempt per page per load; silent on error.
+
+		const prefetchSeen = new Set();
+
+		const prefetchQueue = [];
+
+		let prefetchActive = 0;
+
+		const PREFETCH_MAX_ACTIVE = 2;
+
+		const pumpPrefetchQueue = () => {
+
+			while (prefetchActive < PREFETCH_MAX_ACTIVE && prefetchQueue.length) {
+
+				const next = prefetchQueue.shift();
+
+				prefetchActive += 1;
+
+				fetchPagePayload(next).catch(() => null).finally(() => {
+
+					prefetchActive -= 1;
+
+					pumpPrefetchQueue();
+
+				});
+
+			}
+
+		};
+
+		const prefetchPage = (value) => {
+
+			try {
+
+				if (navigator.connection?.saveData) return;
+
+				const url = new URL(value, window.location.href);
+
+				if (url.origin !== window.location.origin) return;
+
+				if (!/\.html?$/i.test(url.pathname) && !/\/$/.test(url.pathname)) return;
+
+				const key = getPageCacheKey(url.href);
+
+				if (pageCache.has(key) || prefetchSeen.has(key)) return;
+
+				prefetchSeen.add(key);
+
+				prefetchQueue.push(url.href);
+
+				pumpPrefetchQueue();
+
+			} catch {
+
+				/* ignore */
+
+			}
+
+		};
 
 
 
@@ -3848,6 +3918,18 @@ Last updated: September 7, 2026 at 08:49
 
 			document.body.appendChild(nav);
 
+			// The full sidebar now lives twice in live DOM (hidden quarto
+
+			// original + working clone, ~200 links). Drop the hidden copy's
+
+			// menu: quarto init only excludes sidebar links from external-link
+
+			// adornment, nothing reads the hidden tree afterwards. Containers
+
+			// and the quarto search box stay untouched.
+
+			sidebar.querySelector('.sidebar-menu-container')?.replaceChildren();
+
 			innInitNavLangData(nav);
 
 			// The RU manifest (~4 KB) refreshes in the background AFTER the nav
@@ -4686,7 +4768,21 @@ Last updated: September 7, 2026 at 08:49
 
 
 
-			const queueIdlePrefetch = () => {};
+			const queueIdlePrefetch = (hrefs) => {
+
+				const run = () => (hrefs || []).slice(0, 8).forEach(prefetchPage);
+
+				if (typeof window.requestIdleCallback === 'function') {
+
+					window.requestIdleCallback(run, { timeout: 2500 });
+
+				} else {
+
+					window.setTimeout(run, 1200);
+
+				}
+
+			};
 
 
 
@@ -5183,6 +5279,48 @@ Last updated: September 7, 2026 at 08:49
 				event.preventDefault();
 
 				navigateTo(link.href);
+
+			});
+
+			// Intent prefetch: warm pageCache on hover/focus/press so a
+
+			// subsequent tap swaps instantly. Timers cancel on leave.
+
+			let hoverTimer = null;
+
+			const intentLink = (event) => event.target?.closest?.(
+
+				'.inn-site-nav__menu a[href], .inn-site-nav__results a[href]',
+
+			) || null;
+
+			nav.addEventListener('pointerover', (event) => {
+
+				const link = intentLink(event);
+
+				if (!link?.href) return;
+
+				window.clearTimeout(hoverTimer);
+
+				hoverTimer = window.setTimeout(() => prefetchPage(link.href), 90);
+
+			});
+
+			nav.addEventListener('pointerout', () => window.clearTimeout(hoverTimer));
+
+			nav.addEventListener('pointerdown', (event) => {
+
+				const link = intentLink(event);
+
+				if (link?.href) prefetchPage(link.href);
+
+			});
+
+			nav.addEventListener('focusin', (event) => {
+
+				const link = intentLink(event);
+
+				if (link?.href) prefetchPage(link.href);
 
 			});
 
