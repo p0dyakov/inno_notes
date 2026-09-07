@@ -483,7 +483,38 @@
 			rememberPage(key, payload);
 			return clonePagePayload(payload);
 		};
-		const prefetchPage = () => {};
+		// Hover/intent prefetch into pageCache: the SPA reader then swaps
+		// instantly with zero network wait. Bounded (2 in flight), skips
+		// metered connections; one attempt per page per load; silent on error.
+		const prefetchSeen = new Set();
+		const prefetchQueue = [];
+		let prefetchActive = 0;
+		const PREFETCH_MAX_ACTIVE = 2;
+		const pumpPrefetchQueue = () => {
+			while (prefetchActive < PREFETCH_MAX_ACTIVE && prefetchQueue.length) {
+				const next = prefetchQueue.shift();
+				prefetchActive += 1;
+				fetchPagePayload(next).catch(() => null).finally(() => {
+					prefetchActive -= 1;
+					pumpPrefetchQueue();
+				});
+			}
+		};
+		const prefetchPage = (value) => {
+			try {
+				if (navigator.connection?.saveData) return;
+				const url = new URL(value, window.location.href);
+				if (url.origin !== window.location.origin) return;
+				if (!/\.html?$/i.test(url.pathname) && !/\/$/.test(url.pathname)) return;
+				const key = getPageCacheKey(url.href);
+				if (pageCache.has(key) || prefetchSeen.has(key)) return;
+				prefetchSeen.add(key);
+				prefetchQueue.push(url.href);
+				pumpPrefetchQueue();
+			} catch {
+				/* ignore */
+			}
+		};
 
 		const syncSidebarReadState = () => {
 			document.querySelectorAll('.sidebar-item-text.sidebar-link[href]:not([data-nav-section-toggle="true"])').forEach(link => {
@@ -993,6 +1024,12 @@
 			if (tools) nav.querySelector('.inn-site-nav__tools')?.append(...tools.childNodes);
 			if (menu) nav.querySelector('.inn-site-nav__menu')?.appendChild(menu);
 			document.body.appendChild(nav);
+			// The full sidebar now lives twice in live DOM (hidden quarto
+			// original + working clone, ~200 links). Drop the hidden copy's
+			// menu: quarto init only excludes sidebar links from external-link
+			// adornment, nothing reads the hidden tree afterwards. Containers
+			// and the quarto search box stay untouched.
+			sidebar.querySelector('.sidebar-menu-container')?.replaceChildren();
 			innInitNavLangData(nav);
 			// The RU manifest (~4 KB) refreshes in the background AFTER the nav
 			// is built and the boot finishes (see below): first paint and the
@@ -1412,7 +1449,14 @@
 			};
 			window.__innNavigateInternal = navigateInternal;
 
-			const queueIdlePrefetch = () => {};
+			const queueIdlePrefetch = (hrefs) => {
+				const run = () => (hrefs || []).slice(0, 8).forEach(prefetchPage);
+				if (typeof window.requestIdleCallback === 'function') {
+					window.requestIdleCallback(run, { timeout: 2500 });
+				} else {
+					window.setTimeout(run, 1200);
+				}
+			};
 
 			const collectPrefetchCandidates = () => {
 				const candidates = [];
@@ -1661,6 +1705,27 @@
 				}
 				event.preventDefault();
 				navigateTo(link.href);
+			});
+			// Intent prefetch: warm pageCache on hover/focus/press so a
+			// subsequent tap swaps instantly. Timers cancel on leave.
+			let hoverTimer = null;
+			const intentLink = (event) => event.target?.closest?.(
+				'.inn-site-nav__menu a[href], .inn-site-nav__results a[href]',
+			) || null;
+			nav.addEventListener('pointerover', (event) => {
+				const link = intentLink(event);
+				if (!link?.href) return;
+				window.clearTimeout(hoverTimer);
+				hoverTimer = window.setTimeout(() => prefetchPage(link.href), 90);
+			});
+			nav.addEventListener('pointerout', () => window.clearTimeout(hoverTimer));
+			nav.addEventListener('pointerdown', (event) => {
+				const link = intentLink(event);
+				if (link?.href) prefetchPage(link.href);
+			});
+			nav.addEventListener('focusin', (event) => {
+				const link = intentLink(event);
+				if (link?.href) prefetchPage(link.href);
 			});
 
 			const sections = nav.querySelectorAll('li.sidebar-item-section');
@@ -1932,6 +1997,8 @@
 		if (await initializeCustomNav(sidebar, { mobile: window.innerWidth <= 991 })) {
 			return;
 		}
+		// Fallback path: the quarto sidebar stays the UI, unhide it.
+		document.documentElement.classList.remove('js');
 
 		const sidebarWidthKey = 'sidebar_width_px';
 		const defaultSidebarWidth = 384;
@@ -2082,6 +2149,7 @@
 			await initializeInnoNotesUI();
 		} catch (error) {
 			console.error('InnoNotes UI init failed', error);
+			document.documentElement.classList.remove('js');
 			document.documentElement.classList.remove('inn-ui-booting');
 			document.body?.classList.remove('inn-ui-booting');
 			const existingLoader = document.getElementById('inn-page-loader');
