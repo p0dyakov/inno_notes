@@ -2,7 +2,7 @@
 """Fix formatting in all .qmd files:
 1. Remove blank lines between list items (numbered and bullet)
 2. Add blank line after ':' before bullet lists and tables
-3. Detect AI thinking artifacts and write a root Markdown report
+3. Detect AI thinking artifacts and write a Markdown report (next to this script)
 """
 import re
 import glob
@@ -668,7 +668,7 @@ def process_file(filepath):
 
 
 def build_report(stats, artifacts_by_file, format_issues_by_file):
-    """Build the root Markdown report."""
+    """Build the Markdown report."""
     lines = [
         "# Formatting Report",
         "",
@@ -725,7 +725,7 @@ def build_report(stats, artifacts_by_file, format_issues_by_file):
 
 
 # ─── Main ───
-REPORT_FILE = "formatting_report.md"
+REPORT_FILE = str(Path(__file__).with_name("formatting_report.md"))
 
 qmd_files = sorted(
     fp for fp in glob.glob('**/*.qmd', recursive=True)

@@ -27,8 +27,8 @@ from llm import complete as llm_complete
 
 ROOT = Path(__file__).resolve().parents[2]
 INNO_NOTES = ROOT
-PROMPT_MD = ROOT / "prompt.md"
-RULES_MD = ROOT / "rules.md"
+PROMPT_MD = ROOT / "scripts/agent/prompts/prompt.md"
+RULES_MD = ROOT / "scripts/agent/prompts/rules.md"
 COURSE_MAP_JSON = Path(__file__).parent / "course_map.json"
 
 
@@ -222,9 +222,9 @@ def quarto_render_one(qmd: Path) -> tuple[bool, str]:
 
 
 def fix_formatting_check() -> tuple[bool, str]:
-    res = run([sys.executable, "fix_formatting.py"], cwd=str(ROOT))
+    res = run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT))
     # fix_formatting writes formatting_report.md; check it
-    report = ROOT / "formatting_report.md"
+    report = ROOT / "scripts/formatting_report.md"
     if report.exists():
         txt = report.read_text(encoding="utf-8")
         if "No format-rule violations detected" in txt and "No potential AI artifacts detected" in txt:
@@ -777,7 +777,7 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
                  old, count=1, flags=re.DOTALL | re.M)
     assert new != old, "Theory splice failed"
     qmd.write_text(new, encoding="utf-8")
-    run([sys.executable, "fix_formatting.py"], cwd=str(ROOT))
+    run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT))
     print(f"  Theory replaced: {words} words, {subs} subsections")
     return True
 
@@ -836,16 +836,16 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
         tmp.replace(qmd)
 
         # Fix formatting + renumber
-        res = run([sys.executable, "fix_formatting.py"], cwd=str(ROOT))
+        res = run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT))
         if res.returncode != 0:
             print(f"  fix_formatting failed: {res.stderr[:500]}")
         # Renumber if needed (check if headings changed)
-        res2 = run([sys.executable, "renumber_examples.py", str(qmd)])
+        res2 = run([sys.executable, "scripts/renumber_examples.py", str(qmd)])
         if res2.returncode != 0:
             print(f"  renumber failed (non-fatal): {res2.stderr[:300]}")
 
         # Validate fix_formatting report
-        report = ROOT / "formatting_report.md"
+        report = ROOT / "scripts/formatting_report.md"
         if report.exists():
             txt = report.read_text(encoding="utf-8")
             if "No format-rule violations detected" in txt:

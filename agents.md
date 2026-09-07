@@ -72,7 +72,7 @@
    - в конце `update_sidebar()` дописывает новые файлы в `_quarto.yml`;
 3. коммит `semester-4/ + index.qmd + _quarto.yml` в `main` от `inno-notes-agent`.
 
-Формат статей — жёсткий: `prompt.md` (структура Theory/Definitions/Formulas/Practice,
+Формат статей — жёсткий: `scripts/agent/prompts/prompt.md` (структура Theory/Definitions/Formulas/Practice,
 `Example`/`Task` с решениями в `<details>`), `rules.md` (нумерация `W<N>`, заголовки,
 метки источников), `translation-rules.md` (EN↔RU только для TCS).
 `fix_formatting.py` чинит списки/отступы и ловит AI-артефакты (`formatting_report.md`).
@@ -152,11 +152,11 @@ Job `deploy` (ubuntu, после `build`): берёт свежий `main`, кл�
 | Другой base / больше параллелизма | `--base <ref>`, `--jobs N` (default 4) | Параллельные рендеры с ретраями коллизий `site_libs` |
 | Сгенерировать/перегенерировать статью из транскриптов | `python3 scripts/agent/generate.py --inno-files <путь>` | Сам находит изменения; `--semester semester-4`, `--limit N` (тест), `--dry-run`, `--regen-theory <qmd> --tries 3` (Theory сильнейшей доступной моделью), `--scaffold-semester semester-N` (новый семестр) |
 | Проверить здоровье Antigravity-хаба (без траты квоты) | `python3 scripts/agent/llm_antigravity.py` | Discovery хаба + квоты |
-| Починить форматирование всех qmd | `python3 fix_formatting.py` | + пишет `formatting_report.md`; CI гейтится на «No format-rule violations» |
+| Починить форматирование всех qmd | `python3 scripts/fix_formatting.py` | + пишет `formatting_report.md`; CI гейтится на «No format-rule violations» |
 | Пересобрать таблицу курсов на главной | `python3 scripts/update_index.py` | Источник: `semester-*/course_map.json`; обычно вызывается сам (pre-render / render_changed) |
 | Обновить «Last updated» | `python3 scripts/update_last_updated.py` | Тоже авто (pre-render); руками не нужно |
 | Прогнать SPA+math smoke-тест | см. `scripts/test-spa-math.mjs` (playwright, `BASE` внутри) | Навигация + бейкнутая CHTML-математика на локальном `_site` |
-| Вручную вшить `_includes` в собранный HTML | `python3 sync_includes.py` | render_changed делает это сам для `_includes/*` (in-place патч собранных страниц без рендера) |
+| Вручную вшить `_includes` в собранный HTML | `python3 scripts/sync_includes.py` | render_changed делает это сам для `_includes/*` (in-place патч собранных страниц без рендера) |
 
 ### Как `render_changed.py` классифицирует изменения (vs base, default `origin/main`)
 
@@ -204,7 +204,7 @@ Job `deploy` (ubuntu, после `build`): берёт свежий `main`, кл�
    `config.json` (есть `*.example.json`), `*_state.json`, `.venv/`, `logs/` —
    проверены `.gitignore`; токены — только через Secrets (`NOTES_PAT` в inno_files,
    `GEMINI_API_KEY` + `INNO_FILES_PAT` в inno_notes).
-5. **Статьи — по `prompt.md`/`rules.md`.** Заголовки `#### **N. …**`, примеры/таски
+5. **Статьи — по `scripts/agent/prompts/prompt.md`/`rules.md`.** Заголовки `#### **N. …**`, примеры/таски
    `##### **4.N. Title** (Source X, Task/Example N)` с решением в `<details>` —
    иначе не встанут Solved-пилюли (`_includes/index.html`) и упадёт гейт форматирования.
 6. **Фоновая инфраструктура на Mac:** превью inno_notes — LaunchAgent

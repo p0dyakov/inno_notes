@@ -48,11 +48,11 @@ def changed_qmd(base: str) -> list[Path]:
 def format_gate(files: list[Path]) -> bool:
     """Run repo-wide fixer, then require zero violations for our files."""
     print("prebake: fix_formatting.py ...")
-    res = run([sys.executable, "fix_formatting.py"], cwd=str(ROOT))
+    res = run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT))
     if res.returncode != 0:
         print(f"prebake FAIL: fix_formatting.py exited {res.returncode}\n{res.stderr[:1000]}")
         return False
-    report = ROOT / "formatting_report.md"
+    report = ROOT / "scripts/formatting_report.md"
     txt = report.read_text(encoding="utf-8") if report.exists() else ""
     ok = True
     for f in files:

@@ -299,7 +299,7 @@ def main() -> None:
             print("changed:", p)
         return
 
-    r = run([sys.executable, str(ROOT / "fix_formatting.py")])
+    r = run([sys.executable, str(ROOT / "scripts/fix_formatting.py")])
     if r.returncode != 0:
         print("fix_formatting.py failed, aborting", file=sys.stderr)
         sys.exit(1)
