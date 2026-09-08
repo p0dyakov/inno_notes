@@ -32,7 +32,7 @@ import time
 
 import httpx
 
-BACKEND = os.environ.get("LLM_BACKEND", "apikey").strip().lower()
+BACKEND = os.environ.get("LLM_BACKEND", "openlux").strip().lower()
 
 _KEY_ENV_VARS = ("GEMINI_API_KEYS", "GEMINI_API_KEY", "GEMINI_API_KEY_2",
                  "GEMINI_API_KEY_3", "GOOGLE_API_KEY")

@@ -84,7 +84,9 @@
 
 LLM-бэкенды (`scripts/agent/LLM_BACKENDS.md`, env `LLM_BACKEND`):
 
-- `apikey` (default, используется в CI) — ключ `GEMINI_API_KEY`;
+- `openlux` (default для генераций) — реле https://api.openlux.ai/v1, ключ `OPENLUX_API_KEY`, 
+  модель `OPENLUX_MODEL` (default gemini-3.1-pro-preview); токены каждого вызова — в `scripts/agent/costs.jsonl`;
+- `apikey` (только парсинг в inno_files и запасной путь) — ключи `GEMINI_API_KEY*`;
 - `antigravity` — локальный хаб Antigravity (подписка, без ключа); на Windows
   разворачивается через `scripts/agent/windows/setup.ps1` (статус без флагов,
   применение — `-Apply` под админом: Yandex DoH-политика, proxy-исключения, Tailscale SSH);

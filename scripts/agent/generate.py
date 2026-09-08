@@ -524,15 +524,23 @@ def gather_changed_lectures(
     semesters = semesters or managed_semesters()
     managed = set(semesters)
     if since_sha:
-        res = run(["git", "-C", str(inno_files), "diff", "--name-only", f"{since_sha}..HEAD", "--"] + semesters)
-        # If that fails (shallow), fall back to full scan
+        # Scope = the triggering commit itself (what this push added/changed).
+        # NOTE: callers check out exactly since_sha, so `since_sha..HEAD` would
+        # always be empty and silently degrade to a full regen of every article
+        # (observed: multi-hour runs re-rolling the whole semester). Compare
+        # against the first parent instead; full scan stays for manual runs
+        # without --sha.
+        res = run(["git", "-C", str(inno_files), "diff", "--name-only",
+                   f"{since_sha}^..{since_sha}", "--"] + semesters)
         if res.returncode != 0 or not res.stdout.strip():
             pass
         else:
             files = [inno_files / p.strip() for p in res.stdout.splitlines() if p.strip().endswith(".md")]
             # Keep only existing files inside managed semesters
-            return [p for p in files if p.exists() and md_semester_safe(p, inno_files) in managed]
-
+            picked = [p for p in files if p.exists() and md_semester_safe(p, inno_files) in managed]
+            if picked:
+                return picked
+            print(f"  push {since_sha[:12]} touched no transcripts; falling back to full scan")
     # Full scan: every transcript MD in managed semesters (Syllabus excluded)
     out: list[Path] = []
     for sem in semesters:
