@@ -253,7 +253,7 @@ def gemini_section(
     for m in models:
         for attempt in range(1, 4):
             try:
-                return _call_gemini(prompt, api_key, m, purpose=name)
+                return _call_gemini(prompt, api_key, m, purpose=section)
             except Exception as e:
                 last_err = e
                 msg = str(e)
