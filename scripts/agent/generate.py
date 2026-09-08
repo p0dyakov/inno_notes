@@ -253,7 +253,7 @@ def gemini_section(
     for m in models:
         for attempt in range(1, 4):
             try:
-                return _call_gemini(prompt, api_key, m)
+                return _call_gemini(prompt, api_key, m, purpose=name)
             except Exception as e:
                 last_err = e
                 msg = str(e)
@@ -383,7 +383,7 @@ def _call_with_fallbacks_helper(name, prompt, api_key, model, fallbacks):
     for m in models:
         for attempt in range(1, 4):
             try:
-                return _call_gemini(prompt, api_key, m)
+                return _call_gemini(prompt, api_key, m, purpose=name)
             except Exception as e:
                 last_err = e
                 msg = str(e)
@@ -505,13 +505,16 @@ def _build_section_prompt(section: str, transcript: str, style_context: str, tar
     return preamble
 
 
-def _call_gemini(prompt: str, api_key: str, model: str, timeout_s: int = 300) -> str:
+def _call_gemini(prompt: str, api_key: str, model: str, timeout_s: int = 300,
+                 purpose: str = "") -> str:
     """Single generation via the configured LLM backend (see llm.py).
 
     antigravity backend ignores api_key (local hub auth); apikey backend
     preserves the previous direct generativelanguage behavior for CI.
+    purpose labels the call in the cost ledger (openlux backend).
     """
-    return llm_complete(prompt, model, api_key=api_key, timeout_s=timeout_s)
+    return llm_complete(prompt, model, api_key=api_key, timeout_s=timeout_s,
+                        purpose=purpose)
 
 
 def gather_changed_lectures(

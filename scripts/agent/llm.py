@@ -9,6 +9,12 @@ Backends (``LLM_BACKEND`` env, default ``apikey`` so CI keeps working):
   immediately. Keys must come from DIFFERENT Google Cloud projects — limits
   are enforced per project, not per key, so extra keys in one project share
   a single quota.
+- ``openlux`` (default for article generation): OpenLux relay
+  (https://api.openlux.ai/v1, OpenAI-compatible) with OPENLUX_API_KEY.
+  Requested model ids are remapped to OPENLUX_MODEL (default
+  gemini-3.1-pro-preview). Per-call token usage is appended to costs.jsonl
+  next to this module (see _record_cost); USD estimates stay null until
+  base prices are configured in OPENLUX_PRICES_USD_PER_1M.
 - ``antigravity``: local Antigravity hub on this machine (logged-in account,
   subscription quota, no key). Mac: Antigravity.app running. Windows: same
   (Antigravity installed + logged in + egress to Google, e.g. Sota).
@@ -98,7 +104,9 @@ def _tier_for(model: str) -> str:
 
 
 def complete(prompt: str, model: str, api_key: str = "", timeout_s: int = 900,
-             title: str = "inno-notes") -> str:
+             title: str = "inno-notes", purpose: str = "") -> str:
+    if BACKEND == "openlux":
+        return _call_openlux(prompt, model, timeout_s, purpose or title)
     if BACKEND == "antigravity":
         from llm_antigravity import FatalError, Hub, TransientError
         hub = Hub()
@@ -223,5 +231,148 @@ def _call_apikey(prompt: str, api_key: str, model: str, timeout_s: int = 300) ->
             print(f"  apikey: transient ({str(e)[:120]}), retry in {wait}s...")
             time.sleep(wait)
             continue
+    assert last_err is not None
+    raise last_err
+
+OPENLUX_BASE_URL = os.environ.get("OPENLUX_BASE_URL", "https://api.openlux.ai/v1")
+OPENLUX_MODEL_DEFAULT = "gemini-3.1-pro-preview"
+# Optional base prices to turn token counts into USD estimates:
+# OPENLUX_PRICES_USD_PER_1M='{"input": 1.25, "output": 10.0, "reasoning": 10.0}'
+LEDGER_NAME = "costs.jsonl"
+_cost_totals = {"prompt": 0, "completion": 0, "reasoning": 0, "calls": 0}
+
+
+def _openlux_model():
+    return os.environ.get("OPENLUX_MODEL", OPENLUX_MODEL_DEFAULT)
+
+
+def _ledger_path():
+    from pathlib import Path as _Path
+    return str(_Path(__file__).resolve().parent / LEDGER_NAME)
+
+
+def _usd_estimate(prompt_t, completion_t, reasoning_t):
+    import json as _json2
+    raw = os.environ.get("OPENLUX_PRICES_USD_PER_1M", "")
+    if not raw:
+        return None
+    try:
+        pr = _json2.loads(raw)
+        return round(prompt_t * float(pr.get("input", 0))
+                     + completion_t * float(pr.get("output", 0))
+                     + reasoning_t * float(pr.get("reasoning", pr.get("output", 0)))) / 1000000.0
+    except Exception:
+        return None
+
+
+def _record_cost(model, purpose, usage, seconds):
+    import datetime as _dt
+    import json as _json3
+    prompt_t = int((usage or {}).get("prompt_tokens", 0) or 0)
+    det = (usage or {}).get("completion_tokens_details") or {}
+    reasoning_t = int(det.get("reasoning_tokens", 0) or 0)
+    completion_t = int((usage or {}).get("completion_tokens", 0) or 0)
+    _cost_totals["prompt"] += prompt_t
+    _cost_totals["completion"] += completion_t
+    _cost_totals["reasoning"] += reasoning_t
+    _cost_totals["calls"] += 1
+    entry = {"ts": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
+             "backend": "openlux", "model": model, "purpose": purpose,
+             "prompt_tokens": prompt_t, "completion_tokens": completion_t,
+             "reasoning_tokens": reasoning_t, "seconds": round(seconds, 1),
+             "est_usd": _usd_estimate(prompt_t, completion_t, reasoning_t)}
+    try:
+        with open(_ledger_path(), "a", encoding="utf-8") as f:
+            f.write(_json3.dumps(entry, ensure_ascii=False) + chr(10))
+    except Exception as e:
+        print("  cost ledger write failed: " + str(e)[:120])
+
+
+def _print_cost_totals():
+    t = _cost_totals
+    if not t["calls"]:
+        return
+    print("  [costs] openlux calls=" + str(t["calls"])
+          + " prompt_tokens=" + str(t["prompt"])
+          + " completion_tokens=" + str(t["completion"])
+          + " reasoning_tokens=" + str(t["reasoning"])
+          + " ledger=" + LEDGER_NAME)
+
+
+import atexit as _atexit
+_atexit.register(_print_cost_totals)
+
+
+def _openlux_once(prompt, model, timeout_s):
+    import json as _json4
+    key = os.environ.get("OPENLUX_API_KEY", "")
+    if not key:
+        raise ValueError("OPENLUX_API_KEY missing")
+    payload = {"model": model,
+               "messages": [{"role": "user", "content": prompt}],
+               "temperature": 0.0}
+    try:
+        with httpx.Client(timeout=httpx.Timeout(timeout_s, connect=20.0)) as client:
+            resp = client.post(
+                OPENLUX_BASE_URL.rstrip("/") + "/chat/completions",
+                headers={"Content-Type": "application/json",
+                         "Authorization": "Bearer " + key},
+                json=payload,
+            )
+    except httpx.TimeoutException as e:
+        raise _ServerTransient("openlux timeout: " + str(e)[:200])
+    except httpx.HTTPError as e:
+        raise _ServerTransient("openlux transport error: " + str(e)[:200])
+    if resp.status_code == 429:
+        raise _RateLimited("openlux HTTP 429: " + resp.text[:300])
+    if resp.status_code in (500, 502, 503, 504):
+        raise _ServerTransient("openlux HTTP " + str(resp.status_code) + ": " + resp.text[:300])
+    if resp.status_code in (400, 401, 403):
+        raise _Fatal("openlux HTTP " + str(resp.status_code) + ": " + resp.text[:300])
+    try:
+        resp.raise_for_status()
+    except Exception as e:
+        raise _Fatal(str(e))
+    data = resp.json()
+    if isinstance(data, dict) and data.get("error"):
+        err = data["error"]
+        msg = err.get("message", err) if isinstance(err, dict) else err
+        low = str(msg).lower()
+        if "rate" in low or "quota" in low or "429" in low:
+            raise _RateLimited("openlux: " + str(msg)[:300])
+        if "overload" in low or "503" in low or "500" in low:
+            raise _ServerTransient("openlux: " + str(msg)[:300])
+        raise _Fatal("openlux: " + str(msg)[:300])
+    try:
+        choice = (data.get("choices") or [])[0]
+        text = (choice.get("message") or {}).get("content") or ""
+    except Exception:
+        text = ""
+    if not (text or "").strip():
+        raise _ServerTransient("openlux: empty content: " + _json4.dumps(data)[:800])
+    return text.strip(), data.get("usage") or {}
+
+
+def _call_openlux(prompt, model, timeout_s, purpose):
+    real_model = _openlux_model()
+    if real_model != model:
+        print("  openlux: remap " + str(model) + " -> " + real_model)
+    last_err = None
+    for attempt in range(1, 4):
+        t0 = time.monotonic()
+        try:
+            text, usage = _openlux_once(prompt, real_model, timeout_s)
+            _record_cost(real_model, purpose, usage, time.monotonic() - t0)
+            return text
+        except _RateLimited as e:
+            last_err = e
+            wait = min(2 ** attempt * 10, 90)
+            print("  openlux 429, retry " + str(attempt) + "/3 in " + str(wait) + "s...")
+            time.sleep(wait)
+        except _ServerTransient as e:
+            last_err = e
+            wait = min(2 ** attempt * 10, 60)
+            print("  openlux transient, retry " + str(attempt) + "/3 in " + str(wait) + "s...")
+            time.sleep(wait)
     assert last_err is not None
     raise last_err
