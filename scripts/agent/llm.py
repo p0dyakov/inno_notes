@@ -31,6 +31,7 @@ import threading
 import time
 
 import httpx
+from pathlib import Path
 
 BACKEND = os.environ.get("LLM_BACKEND", "openlux").strip().lower()
 
@@ -103,25 +104,99 @@ def _tier_for(model: str) -> str:
     return "flash"
 
 
+
+
+_CACHE_ENABLED = os.environ.get("LLM_CACHE", "1").strip() != "0"
+_CACHE_DIR = Path(__file__).resolve().parent / "llm_cache"
+_cache_lock = threading.Lock()
+_LAST_USAGE: dict = {}
+
+
+def _cache_key(backend, model_label, prompt):
+    import hashlib as _hl
+    h = _hl.sha256()
+    h.update(backend.encode("utf-8"))
+    h.update(model_label.encode("utf-8"))
+    h.update(prompt.encode("utf-8"))
+    return h.hexdigest()
+
+
+def _cache_get(key):
+    if not _CACHE_ENABLED:
+        return None
+    try:
+        fp = _CACHE_DIR / (key + ".json")
+        if not fp.exists():
+            return None
+        import json as _jc
+        d = _jc.loads(fp.read_text(encoding="utf-8"))
+        text = d.get("text") or ""
+        if not text:
+            return None
+        return (text, d.get("usage") or {})
+    except Exception:
+        return None
+
+
+def _cache_put(key, text, usage, tag, backend, model_label):
+    if not _CACHE_ENABLED:
+        return
+    try:
+        import datetime as _dc
+        import json as _jd
+        with _cache_lock:
+            _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            fp = _CACHE_DIR / (key + ".json")
+            tmp = _CACHE_DIR / (key + ".json.tmp")
+            entry = {"v": 1, "backend": backend, "model": model_label,
+                     "tag": tag, "prompt_sha": key,
+                     "ts": _dc.datetime.now(_dc.timezone.utc).isoformat(timespec="seconds"),
+                     "usage": usage or {}, "text": text}
+            tmp.write_text(_jd.dumps(entry, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(fp)
+    except Exception as e:
+        print("  llm cache write failed: " + str(e)[:120])
+
+
 def complete(prompt: str, model: str, api_key: str = "", timeout_s: int = 900,
              title: str = "inno-notes", purpose: str = "") -> str:
+    tag = purpose or title
     if BACKEND == "openlux":
-        return _call_openlux(prompt, model, timeout_s, purpose or title)
-    if BACKEND == "antigravity":
+        label = _openlux_model()
+    elif BACKEND == "antigravity":
+        label = "tier:" + _tier_for(model)
+    else:
+        label = model
+    key = _cache_key(BACKEND, label, prompt)
+    hit = _cache_get(key)
+    if hit is not None:
+        print("  llm cache HIT " + BACKEND + "/" + label + " [" + tag + "]")
+        _record_cost(label, tag + " [cache-hit]", {}, 0.0, cached=True)
+        return hit[0]
+    usage: dict = {}
+    if BACKEND == "openlux":
+        text = _call_openlux(prompt, model, timeout_s, tag)
+        usage = dict(_LAST_USAGE)
+    elif BACKEND == "antigravity":
         from llm_antigravity import FatalError, Hub, TransientError
         hub = Hub()
         last: Exception | None = None
         for attempt in range(1, 4):
             try:
-                return hub.complete(prompt, tier=_tier_for(model), title=title,
+                text = hub.complete(prompt, tier=_tier_for(model), title=title,
                                     timeout_s=timeout_s)
+                break
             except TransientError as e:
                 last = e
                 print(f"  antigravity: transient ({str(e)[:120]}), retry {attempt}/3 ...")
                 time.sleep(min(2 ** attempt * 15, 90))
-        assert last is not None
-        raise last
-    return _call_apikey(prompt, api_key, model, timeout_s)
+        else:
+            assert last is not None
+            raise last
+    else:
+        text = _call_apikey(prompt, api_key, model, timeout_s)
+    _cache_put(key, text, usage, tag, BACKEND, label)
+    return text
 
 
 class _RateLimited(RuntimeError):
@@ -265,20 +340,21 @@ def _usd_estimate(prompt_t, completion_t, reasoning_t):
         return None
 
 
-def _record_cost(model, purpose, usage, seconds):
+def _record_cost(model, purpose, usage, seconds, cached=False):
     import datetime as _dt
     import json as _json3
     prompt_t = int((usage or {}).get("prompt_tokens", 0) or 0)
     det = (usage or {}).get("completion_tokens_details") or {}
     reasoning_t = int(det.get("reasoning_tokens", 0) or 0)
     completion_t = int((usage or {}).get("completion_tokens", 0) or 0)
-    _cost_totals["prompt"] += prompt_t
-    _cost_totals["completion"] += completion_t
-    _cost_totals["reasoning"] += reasoning_t
-    _cost_totals["calls"] += 1
+    if not cached:
+        _cost_totals["prompt"] += prompt_t
+        _cost_totals["completion"] += completion_t
+        _cost_totals["reasoning"] += reasoning_t
+        _cost_totals["calls"] += 1
     entry = {"ts": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
              "backend": "openlux", "model": model, "purpose": purpose,
-             "prompt_tokens": prompt_t, "completion_tokens": completion_t,
+             "cached": cached, "prompt_tokens": prompt_t, "completion_tokens": completion_t,
              "reasoning_tokens": reasoning_t, "seconds": round(seconds, 1),
              "est_usd": _usd_estimate(prompt_t, completion_t, reasoning_t)}
     try:
@@ -362,6 +438,8 @@ def _call_openlux(prompt, model, timeout_s, purpose):
         t0 = time.monotonic()
         try:
             text, usage = _openlux_once(prompt, real_model, timeout_s)
+            _LAST_USAGE.clear()
+            _LAST_USAGE.update(usage or {})
             _record_cost(real_model, purpose, usage, time.monotonic() - t0)
             return text
         except _RateLimited as e:

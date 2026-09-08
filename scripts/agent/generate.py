@@ -1118,6 +1118,24 @@ def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False)
     return process_week(md_to_qmd_target(md, inno_files), [md], inno_files, api_key, dry_run)
 
 
+def _file_violation_block(report_txt, qmd):
+    out = []
+    mine = False
+    for ln in report_txt.splitlines():
+        if ln.startswith("### "):
+            cur = ln[4:].strip()
+            mine = bool(cur) and str(qmd).endswith(cur)
+            if mine:
+                out.append(ln)
+            continue
+        if ln.startswith("## "):
+            mine = False
+            continue
+        if mine and ln.strip().startswith("-"):
+            out.append(ln)
+    return chr(10).join(out)
+
+
 def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry_run: bool = False) -> bool:
     first = mds[0]
     semester = md_semester(first, inno_files)
@@ -1210,7 +1228,9 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
                     # Feed formatting violations back
                     print(f"  Formatting violations remain, feeding back (attempt {it})...")
                     # Extract snippet
-                    violations = "\n".join(l for l in txt.splitlines() if qmd.name in l or "Line" in l)[:4000]
+                    violations = _file_violation_block(txt, qmd)[:4000]
+                    print("  violation block for " + qmd.name + ":")
+                    print(violations[:2000] if violations else "  (empty block - report format changed?)")
                     style = f"Previous attempt had formatting violations:\n{violations}\n\nFix these exactly per rules.md. Original transcript(s):\n{transcript[:3000]}"
                     continue
 
