@@ -389,7 +389,7 @@ def _call_with_fallbacks_helper(name, prompt, api_key, model, fallbacks):
                 msg = str(e)
                 if "429" in msg or "503" in msg or "overload" in msg.lower():
                     wait = min(2 ** attempt * 5, 60)
-                    print(" ", name, ":", m, "failed, retry", attempt, "/3 in", wait + "s...")
+                    print(" ", name, ":", m, "failed, retry", attempt, "/3 in", str(wait) + "s...")
                     time.sleep(wait)
                     continue
                 raise
@@ -759,7 +759,7 @@ def generate_article(
     practice_body = ""
     part_bodies = []
     bjobs = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
         futs2 = {}
         if "Practice" in required and task_map:
             practice_instruction = (PROMPTS_DIR / "practice.md").read_text(encoding="utf-8")
