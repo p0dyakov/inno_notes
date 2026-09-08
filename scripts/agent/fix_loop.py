@@ -19,6 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RULES_MD = Path(__file__).resolve().parent / "prompts" / "rules.md"
+EXEMPLARS_MD = Path(__file__).resolve().parent / "prompts" / "exemplars.md"
 REPORT = ROOT / "scripts" / "formatting_report.md"
 
 WINDOW = 12
@@ -30,6 +31,13 @@ QUAR_MARK = "<!-- QUARANTINE: block-fix loop failed, manual finish needed -->"
 def _read_rules() -> str:
     try:
         return RULES_MD.read_text(encoding="utf-8")[:6000]
+    except OSError:
+        return ""
+
+
+def _read_exemplars() -> str:
+    try:
+        return EXEMPLARS_MD.read_text(encoding="utf-8")[:3000]
     except OSError:
         return ""
 
@@ -113,7 +121,7 @@ def _fix_prompt(rules: str, violations: list[str], render_excerpt: str,
                 blocks: list[tuple[int, int, str]]) -> str:
     parts = ["You fix formatting/build errors in a Quarto article. Style rules:",
              rules,
-             "VIOLATIONS (authoritative, fix exactly these):"]
+             "FORMAT EXEMPLARS (shapes that pass validation, imitate exactly):", _read_exemplars(), "VIOLATIONS (authoritative, fix exactly these):"]
     if violations:
         parts.append(chr(10).join(violations))
     else:

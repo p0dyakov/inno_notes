@@ -517,6 +517,57 @@ def get_section_header(lines, line_num):
     return None
 
 
+def _strip_heading_number(title):
+    words = title.split()
+    while words:
+        w = words[0]
+        if w and all(c.isdigit() or c == "." for c in w) and any(c.isdigit() for c in w):
+            words = words[1:]
+        else:
+            break
+    return " ".join(words)
+
+
+def number_theory_subsections(lines):
+    out = list(lines)
+    changed = False
+    in_code = False
+    parent = None
+    kid = 0
+    for idx, line in enumerate(out):
+        s = line.strip()
+        if s.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        if s.startswith("#### ") and not s.startswith("##### "):
+            parent = None
+            continue
+        if s.startswith("##### ") and not s.startswith("###### "):
+            core = s[len("##### "):].strip()
+            if core.startswith("**1."):
+                num = ""
+                for ch in core[4:]:
+                    if ch.isdigit():
+                        num += ch
+                    else:
+                        break
+                parent = num if num else None
+                kid = 0
+            else:
+                parent = None
+            continue
+        if parent and s.startswith("###### **") and s.endswith("**"):
+            kid += 1
+            title = _strip_heading_number(s[len("###### **"):-len("**")].strip())
+            want = "###### **1." + parent + "." + str(kid) + " " + title + "**"
+            if s != want:
+                out[idx] = want
+                changed = True
+    return out, changed
+
+
 def process_file(filepath):
     with open(filepath, encoding="utf-8") as f:
         content = f.read()
@@ -524,6 +575,7 @@ def process_file(filepath):
 
     # Auto-fix: sequential #### numbers + practice ##### prefixes before validating
     lines, _ = renumber_sections(lines, filepath)
+    lines, _ = number_theory_subsections(lines)
 
     format_issues = validate_format_rules(filepath, lines)
 

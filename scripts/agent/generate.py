@@ -278,6 +278,14 @@ def _section_instruction(section: str) -> str:
     return section
 
 
+def _exemplars() -> str:
+    p = PROMPTS_DIR / "exemplars.md"
+    try:
+        return p.read_text(encoding="utf-8")[:3000]
+    except OSError:
+        return ""
+
+
 def _title_rules() -> str:
     p = PROMPTS_DIR / "title.md"
     return p.read_text(encoding="utf-8") if p.exists() else ""
@@ -464,7 +472,7 @@ def force_part_heading(body, sec_num, idx, title):
 def gen_theory_part(topic, siblings, sec_num, idx, transcript, style_context,
                     target_info, api_key, feedback=None):
     """Write one ##### theory part for a map topic."""
-    instruction = (PROMPTS_DIR / "theory_part.md").read_text(encoding="utf-8")
+    instruction = (PROMPTS_DIR / "theory_part.md").read_text(encoding="utf-8") + chr(10) + chr(10) + _exemplars()
     topic_json = json.dumps(topic, ensure_ascii=False)
     sib_lines = []
     for t in siblings:
@@ -500,6 +508,7 @@ def _build_section_prompt(section: str, transcript: str, style_context: str, tar
         f"{style_context[:6000]}\n\n"
         f"Rules excerpt (relevant part of rules.md — must be satisfied for format checks):\n"
         f"{rules[:4000]}\n\n"
+        f"Canonical formatting exemplars (copy heading shapes exactly, they pass validation):{chr(10)}{_exemplars()}{chr(10)}{chr(10)}"
         f"Full transcript for THIS article (use as authoritative source order and coverage checklist):\n"
         f"{transcript[:90000]}\n"
     )
@@ -591,13 +600,26 @@ SOURCE_KINDS = ["Lab", "Homework", "Assignment", "Exercises", "Lecture", "Tutori
                 "Chapter", "Recap", "Test", "Midterm", "Final"]
 
 
+def _source_number(stem: str, kind: str) -> str:
+    i = stem.lower().find(kind.lower()) + len(kind)
+    digits = ""
+    for ch in stem[i:]: 
+        if ch.isdigit():
+            digits += ch
+        elif digits:
+            break
+    return digits or "1"
+
+
 def source_kind(md_name: str) -> str:
-    """Canonical Practice source label from transcript filename (Lecture.md -> Lecture)."""
-    stem = Path(md_name).stem.lower()
+    """Canonical Practice source label WITH number (Tutorial-2.md -> Tutorial 2)."""
+    stem = Path(md_name).stem
     for kind in SOURCE_KINDS:
-        if kind.lower() in stem:
-            return kind
-    return Path(md_name).stem
+        if kind.lower() in stem.lower():
+            if kind == "Homework":
+                return kind
+            return kind + " " + _source_number(stem, kind)
+    return stem
 
 
 def group_lectures(mds: list[Path], inno_files: Path) -> list[tuple[Path, list[Path]]]:
@@ -763,7 +785,7 @@ def generate_article(
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
         futs2 = {}
         if "Practice" in required and task_map:
-            practice_instruction = (PROMPTS_DIR / "practice.md").read_text(encoding="utf-8")
+            practice_instruction = (PROMPTS_DIR / "practice.md").read_text(encoding="utf-8") + chr(10) + chr(10) + _exemplars()
             practice_payload = (
                 "TASK MAP (authoritative item set, write every entry in map order): "
                 + chr(10) + json.dumps(task_map, ensure_ascii=False)
