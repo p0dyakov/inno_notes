@@ -185,16 +185,26 @@ def _call_apikey(prompt: str, api_key: str, model: str, timeout_s: int = 300) ->
     if len(keys) > 1:
         print(f"  apikey: pool of {len(keys)} keys, rotating on 429")
     last_err: Exception | None = None
+    # Circuit breaker: all-cooling waits do NOT consume tries (by design - quota
+    # may free up), so a fully dead quota would grind forever. Fail fast instead.
+    cooling_streak = 0
     max_tries = 2 + 3 * len(keys)
     tries = 0
     while tries < max_tries:
         picked = _pick_key(keys)
         if picked is None:
+            cooling_streak += 1
+            if cooling_streak > 20:
+                raise _RateLimited(
+                    f"quota exhausted on all {len(keys)} keys "
+                    f"({cooling_streak} consecutive all-cooling waits) - "
+                    f"failing fast; retry after quota reset")
             wait = _cooldown_sleep()
             print(f"  apikey: all {len(keys)} keys cooling, sleep {wait:.0f}s...")
             time.sleep(wait)
             continue
         idx, key = picked
+        cooling_streak = 0
         try:
             return _post_once(prompt, key, model, timeout_s)
         except _RateLimited as e:
