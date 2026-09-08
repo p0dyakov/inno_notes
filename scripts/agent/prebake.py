@@ -30,6 +30,16 @@ def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, **kwargs)
 
 
+def _is_draft_qmd(f: Path) -> bool:
+    try:
+        parts = f.read_text(encoding="utf-8").split("---", 2)
+    except OSError:
+        return False
+    if len(parts) < 3:
+        return False
+    return any(l.strip() == "draft: true" for l in parts[1].splitlines())
+
+
 def changed_qmd(base: str) -> list[Path]:
     out: list[Path] = []
     for args in (["git", "diff", "--name-only", f"{base}...HEAD", "--"],
@@ -89,6 +99,11 @@ def main() -> int:
     args = ap.parse_args()
     files = [Path(f).resolve() for f in args.files] if args.files else changed_qmd(args.base)
     files = [f for f in files if f.suffix == ".qmd" and f.is_file()]
+    drafts = [f for f in files if _is_draft_qmd(f)]
+    if drafts:
+        print("prebake: drafts skipped (quarantine/hidden): "
+              + ", ".join(str(f.relative_to(ROOT)) for f in drafts))
+    files = [f for f in files if f not in drafts]
     if not files:
         print("prebake: no .qmd files to check")
         return 0

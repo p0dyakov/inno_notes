@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 RULES_MD = Path(__file__).resolve().parent / "prompts" / "rules.md"
 REPORT = ROOT / "scripts" / "formatting_report.md"
 
@@ -177,13 +177,24 @@ def _apply(sent: list[tuple[int, int]], fixes: dict, lines: list[str]) -> tuple[
     return lines, len(sent)
 
 
-def _run_fix_format() -> str:
-    subprocess.run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT),
-                   capture_output=True, text=True)
+def _run_fix_format() -> tuple[str, str]:
     try:
-        return REPORT.read_text(encoding="utf-8")
+        before = REPORT.stat().st_mtime if REPORT.exists() else 0.0
     except OSError:
-        return ""
+        before = 0.0
+    r = subprocess.run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT),
+                       capture_output=True, text=True)
+    try:
+        after = REPORT.stat().st_mtime if REPORT.exists() else 0.0
+    except OSError:
+        after = 0.0
+    if r.returncode != 0 or after <= before:
+        err = ((r.stderr or "") + (r.stdout or ""))[-800:]
+        return "", "fix_formatting did not produce a fresh report: " + err
+    try:
+        return REPORT.read_text(encoding="utf-8"), ""
+    except OSError as e:
+        return "", "report unreadable: " + str(e)[:200]
 
 
 def _render_one(qmd: Path) -> tuple[bool, str]:
@@ -196,14 +207,15 @@ def _render_one(qmd: Path) -> tuple[bool, str]:
     return r.returncode == 0, log
 
 
-def verify(qmd: Path) -> tuple[bool, str, list[str], list[int], str]:
-    """One check pass: fix_format report + quarto render. No LLM calls."""
-    txt = _run_fix_format()
+def verify(qmd: Path) -> tuple[bool, str, list[str], list[int], str, str]:
+    txt, err = _run_fix_format()
+    if err:
+        return False, "report-stale", [], [], "", err
     bullets, nums = violation_lines(txt, qmd)
     clean = ("No format-rule violations detected" in txt) and not bullets
     ok_render, render_log = _render_one(qmd)
     summary = "violations=" + str(len(bullets)) + " render=" + ("ok" if ok_render else "FAIL")
-    return (clean and ok_render), summary, bullets, nums, render_log
+    return (clean and ok_render), summary, bullets, nums, render_log, ""
 
 
 def remove_from_sidebar(qmd: Path) -> None:
@@ -283,7 +295,10 @@ def fix_article(qmd: Path, rounds: int = 3) -> str:
     last_bullets: list[str] = []
     last_render = ""
     for rnd in range(1, rounds + 1):
-        ok, summary, bullets, nums, render_log = verify(qmd)
+        ok, summary, bullets, nums, render_log, verr = verify(qmd)
+        if verr:
+            print("  fix-loop INFRA failure, no LLM rounds burned: " + verr)
+            return "infra:" + verr
         last_bullets, last_render = bullets, render_log
         history.append("round " + str(rnd) + ": " + summary)
         print("  fix-loop round " + str(rnd) + ": " + summary)
@@ -330,7 +345,9 @@ def fix_article(qmd: Path, rounds: int = 3) -> str:
             history.append("round " + str(rnd) + ": applied " + str(applied) + " block(s)")
         else:
             history.append("round " + str(rnd) + ": nothing applied")
-    ok, summary, bullets, _n, render_log = verify(qmd)
+    ok, summary, bullets, _n, render_log, verr = verify(qmd)
+    if verr:
+        return "infra:" + verr
     history.append("final: " + summary)
     if ok:
         return "ok"
