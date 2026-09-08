@@ -25,6 +25,7 @@ from pathlib import Path
 
 
 from llm import complete as llm_complete
+from fix_loop import fix_article
 
 ROOT = Path(__file__).resolve().parents[2]
 INNO_NOTES = ROOT
@@ -1094,7 +1095,7 @@ def regen_article(qmd, inno_files, api_key):
         print(f"  no transcripts for {qmd}")
         return False
     target = qmd if qmd.is_absolute() else ROOT / qmd
-    return process_week(target, mds, inno_files, api_key, dry_run=False)
+    return process_week(target, mds, inno_files, api_key, dry_run=False, force=True)
 
 
 def _group_qmd_paths(tokens):
@@ -1118,25 +1119,15 @@ def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False)
     return process_week(md_to_qmd_target(md, inno_files), [md], inno_files, api_key, dry_run)
 
 
-def _file_violation_block(report_txt, qmd):
-    out = []
-    mine = False
-    for ln in report_txt.splitlines():
-        if ln.startswith("### "):
-            cur = ln[4:].strip()
-            mine = bool(cur) and str(qmd).endswith(cur)
-            if mine:
-                out.append(ln)
-            continue
-        if ln.startswith("## "):
-            mine = False
-            continue
-        if mine and ln.strip().startswith("-"):
-            out.append(ln)
-    return chr(10).join(out)
+def fix_loop_mark(qmd: Path) -> bool:
+    try:
+        head = qmd.read_text(encoding="utf-8")[:3000]
+    except OSError:
+        return False
+    return "<!-- QUARANTINE" in head
 
 
-def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry_run: bool = False) -> bool:
+def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry_run: bool = False, force: bool = False) -> bool:
     first = mds[0]
     semester = md_semester(first, inno_files)
     # Guard: only managed semesters (with course_map.json) are ever touched
@@ -1150,6 +1141,9 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
     if qmd.exists() and "<!-- HANDWRITTEN -->" in qmd.read_text(encoding="utf-8")[:2000]:
         print(f"  Skip hand-written article (locked) {qmd.relative_to(ROOT)}")
         return False
+    if qmd.exists() and not force and fix_loop_mark(qmd):
+        print(f"  Skip quarantined article (manual finish pending) {qmd.relative_to(ROOT)}")
+        return True
     transcript = combine_transcripts(mds)
     if not transcript.strip():
         print(f"  Skip empty transcripts {mds}")
@@ -1165,8 +1159,7 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
     style = collect_style_context(short_to_full(course, semester), semester=semester)
     ctx = article_context(transcript, course, week, api_key,
                           [md.name for md in mds], semester)
-    # Maps are built ONCE per article, not per retry iteration: retries re-roll
-    # parts only. A map failure falls back to per-iteration maps (None).
+    # Maps are built ONCE per article and reused by the fix loop below.
     pre_task, pre_theory = None, None
     try:
         if "Practice" in ctx["required"]:
@@ -1177,79 +1170,40 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
         print("  maps failed, will rebuild per iteration...")
         pre_task, pre_theory = None, None
 
-    # Generate
-    max_iters = 3
-    for it in range(1, max_iters + 1):
-        print(f"Generating {qmd} iteration {it}/{max_iters} ...")
-        try:
-            article = generate_article(transcript, course, week, api_key, style,
-                                       [md.name for md in mds], semester,
-                                       ctx=ctx, task_map=pre_task,
-                                       theory_map=pre_theory)
-        except Exception as e:
-            print(f"  Gemini failed: {e}")
-            if it == max_iters:
-                raise
-            time.sleep(5)
-            continue
-
-        # Write atomically
-        qmd.parent.mkdir(parents=True, exist_ok=True)
-        tmp = qmd.with_suffix(".qmd.tmp")
-        tmp.write_text(article, encoding="utf-8")
-        tmp.replace(qmd)
-
-        # One article at a time here: fix/report/render share state.
-        with _VALIDATE_LOCK:
-            # Fix formatting + renumber
-            res = run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT))
-            if res.returncode != 0:
-                print(f"  fix_formatting failed: {res.stderr[:500]}")
-            # Renumber if needed (check if headings changed)
-            res2 = run([sys.executable, "scripts/renumber_examples.py", str(qmd)])
-            if res2.returncode != 0:
-                print(f"  renumber failed (non-fatal): {res2.stderr[:300]}")
-
-            # Validate fix_formatting report
-            report = ROOT / "scripts/formatting_report.md"
-            if report.exists():
-                txt = report.read_text(encoding="utf-8")
-                if "No format-rule violations detected" in txt:
-                    # Try quarto render for this file only
-                    ok, log = quarto_render_one(qmd)
-                    if ok:
-                        print(f"  OK {qmd} (fix_formatting clean + quarto render ok)")
-                        return True
-                    else:
-                        print(f"  Quarto render failed for {qmd}, feeding back to Gemini (attempt {it})...")
-                        style = f"Previous attempt failed quarto render with:\n{log[:4000]}\n\nOriginal style context:\n{style[:2000]}"
-                        continue
-                else:
-                    # Feed formatting violations back
-                    print(f"  Formatting violations remain, feeding back (attempt {it})...")
-                    # Extract snippet
-                    violations = _file_violation_block(txt, qmd)[:4000]
-                    print("  violation block for " + qmd.name + ":")
-                    print(violations[:2000] if violations else "  (empty block - report format changed?)")
-                    style = f"Previous attempt had formatting violations:\n{violations}\n\nFix these exactly per rules.md. Original transcript(s):\n{transcript[:3000]}"
-                    continue
-
-    print(f"  Exhausted iterations for {qmd}, removing failed draft so it never pushes")
+    # Generate once (maps prebuilt above; llm_cache makes reruns cheap).
+    print(f"Generating {qmd} ...")
     try:
-        if qmd.exists():
-            # Only remove if this run created it (untracked or modified in this run).
-            # Keep pre-existing committed versions untouched: restore from git if tracked.
-            tracked = run(["git", "ls-files", "--error-unmatch", str(qmd)], cwd=str(ROOT))
-            if tracked.returncode == 0:
-                run(["git", "checkout", "--", str(qmd)], cwd=str(ROOT))
-            else:
-                qmd.unlink()
-            tmp = qmd.with_suffix(".qmd.tmp")
-            if tmp.exists():
-                tmp.unlink()
-    except Exception as e:  # noqa: BLE001
-        print(f"  cleanup failed for {qmd}: {e}")
-    return False
+        article = generate_article(transcript, course, week, api_key, style,
+                                   [md.name for md in mds], semester,
+                                   ctx=ctx, task_map=pre_task,
+                                   theory_map=pre_theory)
+    except Exception as e:
+        print(f"  Gemini failed: {e}")
+        return False
+
+    # Write atomically
+    qmd.parent.mkdir(parents=True, exist_ok=True)
+    tmp = qmd.with_suffix(".qmd.tmp")
+    tmp.write_text(article, encoding="utf-8")
+    tmp.replace(qmd)
+
+    # One article at a time here: fix/report/render share state.
+    with _VALIDATE_LOCK:
+        # Deterministic pre-pass: formatting autofix + renumber
+        res = run([sys.executable, "scripts/fix_formatting.py"], cwd=str(ROOT))
+        if res.returncode != 0:
+            print(f"  fix_formatting failed: {res.stderr[:500]}")
+        res2 = run([sys.executable, "scripts/renumber_examples.py", str(qmd)])
+        if res2.returncode != 0:
+            print(f"  renumber failed (non-fatal): {res2.stderr[:300]}")
+        # Block-level fix loop (up to 3 rounds), then quarantine (never delete).
+        status = fix_article(qmd, rounds=3)
+        if status == "ok":
+            print(f"  OK {qmd} (fix-loop clean + quarto render ok)")
+        else:
+            print(f"  KEPT AS QUARANTINE {qmd} (pushed with .log, hidden from prod)")
+        return True
+
 
 
 def scaffold_semester(semester: str, inno_files: Path) -> Path:
