@@ -1200,8 +1200,11 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
         status = fix_article(qmd, rounds=3)
         if status == "ok":
             print(f"  OK {qmd} (fix-loop clean + quarto render ok)")
-        else:
-            print(f"  KEPT AS QUARANTINE {qmd} (pushed with .log, hidden from prod)")
+            return True
+        if status.startswith("infra:"):
+            print(f"  INFRA failure, failing run (no quarantine): {status[6:]}")
+            return False
+        print(f"  KEPT AS QUARANTINE {qmd} (pushed with .log, hidden from prod)")
         return True
 
 

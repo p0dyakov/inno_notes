@@ -253,8 +253,29 @@ def quarantine(qmd: Path, history: list[str], report_tail: str, render_tail: str
     print("  QUARANTINED " + str(qmd) + " (draft:true, sidebar removed, .log alongside)")
 
 
+def toolchain_ok() -> tuple[bool, str]:
+    try:
+        r = subprocess.run(["quarto", "--version"], capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            return False, "quarto --version failed: " + (r.stderr or "")[:200]
+    except Exception as e:
+        return False, "quarto missing: " + str(e)[:200]
+    try:
+        r = subprocess.run([sys.executable, "-c", "import fonttools, brotli"],
+                           capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            return False, "fonttools/brotli missing: " + (r.stderr or "")[:300]
+    except Exception as e:
+        return False, "toolchain check failed: " + str(e)[:200]
+    return True, ""
+
+
 def fix_article(qmd: Path, rounds: int = 3) -> str:
     """Returns 'ok' or 'quarantined'. Never raises on validation failures."""
+    ok_tool, why_tool = toolchain_ok()
+    if not ok_tool:
+        print("  fix-loop INFRA failure, no LLM rounds burned: " + why_tool)
+        return "infra:" + why_tool
     from llm import complete as _complete
     rules = _read_rules()
     history: list[str] = []
