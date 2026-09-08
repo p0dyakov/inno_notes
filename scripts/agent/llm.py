@@ -12,7 +12,7 @@ Backends (``LLM_BACKEND`` env, default ``apikey`` so CI keeps working):
 - ``openlux`` (default for article generation): OpenLux relay
   (https://api.openlux.ai/v1, OpenAI-compatible) with OPENLUX_API_KEY.
   Requested model ids are remapped to OPENLUX_MODEL (default
-  gemini-3.1-pro-preview). Per-call token usage is appended to costs.jsonl
+  gemini-3.8-flash). Per-call token usage is appended to costs.jsonl
   next to this module (see _record_cost); USD estimates stay null until
   base prices are configured in OPENLUX_PRICES_USD_PER_1M.
 - ``antigravity``: local Antigravity hub on this machine (logged-in account,
@@ -235,7 +235,7 @@ def _call_apikey(prompt: str, api_key: str, model: str, timeout_s: int = 300) ->
     raise last_err
 
 OPENLUX_BASE_URL = os.environ.get("OPENLUX_BASE_URL", "https://api.openlux.ai/v1")
-OPENLUX_MODEL_DEFAULT = "gemini-3.1-pro-preview"
+OPENLUX_MODEL_DEFAULT = "gemini-3.8-flash"
 # Optional base prices to turn token counts into USD estimates:
 # OPENLUX_PRICES_USD_PER_1M='{"input": 1.25, "output": 10.0, "reasoning": 10.0}'
 LEDGER_NAME = "costs.jsonl"
