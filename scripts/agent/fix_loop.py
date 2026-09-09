@@ -310,6 +310,11 @@ def fix_article(qmd: Path, rounds: int = 3) -> str:
         last_bullets, last_render = bullets, render_log
         history.append("round " + str(rnd) + ": " + summary)
         print("  fix-loop round " + str(rnd) + ": " + summary)
+        if not ok and summary.endswith("render=FAIL"):
+            tail = render_log.strip().splitlines()[-15:]
+            print("  render tail:")
+            for _tl in tail:
+                print("   | " + _tl[:300])
         if ok:
             return "ok"
         lines = qmd.read_text(encoding="utf-8").splitlines()

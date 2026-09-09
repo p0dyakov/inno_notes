@@ -1162,7 +1162,7 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
 
     if qmd.exists() and "<!-- HANDWRITTEN -->" in qmd.read_text(encoding="utf-8")[:2000]:
         print(f"  Skip hand-written article (locked) {qmd.relative_to(ROOT)}")
-        return False
+        return True
     if qmd.exists() and not force and fix_loop_mark(qmd):
         print(f"  Skip quarantined article (manual finish pending) {qmd.relative_to(ROOT)}")
         return True
