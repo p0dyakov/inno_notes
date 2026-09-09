@@ -281,7 +281,7 @@ def toolchain_ok() -> tuple[bool, str]:
     except Exception as e:
         return False, "quarto missing: " + str(e)[:200]
     try:
-        r = subprocess.run([sys.executable, "-c", "import fonttools, brotli"],
+        r = subprocess.run([sys.executable, "-c", "import fontTools, brotli"],
                            capture_output=True, text=True, timeout=120)
         if r.returncode != 0:
             return False, "fonttools/brotli missing for " + sys.executable + ": " + (r.stderr or "")[:300]
