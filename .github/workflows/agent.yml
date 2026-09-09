@@ -16,6 +16,10 @@ on:
         description: 'space-separated qmd paths for --regen-theory (API-key backend)'
         required: false
         default: ''
+      article:
+        description: 'space-separated qmd paths for --regen-article (staged flow: maps + parts)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -51,15 +55,24 @@ jobs:
         with:
           node-version: '20'
       - run: npm ci --silent || npm install --silent
-      - run: pip install httpx pymupdf beautifulsoup4 2>&1 | tail -n 5
+      - name: Install python deps (same interpreter that runs generate.py)
+        run: |
+          which python3; python3 --version; python3 -m pip --version
+          python3 -m pip install httpx pymupdf beautifulsoup4 "fonttools==4.61.1" "brotli==1.2.0" 2>&1 | tail -n 5
+          python3 -c "import httpx, pymupdf, fonttools, brotli; print('deps ok:', __import__('sys').executable)"
       - name: Generate semester-4 articles
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+          LLM_BACKEND: openlux
+          OPENLUX_API_KEY: ${{ secrets.OPENLUX_API_KEY }}
           INNO_FILES_SHA: ${{ env.INNO_FILES_SHA }}
         run: |
-          if [ -n "${{ inputs.regen_theory }}" ]; then
+          if [ -n "${{ inputs.article }}" ]; then
+            # shellcheck disable=SC2086
+            python3 scripts/agent/generate.py --inno-files /tmp/inno_files --regen-article ${{ inputs.article }}
+          elif [ -n "${{ inputs.regen_theory }}" ]; then
             # shellcheck disable=SC2086
             python3 scripts/agent/generate.py --inno-files /tmp/inno_files --regen-theory ${{ inputs.regen_theory }} --tries 3
           else
@@ -82,17 +95,17 @@ jobs:
           git config user.name "inno-notes-agent"
           git config user.email "agent@innonotes.ru"
           # Stage first so untracked new files count as changes
-          git add -A -- semester-4/ index.qmd _quarto.yml formatting_report.md
-          if git diff --cached --quiet -- semester-4/ index.qmd _quarto.yml formatting_report.md; then
+          git add -A -- semester-4/ index.qmd _quarto.yml scripts/formatting_report.md scripts/agent/costs.jsonl scripts/agent/llm_cache/
+          if git diff --cached --quiet -- semester-4/ index.qmd _quarto.yml scripts/formatting_report.md scripts/agent/costs.jsonl scripts/agent/llm_cache/; then
             echo "No semester-4 changes to push."
             exit 0
           fi
-          git status --short -- semester-4/ index.qmd _quarto.yml formatting_report.md
+          git status --short -- semester-4/ index.qmd _quarto.yml scripts/formatting_report.md scripts/agent/costs.jsonl scripts/agent/llm_cache/
           git commit -m "agent: semester-4 update from inno_files $INNO_FILES_SHA
 
           Co-authored-by: inno-notes-agent"
           # Single-file quarto renders inside generate.py dirty _site/_freeze/
-          # and fix_formatting rewrites formatting_report.md — all outside the
+          # and fix_formatting rewrites scripts/formatting_report.md — all outside the
           # staged paths. Drop that dirt before rebasing or the rebase refuses
           # to start ("unstaged changes") and the result is lost (Sept 5).
           git checkout -- _site/ _freeze/ 2>/dev/null || true
