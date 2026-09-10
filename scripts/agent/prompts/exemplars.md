@@ -43,3 +43,39 @@ A fair coin is tossed twice. List the sample space.
 
 **Answer:** HH, HT, TH, TT.
 </details>
+
+### Diagrams: mermaid (flows, pipelines, relations)
+
+Copy this shape exactly for flowcharts and process diagrams:
+
+```{mermaid}
+%%| fig-width: 6
+flowchart LR
+    A["First step"] --> B{"Decision"}
+    B -->|Yes| C["Result one"]
+    B -->|No| D["Result two"]
+```
+
+Rules: node text always in double quotes; one idea per node; keep the
+%%| fig-width first line so labels stay readable; never leave a node
+empty; never draw a diagram as plain quoted words.
+
+### Diagrams: tikz (plots, geometry, coordinate drawings)
+
+Copy this shape exactly for plots and coordinate geometry:
+
+```{tikz}
+%| fig-width: 5
+%| out-width: 100%
+\begin{tikzpicture}[scale=0.9, every node/.style={font=\small}]
+  \draw[->] (-0.5,0) -- (5,0) node[right] {$x$};
+  \draw[->] (0,-0.5) -- (0,4) node[above] {$y$};
+  \draw[thick] (0,0) -- (4,3) node[midway, above] {label};
+\end{tikzpicture}
+```
+
+Rules: axes always drawn with arrows and labels placed OUTSIDE the tips
+(node[right], node[above]); every plotted element gets a label in
+whitespace (midway, above right); labels never overlap lines or each
+other; keep scale at most 1 so the figure fits the column.
+

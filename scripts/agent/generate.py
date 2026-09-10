@@ -282,7 +282,7 @@ def _section_instruction(section: str) -> str:
 def _exemplars() -> str:
     p = PROMPTS_DIR / "exemplars.md"
     try:
-        return p.read_text(encoding="utf-8")[:3000]
+        return p.read_text(encoding="utf-8")[:6000]
     except OSError:
         return ""
 

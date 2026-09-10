@@ -587,6 +587,182 @@ def number_theory_subsections(lines):
     return out, changed
 
 
+def renumber_equation_tags(lines):
+    BS = chr(92)
+    tag_re = re.compile(BS + BS + 'tag{(' + BS + 'd+(?:' + BS + '.' + BS + 'd+)*)}')
+    ref_re = re.compile('(?<!' + BS + 'w)' + BS + '((' + BS + 'd{1,3}(?:' + BS + '.' + BS + 'd+)*)' + BS + ')(?!' + BS + 'w)')
+    out = list(lines)
+    fence = False
+    occ = []
+    for idx, line in enumerate(out):
+        s = line.strip()
+        if s.startswith('```'):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        for m in tag_re.finditer(line):
+            occ.append([idx, m.start(), m.end(), m.group(1)])
+    if not occ:
+        return out, False
+    ordered = [o[3] for o in occ]
+    seen = []
+    for v in ordered:
+        if v not in seen:
+            seen.append(v)
+    if len(ordered) == len(seen):
+        return out, False  # unique tags in any style: author's convention stands
+    first_num = {}
+    for pos, o in enumerate(occ, start=1):
+        if o[3] not in first_num:
+            first_num[o[3]] = str(pos)
+    by_line = {}
+    for pos, o in enumerate(occ, start=1):
+        by_line.setdefault(o[0], []).append((o[1], o[2], str(pos)))
+    changed = False
+    for idx, items in by_line.items():
+        line = out[idx]
+        for a, b, num in sorted(items, reverse=True):
+            line = line[:a] + BS + 'tag{' + num + '}' + line[b:]
+        if line != out[idx]:
+            out[idx] = line
+            changed = True
+    def _sub(m):
+        old = m.group(1)
+        if old in first_num:
+            return '(' + first_num[old] + ')'
+        return m.group(0)
+    TOK = BS + 'd+(?:[.]' + BS + 'd+)*'
+    TOK_RE = re.compile(TOK)
+    DASH = '-\u2013\u2014'
+    range_re = re.compile('(?<!' + BS + 'w)' + BS + '(' + '(' + TOK + ')' + BS + 's*[' + DASH + ']' + BS + 's*(' + TOK + ')' + BS + ')')
+    def _sub_range(m):
+        a = m.group(1)
+        b = m.group(2)
+        na = first_num.get(a, a)
+        nb = first_num.get(b, b)
+        if na == a and nb == b:
+            return m.group(0)
+        s0 = m.group(0)
+        o = m.start(0)
+        return s0[:m.start(1) - o] + na + s0[m.end(1) - o:m.start(2) - o] + nb + s0[m.end(2) - o:]
+    fence = False
+    for idx, line in enumerate(out):
+        s = line.strip()
+        if s.startswith('```'):
+            fence = not fence
+            continue
+        if fence or s.startswith('#'):
+            continue
+        new_line = range_re.sub(_sub_range, line)
+        new_line = ref_re.sub(_sub, new_line)
+        if new_line != line:
+            out[idx] = new_line
+            changed = True
+    return out, changed
+
+
+def _ascii_art_ratio(nonempty):
+    BOX = '─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬►◄▲▼◆●○■□→←↑↓'
+    SYMS = '|+<>^vVxXoO#*=~_./' + chr(92)
+    art = 0
+    n = 0
+    for s in nonempty:
+        if not s:
+            continue
+        n += 1
+        if s.startswith('|'):
+            continue
+        hit = False
+        for c in s:
+            if c in BOX:
+                hit = True
+                break
+        if hit:
+            art += 1
+            continue
+        letters = 0
+        syms = 0
+        for c in s:
+            if c.isalpha():
+                letters += 1
+            elif c in SYMS:
+                syms += 1
+        if len(s) >= 4 and syms >= 3 and letters * 5 <= len(s) * 2:
+            art += 1
+    return art / n if n else 0.0
+
+
+def _unfenced_art_line(s):
+    BOX = '─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬►◄▲▼◆●○■□→←↑↓'
+    if not s or len(s) > 200:
+        return False
+    if s.startswith(('|', '#', '<', '>', '-', '*', '$')):
+        return False
+    if s[0].isdigit() and ('.' in s[:5] or ')' in s[:5] or ':' in s[:5]):
+        return False
+    for c in s:
+        if c in BOX:
+            return True
+    if s.startswith('+') and len(s) >= 3:
+        return True
+    return False
+
+
+def detect_ascii_diagrams(lines):
+    issues = []
+    ART_INFO = ('', 'text', 'txt', 'plain', 'ascii', 'art', 'diagram')
+    fence = False
+    info = ''
+    start = 0
+    buf = []
+    n = len(lines)
+    run_start = None
+    run_end = None
+    def flush_fence(end_idx):
+        nonempty = [x.strip() for x in buf if x.strip()]
+        if len(nonempty) >= 3 and _ascii_art_ratio(nonempty) >= 0.6:
+            issues.append('Line ' + str(start) + ': ASCII-art diagram (lines ' + str(start) + '-' + str(end_idx) + '); redraw as mermaid/tikz per exemplars.')
+    def flush_run():
+        if run_start is not None and run_end is not None and run_end - run_start + 1 >= 4:
+            issues.append('Line ' + str(run_start) + ': ASCII-art diagram (lines ' + str(run_start) + '-' + str(run_end) + '); redraw as mermaid/tikz per exemplars.')
+    for idx, line in enumerate(lines, start=1):
+        s = line.strip()
+        if s.startswith('```'):
+            if fence:
+                if info in ART_INFO:
+                    flush_fence(idx - 1)
+                fence = False
+                buf = []
+            else:
+                fence = True
+                rest = s[3:].strip()
+                info = rest.split()[0] if rest else ''
+                if info.startswith('{') and info.endswith('}') and len(info) > 2:
+                    info = info[1:-1]
+                start = idx + 1
+                buf = []
+            flush_run()
+            run_start = None
+            run_end = None
+            continue
+        if fence:
+            buf.append(line)
+            continue
+        if _unfenced_art_line(s):
+            if run_start is None:
+                run_start = idx
+            run_end = idx
+        elif s:
+            flush_run()
+            run_start = None
+            run_end = None
+    if fence and info in ART_INFO:
+        flush_fence(n)
+    flush_run()
+    return issues
+
+
 def process_file(filepath):
     with open(filepath, encoding="utf-8") as f:
         content = f.read()
@@ -595,8 +771,14 @@ def process_file(filepath):
     # Auto-fix: sequential #### numbers + practice ##### prefixes before validating
     lines, _ = renumber_sections(lines, filepath)
     lines, _ = number_theory_subsections(lines)
+    if is_managed_file(filepath):
+        lines, _tags_fixed = renumber_equation_tags(lines)
+    else:
+        _tags_fixed = False
 
     format_issues = validate_format_rules(filepath, lines)
+    if is_managed_file(filepath):
+        format_issues.extend(detect_ascii_diagrams(lines))
 
     # === Detect AI artifacts (fenced code blocks are exempt: listings and
     # code comments legitimately contain flagged phrasing) ===
@@ -798,7 +980,7 @@ def process_file(filepath):
 
     # Write back
     new_content = '\n'.join(result)
-    changed = new_content != content
+    changed = (new_content != content) or _tags_fixed
     if changed:
         with open(filepath, 'w', encoding="utf-8") as f:
             f.write(new_content)

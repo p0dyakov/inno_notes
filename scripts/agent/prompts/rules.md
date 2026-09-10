@@ -121,3 +121,12 @@ N - 3/4
 каждого файла. Ненулевой exit = пушить нельзя.
 `pre-push`-хук гоняет быструю проверку (`--format-only`); полная выпечка —
 на Windows/dev-машине или в CI.
+
+### Machine-checkable bans (fix_formatting gate)
+
+- ASCII-art diagrams are banned: a fenced block whose lines are mostly
+  box-drawing/dash-pipe compositions is a violation, not a style choice.
+  Redraw as mermaid/tikz per exemplars.
+- Equation tags must be unique (any style): duplicates are renumbered
+  deterministically and stale (N) references remapped before validation.
+

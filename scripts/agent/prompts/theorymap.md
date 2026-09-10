@@ -23,3 +23,8 @@ Output ONLY a JSON array (no fences, no commentary), each:
 {"n": <1-based>, "title": "<short topic title>",
  "scope": "<what this part must teach, 2-4 sentences: concepts, facts, numbers, boundaries>",
  "key_points": ["<fact/formula/step the part must contain>", ...]}
+
+- EXCLUDE biography, history-of-field and philosophy-as-topic unless they
+  dominate the source: a passing mention of Turing or Asimov is context,
+  never its own topic.
+
