@@ -1493,6 +1493,47 @@ def _is_draft_qmd(qmd: Path) -> bool:
     return len(parts) >= 3 and re.search(r"(?m)^draft:\s*true\s*$", parts[1]) is not None
 
 
+def _week_sort_key(rel: str):
+    base = rel.rsplit("/", 1)[-1]
+    stem = base.rsplit(".", 1)[0]
+    digits = ""
+    for ch in stem:
+        if ch.isdigit():
+            digits += ch
+        else:
+            break
+    num = int(digits) if digits else 10 ** 9
+    return (num, stem)
+
+
+def _is_plain_file_entry(stripped: str) -> bool:
+    return (stripped.startswith('- file: "') and stripped.endswith('"')
+            and stripped.count('"') == 2)
+
+
+def sort_sidebar_weeks(text: str) -> str:
+    out: list[str] = []
+    run: list[str] = []
+    def flush():
+        if len(run) > 1:
+            keys = {}
+            for ln in run:
+                rel = ln.strip()[len('- file: "'):-1]
+                keys[ln] = _week_sort_key(rel)
+            run.sort(key=lambda ln: keys[ln])
+        out.extend(run)
+        run.clear()
+    for ln in text.splitlines():
+        s = ln.strip()
+        if _is_plain_file_entry(s):
+            run.append(ln)
+        else:
+            flush()
+            out.append(ln)
+    flush()
+    return chr(10).join(out) + chr(10) if out else text
+
+
 def update_sidebar(semesters: list[str] | None = None) -> None:
     """Ensure every managed-semester qmd is listed in _quarto.yml sidebar."""
     semesters = semesters or managed_semesters()
@@ -1538,6 +1579,7 @@ def update_sidebar(semesters: list[str] | None = None) -> None:
                         1,
                     )
                     added += 1
+    text = sort_sidebar_weeks(text)
     if text != original:
         yml.write_text(text, encoding="utf-8")
         print(f"Updated _quarto.yml: {added} new file(s), sidebar sections synced")
