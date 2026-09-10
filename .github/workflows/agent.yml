@@ -112,8 +112,14 @@ jobs:
           # and fix_formatting rewrites scripts/formatting_report.md — all outside the
           # staged paths. Drop that dirt before rebasing or the rebase refuses
           # to start ("unstaged changes") and the result is lost (Sept 5).
-          git checkout -- _site/ _freeze/ scripts/subset-fonts-fingerprint.json ru-manifest.json 2>/dev/null || true
-          git clean -fdq -- _site/ _freeze/ 2>/dev/null || true
+          echo '--- pre-rebase dirt (tracked, unstaged) ---'
+          git status --porcelain --untracked-files=no | head -n 30
+          # Everything valuable is already committed above, so reset tracked
+          # dirt wholesale instead of guessing paths (Sept 10: unknown file
+          # kept blocking rebase). Then drop render junk dirs.
+          git checkout -- . 2>/dev/null || true
+          git clean -fdq -- _site/ _freeze/ .quarto/ 2>/dev/null || true
+          git status --porcelain --untracked-files=no | head -n 30
           # dev moves under us (parallel agent/human work); integrate before
           # push with retries — a plain push loses the race and drops work.
           for i in 1 2 3 4 5; do
