@@ -112,16 +112,23 @@ class _MainText(HTMLParser):
         self.skip = 0
         self.parts: list[str] = []
 
+    # mjx-container holds baked CHTML math + a full assistive-MathML duplicate:
+    # invisible duplication that would bloat search entries with linearized
+    # formula tokens (quarto's own full-render entries carry raw TeX instead,
+    # which slim_search_text() removes — skipping here keeps both paths
+    # consistent: search indexes prose, never formula internals).
+    _SKIP_TAGS = ("nav", "script", "style", "header", "mjx-container")
+
     def handle_starttag(self, tag: str, attrs: list) -> None:
         if tag == "main":
             self.depth += 1
-        elif self.depth and tag in ("nav", "script", "style", "header"):
+        elif self.depth and tag in self._SKIP_TAGS:
             self.skip += 1
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "main" and self.depth:
             self.depth -= 1
-        elif self.depth and tag in ("nav", "script", "style", "header") and self.skip:
+        elif self.depth and tag in self._SKIP_TAGS and self.skip:
             self.skip -= 1
         elif self.depth and not self.skip and tag in (
             "p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "div", "section",
@@ -179,13 +186,51 @@ def build_search_entry(rel: str, crumbs_map: dict[str, list[str]]) -> dict:
     href = Path(rel).with_suffix(".html").as_posix()
     parser = _MainText()
     parser.feed((SITE / href).read_text(encoding="utf-8"))
-    text = html_module.unescape(re.sub(r"\n{3,}", "\n\n", re.sub(r"[^\S\n]+", " ", "".join(parser.parts)))).strip()
+    text = slim_search_text(html_module.unescape(re.sub(r"\n{3,}", "\n\n", re.sub(r"[^\S\n]+", " ", "".join(parser.parts)))).strip())
     if rel == "index.qmd":
         crumbs = ["Home"]
     else:
         crumbs = crumbs_map.get(rel, []) + [qmd_title(rel)]
     return {"objectID": href, "href": href, "title": qmd_title(rel),
             "section": "", "text": text, "crumbs": crumbs}
+
+
+# search.json weight control: full page texts (esp. raw-TeX formula spans on
+# math-dense pages) ballooned the index to ~14MB. The file is fetched lazily
+# (quarto-search loads it on first search use, never on page load), but 14MB
+# still stalls first search + Fuse indexing on mobile. Slimming keeps prose
+# fully searchable and drops only formula internals + tails past the cap.
+SLIM_SEARCH_CAP = 30_000
+_SLIM_TEX_RES = [
+    re.compile(r"\$\$[\s\S]*?\$\$"),
+    re.compile(r"\\\([\s\S]*?\\\)"),
+    re.compile(r"\\\[[\s\S]*?\\\]"),
+    re.compile(r"(?<!\$)\$(?!\$)[^\n$]{1,500}?(?<!\\)\$"),
+]
+_SLIM_WS_RE = re.compile(r"\s+")
+
+
+def slim_search_text(text: str) -> str:
+    """Drop raw-TeX spans, collapse whitespace, hard-cap length."""
+    for rx in _SLIM_TEX_RES:
+        text = rx.sub(" ", text)
+    return _SLIM_WS_RE.sub(" ", text).strip()[:SLIM_SEARCH_CAP]
+
+
+def slim_search_file() -> None:
+    """Apply slim_search_text to every entry of the built search.json."""
+    if not SEARCH.is_file():
+        return
+    try:
+        entries = json.loads(SEARCH.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"WARN: search slim skipped ({exc})")
+        return
+    for entry in entries:
+        if entry.get("text"):
+            entry["text"] = slim_search_text(entry["text"])
+    SEARCH.write_text(json.dumps(entries, ensure_ascii=False), encoding="utf-8")
+    print(f"search slimmed: {len(entries)} entries")
 
 
 def _is_draft_qmd(qmd: Path) -> bool:
@@ -254,7 +299,7 @@ def main() -> None:
             print("changed:", p)
         return
 
-    r = run([sys.executable, str(ROOT / "fix_formatting.py")])
+    r = run([sys.executable, str(ROOT / "scripts/fix_formatting.py")])
     if r.returncode != 0:
         print("fix_formatting.py failed, aborting", file=sys.stderr)
         sys.exit(1)
@@ -330,6 +375,7 @@ def main() -> None:
         res = subprocess.run(["quarto", "render"], cwd=str(ROOT))
         if res.returncode == 0:
             purge_draft_outputs(all_draft_qmds())
+            slim_search_file()
         sys.exit(res.returncode)
 
     snap = snapshot_search()
@@ -338,6 +384,7 @@ def main() -> None:
         res = subprocess.run(["quarto", "render"], cwd=str(ROOT))
         if res.returncode == 0:
             purge_draft_outputs(all_draft_qmds())
+            slim_search_file()
         sys.exit(res.returncode)
 
     # Suppress project pre/post-render during parallel renders: update scripts
@@ -477,6 +524,8 @@ def main() -> None:
         if res.returncode != 0:
             print("site-wide bake failed", file=sys.stderr)
             sys.exit(res.returncode)
+
+    slim_search_file()
 
     if (ROOT / "ru-manifest.json").is_file():
         # Tiny EN<->RU manifest (see scripts/update_ru_manifest.py): not matched

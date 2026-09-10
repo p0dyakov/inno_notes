@@ -6,3 +6,5 @@ Theory and Definitions are present, `2.` if Definitions was omitted.
 
 - One bullet per formula: `*   **Formula Name**: $...$` plus conditions/domain of applicability.
 - Skip the whole section if the material has no stable reusable formulas (e.g. pure survey/overview lectures).
+
+- If the material truly has no stable reusable formulas, output exactly `<!-- EMPTY -->` (the pipeline drops the section) — never filler bullets.
