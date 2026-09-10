@@ -442,6 +442,61 @@ const xmlnsHtmlDivs = (svg) => {
   return out;
 };
 
+// Mermaid emits label HTML with leading/trailing newlines inside <div>/<span>
+// ("<div>\n<span>\n\nText\n\n</span>\n</div>"). Label divs use
+// white-space:break-spaces, so each stray newline becomes a real line box
+// that pushes content out of the fixed-height foreignObject viewport:
+// clipped (invisible) labels. Trim edge whitespace of label runs only;
+// interior breaks (explicit <br/>, CJK wrapping) are intentional and stay.
+const trimWs = (s) => {
+  let a = 0;
+  let b = s.length;
+  while (a < b && WS_CHARS.includes(s[a])) a += 1;
+  while (b > a && WS_CHARS.includes(s[b - 1])) b -= 1;
+  return s.slice(a, b);
+};
+
+const trimTagEdges = (block, tag) => {
+  let out = '';
+  let pos = 0;
+  const open = '<' + tag;
+  const close = '</' + tag + '>';
+  for (;;) {
+    const s = block.indexOf(open, pos);
+    if (s < 0) break;
+    const gt = block.indexOf('>', s);
+    if (gt < 0) break;
+    const c = block.charAt(s + 1 + tag.length);
+    if (c !== '>' && c !== '/' && !WS_CHARS.includes(c)) { out += block.slice(pos, gt + 1); pos = gt + 1; continue; }
+    const e = block.indexOf(close, gt);
+    if (e < 0) { out += block.slice(pos, gt + 1); pos = gt + 1; continue; }
+    const inner = block.slice(gt + 1, e);
+    if (inner.includes('<') && tag === 'span') { out += block.slice(pos, gt + 1); pos = gt + 1; continue; }
+    const edge = inner.match(/^([ \t\n\r\f]*)([\s\S]*?)([ \t\n\r\f]*)$/);
+    out += block.slice(pos, gt + 1) + (edge ? edge[2] : inner);
+    pos = e;
+  }
+  return out + block.slice(pos);
+};
+
+const trimForeignLabelText = (html) => {
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    const f = html.indexOf('<foreignObject', pos);
+    if (f < 0) break;
+    const fEnd = html.indexOf('</foreignObject>', f);
+    if (fEnd < 0) break;
+    out += html.slice(pos, f);
+    let block = html.slice(f, fEnd + 16);
+    block = trimTagEdges(block, 'span');
+    block = trimTagEdges(block, 'div');
+    out += block;
+    pos = fEnd + 16;
+  }
+  return out + html.slice(pos);
+};
+
 const externalizeDiagrams = (html, filePath) => {
   let count = 0;
   const written = new Set();
@@ -455,8 +510,8 @@ const externalizeDiagrams = (html, filePath) => {
     const tag = html.slice(s, tagEnd + 1);
     const figId = svgAttr(tag, 'id');
     const close = html.indexOf('</svg>', s);
-    out += html.slice(pos, s);
     if (!figId.startsWith('mermaid-figure-') || !isSafeFigId(figId) || close < 0) {
+      out += html.slice(pos, tagEnd + 1);
       pos = tagEnd + 1;
       continue;
     }
@@ -470,7 +525,7 @@ const externalizeDiagrams = (html, filePath) => {
         h = Math.round(Number(vb[3]) || 0);
       }
     }
-    if (!w || !h) { pos = tagEnd + 1; continue; }
+    if (!w || !h) { out += html.slice(pos, tagEnd + 1); pos = tagEnd + 1; continue; }
     const dir = path.dirname(filePath);
     const stem = path.basename(filePath, path.extname(filePath));
     const filesDir = path.join(dir, stem + '_files');
@@ -479,7 +534,7 @@ const externalizeDiagrams = (html, filePath) => {
     fs.writeFileSync(path.join(filesDir, name), '<?xml version="1.0" encoding="UTF-8"?>' + String.fromCharCode(10) + xmlnsHtmlDivs(closeVoidTags(svg)), 'utf8');
     written.add(name);
     count += 1;
-    out += '<img src="' + stem + '_files/' + name + '" class="img-fluid figure-img" role="img" width="' + w + '" height="' + h + '" alt="' + diagramAlt(svg) + '">';
+    out += html.slice(pos, s) + '<img src="' + stem + '_files/' + name + '" class="img-fluid figure-img" role="img" width="' + w + '" height="' + h + '" alt="' + diagramAlt(svg) + '">';
     pos = close + 6;
   }
   out += html.slice(pos);
@@ -545,6 +600,7 @@ for (const filePath of htmlFiles) {
 	after = injectMathJaxStyles(after, mj, mathCount);
 	after = fixMermaidSvgs(after);
 	after = sanitizeMermaidForeignObjects(after);
+	after = trimForeignLabelText(after);
 	after = fixMermaidLayout(after);
 	const ext = externalizeDiagrams(after, filePath);
 	after = ext.html;
