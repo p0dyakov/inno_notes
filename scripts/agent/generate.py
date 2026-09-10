@@ -221,7 +221,7 @@ def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
 
 def quarto_render_one(qmd: Path) -> tuple[bool, str]:
     # --no-execute: validation render must not need R (knitr runs on Windows build).
-    res = run(["quarto", "render", str(qmd), "--no-execute"])
+    res = run(["quarto", "render", str(qmd), "--no-execute", "-M", "engine:markdown"])
     ok = res.returncode == 0
     log = (res.stdout or "") + (res.stderr or "")
     return ok, log
@@ -1215,6 +1215,10 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
         status = fix_article(qmd, rounds=3)
         if status == "ok":
             print(f"  OK {qmd} (fix-loop clean + quarto render ok)")
+            stale_log = qmd.with_suffix(".log")
+            if stale_log.exists():
+                stale_log.unlink()
+                print(f"  removed stale quarantine log {stale_log.name}")
             return True
         if status.startswith("infra:"):
             print(f"  INFRA failure, failing run (no quarantine): {status[6:]}")

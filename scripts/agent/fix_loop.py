@@ -207,7 +207,7 @@ def _run_fix_format() -> tuple[str, str]:
 
 def _render_one(qmd: Path) -> tuple[bool, str]:
     try:
-        r = subprocess.run(["quarto", "render", str(qmd), "--no-execute"], cwd=str(ROOT),
+        r = subprocess.run(["quarto", "render", str(qmd), "--no-execute", "-M", "engine:markdown"], cwd=str(ROOT),
                            capture_output=True, text=True, timeout=900)
     except Exception as e:
         return False, "quarto launch failed: " + str(e)[:300]
