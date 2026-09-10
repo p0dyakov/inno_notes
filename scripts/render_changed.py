@@ -452,6 +452,9 @@ def main() -> None:
     def norm_include(t: str) -> str:
         return re.sub(r"\n\s*\n+", "\n", t).strip()
 
+    def new_norm_head(t: str) -> str:
+        return norm_include(t)
+
     WS_PREFIX = re.compile(
         r"(?:<script>\s*// Patch WebSocket BEFORE quarto-preview\.js.*?</script>\s*)+"
         r"(?=(?:<style>\s*\n\s*:root\s*\{|<script>\s*const initializeInnoNotesUI))",
@@ -466,11 +469,37 @@ def main() -> None:
         r"<script>\s*const initializeInnoNotesUI[\s\S]*?</script>)",
         re.DOTALL,
     )
-    for rel in sorted(set(includes) | {"_includes/index.html"}):
+    # In-<head> loader is injected verbatim by quarto but with unstable blank
+    # lines, so (like the after-body include) it syncs by anchors + normalized
+    # compare on EVERY build, not only when the file itself changed.
+    HEAD_LOADER = re.compile(
+        r"(?:<!--[\s\S]*?Pre-paint font preload[\s\S]*?-->"
+        r"[\s\S]*?)?"
+        r"<script>\s*// Progressive-enhancement flag"
+        r"[\s\S]*?inn-head-loader-spin[\s\S]*?</style>",
+    )
+    for rel in sorted(set(includes) | {"_includes/index.html", "_includes/head-loader.html"}):
         src = ROOT / rel
         if not src.is_file():
             continue
         new = src.read_text(encoding="utf-8").strip()
+        if rel == "_includes/head-loader.html":
+            patched, fresh, missed = 0, 0, 0
+            for html in SITE.rglob("*.html"):
+                if "site_libs" in html.parts:
+                    continue
+                t = html.read_text(encoding="utf-8")
+                m = HEAD_LOADER.search(t)
+                if not m:
+                    missed += 1
+                    continue
+                if norm_include(m.group(0)) == new_norm_head(new):
+                    fresh += 1
+                    continue
+                html.write_text(t[:m.start()] + new + t[m.end():], encoding="utf-8")
+                patched += 1
+            print(f"sync {rel}: patched {patched} pages ({fresh} already fresh, {missed} without include block)")
+            continue
         if rel != "_includes/index.html":
             # Fallback for any other include file: literal old->new replace.
             old_res = run(["git", "show", f"{args.base}:{rel}"])
