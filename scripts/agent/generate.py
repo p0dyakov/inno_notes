@@ -1122,19 +1122,11 @@ def regen_article(qmd, inno_files, api_key):
 
 
 def _group_qmd_paths(tokens):
-    """Group shell-split tokens back into existing qmd paths (names with spaces)."""
-    grouped = []
-    buf = ""
-    for tok in tokens or []:
-        cand = (buf + " " + tok).strip() if buf else tok
-        if (ROOT / cand).exists() or Path(cand).exists():
-            grouped.append(cand)
-            buf = ""
-        else:
-            buf = cand
-    if buf:
-        grouped.append(buf)
-    return grouped
+    # Workflow inputs are COMMA-separated (paths contain spaces, so plain
+    # shell splitting cannot work; existence checks cannot work for NEW
+    # articles either). Join everything back and split on commas.
+    joined = " ".join(tokens or [])
+    return [c.strip() for c in joined.split(",") if c.strip()]
 
 
 def process_one(md: Path, inno_files: Path, api_key: str, dry_run: bool = False) -> bool:
