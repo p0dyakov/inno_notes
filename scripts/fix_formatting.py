@@ -462,6 +462,28 @@ def validate_dividers(filepath, lines):
     return issues
 
 
+def detect_pitfalls(lines):
+    """Pitfalls blocks are banned (owner decision): headings with Pitfall(s)
+    and top-level bullets starting with **Key/Common Pitfall(s):**. The fixer
+    deletes the whole block (see prompts/rules.md); this gate only flags."""
+    issues = []
+    in_fence = False
+    for idx, line in enumerate(lines, start=1):
+        s = line.strip()
+        if s.startswith('```'):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        m = re.match(r'^(#{5,6})\s.*[Pp]itfall', s)
+        if m:
+            issues.append('Line ' + str(idx) + ': Pitfalls sections are banned; delete the entire block (heading + body up to the next heading).')
+            continue
+        if re.match(r'^[*-] \*\*(Key |Common )?Pitfalls?:\*\*', line):
+            issues.append('Line ' + str(idx) + ': Pitfall bullets are banned; delete the bullet and its nested list.')
+    return issues
+
+
 def validate_format_rules(filepath, lines):
     if should_skip_file(filepath):
         return []
@@ -777,6 +799,7 @@ def process_file(filepath):
         _tags_fixed = False
 
     format_issues = validate_format_rules(filepath, lines)
+    format_issues.extend(detect_pitfalls(lines))
     if is_managed_file(filepath):
         format_issues.extend(detect_ascii_diagrams(lines))
 

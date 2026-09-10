@@ -17,16 +17,12 @@ Top-down, the OS is an **extended machine**. Real hardware is complicated and in
 
 Bottom-up, the OS is a **resource manager**. Many programs compete for the same CPU, memory and I/O devices, so the OS performs an orderly, controlled allocation of processors, memories and devices among them. Sharing (**multiplexing**) works in two ways. **Time multiplexing** lets programs take turns: the CPU executes one process for a few milliseconds, then another (printers work the same way — one job at a time). **Space multiplexing** splits the resource into parts used simultaneously: each program gets its own region of memory, each file its own disk blocks.
 
-* **Key Pitfall:** the two views answer different questions. "Why can I ignore the disk geometry?" — extended machine. "Why does my program slow down when ten others run?" — resource manager.
-
 ##### **1.2 Kernel Mode and User Mode**
 Hardware would be defenceless if any program could execute any instruction: one buggy application could halt the machine or wipe a disk. Therefore most computers provide two execution modes. In **kernel mode** (supervisor mode) the OS runs with complete access to all hardware and may execute every instruction the machine supports. Everything else — browsers, mail readers, music players, the user interface itself — runs in **user mode**: only a subset of instructions is available, and anything affecting machine control or I/O is forbidden.
 
 A user program that needs a service (read a file, send a packet) cannot perform it directly; it issues a **system call (TRAP)**, which traps into the kernel, runs the OS routine with full privileges, and returns the result. Conceptually the machine is layered: hardware at the bottom, the OS in kernel mode above it, and user-mode programs on top.
 
 * **Why it matters:** isolation is what makes crashes survivable. A fault in a user-mode program kills only that program; the same fault in kernel mode halts the whole system (kernel panic / blue screen).
-* **Key Pitfall:** device drivers must live in the OS, precisely so they can run in kernel mode and touch controller registers — that is also why a bad driver can crash the machine.
-
 ##### **1.3 History of Operating Systems**
 Each hardware generation forced a new kind of OS. Five dates and machines cover the whole story.
 
@@ -68,8 +64,6 @@ A hard disk is a stack of **platters**; each surface is divided into concentric 
 Each device has two halves: a **controller** (electronics accepting OS commands) and the **device** itself (deliberately simple, standardised interface). The program that talks to the controller is the **device driver**; it must live in the OS to run in kernel mode. Controllers expose a few **registers**; the set of all of them is the **I/O port space**. Two addressing schemes exist: **memory-mapped I/O** (registers appear at ordinary memory addresses) and a **separate port space** with special IN/OUT instructions usable only in kernel mode.
 
 Getting data in and out has three generations. **Busy waiting (polling):** the driver starts the transfer and spins in a loop asking "done yet?" — simple, but the CPU is tied up. **Interrupts:** the driver starts the device, blocks the caller and does other work; on completion the controller raises an interrupt, the CPU vectors through the **interrupt vector** (a table mapping device numbers to handler addresses) into the handler, then returns to the user program. **DMA (Direct Memory Access):** a dedicated chip moves whole blocks between memory and controller with no CPU involvement; the CPU only programs the transfer and receives one interrupt at the end.
-
-* **Key Pitfall:** interrupts do not make I/O faster — they free the CPU while I/O is in flight. DMA then removes even the per-byte CPU cost.
 
 ###### **1.4.5 Buses**
 Components meet at **buses**, and the OS must know every one for configuration. A **shared bus** (one set of wires, many devices) needs an **arbiter** deciding who transmits. A **parallel bus** spreads one word over many wires (classic PCI: 32 bits over 32 wires); a **serial bus** sends bits down one lane, scaling by adding lanes. Concrete buses: **DDR3/DDR4** (CPU–RAM), **PCIe** (graphics), **DMI** (bridge-to-bridge hub link), **SCSI/SATA** (disks), **USB** (centralised: the root device polls every peripheral for traffic). Before **Plug & Play**, each card hard-coded its interrupt line and register addresses, so two cards could collide; Plug & Play enumerates devices and centrally assigns interrupts and addresses.

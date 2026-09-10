@@ -91,7 +91,7 @@ The Theory section is the most important part.
 - It must teach from zero.
 - It must cover every topic from the table of contents and all important transcript sections.
 - It must be pedagogically ordered, not transcript-dumped.
-- It must explain what a concept is, why it matters, how it is used, and what typical pitfalls exist.
+- It must explain what a concept is, why it matters, and how it is used. Pitfalls blocks are banned (no Pitfalls subsections, no Pitfall bullets).
 - It must define terminology before using it.
 - It must correct transcript errors and fill in missing logical links.
 - It must include enough explanation so a student can later solve the Tasks section.

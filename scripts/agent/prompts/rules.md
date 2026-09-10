@@ -130,3 +130,10 @@ N - 3/4
 - Equation tags must be unique (any style): duplicates are renumbered
   deterministically and stale (N) references remapped before validation.
 
+### Banned: Pitfalls blocks (fix_formatting gate)
+
+- Pitfalls are banned in ALL forms: `#####`/`######` headings containing
+  "Pitfall(s)" and bullets starting with **Key/Common Pitfall(s):**.
+  Never write them. If a violation flags one, delete the entire block:
+  heading/bullet plus body up to the next heading (nested list for bullets).
+

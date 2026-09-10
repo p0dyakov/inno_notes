@@ -19,9 +19,9 @@ Textbook writing, not notes.
   numerical methods / heuristics / convergence theory (belongs to later
   weeks), second worked examples demonstrating the same computation,
   parallel real-world catalogs (safety systems, war stories, product lists).
-- PITFALLS only for confusions grounded in the source (warning boxes,
-  error-prone steps of source examples). No generic advice applicable to
-  any course ("models are simplifications", "check your work").
+- PITFALLS are BANNED entirely: no Pitfalls/Common Pitfalls/Key Pitfalls
+  subsections and no Key/Common Pitfall bullets anywhere. Teach the correct
+  use inline; never add a dedicated pitfalls block.
 - WHY-motivation is at most 1-2 sentences and only when it explains USE.
   No "Why it matters" philosophy paragraphs.
 - State each fact ONCE. Never write definition-then-restatement-then-summary
