@@ -129,6 +129,10 @@ N - 3/4
   Redraw as mermaid/tikz per exemplars.
 - Equation tags must be unique (any style): duplicates are renumbered
   deterministically and stale (N) references remapped before validation.
+- Lists are always tight: no blank lines between items of one list; item
+  math (`$$` lines, even labeled/multiline), continuation paragraphs and
+  nested sublists attach directly (indented, no blank line). Blank lines
+  inside a list force a loose list with gaps between items.
 
 ### Banned: Pitfalls blocks (fix_formatting gate)
 

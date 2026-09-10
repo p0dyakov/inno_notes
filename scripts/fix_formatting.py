@@ -506,12 +506,6 @@ def is_list_item(line):
     return bool(re.match(r'^\s*(\d+\.\s|[-*+] )', line))
 
 
-def list_indent(line):
-    """Column of the list marker (indentation width)."""
-    m = re.match(r'^(\s*)(\d+\.\s|[-*+] )', line)
-    return len(m.group(1)) if m else 0
-
-
 def is_block_boundary(line):
     """Lines that already terminate a paragraph block: headers, fences,
     tables, rules, math display, HTML tags, blockquotes."""
@@ -788,6 +782,30 @@ def detect_ascii_diagrams(lines):
     return issues
 
 
+def _is_joinable_continuation(line):
+    """Indented plain/math line that may merge into a list item's paragraph.
+
+    Used only to collapse blank lines strictly inside a list (tight lists
+    render without <p> gaps). Anything structural returns False, so the
+    blank line - and the loose list - stays untouched.
+    """
+    if not line or line[0] not in (' ', chr(9)):
+        return False
+    if is_list_item(line):
+        return False
+    stripped = line.strip()
+    if not stripped:
+        return False
+    indent = len(line) - len(line.lstrip(' '))
+    if indent < 1 or indent > 5:
+        return False
+    if stripped.startswith(('```', '|', '<', '#', '>', ':')):
+        return False
+    if len(stripped) >= 3 and set(stripped) <= set('-*_'):
+        return False
+    return True
+
+
 def process_file(filepath):
     with open(filepath, encoding="utf-8") as f:
         content = f.read()
@@ -829,9 +847,14 @@ def process_file(filepath):
                 break
 
     # === Pass 1: Remove blank lines within lists ===
+    # Goal: lists render TIGHT (no <p> wrappers = no gaps between items).
+    # Verified with quarto: item-attached $$ math (even labeled/multiline),
+    # continuation paragraphs and nested sublists all parse correctly without
+    # a preceding blank line and keep the list tight.
     result = []
     i = 0
     in_code = False
+    in_math = False
     removed = 0
 
     while i < len(lines):
@@ -854,17 +877,23 @@ def process_file(filepath):
                 j += 1
 
             should_remove = False
-            if j < len(lines) and is_list_item(lines[j]) and prev_is_in_list(result):
-                prev = get_prev_nonblank(result)
-                # Exception: keep blank if prev ends with ':' and is NOT a list item
-                # (user wants blank line after colon before list)
-                if prev and ends_with_colon(prev) and not is_list_item(prev):
-                    should_remove = False
-                # Never remove the blank before a nested sublist: without it
-                # pandoc parses the sublist as a paragraph continuation.
-                elif prev and is_list_item(prev) and list_indent(lines[j]) > list_indent(prev):
-                    should_remove = False
-                else:
+            if j < len(lines) and prev_is_in_list(result):
+                if is_list_item(lines[j]):
+                    prev = get_prev_nonblank(result)
+                    # Exception: keep blank if prev ends with ':' and is NOT a list item
+                    # (user wants blank line after colon before list).
+                    # Nested sublists need no blank either: pandoc nests them
+                    # correctly and the list stays tight.
+                    if prev and ends_with_colon(prev) and not is_list_item(prev):
+                        should_remove = False
+                    else:
+                        should_remove = True
+                elif not in_math and _is_joinable_continuation(lines[j]):
+                    # Item-attached math, continuation paragraph or wrapped text:
+                    # joining keeps the item a single block, so the whole list
+                    # renders tight. Structural lines (fences, tables, divs,
+                    # HTML, headings, quotes, rules, code-level indents) and
+                    # blanks inside $$ spans keep their blank line.
                     should_remove = True
 
             if should_remove:
@@ -875,6 +904,8 @@ def process_file(filepath):
                 result.append(line)
                 i += 1
         else:
+            if '$$' in line and line.count('$$') % 2 == 1:
+                in_math = not in_math
             result.append(line)
             i += 1
 
@@ -959,14 +990,11 @@ def process_file(filepath):
             if result4 and result4[-1].strip() == '':
                 pass  # blank already present: idempotent no-op
             elif is_list_item(prev_nonblank):
-                if list_indent(line) <= list_indent(prev_nonblank):
-                    pass  # same-level continuation: keep tight (Pass 1 style)
-                else:
-                    result4.append('')  # nested sublist start
-                    blanks_added += 1
-            else:
-                result4.append('')  # paragraph/math/html -> list
+                pass  # same list (nested or same level): keep tight, no blank
+            elif not prev_is_in_list(result4):
+                result4.append('')  # true list start after paragraph text
                 blanks_added += 1
+            # else: inside a list (e.g. sublist after item text): keep tight
         result4.append(line)
         prev_nonblank = line
 
