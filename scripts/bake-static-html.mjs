@@ -471,7 +471,6 @@ const trimTagEdges = (block, tag) => {
     const e = block.indexOf(close, gt);
     if (e < 0) { out += block.slice(pos, gt + 1); pos = gt + 1; continue; }
     const inner = block.slice(gt + 1, e);
-    if (inner.includes('<') && tag === 'span') { out += block.slice(pos, gt + 1); pos = gt + 1; continue; }
     const edge = inner.match(/^([ \t\n\r\f]*)([\s\S]*?)([ \t\n\r\f]*)$/);
     out += block.slice(pos, gt + 1) + (edge ? edge[2] : inner);
     pos = e;
