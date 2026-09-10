@@ -220,7 +220,8 @@ def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
 
 
 def quarto_render_one(qmd: Path) -> tuple[bool, str]:
-    res = run(["quarto", "render", str(qmd)])
+    # --no-execute: validation render must not need R (knitr runs on Windows build).
+    res = run(["quarto", "render", str(qmd), "--no-execute"])
     ok = res.returncode == 0
     log = (res.stdout or "") + (res.stderr or "")
     return ok, log
