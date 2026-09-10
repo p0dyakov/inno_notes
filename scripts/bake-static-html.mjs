@@ -455,6 +455,7 @@ const externalizeDiagrams = (html, filePath) => {
     const tag = html.slice(s, tagEnd + 1);
     const figId = svgAttr(tag, 'id');
     const close = html.indexOf('</svg>', s);
+    out += html.slice(pos, s);
     if (!figId.startsWith('mermaid-figure-') || !isSafeFigId(figId) || close < 0) {
       pos = tagEnd + 1;
       continue;
@@ -478,7 +479,7 @@ const externalizeDiagrams = (html, filePath) => {
     fs.writeFileSync(path.join(filesDir, name), '<?xml version="1.0" encoding="UTF-8"?>' + String.fromCharCode(10) + xmlnsHtmlDivs(closeVoidTags(svg)), 'utf8');
     written.add(name);
     count += 1;
-    out += html.slice(pos, s) + '<img src="' + stem + '_files/' + name + '" class="img-fluid figure-img" role="img" width="' + w + '" height="' + h + '" alt="' + diagramAlt(svg) + '">';
+    out += '<img src="' + stem + '_files/' + name + '" class="img-fluid figure-img" role="img" width="' + w + '" height="' + h + '" alt="' + diagramAlt(svg) + '">';
     pos = close + 6;
   }
   out += html.slice(pos);

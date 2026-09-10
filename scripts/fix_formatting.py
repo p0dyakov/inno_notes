@@ -481,6 +481,9 @@ def detect_pitfalls(lines):
             continue
         if re.match(r'^[*-] \*\*(Key |Common )?Pitfalls?:\*\*', line):
             issues.append('Line ' + str(idx) + ': Pitfall bullets are banned; delete the bullet and its nested list.')
+            continue
+        if re.match(r'^\*\*[^*]*[Pp]itfalls?[^*]*\*\*:?\s*$', s):
+            issues.append('Line ' + str(idx) + ': Standalone Pitfalls lead-ins are banned; delete the line and its bullet list.')
     return issues
 
 
