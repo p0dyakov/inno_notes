@@ -119,350 +119,188 @@ function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 </script>
+<!-- Pre-paint font preload: the three faces above-the-fold text always needs
+(body 400, headings 700, nav/UI 600). Without this the browser discovers them
+only after CSS parse + first layout, so first paint uses the fallback and every
+cold open visibly "jumps" on swap. Hrefs are root-absolute so one include works
+at any page depth; they byte-match the URLs styles.css requests (no double fetch).
+Archivo mode intentionally not preloaded: default stack is SF, secondary stack
+keeps swap with metric-matched fallback (layout-stable). -->
+<link rel="preload" href="/styles/fonts/SF-Pro-Text-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/styles/fonts/SF-Pro-Text-Semibold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/styles/fonts/SF-Pro-Display-Bold.woff2" as="font" type="font/woff2" crossorigin>
 <script>
-
 // Progressive-enhancement flag: custom nav replaces the server-rendered
-
 // quarto chrome (#quarto-sidebar/glass/header). Hiding it pre-paint avoids
-
 // a white flash in dark theme; without JS the flag is absent and the
-
 // quarto chrome stays visible. Removed again if custom UI fails to boot.
-
 document.documentElement.classList.add("js");
-
 </script>
-
 <script>
-
 (function () {
-
 	var KEY = "inn-color-mode";
-
 	function stored() {
-
 		try {
-
 			return localStorage.getItem(KEY);
-
 		} catch {
-
 			return null;
-
 		}
-
 	}
-
 	function computeDark() {
-
 		var s = stored();
-
 		if (s === "light") return false;
-
 		if (s === "dark") return true;
-
 		try {
-
 			return window.matchMedia("(prefers-color-scheme: dark)").matches;
-
 		} catch {
-
 			return false;
-
 		}
-
 	}
-
 	function apply() {
-
 		var dark = computeDark();
-
 		document.documentElement.classList.toggle("inn-dark", dark);
-
 		try {
-
 			document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
-
 		} catch {
-
 			/* ignore */
-
 		}
-
 		try {
-
 			window.dispatchEvent(new CustomEvent("inn-color-mode-change"));
-
 		} catch {
-
 			/* ignore */
-
 		}
-
 	}
-
 	apply();
-
 	try {
-
 		window.__innColorMode = {
-
 			get: function () {
-
 				return stored() || "auto";
-
 			},
-
 			set: function (mode) {
-
 				if (mode === "auto") {
-
 					try {
-
 						localStorage.removeItem(KEY);
-
 					} catch {
-
 						/* ignore */
-
 					}
-
 				} else {
-
 					try {
-
 						localStorage.setItem(KEY, mode);
-
 					} catch {
-
 						/* ignore */
-
 					}
-
 				}
-
 				apply();
-
 			},
-
 			apply: apply,
-
 		};
-
 		window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
-
 			if (!stored()) apply();
-
 		});
-
 	} catch {
-
 		/* ignore */
-
 	}
-
 	if (!document.documentElement.hasAttribute("data-inn-baked")) {
-
 		document.documentElement.classList.add("inn-ui-booting");
-
 	}
-
 })();
-
 </script>
-
 <script>
-
 // Sync pre-paint UI state: font stack + saved panel widths from localStorage.
-
 // Must run before first paint so the page never flashes default fonts/widths
-
 // and post-load JS only re-applies identical values (no visual change).
-
 (function () {
-
 	try {
-
 		var f = null;
-
 		try {
-
 			f = localStorage.getItem("inn-sans");
-
 		} catch (e) {}
-
 		// Deterministic default 'sf' (matches innResolveSansMode in index.html).
-
 		document.documentElement.classList.add(f === "archivo" ? "inn-sans-archivo" : "inn-sans-sf");
-
 	} catch (e) {}
-
 	function px(key, min, max, deflt) {
-
 		var v = deflt;
-
 		try {
-
 			var raw = parseInt(localStorage.getItem(key) || "", 10);
-
 			if (isFinite(raw)) v = Math.max(min, Math.min(max, raw));
-
 		} catch (e) {}
-
 		return v;
-
 	}
-
 	try {
-
 		document.documentElement.style.setProperty(
-
 			"--inn-nav-width",
-
 			px("inn_custom_nav_width", 272, 520, 344) + "px",
-
 		);
-
 		document.documentElement.style.setProperty(
-
 			"--inn-sidebar-width",
-
 			px("sidebar_width_px", 288, 608, 384) + "px",
-
 		);
-
 	} catch (e) {}
-
 })();
-
 </script>
-
-
-
 
 
 <style>
-
 	html {
-
 		--inn-loader-bg: #ffffff;
-
 		--inn-loader-spinner-track: rgba(23, 48, 66, 0.14);
-
 		--inn-loader-spinner-color: #173042;
-
 	}
-
-
 
 	html.inn-dark {
-
 		--inn-loader-bg: #000000;
-
 		--inn-loader-spinner-track: rgba(255, 255, 255, 0.22);
-
 		--inn-loader-spinner-color: #ffffff;
-
 	}
-
-
 
 	@keyframes inn-head-loader-spin {
-
 		to {
-
 			transform: rotate(360deg);
-
 		}
-
 	}
-
-
 
 	html.inn-ui-booting {
-
 		background: var(--inn-loader-bg);
-
 		overflow: hidden;
-
 	}
-
-
 
 	html.js body #quarto-sidebar,
-
 	html.js body #quarto-sidebar-glass,
-
 	html.js body #quarto-header,
-
 	html.js body #quarto-sidebar *,
-
 	html.js body #quarto-sidebar-glass *,
-
 	html.js body #quarto-header * {
-
 		visibility: hidden !important;
-
 	}
-
-
 
 	html.inn-ui-booting body {
-
 		opacity: 0;
-
 	}
-
-
 
 	html.inn-ui-booting::before {
-
 		content: "";
-
 		position: fixed;
-
 		inset: 0;
-
 		background: var(--inn-loader-bg);
-
 		z-index: 2147483646;
-
 		pointer-events: none;
-
 	}
-
-
 
 	html.inn-ui-booting::after {
-
 		content: "";
-
 		position: fixed;
-
 		top: 50%;
-
 		left: 50%;
-
 		width: 44px;
-
 		height: 44px;
-
 		margin: -22px 0 0 -22px;
-
 		border-radius: 50%;
-
 		border: 3px solid var(--inn-loader-spinner-track);
-
 		border-top-color: var(--inn-loader-spinner-color);
-
 		animation: inn-head-loader-spin 0.72s linear infinite;
-
 		z-index: 2147483647;
-
 		pointer-events: none;
-
 	}
-
 </style>
 
 <script type="text/javascript">
