@@ -333,6 +333,7 @@ The language $L_3$ consists of strings of the form $v \cdot c \cdot v^R$: a stri
 
 *   States: $q_0$ (push phase), $q_1$ (pop phase, after $c$), $q_2$ (accepting)
 *   Key transitions (push phase, state $q_0$, loops):
+
     *   $a,\, Z_0 / AZ_0$; $b,\, Z_0 / BZ_0$; $a,\, A / AA$; $a,\, B / AB$; $b,\, A / BA$; $b,\, B / BB$
 *   Pivot (on seeing $c$): $c,\, A / A$; $c,\, B / B$; $c,\, Z_0 / Z_0$ (all move $q_0 \to q_1$)
 *   Pop phase (state $q_1$, loops): $a,\, A / \varepsilon$; $b,\, B / \varepsilon$
@@ -344,6 +345,7 @@ The language of balanced (well-formed) parentheses is the prototypical context-f
 
 *   States: $q_0$ (start), $q_1$ (processing), $q_2$ (accepting)
 *   Transitions:
+
     *   $q_0 \to q_1$: $(,\, Z_0 / PZ_0$ — first `(`: push $P$
     *   $q_1 \circlearrowleft$: $(,\, P / PP$ — each additional `(`: push $P$
     *   $q_1 \circlearrowleft$: $),\, P / \varepsilon$ — each `)`: pop one $P$ (matching the `(`)
@@ -619,6 +621,7 @@ digraph dpda_ab2n {
 ```
 
 1.  **PDA specification:**
+
     *   States: $q_0$ (start), $q_1$ (reading $a$'s), $q_2$ (reading $b$'s), $q_3$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, A\}$
 2.  **Transitions:**
@@ -632,12 +635,15 @@ digraph dpda_ab2n {
     | $q_2 \to q_3$ | $\varepsilon,\, Z_0 / Z_0$ | All $A$'s consumed; accept |
 
     *Note on the push step:* When reading $a$ with $A$ on top, we replace $A$ with $AAA$ — effectively, we keep the existing $A$ and add two more on top, so the stack grows by two per $a$. Equivalently, since each $a$ should add two symbols: we replace $A \to AAA$ (adding two) which matches the $2:1$ ratio.
+
 3.  **Trace for input $"abb"$** ($n=1$, $2n=2$):
+
     *   $q_0 \xrightarrow{a,\,Z_0/AAZ_0} q_1$: stack = $A, A, Z_0$
     *   $q_1 \xrightarrow{b,\,A/\varepsilon} q_2$: stack = $A, Z_0$
     *   $q_2 \xrightarrow{b,\,A/\varepsilon} q_2$: stack = $Z_0$
     *   $q_2 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_3$: **ACCEPT** $\checkmark$
 4.  **Trace for input $"aabbbb"$** ($n=2$, $2n=4$):
+
     *   $q_0 \xrightarrow{a,\,Z_0/AAZ_0} q_1$: stack = $A,A,Z_0$
     *   $q_1 \xrightarrow{a,\,A/AAA} q_1$: stack = $A,A,A,Z_0$ (net +2: $A \to AAA$ adds two)
     *   $q_1 \xrightarrow{b,\,A/\varepsilon} q_2$: stack = $A,A,Z_0$
@@ -713,6 +719,7 @@ digraph dpda_expr {
 For a simple DPDA approach tracking only parenthesis balance:
 
 1.  **States:** $q_0$ (processing), $q_1$ (accepting)
+
     *   Stack alphabet: $\Gamma = \{Z_0, P\}$ where $P$ marks an open `(`
 2.  **Transitions (loops on $q_0$):**
 
@@ -727,6 +734,7 @@ For a simple DPDA approach tracking only parenthesis balance:
     | $+,\, P / P$ | Read operator inside parentheses: no stack change |
 3.  **Accept:** $q_0 \to q_1$: $\varepsilon,\, Z_0 / Z_0$ — balanced.
 4.  **Trace for $"(a+a)"$:**
+
     *   $q_0 \xrightarrow{(,\,Z_0/PZ_0} q_0$: stack = $P, Z_0$
     *   $q_0 \xrightarrow{a,\,P/P} q_0$: stack = $P, Z_0$
     *   $q_0 \xrightarrow{+,\,P/P} q_0$: stack = $P, Z_0$
@@ -751,24 +759,31 @@ Build a DPDA that recognizes $P = \{xycy^Rx^R \mid x \in \{a,b\}^*, y \in \{d,e\
 **Key Concept:** Push all symbols of $x$ (using stack symbols $A$ for $a$, $B$ for $b$) and then all symbols of $y$ (using $D$ for $d$, $E$ for $e$). When $c$ appears, switch to pop mode: first pop $y^R$ (matching $y$ reversed), then pop $x^R$ (matching $x$ reversed).
 
 1.  **PDA specification:**
+
     *   States: $q_0$ (pushing $x$), $q_1$ (pushing $y$), $q_2$ (popping $y^R$), $q_3$ (popping $x^R$), $q_4$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, A, B, D, E\}$
 2.  **Phase 1 — Push $x$ (state $q_0$, loops):**
+
     *   $a,\, Z_0 / AZ_0$; $b,\, Z_0 / BZ_0$
     *   $a,\, A / AA$; $a,\, B / AB$
     *   $b,\, A / BA$; $b,\, B / BB$
 3.  **Transition to $y$-push phase (state $q_0 \to q_1$):** On reading the first $d$ or $e$ symbol, switch to $q_1$:
+
     *   $d,\, A / DA$; $d,\, B / DB$; $e,\, A / EA$; $e,\, B / EB$
 4.  **Phase 2 — Push $y$ (state $q_1$, loops):**
+
     *   $d,\, D / DD$; $d,\, E / DE$
     *   $e,\, D / ED$; $e,\, E / EE$
 5.  **Pivot on $c$ ($q_1 \to q_2$ or $q_0 \to q_2$ if $y$ empty):**
+
     *   $c,\, D / D$; $c,\, E / E$ (top is a $y$-symbol: switch to pop-$y$ phase)
     *   $c,\, A / A$; $c,\, B / B$ (no $y$ was pushed, skip to pop-$x$ phase: $q_1 \to q_3$)
 6.  **Phase 3 — Pop $y^R$ (state $q_2$, loops):**
+
     *   $d,\, D / \varepsilon$; $e,\, E / \varepsilon$ (match $d \leftrightarrow D$, $e \leftrightarrow E$)
     *   Transition to pop-$x$ phase when hitting an $x$-symbol: $q_2 \to q_3$ on $\varepsilon$ when top is $A$ or $B$: $\varepsilon,\, A / A$; $\varepsilon,\, B / B$
 7.  **Phase 4 — Pop $x^R$ (state $q_3$, loops):**
+
     *   $a,\, A / \varepsilon$; $b,\, B / \varepsilon$ (match $a \leftrightarrow A$, $b \leftrightarrow B$)
 8.  **Accept:** $q_3 \to q_4$: $\varepsilon,\, Z_0 / Z_0$
 
@@ -810,6 +825,7 @@ digraph dpda_brackets {
 *Note:* A key challenge is that `([)]` must be rejected — the closing symbols must match the most recently opened one. The stack's LIFO property enforces this naturally.
 
 1.  **PDA specification:**
+
     *   States: $q_0$ (start, processing), $q_1$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, P, Q\}$ where $P$ marks `(` and $Q$ marks `[`
 2.  **Transitions (all loops on $q_0$ except the final accept):**
@@ -827,6 +843,7 @@ digraph dpda_brackets {
 3.  **Accept:** $q_0 \to q_1$: $\varepsilon,\, Z_0 / Z_0$ — all matched, stack has only $Z_0$.
 4.  **Rejection (implicitly):** If `)` is read but $Q$ (not $P$) is on top, there is no defined transition, so the PDA gets stuck and rejects. This correctly rejects strings like `([)]`.
 5.  **Trace for input $"([])"$:**
+
     *   $q_0 \xrightarrow{(,\,Z_0/PZ_0} q_0$: stack = $P, Z_0$
     *   $q_0 \xrightarrow{[,\,P/QP} q_0$: stack = $Q, P, Z_0$
     *   $q_0 \xrightarrow{],\,Q/\varepsilon} q_0$: stack = $P, Z_0$
@@ -848,6 +865,7 @@ Build a DPDA that recognizes $L_1 = \{w \in \{a,b\}^* \mid \phi(w,a) = \phi(w,b)
 **Key Concept:** Unlike $a^n b^n$ where all $a$'s come first, here $a$'s and $b$'s can be interleaved in any order. We use the stack as a *counter*: push $A$ for each $a$ seen (when stack contains only $Z_0$ or $A$'s), and push $B$ for each $b$ seen (when stack contains only $Z_0$ or $B$'s). When the top symbol and the input symbol cancel (an $a$ arrives while the top is $B$, or a $b$ arrives while the top is $A$), pop the top instead. This is a net balance counter.
 
 1.  **PDA specification:**
+
     *   States: $q_0$ (processing), $q_1$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, A, B\}$
     *   $A$ on the stack means "more $a$'s seen so far"; $B$ means "more $b$'s seen so far"
@@ -863,12 +881,14 @@ Build a DPDA that recognizes $L_1 = \{w \in \{a,b\}^* \mid \phi(w,a) = \phi(w,b)
     | $b,\, A / \varepsilon$ | Read $b$, currently have excess $a$'s: cancel one $A$ |
 3.  **Accept:** $q_0 \to q_1$: $\varepsilon,\, Z_0 / Z_0$ — all cancelled out, stack holds $Z_0$: counts equal; accept.
 4.  **Trace for input $"abba"$:**
+
     *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$ (1 excess $a$)
     *   $q_0 \xrightarrow{b,\,A/\varepsilon} q_0$: stack = $Z_0$ (cancelled)
     *   $q_0 \xrightarrow{b,\,Z_0/BZ_0} q_0$: stack = $B, Z_0$ (1 excess $b$)
     *   $q_0 \xrightarrow{a,\,B/\varepsilon} q_0$: stack = $Z_0$ (cancelled)
     *   $q_0 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_1$: **ACCEPT** $\checkmark$
 5.  **Trace for input $"aab"$** (should reject since $\phi(w,a)=2 \neq 1=\phi(w,b)$):
+
     *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
     *   $q_0 \xrightarrow{a,\,A/AA} q_0$: stack = $A, A, Z_0$
     *   $q_0 \xrightarrow{b,\,A/\varepsilon} q_0$: stack = $A, Z_0$
@@ -961,6 +981,7 @@ Use the Bar-Hillel Lemma (Pumping Lemma for context-free languages) to prove tha
 2.  **Choose the word** $w = a^m b^m c^m \in L$. Note $|w| = 3m \geq m$.
 3.  **Consider any split** $w = x_1 x_2 x_3 x_4 x_5$ with $|x_2 x_4| > 0$ and $|x_2 x_3 x_4| \leq m$.
 4.  **Restrict where $x_2 x_3 x_4$ can lie:** The distance from the first $a$ to the last $c$ is $3m - 1$ characters. Since $|x_2 x_3 x_4| \leq m < 3m$, the window $x_2 x_3 x_4$ cannot span all three types of symbols simultaneously. It can cover:
+
     *   Only $a$'s, or only $b$'s, or only $c$'s, or
     *   $a$'s and $b$'s (but not $c$'s), or $b$'s and $c$'s (but not $a$'s)
 5.  **Pump with $i = 2$** (pump up):
@@ -1011,6 +1032,7 @@ digraph dpda_tut_abn {
 ```
 
 1.  **PDA specification:**
+
     *   States: $p_0$ (start), $p_1$ (reading $a$'s), $p_2$ (reading $b$'s), $p_3$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, A\}$
     *   Input alphabet: $I = \{a, b\}$
@@ -1024,6 +1046,7 @@ digraph dpda_tut_abn {
     | $p_2 \circlearrowleft$ | $b,\, A / \varepsilon$ | Read additional $b$'s; pop one $A$ each time |
     | $p_2 \to p_3$ | $\varepsilon,\, Z_0 / Z_0$ | Input exhausted; $Z_0$ on top means all $A$'s were matched; accept |
 3.  **Verification that this is a DPDA:**
+
     *   Each $\delta$ entry has exactly one output: condition 1 satisfied.
     *   The $\varepsilon$-transition $\delta(p_2, \varepsilon, Z_0) = (p_3, Z_0)$ uses stack top $Z_0$. No input-reading transition from $p_2$ has $Z_0$ on top: condition 2 satisfied.
 4.  **Trace for input $"aabb"$:**
@@ -1055,6 +1078,7 @@ Construct a DPDA that recognizes $L_2 = \{a^n b a^n \mid n \geq 1\}$.
 **Key Concept:** Push one $A$ per $a$ before the $b$. The single $b$ is a pivot — it signals to switch from push mode to pop mode. After the $b$, pop one $A$ per $a$ on the right side. Equal stacks before and after $b$ means equal $a$-counts.
 
 1.  **PDA specification:**
+
     *   States: $q_0$ (start, push phase), $q_1$ (pop phase, after $b$), $q_2$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, A\}$
 2.  **Transitions:**
@@ -1067,11 +1091,13 @@ Construct a DPDA that recognizes $L_2 = \{a^n b a^n \mid n \geq 1\}$.
     | $q_1 \circlearrowleft$ | $a,\, A / \varepsilon$ | Each $a$ after $b$: pop one $A$ |
     | $q_1 \to q_2$ | $\varepsilon,\, Z_0 / Z_0$ | All $A$'s matched; accept |
 3.  **Trace for input $"aba"$:**
+
     *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
     *   $q_0 \xrightarrow{b,\,A/A} q_1$: stack = $A, Z_0$ (unchanged)
     *   $q_1 \xrightarrow{a,\,A/\varepsilon} q_1$: stack = $Z_0$
     *   $q_1 \xrightarrow{\varepsilon,\,Z_0/Z_0} q_2$: **ACCEPT** $\checkmark$
 4.  **Trace for input $"aabaa"$:**
+
     *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
     *   $q_0 \xrightarrow{a,\,A/AA} q_0$: stack = $A, A, Z_0$
     *   $q_0 \xrightarrow{b,\,A/A} q_1$: stack = $A, A, Z_0$
@@ -1094,6 +1120,7 @@ Construct a DPDA that recognizes $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$, where $
 **Key Concept:** Push every symbol of $v$ onto the stack (using distinct symbols $A$ for $a$ and $B$ for $b$). When the center $c$ is seen, switch to pop mode. Then match each symbol of $v^R$ against the stack. Since $v^R$ is the reverse of $v$, the stack contents should match $v^R$ from top to bottom.
 
 1.  **PDA specification:**
+
     *   States: $q_0$ (push phase), $q_1$ (pop phase), $q_2$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, A, B\}$ where $A$ represents $a$ and $B$ represents $b$
 2.  **Transitions:**
@@ -1125,7 +1152,9 @@ Construct a DPDA that recognizes $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$, where $
     | $b,\, B / \varepsilon$ | Read $b$, top is $B$: match, pop $B$ |
 
     *Accept*: $q_1 \to q_2$: $\varepsilon,\, Z_0 / Z_0$ — all matched, accept.
+
 3.  **Trace for input $"abcba"$** (so $v = "ab"$, $v^R = "ba"$):
+
     *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
     *   $q_0 \xrightarrow{b,\,A/BA} q_0$: stack = $B, A, Z_0$
     *   $q_0 \xrightarrow{c,\,B/B} q_1$: stack = $B, A, Z_0$ (unchanged)
