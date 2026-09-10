@@ -481,6 +481,25 @@ def is_list_item(line):
     return bool(re.match(r'^\s*(\d+\.\s|[-*+] )', line))
 
 
+def list_indent(line):
+    """Column of the list marker (indentation width)."""
+    m = re.match(r'^(\s*)(\d+\.\s|[-*+] )', line)
+    return len(m.group(1)) if m else 0
+
+
+def is_block_boundary(line):
+    """Lines that already terminate a paragraph block: headers, fences,
+    tables, rules, math display, HTML tags, blockquotes."""
+    t = line.strip()
+    if not t:
+        return True
+    if t.startswith(('#', '```', '|', '>', '<', '$$')):
+        return True
+    if re.match(r'^(---+|\*\*\*+|___+)\s*$', t):
+        return True
+    return False
+
+
 def ends_with_colon(line):
     """Line ends with ':' possibly followed by bold/italic markers."""
     return bool(re.search(r':\s*[*_]{0,4}\s*$', line))
@@ -633,6 +652,10 @@ def process_file(filepath):
                 # (user wants blank line after colon before list)
                 if prev and ends_with_colon(prev) and not is_list_item(prev):
                     should_remove = False
+                # Never remove the blank before a nested sublist: without it
+                # pandoc parses the sublist as a paragraph continuation.
+                elif prev and is_list_item(prev) and list_indent(lines[j]) > list_indent(prev):
+                    should_remove = False
                 else:
                     should_remove = True
 
@@ -677,6 +700,70 @@ def process_file(filepath):
                 added += 1
 
     lines = result
+
+    # === Pass 4: Ensure a blank line before every list start ===
+    # Without it pandoc parses `* ...` as emphasis and `1. ...` as paragraph
+    # continuation (the whole list renders as one run-on paragraph). Only the
+    # list START needs it: blanks inside a list are still removed by Pass 1.
+    # (implemented as explicit loop for lookahead-free prev-tracked logic)
+    yaml_open = bool(lines and lines[0].strip() == '---')
+    blanks_added = 0
+    result4 = []
+    in_code = False
+    in_math = False
+    yaml_done = not yaml_open
+    prev_nonblank = None  # last non-blank, non-skipped line
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('```'):
+            in_code = not in_code
+            result4.append(line)
+            if not in_code:
+                prev_nonblank = None  # fence resets paragraph context
+            continue
+        if in_code:
+            result4.append(line)
+            continue
+        if not yaml_done:
+            result4.append(line)
+            if i > 0 and stripped == '---':
+                yaml_done = True
+            prev_nonblank = None
+            continue
+        if stripped == '$$' or (stripped.startswith('$$') and stripped.endswith('$$') and len(stripped) > 2):
+            # single-line display math resets context like a boundary
+            result4.append(line)
+            prev_nonblank = None
+            continue
+        if stripped.startswith('$$'):
+            in_math = not in_math
+            result4.append(line)
+            if not in_math:
+                prev_nonblank = None
+            continue
+        if in_math:
+            result4.append(line)
+            continue
+        if stripped == '':
+            result4.append(line)
+            continue
+        if is_list_item(line) and prev_nonblank is not None and not is_block_boundary(prev_nonblank):
+            if result4 and result4[-1].strip() == '':
+                pass  # blank already present: idempotent no-op
+            elif is_list_item(prev_nonblank):
+                if list_indent(line) <= list_indent(prev_nonblank):
+                    pass  # same-level continuation: keep tight (Pass 1 style)
+                else:
+                    result4.append('')  # nested sublist start
+                    blanks_added += 1
+            else:
+                result4.append('')  # paragraph/math/html -> list
+                blanks_added += 1
+        result4.append(line)
+        prev_nonblank = line
+
+    lines = result4
+    added += blanks_added
 
     # === Pass 3: Ensure '---' before top-level numbered section headers ===
     # Matches: #### **N. SectionName** (e.g. #### **2. Definitions**)
