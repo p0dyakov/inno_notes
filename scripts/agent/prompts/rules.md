@@ -133,6 +133,10 @@ N - 3/4
   math (`$$` lines, even labeled/multiline), continuation paragraphs and
   nested sublists attach directly (indented, no blank line). Blank lines
   inside a list force a loose list with gaps between items.
+- Practice items are only `Example` (teacher demonstrates) or `Task`
+  (student assignment): source labels like `(Tutorial 1, Task 2)` or
+  `(Lab 5, Example)`. `Problem`, `Practice Task(s)`, `Exercise` and any
+  other kinds are violations, not style choices.
 
 ### Banned: Pitfalls blocks (fix_formatting gate)
 

@@ -87,6 +87,10 @@ ANY_HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*$')
 THEORY_LEVEL5_RE = re.compile(r'^#####\s+\*\*1\.\d+\s+.+?\*\*\s*$')
 THEORY_LEVEL6_RE = re.compile(r'^######\s+\*\*1\.\d+(?:\.\d+)+\s+.+?\*\*\s*$')
 PRACTICE_HEADING_RE = re.compile(r'^#####\s+\*\*(\d+)\.(\d+)\.\s+(.+?)(?:\*\*\s+\((.+)\))?\s*$')
+# Only two practice item kinds exist: Example (teacher demonstrates) and Task
+# (student assignment). Anything else (Problem, Practice Task(s), Exercise...)
+# breaks Solved-pills and the Practice taxonomy.
+ITEM_KIND_WORD_RE = re.compile(r'(?i)\b(tasks?|examples?|problems?|exercises?|practice)\b')
 # Allow dotted/suffixed task numbers (6.1, 3a, 17-18, 1 & 2), collection sources
 # (Practice Sheet, Additional Problems, Exercises, Preparing for Final, Mock Midterm,
 # Assignment, Problem Set), and topic-style sources (Chapter 1, Substitution).
@@ -373,6 +377,14 @@ def validate_practice_headings(lines, filepath=""):
         source_error = validate_source_label(source_label)
         if source_error:
             issues.append(f"Line {line_num}: {source_error} Found `({source_label})`.")
+
+        if source_label is not None:
+            last_part = source_label.rsplit(',', 1)[-1]
+            kind_match = ITEM_KIND_WORD_RE.search(last_part)
+            if kind_match and kind_match.group(0) not in ('Task', 'Example'):
+                issues.append(
+                    f"Line {line_num}: practice item kind must be `Example` or `Task`, "
+                    f"found `{kind_match.group(0)}`. Found `({source_label})`.")
 
     return issues
 
