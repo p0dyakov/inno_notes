@@ -78,4 +78,13 @@ Rules: axes always drawn with arrows and labels placed OUTSIDE the tips
 (node[right], node[above]); every plotted element gets a label in
 whitespace (midway, above right); labels never overlap lines or each
 other; keep scale at most 1 so the figure fits the column.
+Readability is mandatory, not a suggestion:
+- NEVER rotate text (`rotate=` is banned by the formatting gate, except
+  `shape border rotate` for shapes). All labels horizontal.
+- every label sits in real whitespace with clearance from lines, dots and
+  other labels; a label crossing a line gets `fill=white, inner sep=2pt`.
+- when 3+ lines crowd one area, drop inline equation labels and put a
+  small `draw, fill=white` legend box in empty plot whitespace instead.
+- keep the bounding box tight: no label may stick out past the axes;
+  fig-height at most 3.5.
 

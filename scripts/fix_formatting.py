@@ -91,6 +91,15 @@ PRACTICE_HEADING_RE = re.compile(r'^#####\s+\*\*(\d+)\.(\d+)\.\s+(.+?)(?:\*\*\s+
 # (student assignment). Anything else (Problem, Practice Task(s), Exercise...)
 # breaks Solved-pills and the Practice taxonomy.
 ITEM_KIND_WORD_RE = re.compile(r'(?i)\b(tasks?|examples?|problems?|exercises?|practice)\b')
+# ATX headings must start their own line preceded by a blank line: without it
+# pandoc parses `##### ...` as lazy paragraph/list continuation and renders
+# the hashes literally. Mid-line glued headings (`...text ##### 1.6 ...`)
+# are split the same way (conservative: 4-6 hashes + numbered title only).
+ATX_HEADING_RE = re.compile(r'^(#{1,6})(?!#)[ \t]')
+GLUED_HEADING_RE = re.compile(r'^(.*?\S.*?)\s+(#{4,6})(?!#)[ \t]+(\*{0,2}\d.*)$')
+INLINE_CODE_RE = re.compile(r'`[^`]*`')
+def _count_dd(line):
+    return INLINE_CODE_RE.sub('', line).count('$$')
 # Allow dotted/suffixed task numbers (6.1, 3a, 17-18, 1 & 2), collection sources
 # (Practice Sheet, Additional Problems, Exercises, Preparing for Final, Mock Midterm,
 # Assignment, Problem Set), and topic-style sources (Chapter 1, Substitution).
@@ -794,6 +803,25 @@ def detect_ascii_diagrams(lines):
     return issues
 
 
+def detect_tikz_rotate(lines):
+    """Flag rotated text in tikz blocks (unreadable labels)."""
+    issues = []
+    in_tikz = False
+    for i, line in enumerate(lines, start=1):
+        s = line.strip()
+        if s.startswith('```'):
+            if in_tikz:
+                in_tikz = False
+            elif 'tikz' in s:
+                in_tikz = True
+            continue
+        if in_tikz and re.search(r'(?<!shape border )rotate\s*=\s*(?!0\b)', line):
+            issues.append(
+                f"Line {i}: `rotate=` text rotation in tikz breaks "
+                f"readability (use horizontal labels).")
+    return issues
+
+
 def _is_joinable_continuation(line):
     """Indented plain/math line that may merge into a list item's paragraph.
 
@@ -833,6 +861,7 @@ def process_file(filepath):
 
     format_issues = validate_format_rules(filepath, lines)
     format_issues.extend(detect_pitfalls(lines))
+    format_issues.extend(detect_tikz_rotate(lines))
     if is_managed_file(filepath):
         format_issues.extend(detect_ascii_diagrams(lines))
 
@@ -1012,6 +1041,97 @@ def process_file(filepath):
 
     lines = result4
     added += blanks_added
+
+    # === Pass 5: ATX headings own their line + blank line before ===
+    # Without a preceding blank pandoc renders `##### ...` as literal text
+    # glued into the paragraph (observed on 1.5.x/1.6.x headings). Unclosed
+    # $$ spans and blank lines inside display math break the same way and
+    # cannot be fixed safely, so they are reported as violations (gate).
+    result5 = []
+    in_code5 = False
+    par_dd5 = 0
+    par_start5 = 0
+    yaml5 = bool(lines and lines[0].strip() == '---')
+    yaml_done5 = not yaml5
+    head_issues = []
+    head_added = 0
+    def _flush_par5(at_line):
+        if par_dd5 % 2 == 1:
+            head_issues.append(
+                f"Lines {par_start5}-{at_line}: unpaired `$$` display math "
+                f"breaks rendering (renders literally).")
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('```'):
+            in_code5 = not in_code5
+            _flush_par5(idx + 1)
+            par_dd5 = 0
+            par_start5 = 0
+            result5.append(line)
+            continue
+        if in_code5:
+            result5.append(line)
+            continue
+        if not yaml_done5:
+            result5.append(line)
+            if idx > 0 and stripped == '---':
+                yaml_done5 = True
+                par_dd5 = 0
+                par_start5 = 0
+            continue
+        # NOTE: table rows ('|...') are NOT a boundary here: a display-math
+        # line can start with '|' (|f|, norms). Balanced tables pass as one
+        # paragraph; an unbalanced row still flags at the table end.
+        if stripped == '' and par_start5 != 0 and par_dd5 % 2 == 1:
+            # Blank line strictly inside a display-math span can never
+            # render (pandoc splits the paragraph there): drop it so the
+            # span survives. Leftover odd parity still flags below.
+            removed += 1
+            continue
+        if stripped == '' or ATX_HEADING_RE.match(stripped) or stripped.startswith('<'):
+            _flush_par5(idx + 1)
+            par_dd5 = 0
+            par_start5 = 0
+        elif stripped.startswith('>'):
+            pass
+        else:
+            if par_start5 == 0:
+                par_start5 = idx + 1
+            par_dd5 += _count_dd(line)
+        if stripped == '':
+            result5.append(line)
+            continue
+        if stripped.startswith('|') or stripped.startswith('>') or stripped.startswith('<'):
+            result5.append(line)
+            continue
+        if not stripped.startswith('#'):
+            gm = GLUED_HEADING_RE.match(line)
+            if gm:
+                if par_start5 == 0:
+                    par_start5 = idx + 1
+                par_dd5 += _count_dd(gm.group(1))
+                _flush_par5(idx + 1)
+                par_dd5 = 0
+                par_start5 = 0
+                result5.append(gm.group(1))
+                result5.append('')
+                result5.append(gm.group(2) + ' ' + gm.group(3))
+                head_added += 1
+                continue
+        if ATX_HEADING_RE.match(stripped):
+            prev = get_prev_nonblank(result5)
+            if prev is not None and not ATX_HEADING_RE.match(prev.strip()):
+                if result5 and result5[-1].strip() != '':
+                    result5.append('')
+                    head_added += 1
+        result5.append(line)
+    if par_dd5 % 2 == 1:
+        head_issues.append(
+            f"Line {par_start5}: unpaired `$$` display math breaks "
+            f"rendering (renders literally).")
+    lines = result5
+    added += head_added
+    format_issues.extend(head_issues)
 
     # === Pass 3: Ensure '---' before top-level numbered section headers ===
     # Matches: #### **N. SectionName** (e.g. #### **2. Definitions**)

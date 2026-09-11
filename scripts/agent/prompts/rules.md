@@ -137,6 +137,11 @@ N - 3/4
   (student assignment): source labels like `(Tutorial 1, Task 2)` or
   `(Lab 5, Example)`. `Problem`, `Practice Task(s)`, `Exercise` and any
   other kinds are violations, not style choices.
+- ATX headings start their own line with a blank line before (auto-fixed);
+  a `$$` paragraph must pair within itself (unpaired `$$` and `rotate=`
+  text in tikz are gate violations). Figures stay readable: horizontal
+  labels with clearance or white chips, legend box when crowded, tight
+  bounding box, fig-height at most 3.5 (plus a CSS max-height backstop).
 
 ### Banned: Pitfalls blocks (fix_formatting gate)
 
