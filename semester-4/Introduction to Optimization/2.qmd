@@ -1,0 +1,662 @@
+---
+title: "W2. Simplex Method"
+author: "Mohammad Reza Bahrami"
+date: "September 11, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Theory**
+
+##### **1.1 Geometric Foundations and Iterative Nature of the Simplex Method**
+
+The **simplex method** is an iterative, edge-following algebraic algorithm designed to solve linear programming problems by systematically traversing the boundary of the convex polyhedral feasible region. Geometrically, the feasible solution space formed by a system of linear inequality constraints $\mathbf{A}\mathbf{x} \le \mathbf{b}$ and non-negativity restrictions $\mathbf{x} \ge \mathbf{0}$ constitutes a convex polytope. The fundamental theorem of linear programming guarantees that if an optimal solution exists, at least one **extreme point** (or **corner point vertex**) of this polytope achieves that optimum. Rather than evaluating every vertex combinatorially, the simplex method moves sequentially along adjacent 1-dimensional **edges** until an optimal vertex is attained.
+
+The algorithm relies on three foundational geometric principles:
+
+1. **Standard Initialization at the Coordinate Origin:** To establish a standardized computational starting state, the algorithm initializes at the origin extreme point where all primary decision variables satisfy:
+   $$x_j = 0, \quad \forall j \in \{1, 2, \dots, n\}$$
+   At this initial vertex, the baseline objective function value satisfies $z = 0$.
+2. **One-Variable-at-a-Time Improvement:** The algorithm evaluates whether an increase in nonbasic variables above zero improves the objective value $z$. The algebraic design prohibits simultaneous adjustments of multiple variables; candidate variables are targeted strictly one at a time. The chosen variable is the one exhibiting the greatest **rate of improvement**—defined as the largest positive gradient coefficient in the objective function for a maximization problem.
+3. **Boundary Edge Traversal and Interior Prohibition:** The progression between consecutive solutions occurs strictly along the boundary edges connecting adjacent corner points. The simplex method **never cuts across the interior** of the feasible region. Direct diagonal traversal from an initial vertex to a non-adjacent optimal vertex through the interior solution space is prohibited by the algebraic mechanics of variable substitution.
+
+Every corner point visited along the traversal path corresponds to exactly one computational **iteration** of the simplex algorithm.
+
+```{tikz}
+#| label: fig-simplex-path
+#| fig-cap: "Feasible region with the iterative simplex boundary path traversing from origin vertex A to B and optimal vertex C."
+#| echo: false
+#| lang: tex
+#| fig-height: 4
+\begin{tikzpicture}[scale=1.1, every node/.style={font=\small}]
+    \fill[gray!25] (0,0) -- (2,0) -- (1,2) -- (0,2.5) -- cycle;
+    \draw[->, thick] (-0.5,0) -- (5.5,0) node[right] {$x_1$};
+    \draw[->, thick] (0,-0.5) -- (0,4.5) node[above] {$x_2$};
+    \foreach \x in {1,2,3,4,5} \draw (\x,0.08) -- (\x,-0.08) node[below] {$\x$};
+    \foreach \y in {1,2,3,4} \draw (0.08,\y) -- (-0.08,\y) node[left] {$\y$};
+    \draw[dashed, domain=0:2.2] plot (\x, {4 - 2*\x});
+    \draw[dashed, domain=0:5.2] plot (\x, {2.5 - 0.5*\x});
+    \node at (0.3,4.1) {$F(0,4)$};
+    \node at (5.2,0.3) {$E(5,0)$};
+    \node[below left] at (0,0) {$A(0,0)$};
+    \node[left] at (0,2.5) {$B(0,2.5)$};
+    \node[below] at (2,0) {$D(2,0)$};
+    \filldraw[black] (0,0) circle (2pt);
+    \filldraw[black] (0,2.5) circle (2pt);
+    \filldraw[black] (1,2) circle (2pt) node[above right] {$C(1,2)$ [Optimum]};
+    \filldraw[black] (2,0) circle (2pt);
+    \draw[->, ultra thick, line width=1.5pt] (0,0) -- (0,2.4);
+    \draw[->, ultra thick, line width=1.5pt] (0,2.5) -- (0.95,2.03);
+    \draw[dotted, red, thick] (0,0) -- (0.95,1.9);
+    \node[red, above left, rotate=63] at (0.6,0.9) {interior traversal prohibited};
+\end{tikzpicture}
+```
+
+* **Worked Illustration:** Consider the optimization problem:
+  $$\text{Maximize } z = 2x_1 + 3x_2$$
+  subject to linear boundary constraints defining vertices $A(0,0)$, $B(0, 2.5)$, $C(1,2)$, and $D(2,0)$. The algorithm initializes at origin vertex $A$, where $x_1 = 0$, $x_2 = 0$, and $z = 0$. 
+  Evaluating the marginal objective coefficients reveals a rate of improvement of $2$ with respect to $x_1$ and $3$ with respect to $x_2$. Because $3 > 2$, the algorithm selects $x_2$ as the entering variable to increase. Increasing $x_2$ while holding $x_1 = 0$ directs movement along the vertical boundary edge to adjacent vertex $B(0, 2.5)$. From vertex $B$, the subsequent boundary edge leads directly to corner point $C(1,2)$, which achieves the global optimum. The completed algorithmic path is $A \to B \to C$, requiring two iterations and completely circumventing any direct interior line segment from $A$ to $C$.
+
+##### **1.2 Standard LP Augmentation and Initial Simplex Tableau Construction**
+
+Executing the simplex method computationally requires casting a linear program into standard equality form and tabulating the resulting linear system. **Standard LP augmentation** is the systematic algebraic conversion of inequality constraints into linear equalities by introducing auxiliary non-negative variables, accompanied by rewriting the objective relation as a single homogeneous zero-sum equation.
+
+###### **1.2.1 Constraint Augmentation via Slack Variables**
+
+When constraints are expressed as less-than-or-equal-to inequalities ($\le$), each inequality represents an upper bound on resource utilization. A **slack variable** $s_i \ge 0$ is added to the left-hand side of the $i$-th constraint to absorb the difference between the actual resource consumption and the maximum allowable capacity:
+
+$$\sum_{j=1}^n a_{ij} x_j \le b_i \iff \sum_{j=1}^n a_{ij} x_j + s_i = b_i, \quad s_i \ge 0$$
+
+where $b_i \ge 0$ constitutes the non-negative right-hand-side requirement. Each introduced slack variable possesses a cost coefficient of zero in the original objective function, ensuring that unused resource quantities do not directly alter the calculated objective value $z$.
+
+###### **1.2.2 Homogeneous Objective Equation Reformulation**
+
+The linear objective function $\max z = \sum_{j=1}^n c_j x_j + \sum_{i=1}^m 0 s_i$ is treated algebraically as an additional linear equation. To integrate it directly into an elimination system, all decision and slack variable terms are shifted to the left-hand side, establishing the **homogeneous objective form**:
+
+$$z - \sum_{j=1}^n c_j x_j - \sum_{i=1}^m 0 s_i = 0$$
+
+In this form, each decision variable $x_j$ appears with coefficient $-c_j$, and the right-hand-side constant equals zero at the starting baseline.
+
+###### **1.2.3 Basic and Nonbasic Variable Partitioning**
+
+For an augmented linear system containing $m$ functional equality constraints and $n + m$ total variables (decision variables plus slacks), there are more unknowns than linearly independent equations. The simplex framework partitions the variables into two distinct subsets:
+
+*   **Nonbasic variables:** A subset of $(n + m) - m = n$ variables assigned an exact numerical value of zero. At the initial construction, the original decision variables ($x_1, x_2, \dots, x_n$) are designated as nonbasic, representing the coordinate origin.
+*   **Basic variables:** A subset of $m$ variables whose values are uniquely resolved from the constraint equations once the nonbasic variables are set to zero. At initialization, each constraint equation contains exactly one isolated slack variable with a coefficient of $+1$, allowing the set of slack variables ($s_1, s_2, \dots, s_m$) to serve as the initial **basis**.
+
+Setting the nonbasic variables to zero simplifies the augmented system $\mathbf{A}\mathbf{x} + \mathbf{I}\mathbf{s} = \mathbf{b}$ to $\mathbf{I}\mathbf{s} = \mathbf{b}$, immediately yielding the **initial basic feasible solution (BFS)**:
+
+$$\mathbf{s} = \mathbf{b} \ge \mathbf{0}, \quad \mathbf{x} = \mathbf{0}, \quad z = 0$$
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Standard LP augmentation and initial simplex tableau setup pipeline"
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Original Model<br/>Inequalities and max z"] --> B["Add Slack Variables<br/>Convert to equalities"]
+    B --> C["Homogeneous Form<br/>Shift z terms to LHS"]
+    C --> D["Partition Variables<br/>Nonbasic to zero, slacks basic"]
+    D --> E["Initial Simplex Tableau<br/>Read starting BFS from RHS"]
+```
+
+###### **1.2.4 Canonical Simplex Tableau Structure and Concrete Formulation**
+
+The full augmented system of linear equations is arranged into a standardized compact matrix structure called the **simplex tableau**. The canonical tableau organizes coefficients across distinct functional columns:
+
+1.  **Basic column:** Lists the current basic variables corresponding to each constraint row, with the top row reserved for the objective variable $z$.
+2.  **$z$-column:** Displays the coefficients of the objective variable $z$ (identically $1$ in the $z$-row and $0$ in all constraint rows).
+3.  **Variable columns:** Contains the structural constraint coefficients under both decision variables ($x_j$) and slack variables ($s_i$). The basic slack variables form an $m \times m$ identity matrix $\mathbf{I}$.
+4.  **Solution (RHS) column:** Holds the constant terms $b_i$, from which the numerical values of the basic variables and the objective $z$ are read directly.
+
+Consider the Tatar-Paint problem with decision variables $x_1$ and $x_2$ and four operational restrictions:
+
+$$\begin{aligned}
+\text{Maximize } & z = 5x_1 + 4x_2 \\
+\text{Subject to } & 6x_1 + 4x_2 \le 24 && \text{(Raw material M1)} \\
+& x_1 + 2x_2 \le 6 && \text{(Raw material M2)} \\
+& -x_1 + x_2 \le 1 && \text{(Market limit)} \\
+& x_2 \le 2 && \text{(Demand limit)} \\
+& x_1, x_2 \ge 0
+\end{aligned}$$
+
+Introducing slack variables $s_1, s_2, s_3, s_4 \ge 0$ converts the inequalities into equalities, and rearranging the objective relation produces:
+
+$$\begin{aligned}
+z - 5x_1 - 4x_2 - 0s_1 - 0s_2 - 0s_3 - 0s_4 &= 0 \\
+6x_1 + 4x_2 + s_1 &= 24 \\
+x_1 + 2x_2 + s_2 &= 6 \\
+-x_1 + x_2 + s_3 &= 1 \\
+x_2 + s_4 &= 2
+\end{aligned}$$
+
+Setting the $n = 2$ nonbasic variables to zero ($x_1 = 0, x_2 = 0$) isolates the $m = 4$ basic variables as $s_1 = 24$, $s_2 = 6$, $s_3 = 1$, and $s_4 = 2$, yielding $z = 0$. This configuration is tabulated into the initial simplex tableau:
+
+| Basic | $z$ | $x_1$ | $x_2$ | $s_1$ | $s_2$ | $s_3$ | $s_4$ | Sol. | Row Identifier |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| $z$ | 1 | -5 | -4 | 0 | 0 | 0 | 0 | 0 | $z$-row |
+| $s_1$ | 0 | 6 | 4 | 1 | 0 | 0 | 0 | 24 | $s_1$-row |
+| $s_2$ | 0 | 1 | 2 | 0 | 1 | 0 | 0 | 6 | $s_2$-row |
+| $s_3$ | 0 | -1 | 1 | 0 | 0 | 1 | 0 | 1 | $s_3$-row |
+| $s_4$ | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 2 | $s_4$-row |
+
+The identity matrix embedded under columns $s_1, s_2, s_3, s_4$ explicitly mirrors the basis. The rightmost Solution column immediately provides the initial basic feasible coordinate vector $(x_1, x_2, s_1, s_2, s_3, s_4) = (0, 0, 24, 6, 1, 2)$ at profit level $z = 0$.
+
+##### **1.3 The Simplex Optimality Condition and Entering Variable Selection**
+
+The **simplex optimality condition** is an algebraic decision rule used at each simplex iteration to evaluate whether the current basic feasible solution can be improved, and if not, to select an **entering variable** that transitions the basis to an adjacent extreme point with a strictly better objective value.
+
+In a canonical simplex tableau, the objective function is written in implicit row form alongside the constraints. For a maximization objective $z = \sum_{j=1}^n c_j x_j$, expressing the objective as an equation yields:
+
+$$z - \sum_{j=1}^n c_j x_j = 0$$
+
+The coefficients appearing under the nonbasic variables in this objective row ($z$-row) represent **reduced costs** (relative profit coefficients). Because the current basic feasible solution sets all nonbasic variables to zero, each $z$-row coefficient indicates how the objective value $z$ changes per unit increase in that nonbasic variable:
+
+* A negative coefficient $-c_j < 0$ in the $z$-row of a maximization tableau means that increasing the nonbasic variable $x_j$ above zero produces an increase in $z$ at a rate of $+c_j$.
+* A positive coefficient in the $z$-row of a maximization tableau means that increasing that nonbasic variable would decrease $z$.
+* A zero coefficient indicates that altering the variable leaves $z$ locally unchanged.
+
+The selection rule targets the nonbasic variable offering the highest per-unit rate of improvement:
+
+1. **Maximization problems:** The entering variable is the nonbasic variable associated with the **most negative coefficient** in the $z$-row.
+2. **Minimization problems:** The entering variable is the nonbasic variable associated with the **most positive coefficient** in the $z$-row.
+
+The vertical column corresponding to the chosen entering variable is designated as the **pivot column**.
+
+The **termination criterion** states that a basic feasible solution is optimal when no nonbasic variable can improve the objective function further. For a maximization problem, optimality is achieved when all reduced cost coefficients in the $z$-row are **non-negative** ($\ge 0$). For a minimization problem, optimality is achieved when all $z$-row coefficients are **non-positive** ($\le 0$).
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Simplex optimality verification and entering variable selection pipeline."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Inspect nonbasic coefficients<br/>in the objective z-row"] --> B{"Any qualifying<br/>improvement rates?"}
+    B -->|"Max: all coefs &ge; 0<br/>Min: all coefs &le; 0"| C["Current solution is optimal<br/>Terminate algorithm"]
+    B -->|"Max: negative coefs exist<br/>Min: positive coefs exist"| D["Select candidate with largest<br/>magnitude rate of improvement"]
+    D --> E["Designate entering variable<br/>and identify pivot column"]
+```
+
+* **Worked Illustration:** Consider the initial tableau of the Tatar-Paint maximization problem:
+  $$\text{Maximize } z = 5x_1 + 4x_2 \implies z - 5x_1 - 4x_2 + 0s_1 + 0s_2 + 0s_3 + 0s_4 = 0$$
+  The nonbasic decision variables at the origin are $x_1 = 0$ and $x_2 = 0$. The coefficients in the tableau's $z$-row are:
+  $$\begin{array}{c|cccccc|c}
+  \text{Basic} & x_1 & x_2 & s_1 & s_2 & s_3 & s_4 & \text{Solution} \\
+  \hline
+  z & -5 & -4 & 0 & 0 & 0 & 0 & 0
+  \end{array}$$
+  Evaluating the simplex optimality condition:
+
+  * The tableau is not optimal because negative coefficients remain under nonbasic columns ($-5$ and $-4$).
+  * The nonbasic variables offer marginal profit rates of $+5$ for $x_1$ and $+4$ for $x_2$.
+  * Comparing the candidates, $-5 < -4$, making $-5$ the most negative coefficient.
+  Therefore, $x_1$ is selected as the **entering variable**, and the column under $x_1$ becomes the **pivot column** for the subsequent iteration.
+
+##### **1.4 The Simplex Feasibility Condition and the Minimum Ratio Test**
+
+The **simplex feasibility condition** governs the selection of the **leaving variable** when an entering variable is introduced into the basis. When a nonbasic variable $x_k$ is selected as the **entering variable**, it increases from zero while all other nonbasic variables remain fixed at zero. Each current basic variable $x_{B_i}$ responds linearly to this increase according to the algebraic relation:
+
+$$x_{B_i} = b_i - a_{ik} x_k \tag{1}$$
+
+where $b_i \ge 0$ is the current value in the right-hand-side Solution column, and $a_{ik}$ is the coefficient of constraint row $i$ in pivot column $k$.
+
+To preserve non-negativity across all variables ($x_{B_i} \ge 0$), the growth of $x_k$ is strictly bounded:
+
+$$b_i - a_{ik} x_k \ge 0 \implies a_{ik} x_k \le b_i$$
+
+The effect of this condition depends on the algebraic sign of $a_{ik}$:
+
+* When $a_{ik} > 0$, increasing $x_k$ reduces the value of $x_{B_i}$. To prevent $x_{B_i}$ from becoming negative, $x_k$ cannot exceed the upper bound:
+  $$x_k \le \frac{b_i}{a_{ik}}$$
+* When $a_{ik} \le 0$, an increase in $x_k$ either leaves $x_{B_i}$ completely unchanged (if $a_{ik} = 0$) or increases its value (if $a_{ik} < 0$). Non-positive constraint coefficients impose no upper limit on the growth of $x_k$, and division by zero is undefined. Consequently, non-positive coefficients ($a_{ik} \le 0$) are excluded from ratio computations.
+
+The **minimum ratio test** determines the maximum permissible value of the entering variable, denoted $\theta^*$, by taking the smallest nonnegative ratio among all rows with strictly positive pivot coefficients:
+
+$$\theta^* = \min_{i} \left\{ \frac{b_i}{a_{ik}} \;\middle|\; a_{ik} > 0 \right\} \tag{2}$$
+
+The basic variable in the row attaining $\theta^*$ drops to zero first as $x_k$ reaches its upper bound. This variable is chosen as the **leaving variable**, and its corresponding row becomes the **pivot row**.
+
+###### **1.4.1 Geometric Interpretation of Constraint Intercepts**
+
+Geometrically, evaluating ratios along the pivot column corresponds to locating the intercepts of the active constraint boundary lines with the entering variable axis. Moving along the axis represents traveling along an edge of the convex feasible polyhedron from the current corner point toward an adjacent corner point. The smallest positive intercept defines the boundary of the feasible region along that edge. Any increase of $x_k$ beyond $\theta^*$ crosses the first encountered constraint boundary, driving the corresponding slack or basic variable below zero and rendering the solution infeasible.
+
+```{tikz}
+#| label: fig-ratio-intercepts
+#| fig-cap: "Constraint intercepts on the entering variable axis delineating the feasible step bound."
+#| echo: false
+#| lang: tex
+#| fig-height: 4
+\begin{tikzpicture}[scale=0.85, every node/.style={font=\small}]
+  \fill[gray!20] (0,0) -- (4,0) -- (1,2) -- (0,1) -- cycle;
+  \draw[->] (-2,0) -- (7,0) node[right] {$x_1$};
+  \draw[->] (0,-0.5) -- (0,4) node[above] {$x_2$};
+
+  \draw[thick, blue] (-0.5, 3.75) -- (5.5, -0.75) node[pos=0.85, above right] {$6x_1 + 4x_2 = 24$};
+  \draw[thick, red] (-1, 3.5) -- (7, -0.5) node[pos=0.85, above right] {$x_1 + 2x_2 = 6$};
+  \draw[thick, green!60!black] (-1.5, -0.5) -- (2, 3) node[pos=0.85, above left] {$-x_1 + x_2 = 1$};
+  \draw[thick, purple] (-1.5, 2) -- (6.5, 2) node[pos=0.9, above] {$x_2 = 2$};
+
+  \filldraw[black] (0,0) circle (2pt) node[below left] {$A(0,0)$};
+  \filldraw[black] (4,0) circle (2pt) node[below] {$B(4,0)$};
+  \filldraw[black] (6,0) circle (2pt) node[below] {$(6,0)$};
+  \filldraw[black] (-1,0) circle (2pt) node[below] {$(-1,0)$};
+
+  \draw[ultra thick, ->, teal] (0,0) -- (3.9,0) node[midway, below] {$x_1 \to 4$};
+\end{tikzpicture}
+```
+
+###### **1.4.2 Ratio Test Calculation on the Starting Tableau**
+
+In the Tatar-Paint model, the entering variable is $x_1$ with right-hand-side vector $\mathbf{b} = [24, 6, 1, 2]^T$:
+
+$$\begin{aligned}
+s_1\text{-row: } & 6x_1 \le 24 \implies \theta_1 = \frac{24}{6} = 4 \\
+s_2\text{-row: } & 1x_1 \le 6 \implies \theta_2 = \frac{6}{1} = 6 \\
+s_3\text{-row: } & a_{31} = -1 \le 0 \implies \frac{1}{-1} = -1 \quad \text{(negative coefficient, ignored)} \\
+s_4\text{-row: } & a_{41} = 0 \le 0 \implies \frac{2}{0} \quad \text{(zero coefficient, ignored)}
+\end{aligned}$$
+
+The minimum positive ratio is:
+
+$$\theta^* = \min\{4, 6\} = 4$$
+
+The minimum occurs in row $s_1$. Thus, $x_1$ enters the basis at value $4$, $s_1$ drops to zero and leaves the basis, and row 1 is designated as the pivot row.
+
+##### **1.5 Gauss-Jordan Row Operations and Tableau Pivoting Mechanics**
+
+The transition from a current basic feasible solution to an adjacent improved basic feasible solution is executed algebraically through **pivoting**, an algorithmic sequence of **Gauss-Jordan elementary row operations**. Pivoting updates the linear constraint system and the objective relation so that the newly admitted basic variable assumes canonical identity-column form while the leaving variable recedes to nonbasic status.
+
+The mechanics of pivoting center on three structural coordinates:
+
+* **Pivot Column:** The column belonging to the entering variable, determined by the simplex optimality criterion.
+* **Pivot Row:** The constraint row corresponding to the leaving variable, determined by the minimum ratio test of the feasibility condition.
+* **Pivot Element:** The scalar located at the exact intersection of the pivot row and the pivot column.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Algorithmic flow of Gauss-Jordan tableau pivoting across an iteration"
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Identify entering and leaving variables<br/>Locate pivot element at intersection"] --> B["Basis update<br/>Swap leaving label for entering label"]
+    B --> C["Normalize pivot row<br/>Divide entire row by pivot element"]
+    C --> D["Eliminate non-pivot constraint rows<br/>Subtract scaled pivot row"]
+    C --> E["Eliminate objective z-row<br/>Subtract scaled pivot row"]
+    D --> F["Preserved canonical form<br/>Basic columns form identity matrix"]
+    E --> F
+```
+
+The transformation to the next tableau proceeds through two sequential steps:
+
+1. **Basis Update and Pivot Row Normalization:**
+   In the **Basic** column of the tableau, replace the label of the leaving variable with the entering variable. The new pivot row is computed by dividing every entry in the current pivot row by the pivot element:
+   $$\text{New pivot row} = \frac{\text{Current pivot row}}{\text{Pivot element}}$$
+   This forces the coefficient of the entering variable in its own row to become $+1$.
+2. **Elimination on All Non-Pivot Rows (Including the $z$-Row):**
+   Every remaining row $i$ (each non-pivot constraint row and the objective $z$-row) must have a zero in the pivot column. This is achieved by subtracting an appropriately scaled multiple of the normalized pivot row:
+   $$\text{New row}_i = (\text{Current row}_i) - (\text{Pivot column coefficient in row } i) \times (\text{New pivot row})$$
+
+Applying these operations across all rows ensures the **canonical unit-vector form**: each basic variable has a coefficient of $+1$ in its designated basic row and $0$ in all other constraint rows as well as the $z$-row, allowing the basic variable values to be read directly from the right-hand side **Solution** column.
+
+* **Worked Illustration:** In the starting tableau of the Tatar-Paint problem, $x_1$ is selected as the entering variable (pivot column) and $s_1$ as the leaving variable (pivot row). The pivot element at their intersection is $6$.
+  The current rows are:
+  $$\begin{aligned}
+  z\text{-row} &= \begin{bmatrix} -5 & -4 & 0 & 0 & 0 & 0 & 0 \end{bmatrix} \\
+  s_1\text{-row} &= \begin{bmatrix} 6 & 4 & 1 & 0 & 0 & 0 & 24 \end{bmatrix} \\
+  s_2\text{-row} &= \begin{bmatrix} 1 & 2 & 0 & 1 & 0 & 0 & 6 \end{bmatrix} \\
+  s_3\text{-row} &= \begin{bmatrix} -1 & 1 & 0 & 0 & 1 & 0 & 1 \end{bmatrix} \\
+  s_4\text{-row} &= \begin{bmatrix} 0 & 1 & 0 & 0 & 0 & 1 & 2 \end{bmatrix}
+  \end{aligned}$$
+  Executing the Gauss-Jordan update rules:
+  $$\begin{aligned}
+  \text{New } x_1\text{-row} &= \frac{1}{6} \begin{bmatrix} 6 & 4 & 1 & 0 & 0 & 0 & 24 \end{bmatrix} \\
+  &= \begin{bmatrix} 1 & \frac{2}{3} & \frac{1}{6} & 0 & 0 & 0 & 4 \end{bmatrix}
+  \end{aligned}$$
+  $$\begin{aligned}
+  \text{New } z\text{-row} &= \begin{bmatrix} -5 & -4 & 0 & 0 & 0 & 0 & 0 \end{bmatrix} - (-5) \begin{bmatrix} 1 & \frac{2}{3} & \frac{1}{6} & 0 & 0 & 0 & 4 \end{bmatrix} \\
+  &= \begin{bmatrix} 0 & -\frac{2}{3} & \frac{5}{6} & 0 & 0 & 0 & 20 \end{bmatrix}
+  \end{aligned}$$
+  $$\begin{aligned}
+  \text{New } s_2\text{-row} &= \begin{bmatrix} 1 & 2 & 0 & 1 & 0 & 0 & 6 \end{bmatrix} - (1) \begin{bmatrix} 1 & \frac{2}{3} & \frac{1}{6} & 0 & 0 & 0 & 4 \end{bmatrix} \\
+  &= \begin{bmatrix} 0 & \frac{4}{3} & -\frac{1}{6} & 1 & 0 & 0 & 2 \end{bmatrix}
+  \end{aligned}$$
+  $$\begin{aligned}
+  \text{New } s_3\text{-row} &= \begin{bmatrix} -1 & 1 & 0 & 0 & 1 & 0 & 1 \end{bmatrix} - (-1) \begin{bmatrix} 1 & \frac{2}{3} & \frac{1}{6} & 0 & 0 & 0 & 4 \end{bmatrix} \\
+  &= \begin{bmatrix} 0 & \frac{5}{3} & \frac{1}{6} & 0 & 1 & 0 & 5 \end{bmatrix}
+  \end{aligned}$$
+  $$\begin{aligned}
+  \text{New } s_4\text{-row} &= \begin{bmatrix} 0 & 1 & 0 & 0 & 0 & 1 & 2 \end{bmatrix} - (0) \begin{bmatrix} 1 & \frac{2}{3} & \frac{1}{6} & 0 & 0 & 0 & 4 \end{bmatrix} \\
+  &= \begin{bmatrix} 0 & 1 & 0 & 0 & 0 & 1 & 2 \end{bmatrix}
+  \end{aligned}$$
+  The resulting column under $x_1$ across the rows $(z, x_1, s_2, s_3, s_4)^T$ is $[0, 1, 0, 0, 0]^T$, verifying that the new basic variable $x_1$ is converted into a standard unit basis vector with value $x_1 = 4$ and objective level $z = 20$.
+
+##### **1.6 Algorithmic Execution and Multi-Iteration Simplex Walkthrough**
+
+The **multi-iteration simplex walkthrough** is the complete sequential execution of the simplex algorithm across successive basic feasible solutions until satisfying the terminal optimality criterion. In the Tatar-Paint production model, the linear program in augmented standard form seeks to maximize profit $z = 5x_1 + 4x_2 + 0s_1 + 0s_2 + 0s_3 + 0s_4$ subject to:
+
+$$\begin{aligned}
+6x_1 + 4x_2 + s_1 &= 24 && \text{(Raw material M1)} \\
+x_1 + 2x_2 + s_2 &= 6 && \text{(Raw material M2)} \\
+-x_1 + x_2 + s_3 &= 1 && \text{(Market limit)} \\
+x_2 + s_4 &= 2 && \text{(Demand limit)} \\
+x_1, x_2, s_1, s_2, s_3, s_4 &\ge 0
+\end{aligned}$$
+
+The objective equation expressed in row form is $z - 5x_1 - 4x_2 - 0s_1 - 0s_2 - 0s_3 - 0s_4 = 0$.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Multi-iteration simplex progression from initial basis to global optimum"
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Iteration 0: Origin BFS<br/>Basis: s1, s2, s3, s4; z = 0"] -->|"Pivot: Enter x1, Leave s1<br/>Pivot element = 6"| B["Iteration 1: Intermediate BFS<br/>Basis: x1, s2, s3, s4; z = 20"]
+    B -->|"Pivot: Enter x2, Leave s2<br/>Pivot element = 4/3"| C["Iteration 2: Optimal BFS<br/>Basis: x1, x2, s3, s4; z = 21"]
+    C --> D["Termination<br/>All reduced costs >= 0"]
+```
+
+###### **1.6.1 Transition from Iteration 0 to Iteration 1**
+
+At the initial tableau (Iteration 0), the basis comprises slack variables $\mathbf{x}_B = [s_1, s_2, s_3, s_4]^T$ at values $[24, 6, 1, 2]^T$, yielding an objective value $z = 0$. The nonbasic decision variables are $x_1 = 0$ and $x_2 = 0$. 
+
+The entering variable is $x_1$ due to having the most negative objective coefficient, $-5$. The feasibility condition computes non-negative intercepts along the $x_1$-column:
+$$\theta = \min \left\{ \frac{24}{6}, \frac{6}{1} \right\} = \min \{4, 6\} = 4$$
+The minimum ratio corresponds to basic variable $s_1$, identifying row $s_1$ as the pivot row and the intersection entry $6$ as the **pivot element**.
+
+Applying Gauss-Jordan elimination transforms the system:
+1. Divide the pivot row by $6$:
+   $$\text{New } x_1\text{-row} = \frac{1}{6} [6, 4, 1, 0, 0, 0, 24] = [1, \tfrac{2}{3}, \tfrac{1}{6}, 0, 0, 0, 4]$$
+2. Eliminate $x_1$ from the remaining rows:
+   $$\begin{aligned}
+   \text{New } z\text{-row} &= [-5, -4, 0, 0, 0, 0, 0] - (-5) [1, \tfrac{2}{3}, \tfrac{1}{6}, 0, 0, 0, 4] = [0, -\tfrac{2}{3}, \tfrac{5}{6}, 0, 0, 0, 20] \\
+   \text{New } s_2\text{-row} &= [1, 2, 0, 1, 0, 0, 6] - (1) [1, \tfrac{2}{3}, \tfrac{1}{6}, 0, 0, 0, 4] = [0, \tfrac{4}{3}, -\tfrac{1}{6}, 1, 0, 0, 2] \\
+   \text{New } s_3\text{-row} &= [-1, 1, 0, 0, 1, 0, 1] - (-1) [1, \tfrac{2}{3}, \tfrac{1}{6}, 0, 0, 0, 4] = [0, \tfrac{5}{3}, \tfrac{1}{6}, 0, 1, 0, 5] \\
+   \text{New } s_4\text{-row} &= [0, 1, 0, 0, 0, 1, 2] - (0) [1, \tfrac{2}{3}, \tfrac{1}{6}, 0, 0, 0, 4] = [0, 1, 0, 0, 0, 1, 2]
+   \end{aligned}$$
+
+The resulting Iteration 1 tableau is:
+
+| Basic | $x_1$ | $x_2$ | $s_1$ | $s_2$ | $s_3$ | $s_4$ | Solution | Ratio |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| $z$ | $0$ | $-\frac{2}{3}$ | $\frac{5}{6}$ | $0$ | $0$ | $0$ | $20$ | — |
+| $x_1$ | $1$ | $\frac{2}{3}$ | $\frac{1}{6}$ | $0$ | $0$ | $0$ | $4$ | $4 \div \frac{2}{3} = 6$ |
+| $s_2$ | $0$ | $\frac{4}{3}$ | $-\frac{1}{6}$ | $1$ | $0$ | $0$ | $2$ | $2 \div \frac{4}{3} = \mathbf{1.5}$ |
+| $s_3$ | $0$ | $\frac{5}{3}$ | $\frac{1}{6}$ | $0$ | $1$ | $0$ | $5$ | $5 \div \frac{5}{3} = 3$ |
+| $s_4$ | $0$ | $1$ | $0$ | $0$ | $0$ | $1$ | $2$ | $2 \div 1 = 2$ |
+
+###### **1.6.2 Non-Optimality Evaluation and Iteration 2 Pivoting**
+
+Iteration 1 corresponds to corner point $(x_1, x_2) = (4, 0)$ with intermediate profit $z = 20$. Inspecting the $z$-row reveals a remaining negative coefficient under $x_2$:
+$$c_{x_2}^{\text{reduced}} = -\frac{2}{3} < 0$$
+Because this value is strictly negative, the current basic feasible solution is non-optimal. Nonbasic variable $x_2$ enters the basis.
+
+Computing the minimum ratio test along the $x_2$ pivot column across positive coefficients:
+$$\theta = \min \left\{ \frac{4}{2/3}, \frac{2}{4/3}, \frac{5}{5/3}, \frac{2}{1} \right\} = \min \{6, 1.5, 3, 2\} = 1.5$$
+The minimum ratio is achieved at row $s_2$. Thus, $s_2$ leaves the basis, and the pivot element is $\frac{4}{3}$.
+
+Carrying out the second round of Gauss-Jordan row operations:
+
+1. Normalize the pivot row by dividing row $s_2$ by $\frac{4}{3}$ (multiplying by $\frac{3}{4}$):
+   $$\text{New } x_2\text{-row} = [0, 1, -\tfrac{1}{8}, \tfrac{3}{4}, 0, 0, \tfrac{3}{2}]$$
+2. Update all non-pivot rows:
+   $$\begin{aligned}
+   \text{New } z\text{-row} &= [0, -\tfrac{2}{3}, \tfrac{5}{6}, 0, 0, 0, 20] - (-\tfrac{2}{3}) [0, 1, -\tfrac{1}{8}, \tfrac{3}{4}, 0, 0, \tfrac{3}{2}] = [0, 0, \tfrac{3}{4}, \tfrac{1}{2}, 0, 0, 21] \\
+   \text{New } x_1\text{-row} &= [1, \tfrac{2}{3}, \tfrac{1}{6}, 0, 0, 0, 4] - (\tfrac{2}{3}) [0, 1, -\tfrac{1}{8}, \tfrac{3}{4}, 0, 0, \tfrac{3}{2}] = [1, 0, \tfrac{1}{4}, -\tfrac{1}{2}, 0, 0, 3] \\
+   \text{New } s_3\text{-row} &= [0, \tfrac{5}{3}, \tfrac{1}{6}, 0, 1, 0, 5] - (\tfrac{5}{3}) [0, 1, -\tfrac{1}{8}, \tfrac{3}{4}, 0, 0, \tfrac{3}{2}] = [0, 0, \tfrac{3}{8}, -\tfrac{5}{4}, 1, 0, \tfrac{5}{2}] \\
+   \text{New } s_4\text{-row} &= [0, 1, 0, 0, 0, 1, 2] - (1) [0, 1, -\tfrac{1}{8}, \tfrac{3}{4}, 0, 0, \tfrac{3}{2}] = [0, 0, \tfrac{1}{8}, -\tfrac{3}{4}, 0, 1, \tfrac{1}{2}]
+   \end{aligned}$$
+
+###### **1.6.3 Final Tableau and Optimal Solution Extraction**
+
+The operations yield the Iteration 2 simplex tableau:
+
+| Basic | $z$ | $x_1$ | $x_2$ | $s_1$ | $s_2$ | $s_3$ | $s_4$ | Solution |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| $z$ | $1$ | $0$ | $0$ | $\frac{3}{4}$ | $\frac{1}{2}$ | $0$ | $0$ | $21$ |
+| $x_1$ | $0$ | $1$ | $0$ | $\frac{1}{4}$ | $-\frac{1}{2}$ | $0$ | $0$ | $3$ |
+| $x_2$ | $0$ | $0$ | $1$ | $-\frac{1}{8}$ | $\frac{3}{4}$ | $0$ | $0$ | $\frac{3}{2}$ |
+| $s_3$ | $0$ | $0$ | $0$ | $\frac{3}{8}$ | $-\frac{5}{4}$ | $1$ | $0$ | $\frac{5}{2}$ |
+| $s_4$ | $0$ | $0$ | $0$ | $\frac{1}{8}$ | $-\frac{3}{4}$ | $0$ | $1$ | $\frac{1}{2}$ |
+
+Every reduced cost in the $z$-row is non-negative: the coefficients under nonbasic variables are $\frac{3}{4} \ge 0$ for $s_1$ and $\frac{1}{2} \ge 0$ for $s_2$, with all basic variable coefficients identically zero. Because no negative entry remains in the objective equation, the simplex optimality criterion is fulfilled, and the algorithm terminates.
+
+The global optimal solution and maximal profit are extracted directly from the *Basic* and *Solution* columns:
+
+$$x_1^* = 3, \quad x_2^* = \frac{3}{2} = 1.5, \quad s_3^* = \frac{5}{2} = 2.5, \quad s_4^* = \frac{1}{2} = 0.5, \quad s_1^* =
+
+##### **1.7 Post-Optimal Resource Classification: Scarce Versus Abundant Constraints**
+
+Once the simplex algorithm terminates at the optimal tableau, the numerical values of the slack variables provide an immediate economic and physical diagnostic of the constraints governing the system.
+
+A resource or operational limitation is defined as **scarce** if its associated optimal slack variable equals zero ($s_i^* = 0$). In physical terms, the planned activities of the system consume the resource entirely, causing the constraint to hold with strict equality ($\mathbf{a}_i^T \mathbf{x}^* = b_i$). A scarce resource acts as an active or **binding constraint** that directly restricts further improvement of the objective value.
+
+Conversely, a resource or operational limitation is defined as **abundant** if its associated optimal slack variable is strictly positive ($s_i^* > 0$). Physically, the optimal operational plan does not deplete the resource limit, leaving an unused residual capacity or margin ($s_i^* = b_i - \mathbf{a}_i^T \mathbf{x}^* > 0$). An abundant resource corresponds to a **non-binding constraint** at optimality.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Classification of constraints based on post-optimal slack variable values"
+%%| fig-width: 7
+%%| fig-height: 3.5
+flowchart TB
+    A["Post-Optimal Solution<br/>Slack Evaluation"] --> B{"Optimal Slack Value<br/>s_i*"}
+    B -->|"s_i* = 0"| C["Scarce Resource<br/>Binding constraint"]
+    B -->|"s_i* > 0"| D["Abundant Resource<br/>Non-binding constraint"]
+    style C fill:#f9d9e2,stroke:#355c7d
+    style D fill:#d7f0c2,stroke:#355c7d
+```
+
+* **Worked Illustration (Tatar-Paint System):** At the final simplex tableau, the decision variables reach optimal levels $x_1^* = 3$ and $x_2^* = 1.5$ with maximum profit $z^* = 21$. Reading the right-hand-side values for the slack variables yields the operational status of each constraint:
+
+| Resource / Constraint | Mathematical Equation | Optimal Slack Value | Classification Status |
+| :--- | :--- | :---: | :--- |
+| Raw material M1 | $6x_1 + 4x_2 + s_1 = 24$ | $s_1^* = 0$ | **Scarce** |
+| Raw material M2 | $x_1 + 2x_2 + s_2 = 6$ | $s_2^* = 0$ | **Scarce** |
+| Market limit | $-x_1 + x_2 + s_3 = 1$ | $s_3^* = \frac{5}{2}$ | **Abundant** |
+| Demand limit | $x_2 + s_4 = 2$ | $s_4^* = \frac{1}{2}$ | **Abundant** |
+
+Raw materials M1 and M2 are fully exhausted by production ($6(3) + 4(1.5) = 24$ and $3 + 2(1.5) = 6$), meaning that $s_1$ and $s_2$ are nonbasic at zero level. In contrast, the market and demand restrictions retain positive buffers of $\frac{5}{2}$ and $\frac{1}{2}$ units respectively, remaining non-binding at the optimum.
+
+##### **1.8 Generalization of the Simplex Framework and Starting Solution Prerequisites**
+
+The **simplex algorithm** generalizes to any linear program by decoupling the direction of optimization (maximization versus minimization) from the geometric requirement of maintaining feasibility across iterations.
+
+```{mermaid}
+%%| fig-width: 6.5
+flowchart TD
+    A["Formulation constraints<br/>and right-hand sides"] --> B{"All constraints &le;<br/>and b &ge; 0?"}
+    B -->|Yes| C["Origin Feasible:<br/>Initialize with slack basis"]
+    B -->|No| D["Origin Infeasible:<br/>Artificial variables (Big-M / Two-Phase)"]
+    C --> E["Check Optimality Condition<br/>Max: nonbasic coeff &lt; 0<br/>Min: nonbasic coeff &gt; 0"]
+    D --> E
+    E -->|Condition Met| F["Current Tableau Optimal"]
+    E -->|Condition Not Met| G["Select Entering Variable<br/>Apply Feasibility Condition<br/>Min ratio test with a_ir &gt; 0"]
+    G --> H["Gauss-Jordan Pivot<br/>Update Tableau Basis"]
+    H --> E
+```
+
+###### **1.8.1 Unified Simplex Optimality Condition**
+
+The **simplex optimality condition** governs the selection of the entering variable to ensure a monotonic improvement in the objective value $z$:
+
+*   **Maximization:** The entering variable is the nonbasic variable possessing the *most negative* coefficient in the objective ($z$) row. The algorithm reaches optimality when all coefficients in the $z$-row are nonnegative ($\ge 0$).
+*   **Minimization:** The entering variable is the nonbasic variable possessing the *most positive* coefficient in the objective ($z$) row. The algorithm reaches optimality when all coefficients in the $z$-row are nonpositive ($\le 0$).
+
+When an objective row contains no candidate variable with the required sign, the current basic feasible solution cannot be improved, certifying global optimality.
+
+###### **1.8.2 Universal Simplex Feasibility Condition**
+
+The **simplex feasibility condition** identifies the leaving variable through the **minimum ratio test**. Given an entering variable index $r$ with constraint coefficients $a_{ir}$ and current basic solution values $b_i$, the leaving variable index $l$ is chosen by:
+
+$$\frac{b_l}{a_{lr}} = \min_{i} \left\{ \frac{b_i}{a_{ir}} \;\middle|\; a_{ir} > 0 \right\}$$
+
+This condition applies identically to both maximization and minimization problems. Restricting candidate denominators strictly to positive values ($a_{ir} > 0$) ensures that the new basic variable increases along the extreme edge of the polyhedral cone without violating the nonnegativity bounds ($x_j \ge 0$) of the remaining basic variables. Negative coefficients ($a_{ir} < 0$) and zero coefficients ($a_{ir} = 0$) are ignored because they impose no upper bound on the increase of the entering variable.
+
+###### **1.8.3 Prerequisites for Natural Origin Feasibility**
+
+Standard simplex tableau construction assumes the algorithm initiates at the geometric origin:
+
+$$\mathbf{x} = \begin{bmatrix} x_1 & x_2 & \dots & x_n \end{bmatrix}^T = \mathbf{0}$$
+
+This starting basis is naturally feasible if and only if the system satisfies two structural conditions:
+
+1.  Every functional constraint is an inequality of the less-than-or-equal-to type ($\le$).
+2.  Every constraint right-hand side is non-negative ($b_i \ge 0$ for all $i = 1, \dots, m$).
+
+Under these conditions, introducing non-negative slack variables $s_i \ge 0$ converts the inequalities into equations of the form $\sum_{j=1}^n a_{ij}x_j + s_i = b_i$. Setting all original decision variables to zero yields:
+
+$$s_i = b_i \ge 0 \quad \forall i \in \{1, \dots, m\}$$
+
+The slack variables provide an immediate $m \times m$ identity matrix $I_m$ embedded within the constraint coefficient matrix, serving as the starting basic feasible solution.
+
+###### **1.8.4 Breakdown of Origin Initialization and Artificial Starting Solutions**
+
+When a linear program contains greater-than-or-equal-to constraints ($\ge$) or equality constraints ($=$), setting $\mathbf{x} = \mathbf{0}$ yields an infeasible starting point. 
+
+For a constraint $\sum_{j=1}^n a_{ij}x_j \ge b_i$ with $b_i > 0$, conversion to standard equality form requires subtracting a non-negative **surplus variable** (or negative slack) $e_i \ge 0$:
+
+$$\sum_{j=1}^n a_{ij}x_j - e_i = b_i$$
+
+Evaluating this equation at the origin $\mathbf{x} = \mathbf{0}$ forces $-e_i = b_i \implies e_i = -b_i < 0$, which violates the nonnegativity restriction $e_i \ge 0$. Furthermore, an equality constraint $\sum_{j=1}^n a_{ij}x_j = b_i$ contains neither a slack nor a surplus variable, providing no column vector to populate an initial identity basis.
+
+To initialize problems where the natural origin is infeasible, an **artificial starting solution** is constructed by introducing non-negative **artificial variables** ($R_i \ge 0$) into each constraint lacking a starting basic variable:
+
+$$\sum_{j=1}^n a_{ij}x_j - e_i + R_i = b_i \quad \text{or} \quad \sum_{j=1}^n a_{ij}x_j + R_i = b_i$$
+
+These artificial variables provide an initial identity basis $I_m$, allowing tableau pivoting to begin. Because artificial variables have no physical or economic meaning in the original model, they must be driven to zero by the algorithm to restore true feasibility. Two standard procedures enforce this elimination:
+
+*   **The Big-M Method:** Penalizes the presence of artificial variables by assigning them an exceptionally large objective coefficient $M > 0$ (added as $+M \sum R_i$ in minimization or $-M \sum R_i$ in maximization), forcing them out of the basis during standard iterations.
+*   **The Two-Phase Method:** Deconstructs the solution into two sequential linear programs. Phase I optimizes an auxiliary objective function minimizing the sum of all artificial variables ($\min w = \sum R_i$). If the optimal value of Phase I is $w^* = 0$, all artificial variables have left the basis; the artificial columns are discarded, and Phase II proceeds with the original objective function starting from the feasible basis found.
+
+***
+
+#### **2. Definitions**
+
+*   **Simplex Iteration**: A single algorithmic transition along an edge of the feasible region from one extreme point to an adjacent extreme point that yields an improved or equal objective value.
+*   **Simplex Tableau**: A structured tabular matrix that records the algebraic coefficients of the objective equation, the linear constraints, the current basic variables, and the right-hand-side solution values.
+*   **Entering Variable**: The nonbasic variable selected to enter the basis at a positive level because it possesses the largest rate of improvement in the objective function.
+*   **Leaving Variable**: The basic variable that drops to zero and exits the basis to become nonbasic, identified by the minimum ratio test to preserve solution feasibility.
+*   **Simplex Optimality Condition**: The rule stating that a current basic feasible solution is optimal for a maximization problem when every coefficient in the objective row is non-negative.
+*   **Simplex Feasibility Condition**: The minimum-ratio rule dictating that the leaving variable must correspond to the smallest non-negative ratio of the right-hand-side solution to the strictly positive coefficient in the pivot column.
+*   **Pivot Column**: The column in the simplex tableau associated with the entering variable, whose entries provide the denominators for the feasibility ratio test.
+*   **Pivot Row**: The row in the simplex tableau associated with the leaving variable, which is normalized and used to eliminate the entering variable from all other equations.
+*   **Pivot Element**: The strictly positive coefficient located at the intersection of the pivot row and the pivot column that serves as the divisor during row normalization.
+*   **Gauss-Jordan Row Operations**: Elementary matrix row operations applied across a simplex tableau to transform the pivot column into a standard unit vector with unity at the pivot element and zeros elsewhere.
+*   **Scarce Resource**: A resource constraint whose associated slack variable equals zero at the optimal basic solution, indicating complete consumption of available capacity.
+*   **Abundant Resource**: A resource constraint whose associated slack variable is strictly positive at the optimal basic solution, indicating leftover or unused capacity.
+
+***
+
+#### **3. Formulas**
+
+*   **Canonical Objective Equation Form**: $z - \sum_{j=1}^n c_j x_j = 0$, where $c_j$ denotes the objective function coefficient for variable $x_j$, expressing the objective row in canonical zero-sum format for the simplex tableau.
+*   **Degrees of Freedom (Nonbasic Variables Count)**: $n_{\text{NB}} = n - m$, where $n$ is the total number of structural and slack variables, and $m$ is the number of linearly independent equality constraints with $n \ge m$.
+*   **Simplex Feasibility Condition (Minimum Ratio Test)**: $r = \arg\min_{i \in \{1, \dots, m\}: a_{ik} > 0} \left\{ \frac{b_i}{a_{ik}} \right\}$, where $k$ is the pivot column index of the entering variable, $b_i \ge 0$ is the current solution value in constraint row $i$, and $a_{ik} > 0$ is the strictly positive constraint coefficient; identifies leaving basic variable row $r$.
+*   **Pivot Row Normalization**: $\mathbf{R}_r^{\text{new}} = \frac{1}{a_{rk}} \mathbf{R}_r^{\text{current}}$, where $a_{rk} > 0$ is the pivot element at the intersection of pivot row $r$ and pivot column $k$; establishes a unit coefficient for entering variable $x_k$.
+*   **Gauss-Jordan Row Elimination**: $\mathbf{R}_i^{\text{new}} = \mathbf{R}_i^{\text{current}} - a_{ik} \mathbf{R}_r^{\text{new}}$ for all rows $i \neq r$ (including the objective $z$-row), where $a_{ik}$ is the coefficient of the entering variable in row $i$; reduces all non-pivot entries in column $k$ to zero.
+*   **Optimality Criterion (Standard Maximization)**: $\bar{c}_j \ge 0 \quad \forall j \in \{1, \dots, n\}$, where $\bar{c}_j$ is the coefficient of variable $x_j$ in the objective $z$-row; if $\min_j \{\bar{c}_j\} < 0$, the nonbasic variable with the most negative coefficient is chosen as entering variable $x_k$.
+*   **Resource Slack Classification**: $\text{Status}(i) = \begin{cases} \text{Scarce}, & s_i^* = 0 \\ \text{Abundant}, & s_i^* > 0 \end{cases}$, evaluated at the optimal solution where $s_i^*$ is the optimal value of the slack variable representing unused capacity in constraint $i$.
+
+***
+
+#### **4. Practice**
+
+##### **4.1. Tatar-Paint Linear Program** (Lecture 1, Example 1)
+
+Maximize $z = 5x_1 + 4x_2 + 0s_1 + 0s_2 + 0s_3 + 0s_4$ subject to $6x_1 + 4x_2 + s_1 = 24$, $x_1 + 2x_2 + s_2 = 6$, $-x_1 + x_2 + s_3 = 1$, $x_2 + s_4 = 2$, and $x_1, x_2, s_1, s_2, s_3, s_4 \ge 0$.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** The simplex method transitions between adjacent basic feasible solutions via pivot operations, selecting the entering variable by the most negative objective row coefficient and the leaving variable by the minimum non-negative ratio test.
+
+1.  **Construct the initial simplex tableau.**
+    *   Rewrite the objective function in standard form with zero initial value:
+        $$z - 5x_1 - 4x_2 - 0s_1 - 0s_2 - 0s_3 - 0s_4 = 0$$
+    *   Set the nonbasic decision variables to zero ($x_1 = 0, x_2 = 0$). The starting basic variables are the slack variables: $s_1 = 24, s_2 = 6, s_3 = 1, s_4 = 2$.
+    *   Form the starting tableau:
+
+| Basic | $z$ | $x_1$ | $x_2$ | $s_1$ | $s_2$ | $s_3$ | $s_4$ | Solution |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| $z$ | 1 | $-5$ | $-4$ | 0 | 0 | 0 | 0 | 0 |
+| $s_1$ | 0 | 6 | 4 | 1 | 0 | 0 | 0 | 24 |
+| $s_2$ | 0 | 1 | 2 | 0 | 1 | 0 | 0 | 6 |
+| $s_3$ | 0 | $-1$ | 1 | 0 | 0 | 1 | 0 | 1 |
+| $s_4$ | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 2 |
+
+    *   **Answer: Initial basic feasible solution is $\mathbf{x}_B = [s_1, s_2, s_3, s_4]^T = [24, 6, 1, 2]^T$ with $z = 0$.**
+2.  **Determine entering and leaving variables for Iteration 1.**
+    *   **Optimality condition (entering variable):** Look for the most negative coefficient in the $z$-row among nonbasic columns:
+        $$\min\{-5, -4\} = -5 \implies x_1 \text{ enters.}$$
+    *   **Feasibility condition (leaving variable):** Compute ratios of the Solution column to strictly positive entries in the pivot column ($x_1$):
+        *   Row $s_1$: $\frac{24}{6} = 4$
+        *   Row $s_2$: $\frac{6}{1} = 6$
+        *   Row $s_3$: $\frac{1}{-1} = -1$ (negative denominator, ignore)
+        *   Row $s_4$: $\frac{2}{0} \implies$ zero denominator, ignore
+    *   The minimum non-negative ratio is $\min\{4, 6\} = 4$, corresponding to row $s_1$.
+    *   The pivot element is 6 at the intersection of row $s_1$ and column $x_1$.
+    *   **Answer: $x_1$ enters, $s_1$ leaves, pivot element is 6.**
+3.  **Execute Gauss-Jordan row operations for Iteration 1.**
+    *   **Pivot row:** Replace basic $s_1$ with $x_1$ and divide row $s_1$ by 6:
+        $$\text{New } x_1\text{-row} = \frac{1}{6}[6, 4, 1, 0, 0, 0, 24] = \left[1, \frac{2}{3}, \frac{1}{6}, 0, 0, 0, 4\right]$$
+    *   **Row $z$:** $\text{Current } z - (-5) \times (\text{New } x_1\text{-row})$:
+        $$[-5, -4, 0, 0, 0, 0, 0] + 5\left[1, \frac{2}{3}, \frac{1}{6}, 0, 0, 0, 4\right] = \left[0, -\frac{2}{3}, \frac{5}{6}, 0, 0, 0, 20\right]$$
+    *   **Row $s_2$:** $\text{Current } s_2 - (1) \times (\text{New } x_1\text{-row})$:
+        $$[1, 2, 0, 1, 0, 0, 6] - \left[1, \frac{2}{3}, \frac{1}{6}, 0, 0, 0, 4\right] = \left[0, \frac{4}{3}, -\frac{1}{6}, 1, 0, 0, 2\right]$$
+    *   **Row $s_3$:** $\text{Current } s_3 - (-1) \times (\text{New } x_1\text{-row})$:
+        $$[-1, 1, 0, 0, 1, 0, 1] + \left[1, \frac{2}{3}, \frac{1}{6}, 0, 0, 0, 4\right] = \left[0, \frac{5}{3}, \frac{1}{6}, 0, 1, 0, 5\right]$$
+    *   **Row $s_4$:** $\text{Current } s_4 - (0) \times (\text{New } x_1\text{-row}) = [0, 1, 0, 0, 0, 1, 2]$.
+    *   Resulting tableau after Iteration 1:
+
+| Basic | $z$ | $x_1$ | $x_2$ | $s_1$ | $s_2$ | $s_3$ | $s_4$ | Solution |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| $z$ | 1 | 0 | $-2/3$ | $5/6$ | 0 | 0 | 0 | 20 |
+| $x_1$ | 0 | 1 | $2/3$ | $1/6$ | 0 | 0 | 0 | 4 |
+| $s_2$ | 0 | 0 | $4/3$ | $-1/6$ | 1 | 0 | 0 | 2 |
+| $s_3$ | 0 | 0 | $5/3$ | $1/6$ | 0 | 1 | 0 | 5 |
+| $s_4$ | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 2 |
+
+    *   **Answer: Basic solution is $x_1 = 4, s_2 = 2, s_3 = 5, s_4 = 2$ with $z = 20$.**
+4.  **Determine entering and leaving variables for Iteration 2.**
+    *   **Optimality condition:** The only negative coefficient in the $z$-row is $-\frac{2}{3}$ in the $x_2$ column, so $x_2$ enters.
+    *   **Feasibility condition:** Compute ratios for column $x_2$:
+        *   Row $x_1$: $\frac{4}{2/3} = 6$
+        *   Row $s_2$: $\frac{2}{4/3} = \frac{3}{2} = 1.5$
+        *   Row $s_3$: $\frac{5}{5/3} = 3$
+        *   Row $s_4$: $\frac{2}{1} = 2$
+    *   The minimum ratio is $1.5$, which identifies $s_2$ as the leaving variable.
+    *   The pivot element is $\frac{4}{3}$ at row $s_2$, column $x_2$.
+    *   **Answer: $x_2$ enters, $s_2$ leaves, pivot element is $4/3$.**
+5.  **Execute Gauss-Jordan row operations for Iteration 2.**
+    *   **Pivot row:** Replace basic $s_2$ with $x_2$ and divide row $s_2$ by $\frac{4}{3}$ (multiply by $\frac{3}{4}$):
+        $$\text{New } x_2\text{-row} = \frac{3}{4}\left[0, \frac{4}{3}, -\frac{1}{6}, 1, 0, 0, 2\right] = \left[0, 1, -\frac{1}{8}, \frac{3}{4}, 0, 0, \frac{3}{2}\right]$$
+    *   **Row $z$:** $\text{Current } z - \left(-\frac{2}{3}\right) \times (\text{New } x_2\text{-row})$:
+        $$\left[0, -\frac{2}{3}, \frac{5}{6}, 0, 0, 0, 20\right] + \frac{2}{3}\left[0, 1, -\frac{1}{8}, \frac{3}{4}, 0, 0, \frac{3}{2}\right] = \left[0, 0, \frac{3}{4}, \frac{1}{2}, 0, 0, 21\right]$$
+    *   **Row $x_1$:** $\text{Current } x_1 - \left(\frac{2}{3}\right) \times (\text{New } x_2\text{-row})$:
+        $$\left[1, \frac{2}{3}, \frac{1}{6}, 0, 0, 0, 4\right] - \frac{2}{3}\left[0, 1, -\frac{1}{8}, \frac{3}{4}, 0, 0, \frac{3}{2}\right] = \left[1, 0, \frac{1}{4}, -\frac{1}{2}, 0, 0, 3\right]$$
+    *   **Row $s_3$:** $\text{Current } s_3 - \left(\frac{5}{3}\right) \times (\text{New } x_2\text{-row})$:
+        $$\left[0, \frac{5}{3}, \frac{1}{6}, 0, 1, 0, 5\right] - \frac{5}{3}\left[0, 1, -\frac{1}{8}, \frac{3}{4}, 0, 0, \frac{3}{2}\right] = \left[0, 0, \frac{3}{8}, -\frac{5}{4}, 1, 0, \frac{5}{2}\right]$$
+    *   **Row $s_4$:** $\text{Current } s_4 - (1) \times (\text{New } x_2\text{-row})$:
+        $$\left[0, 1, 0, 0, 0, 1, 2\right] - \left[0, 1, -\frac{1}{8}, \frac{3}{4}, 0, 0, \frac{3}{2}\right] = \left[0, 0, \frac{1}{8}, -\frac{3}{4}, 0, 1, \frac{1}{2}\right]$$
+    *   Resulting optimal tableau:
+
+| Basic | $z$ | $x_1$ | $x_2$ | $s_1$ | $s_2$ | $s_3$ | $s_4$ | Solution |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| $z$ | 1 | 0 | 0 | $3/4$ | $1/2$ | 0 | 0 | 21 |
+| $x_1$ | 0 | 1 | 0 | $1/4$ | $-1/2$ | 0 | 0 | 3 |
+| $x_2$ | 0 | 0 | 1 | $-1/8$ | $3/4$ | 0 | 0 | $3/2$ |
+| $s_3$ | 0 | 0 | 0 | $3/8$ | $-5/4$ | 1 | 0 | $5/2$ |
+| $s_4$ | 0 | 0 | 0 | $1/8$ | $-3/4$ | 0 | 1 | $1/2$ |
+
+    *   **Answer: All coefficients in the $z$-row are non-negative ($0, 0, 3/4, 1/2, 0, 0 \ge 0$), confirming that the tableau is optimal.**
+6.  **Extract the optimal values and classify resource utilization.**
+    *   Optimal solution values:
+        $$x_1^* = 3, \quad x_2^* = \frac{3}{2}, \quad z^* = 21$$
+    *   Resource status by slack values:
+        *   Raw material M1: $s_1^* = 0 \implies$ scarce resource (fully consumed).
+        *   Raw material M2: $s_2^* = 0 \implies$ scarce resource (fully consumed).
+        *   Market limit: $s_3^* = \frac{5}{2} > 0 \implies$ abundant resource (slack available).
+        *   Demand limit: $s_4^* = \frac{1}{2} > 0 \implies$ abundant resource (slack available).
+    *   **Answer: Optimum is at $(x_1^*, x_2^*) = (3, 1.5)$ with maximum profit $z = 21$; M1 and M2 are scarce, while market and demand limits are abundant.**
+
+**Answer:** $x_1^* = 3$, $x_2^* = \frac{3}{2}$, $s_1^* = 0$, $s_2^* = 0$, $s_3^* = \frac{5}{2}$, $s_4^* = \frac{1}{2}$, with maximum objective value $z^* = 21$.
+</details>
