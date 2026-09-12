@@ -600,6 +600,35 @@ def detect_doubled_words(lines):
     return issues
 
 
+def validate_tikz_echo(lines):
+    """Every ```{tikz} figure must carry `#| echo: false` (or `%|` style).
+
+    Without it Quarto prints the tikz source as a code listing above the
+    rendered figure (seen in Physics/1, DE/1 — audit Sept 2026). Flag-only;
+    the fix is one inserted option line, handled by the fix loop / author.
+    """
+    issues = []
+    i, n = 0, len(lines)
+    while i < n:
+        if lines[i].strip().startswith('```{tikz'):
+            start = i + 1
+            j = start
+            opts = []
+            while j < n and re.match(r'^(#|\%)\|', lines[j].strip()):
+                opts.append(lines[j].strip())
+                j += 1
+            if not any(re.match(r'(#|\%)\|\s*echo\s*:\s*false', o) for o in opts):
+                issues.append(
+                    'Line ' + str(start) + ': tikz figure without `echo: false` '
+                    'prints its source as a code listing; add `#| echo: false`.')
+            k = i + 1
+            while k < n and not lines[k].strip().startswith('```'):
+                k += 1
+            i = k
+        i += 1
+    return issues
+
+
 def validate_format_rules(filepath, lines):
     if should_skip_file(filepath):
         return []
@@ -611,6 +640,7 @@ def validate_format_rules(filepath, lines):
     issues.extend(validate_practice_headings(lines, filepath))
     issues.extend(validate_dividers(filepath, lines))
     issues.extend(validate_equation_xrefs(lines))
+    issues.extend(validate_tikz_echo(lines))
     return issues
 
 

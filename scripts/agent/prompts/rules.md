@@ -140,6 +140,8 @@ N - 3/4
   deterministically and stale (N) references remapped before validation.
 - Textual cross-references (`equation (N)`, `Eq. (N)`, ranges) must point at
   an existing `\tag{N}` in the same file — dangling refs are gate violations.
+- Every ` ```{tikz} ` figure must carry `#| echo: false` (or `%|` style),
+  otherwise Quarto prints the tikz source as a code listing above the figure.
 - Lists are always tight: no blank lines between items of one list; item
   math (`$$` lines, even labeled/multiline), continuation paragraphs and
   nested sublists attach directly (indented, no blank line). Blank lines
