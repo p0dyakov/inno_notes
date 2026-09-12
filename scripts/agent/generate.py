@@ -872,7 +872,10 @@ def theory_stats(body: str) -> tuple[int, int]:
 
 _TOPIC_SKIP_RE = re.compile(
     r"^(innopolis university|outline|contents|table of contents|references?|pages?|"
-    r"end of lecture|sources|syllabus|chapter\s+\d+)$", re.I)
+    r"end of lecture|sources|syllabus|chapter\s+\d+|"
+    r"thank(?:s| you|-you)|questions?\??|do you have any questions\??|q\s*&\s*a|about me|summary|"
+    r"welcome(?: to (?:the|this) (?:course|lecture))?|agenda|"
+    r"(?:tutorial|lecture|lab)(?:\s+\d+)?|source file:.*)$", re.I)
 _STOPWORDS = frozenset(
     "with from into over under what when where which while their there "
     "these those have has had been were are and the for vii viii iii ii iv "
@@ -1003,6 +1006,37 @@ def coverage_gap(theory: str, topics: list[str]) -> list[str]:
     return missing
 
 
+def _entry_match_text(entry) -> str:
+    if isinstance(entry, dict):
+        bits = [str(entry.get("title", ""))]
+        scope = entry.get("scope", "")
+        if scope:
+            bits.append(str(scope))
+        kps = entry.get("key_points") or entry.get("keypoints") or []
+        bits.extend(str(x) for x in kps)
+        return " ".join(bits)
+    return str(entry)
+
+
+def _topic_matches_part(topic, entry) -> bool:
+    """True when a missing checklist topic belongs to a map entry."""
+    sig = set(_sig_words(str(topic)))
+    sig = {w for w in sig if len(w) >= 4}
+    if not sig:
+        return False
+    hay = set(_sig_words(_entry_match_text(entry)))
+    return len(sig & hay) > 0
+
+
+def _parts_for_missing(missing, tmap) -> list:
+    """1-based part indices whose map entry matches any missing topic."""
+    idxs = []
+    for k, entry in enumerate(tmap, start=1):
+        if any(_topic_matches_part(m, entry) for m in missing):
+            idxs.append(k)
+    return idxs
+
+
 def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> bool:
     rel = qmd.relative_to(INNO_NOTES)
     semester = rel.parts[0]
@@ -1037,15 +1071,38 @@ def regen_theory(qmd: Path, inno_files: Path, api_key: str, tries: int = 3) -> b
     except Exception as e:
         print(f"  theory map failed: {e}")
         return False
+    parts: list = [None] * len(tmap)
+    missing: list = []
     for it in range(1, tries + 1):
         print(f"  Theory parts attempt {it}/{tries} for {qmd.relative_to(ROOT)} ...")
         siblings = [str(t.get("title", "Topic")) for t in tmap]
-        parts = [None] * len(tmap)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(tmap), 6)) as ex:
+        if it == 1:
+            idxs = list(range(1, len(tmap) + 1))
+            feedbacks = {}
+        else:
+            # Targeted retry: only parts covering still-missing topics, with
+            # the previous draft + the exact gaps attached (a full re-batch
+            # on every try wastes calls without converging faster).
+            idxs = _parts_for_missing(missing, tmap)
+            if not idxs:
+                print("  no actionable missing topics left, keeping best draft")
+                break
+            feedbacks = {}
+            for k in idxs:
+                fixes = [m for m in missing if _topic_matches_part(m, tmap[k - 1])] or list(missing)
+                prev = parts[k - 1] or ""
+                feedbacks[k] = (
+                    "PREVIOUS DRAFT OF THIS PART (fix exactly, keep everything else):"
+                    + chr(10) + prev[:6000] + chr(10) + chr(10)
+                    + "CHECKLIST TOPICS STILL MISSING COVERAGE (weave them in using transcript facts):"
+                    + chr(10) + "- " + (chr(10) + "- ".join(str(m)[:120] for m in fixes)))
+            print(f"  retrying {len(idxs)}/{len(tmap)} part(s): {idxs}")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(idxs), 6)) as ex:
             futs = {}
-            for k, topic in enumerate(tmap, start=1):
-                futs[ex.submit(gen_theory_part, topic, siblings, 1, k,
-                               transcript, style, target_info, api_key)] = k
+            for k in idxs:
+                futs[ex.submit(gen_theory_part, tmap[k - 1], siblings, 1, k,
+                               transcript, style, target_info, api_key,
+                               feedbacks.get(k))] = k
             for fut in concurrent.futures.as_completed(futs):
                 parts[futs[fut] - 1] = fut.result().strip()
         body = "#### **1. Theory**" + chr(10) + chr(10) + (chr(10) + chr(10)).join(parts)

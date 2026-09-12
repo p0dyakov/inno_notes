@@ -1,0 +1,40 @@
+QUARANTINE (2026-09-12): article does not build - quarto render hangs.
+
+SYMPTOM: `quarto render semester-4/Physics I/2.qmd` stalls deterministically
+(0% CPU, no child processes, no output) with knitr progress frozen at the
+7th code chunk. Three independent runs wedged at the same spot; orphans
+cleaned, locks checked - hang reproduces. Its HTML never existed anywhere
+(not in main, not in CI build, not local): every render_changed batch that
+reaches it via self-heal aborts after retries, blocking all other pages.
+
+BISECT TRAIL (all in /tmp, engine knitr):
+- suspect tikz block alone (unnamed-chunk-2, velocity plot): BUILDS (pdflatex-clean too)
+- same block inside <details>: BUILDS
+- first + suspect tikz blocks together: BUILDS
+- file first half (lines 1-389): BUILDS
+- file second half (390-750): WEDGES
+- second-half text WITHOUT its tikz: BUILDS
+=> trigger needs the L391 tikz block + second-half text context together;
+   exact mechanism unidentified (no error output, no CPU, no children).
+   Prime suspects: knitr chunk/output routing with practicedetails/lists
+   around it; NOT content-invalid (pdflatex compiles the figure standalone).
+
+REVERT (manual finish, then):
+1. fix the hang cause, verify `quarto render semester-4/Physics I/2.qmd` exits 0,
+2. remove `draft: true` + `<!-- QUARANTINE -->` from the front matter,
+3. re-add `- file: "semester-4/Physics I/2.qmd"` under Physics I in _quarto.yml,
+4. delete this .log, render + bake + push via the standard flow.
+
+UPDATE (2026-09-12, quarantine v2):
+- `draft: true` does NOT protect full builds: verified empirically that
+  plain `quarto render` BUILDS draft pages (test project: b.html created).
+  The first quarantine attempt additionally broke YAML (HTML comment inside
+  front matter) - fixed by moving the marker below the closing `---`.
+- Protection now: `- "!semester-4/Physics I/2.qmd"` in _quarto.yml `render:`
+  (verified `!`-exclusion works), sidebar entry removed, `draft: true` kept
+  (fix_loop_mark skips auto-regen, update_sidebar/render_changed skip drafts).
+- Bisection trail: suspect tikz figure builds standalone AND in 1-2 chunk
+  docs AND text-only half builds; full file wedges deterministically with
+  knitr frozen at the 7th code chunk (L633 tikz), 0% CPU, no children, no
+  error output. Orphans/stale locks ruled out (cleaned, still wedges).
+  Exact mechanism unidentified - needs a quarto/knitr-level look.

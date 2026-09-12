@@ -10,72 +10,722 @@ engine: knitr
 
 #### **1. Theory**
 
-##### **1.1 What Is an Operating System**
-An **operating system (OS)** is the layer of software between application programs and the bare hardware. It has two complementary jobs, and every exam question about "what the OS does" reduces to one of them.
+##### **1.1 Fundamental Roles and Abstractions of the Operating System**
 
-Top-down, the OS is an **extended machine**. Real hardware is complicated and inconsistent: disks, network cards and printers all speak different low-level protocols. The OS hides this mess behind clean **abstractions** — files instead of disk blocks, sockets instead of wire packets, windows instead of video memory. A programmer reads and writes files; a **disk driver** inside the OS translates that into head movements and sector addresses.
+An **operating system (OS)** is a foundational software layer positioned directly between application programs and the underlying hardware. It executes two complementary functions: delivering a clean, uniform abstraction of physical hardware to software developers, and acting as an authoritative manager for all shared system resources.
 
-Bottom-up, the OS is a **resource manager**. Many programs compete for the same CPU, memory and I/O devices, so the OS performs an orderly, controlled allocation of processors, memories and devices among them. Sharing (**multiplexing**) works in two ways. **Time multiplexing** lets programs take turns: the CPU executes one process for a few milliseconds, then another (printers work the same way — one job at a time). **Space multiplexing** splits the resource into parts used simultaneously: each program gets its own region of memory, each file its own disk blocks.
+From the **top-down perspective**, the operating system functions as an **extended machine**. Bare hardware components—such as storage controllers, timers, and bus interfaces—present complex, inconsistent, and low-level programming interfaces. The operating system hides these hardware-level idiosyncrasies beneath structured **abstractions**. For instance, rather than forcing application programmers to interface directly with magnetic platter seek operations, track sector addressing, and controller status registers, a low-level **disk driver** within the operating system manages device controllers directly, exposing uniform operations to read and write blocks or manipulate files.
 
-##### **1.2 Kernel Mode and User Mode**
-Hardware would be defenceless if any program could execute any instruction: one buggy application could halt the machine or wipe a disk. Therefore most computers provide two execution modes. In **kernel mode** (supervisor mode) the OS runs with complete access to all hardware and may execute every instruction the machine supports. Everything else — browsers, mail readers, music players, the user interface itself — runs in **user mode**: only a subset of instructions is available, and anything affecting machine control or I/O is forbidden.
+From the **bottom-up perspective**, the operating system operates as a **resource manager**. Modern computing environments execute multiple programs concurrently, creating contention for limited physical components, including central processing units, volatile storage, and input/output (I/O) devices. The operating system enforces orderly and controlled resource allocation through **multiplexing** (sharing), which is achieved via two operational mechanisms:
 
-A user program that needs a service (read a file, send a packet) cannot perform it directly; it issues a **system call (TRAP)**, which traps into the kernel, runs the OS routine with full privileges, and returns the result. Conceptually the machine is layered: hardware at the bottom, the OS in kernel mode above it, and user-mode programs on top.
+*   **Time multiplexing**: Competing programs or users take turns accessing a singular hardware asset sequentially over discrete intervals. The CPU implements time multiplexing by scheduling execution slices among concurrent processes; peripheral devices such as printers also utilize time multiplexing by servicing distinct print requests one at a time.
+*   **Space multiplexing**: A physical resource is divided into distinct spatial partitions so that multiple consumers utilize portions of the resource simultaneously. Main memory (RAM) is space-multiplexed to house address spaces for several active programs concurrently, and persistent disk media is space-multiplexed by allocating specific disk sectors and blocks across different files.
 
-* **Why it matters:** isolation is what makes crashes survivable. A fault in a user-mode program kills only that program; the same fault in kernel mode halts the whole system (kernel panic / blue screen).
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Dual architectural perspectives and resource sharing mechanisms of an operating system."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Operating System<br/>Core Architecture"] --> B["Top-Down View:<br/>Extended Machine"]
+    A --> C["Bottom-Up View:<br/>Resource Manager"]
+    B --> D["Hardware Abstractions<br/>(Files, Block Drivers)"]
+    C --> E["Time Multiplexing<br/>(Sequential: CPU, Printers)"]
+    C --> F["Space Multiplexing<br/>(Partitioned: Memory, Disks)"]
+```
 
-##### **1.3 History of Operating Systems**
-Each hardware generation forced a new kind of OS. Five dates and machines cover the whole story.
+##### **1.2 CPU Execution Modes, Hardware Protection, and Traps**
 
-**1st generation (1945–1955): vacuum tubes, plugboards.** Colossus (Turing) and ENIAC (Mauchly): huge, slow, power-hungry, air-conditioned rooms, kilobytes of storage at best, programmed in machine language by rewiring. There was no OS at all — one program owned the whole machine.
+Modern microprocessors enforce protection boundaries in hardware by implementing distinct operating states called execution modes. The processor state is determined by a dedicated flag inside the **Program Status Word (PSW)**, a hardware register containing arithmetic condition flags, execution priority, and the current CPU mode bit.
 
-**2nd generation (1955–1965): transistors, batch systems.** Transistors, core memory, magnetic tapes and disks; machines became smaller, cooler and cheaper. The first operating systems appeared to automate job sequencing on mainframes; programming moved to machine language and assembly.
+**Kernel mode** (also called **supervisor mode**) is the highest-privilege execution context. When the mode bit in the PSW indicates kernel mode, the CPU operates without restrictions: it can execute every machine instruction supported by the instruction set architecture, reference any physical or virtual memory address, and interact directly with hardware controllers and I/O bus interfaces. Operating system core routines, device drivers, and interrupt handlers execute in this mode.
 
-**3rd generation (1965–1980): integrated circuits.** SSI/MSI chips, low power draw, high-level languages (Honeywell-6000, PDP, IBM-360/370). Three OS ideas born here still run the world: **multiprogramming** (several jobs in memory, CPU switches when one waits), **spooling** and **timesharing**. The second half (1971–1980) added microprocessors (LSI/VLSI): portable computers, RAID storage, data communication, fast large memories — and early uses in parallel processing, simulation, speech recognition and artificial intelligence.
+**User mode** is a restricted execution state reserved for unprivileged software, including application runtimes, background services, compilers, and user shell interfaces. In user mode:
 
-**4th generation (1980–1990): personal computers.** LSI made a computer fit on a desk: the first microcomputer paired an Intel 8080 with an 8-inch floppy and ran CP/M (Control Program for Microcomputers), the first disk-based OS. IBM built the PC and contracted Bill Gates for its operating system.
+* The CPU can execute only an unprivileged subset of the machine instruction set.
+* Instructions that modify processor control registers (such as changing the PSW mode bit), manage memory mapping tables, or perform direct input/output operations (such as `IN` and `OUT` bus operations) are completely forbidden.
+* Memory addressing is bounded to the process's allocated address space; referencing arbitrary physical addresses or OS memory directly triggers a hardware protection fault.
 
-**5th generation (1990–present): mobile computers.** From brick phones to touchscreen smartphones: the computer became a battery-powered, always-networked personal device.
+```{mermaid}
+%%| fig-width: 7
+flowchart TB
+    subgraph UserSpace["User Mode (Restricted Privilege)"]
+        A["User Application Running"]
+        B["Application Crashes<br/>(Memory Violation / Fault)"]
+        G["Offending Process Terminated<br/>(OS Recovers State)"]
+    end
 
-* **How to remember:** hardware shrinks and multiplies, software centralises control — no OS, batch OS, multiprogramming OS, personal OS, mobile OS.
+    subgraph KernelSpace["Kernel Mode (Supervisor Privilege)"]
+        C["TRAP / System Call Handler"]
+        D["Execute Privileged Routine<br/>(Direct Hardware / Driver Access)"]
+        E["Return from Exception / Trap"]
+        F["Kernel Fault / Unhandled Panic<br/>(Complete System Halt)"]
+    end
 
-##### **1.4 Computer Hardware Review**
-An OS is tied to the hardware it runs on: it extends the instruction set and manages the resources. Five hardware areas matter.
+    A -->|"Execute TRAP Instruction"| C
+    C --> D
+    D -->|"Restore User Mode (PSW Bit)"| E
+    E --> A
+    A -->|"Illegal Operation"| B
+    B --> G
+    D -.->|"Unrecoverable Error"| F
+```
 
-###### **1.4.1 Processors**
-Every CPU repeats one cycle: **fetch** the next instruction into a buffer, **decode** the opcode and operands, **calculate** effective operand addresses, **fetch** operands from memory (register operands skip this), **execute**, **write** the result back. To hold the working state the CPU has registers: **general registers** for variables and temporaries, the **program counter** (address of the next instruction), the **stack pointer** (top of the in-memory stack), and the **PSW** (Program Status Word: comparison flags, CPU priority, kernel/user mode bit and other control bits).
+To request services that require privileged hardware access—such as allocating physical memory, creating processes, or reading a sector from a hard disk controller—a user-mode program must execute a **system call**. This boundary crossing is mediated by a **TRAP**, a synchronous software-generated interrupt.
 
-Raw speed comes from overlap. A three-stage **pipeline** (fetch → decode → execute units working on three instructions at once) and **superscalar** designs (parallel pipelines feeding parallel execute units through a holding buffer) do more per clock. **Multithreading (hyper-threading)** goes further: the CPU keeps the state of two threads and switches between them in nanoseconds, so when one thread stalls on a memory read the other runs — note this hides latency but is not true parallelism. True parallelism needs several cores: modern chips are **multicore** (a quad-core with a shared L2 cache versus separate L2 per core are the two textbook layouts), and a GPU is thousands of tiny cores for small parallel computations such as polygon rendering. Multicore hardware requires a multiprocessor OS.
+1. **Invocation:** The application loads call-specific arguments into registers or a predefined stack frame and executes the hardware `TRAP` instruction.
+2. **Privilege Transition:** The CPU hardware catches the trap, automatically switches the mode bit in the PSW from user mode to kernel mode, saves the calling program counter and state flags, and jumps to a fixed vector address defined in the kernel's **interrupt vector**.
+3. **Kernel Dispatch:** The operating system inspects the system call identifier, validates arguments to prevent arbitrary memory tampering, and executes the appropriate privileged handler (such as a disk driver interaction).
+4. **Return:** Upon completion, the kernel executes a return-from-trap instruction that restores the saved program counter and flips the PSW mode bit back to user mode, resuming the caller.
 
-###### **1.4.2 Memory**
-Memory is a **hierarchy**: each higher layer is faster, smaller and more expensive per bit. The lecture's reference numbers are worth memorising: registers (~1 nsec, under 1 KB), cache (~2 nsec, ~4 MB), main memory (~10 nsec, 1–8 GB), magnetic disk (~10 msec, 1–4 TB).
+Hardware privilege separation governs **fault isolation**. If a user-mode process executes an invalid instruction, attempts to access an unmapped memory address, or divides by zero, the hardware traps execution to the kernel. Because the operating system is strictly insulated, the failure is contained: the OS safely terminates the offending process, reclaims its allocated memory, and keeps the rest of the machine running. In contrast, an unhandled fault, null pointer dereference, or memory corruption occurring in kernel mode compromises the supervisor execution context itself; because the kernel has absolute control and cannot isolate its own broken invariants, a kernel crash is catastrophic and results in a complete system halt (a kernel panic or blue screen).
 
-Main memory is divided into **cache lines** of typically 64 bytes; the hottest lines live in a cache inside the CPU. On a read, hardware checks the cache first: a **hit** costs about 2 clock cycles and no bus traffic, a **miss** goes to main memory. Machines often stack two or three cache levels, each slower and bigger. Cache design is four questions: when to insert, where to place, what to evict, and where the evicted item goes.
+##### **1.3 Historical Generations of Operating Systems**
 
-Technologies differ in volatility. **RAM** serves whatever the cache cannot; **ROM** keeps factory-programmed contents without power (classically the bootstrap loader lives there); **EEPROM and flash** are also nonvolatile but erasable and rewritable — flash sits between RAM and disk in speed, backs phones and USB sticks, and wears out with writes. **CMOS** memory holds the clock, date and boot configuration such as which disk to boot from.
+The evolution of operating systems is governed by transitions in underlying physical hardware: every major decrease in component size and increase in circuit density forced corresponding architectural redesigns in system software.
 
-* **Worked micro-example (average access time):** with cache hit rate $h_c = 0.9$ at $t_c = 2$ cycles, RAM hit rate $h_m = 0.8$ at $t_m = 20$ cycles on a miss, disk $t_d = 10^6$ cycles otherwise:
-$$\text{AMAT} = h_c t_c + (1 - h_c) h_m t_m + (1 - h_c)(1 - h_m) t_d = 1.8 + 1.6 + 20000 \approx 20003.$$
-The lesson: even a 2% trip to disk dominates everything — hierarchy performance is decided by miss rates, not by cache speed.
+###### **1.3.1 The First Generation (1945–1955): Vacuum Tubes and Plugboards**
 
-###### **1.4.3 Disks**
-A hard disk is a stack of **platters**; each surface is divided into concentric **tracks**, each track into **sectors** (an arc of a track is a segment). An **actuator arm** swings the **read/write heads** over the surfaces. Every access pays three costs: **seek time** (moving the head), **rotation delay / latency** (waiting for the sector to spin under the head) and **transfer time** (the actual bit flow, i.e. data rate).
+The earliest electronic digital computers, such as **Colossus** (designed by Alan Turing) and the **ENIAC** (designed by William Mauchly), were built with vacuum tubes and physical plugboards. These room-sized mainframes lacked an operating system entirely:
 
-###### **1.4.4 I/O Devices**
-Each device has two halves: a **controller** (electronics accepting OS commands) and the **device** itself (deliberately simple, standardised interface). The program that talks to the controller is the **device driver**; it must live in the OS to run in kernel mode. Controllers expose a few **registers**; the set of all of them is the **I/O port space**. Two addressing schemes exist: **memory-mapped I/O** (registers appear at ordinary memory addresses) and a **separate port space** with special IN/OUT instructions usable only in kernel mode.
+* **Execution model:** A single programmer had exclusive access to the machine for a reserved block of time. Programs were entered manually in mechanical language by physically wiring plugboards or setting switches.
+* **Hardware constraints:** Systems exhibited high electricity consumption, generated extreme heat requiring massive dedicated air conditioning installations, possessed severely limited memory capacity (a few kilobytes), and suffered frequent tube burnouts.
 
-Getting data in and out has three generations. **Busy waiting (polling):** the driver starts the transfer and spins in a loop asking "done yet?" — simple, but the CPU is tied up. **Interrupts:** the driver starts the device, blocks the caller and does other work; on completion the controller raises an interrupt, the CPU vectors through the **interrupt vector** (a table mapping device numbers to handler addresses) into the handler, then returns to the user program. **DMA (Direct Memory Access):** a dedicated chip moves whole blocks between memory and controller with no CPU involvement; the CPU only programs the transfer and receives one interrupt at the end.
+###### **1.3.2 The Second Generation (1955–1965): Transistors and Batch Systems**
 
-###### **1.4.5 Buses**
-Components meet at **buses**, and the OS must know every one for configuration. A **shared bus** (one set of wires, many devices) needs an **arbiter** deciding who transmits. A **parallel bus** spreads one word over many wires (classic PCI: 32 bits over 32 wires); a **serial bus** sends bits down one lane, scaling by adding lanes. Concrete buses: **DDR3/DDR4** (CPU–RAM), **PCIe** (graphics), **DMI** (bridge-to-bridge hub link), **SCSI/SATA** (disks), **USB** (centralised: the root device polls every peripheral for traffic). Before **Plug & Play**, each card hard-coded its interrupt line and register addresses, so two cards could collide; Plug & Play enumerates devices and centrally assigns interrupts and addresses.
+The invention of the transistor yielded smaller, more reliable computers that consumed less electricity and generated substantially less heat. Memory architectures transitioned to magnetic core memory, supplemented by secondary storage on magnetic tapes and magnetic disks.
 
-##### **1.5 Booting the Computer**
-Starting the machine is a relay race, in strict order. **BIOS**, a program on the motherboard with low-level I/O routines, runs first and performs **POST** (Power-On Self-Test): memory size, device presence, basic integrity. It then scans the buses to enumerate devices and picks the **boot device** from the list stored in **CMOS** memory. The first sector of that device — the **boot sector** — is loaded and executed; it reads the **partition table** at the sector's end to find the active partition. A **secondary boot loader** from that partition loads the OS itself. The newborn OS queries the BIOS for the hardware inventory, checks it has a driver per device, loads the drivers into the kernel, initialises its tables, spawns background processes, and finally starts a login prompt or GUI.
+To eliminate the enormous human setup delay between consecutive runs, computer manufacturers introduced the **batch system**. Instead of allowing individual programmers interactive physical access:
 
-* **Why the order matters:** each stage only knows how to load something slightly smarter than itself — ROM code cannot parse filesystems, so booting climbs BIOS → boot sector → loader → OS.
+1. Operators collected programs on punched cards in batches.
+2. The cards were transferred to magnetic tape using an auxiliary, inexpensive computer.
+3. The main computer loaded a resident monitor—the earliest form of an operating system—which automated job sequencing by reading a job from the input tape, compiling and running it, writing output to a separate tape, and automatically initiating the next job without mechanical intervention.
+4. Programming languages shifted from raw binary wiring to symbolic assembly language and early high-level languages.
 
-##### **1.6 The OS Zoo**
-Different machines need different operating systems. **Mainframe OSs** (OS/360, OS/390) live in data centres and are tuned for hundreds of concurrent I/O-heavy jobs. **Server OSs** (UNIX, Linux, Windows Server, FreeBSD, Solaris) serve many users over a network, sharing hardware and software. **Multiprocessor OSs** coordinate several CPUs — today every PC and notebook OS qualifies (Linux, Windows). **Personal computer OSs** need a single-user interactive system (Windows, macOS, Linux, FreeBSD). **Handheld OSs** target phones and tablets (Android, iOS). **Embedded OSs** hide inside devices that take no installed software — microwaves, MP3 players, TVs, cars (Embedded Linux, QNX, VxWorks). **Sensor-node OSs** (TinyOS) run on motes that are complete tiny computers — CPU, RAM, ROM plus environmental sensors, meshed over wireless to a base station. **Real-time OSs** keep deadlines: **hard** real-time guarantees the action happens in time, always; **soft** real-time tolerates an occasional miss without damage (QNX). **Smart-card OSs** are the smallest of all: a CPU on a credit card, often holding a JVM interpreter so downloaded applets run on the card.
+###### **1.3.3 The Third Generation (1965–1980): Integrated Circuits to Microprocessors**
+
+The third generation split across two distinct phases of silicon integration.
+
+**Part 1 (1965–1971): Small/Medium Scale Integration (SSI & MSI)**  
+Solid-state integrated circuits allowed multiple transistors onto a single silicon die, reducing power consumption and cost. Representative platforms included the IBM System/360 and 370/168 series, the Honeywell-6000 series, the PDP (Programmed Data Processor) family, and the TDC-316. This era introduced three fundamental software abstractions:
+
+* **Multiprogramming:** Partitioning main memory into several regions, each holding a distinct job. When the currently executing job blocks on an I/O operation, the CPU switches to another resident job rather than idling.
+* **Spooling (Simultaneous Peripheral Operations On-Line):** Reading jobs directly from punched cards onto magnetic disks as soon as they arrive, and routing output to disk buffers before printing, decoupling slow electromechanical peripherals from CPU scheduling.
+* **Time-sharing:** A variant of multiprogramming in which the CPU rapidly allocates discrete time slices among multiple concurrent, interactive users at remote terminals, giving each the illusion of having a dedicated computer.
+
+The conceptual boundary between multiprogramming and time-sharing is precise: **multiprogramming** manages concurrent job residency to maximize CPU and hardware resource utilization, whereas **time-sharing** multiplexes CPU execution intervals among multiple concurrent human users. Consequently, all time-sharing systems are multiprogramming systems, but not all multiprogramming systems are time-sharing systems.
+
+**Part 2 (1971–1980): Large and Very Large Scale Integration (LSI & VLSI)**  
+The emergence of microprocessors integrated thousands of transistors onto a single chip, driving portable computers, high-speed secondary storage memories, RAID (Redundant Array of Independent Disks) data storage architectures, and digital data communications. Operating systems expanded to coordinate parallel processing, simulations, multimedia, virtual reality, speech recognition systems, and artificial intelligence workloads.
+
+###### **1.3.4 The Fourth Generation (1980–1990): Personal Computers**
+
+LSI technology allowed complete central processing units to fit on desktop boards. The microcomputer market emerged with machines combining the **Intel 8080** 8-bit microprocessor with an 8-inch floppy disk drive.
+
+* **CP/M (Control Program for Microcomputers):** Written by Gary Kildall, CP/M was the first dominant disk-based operating system for microcomputers, managing floppy disk files and providing terminal console control.
+* **The IBM PC:** In 1981, IBM entered personal computing with the IBM PC architecture and contracted Microsoft to supply the operating system (DOS), establishing low-cost single-user personal computing as an industry standard.
+
+###### **1.3.5 The Fifth Generation (1990–Present): Mobile and Ubiquitous Computing**
+
+Starting in the 1990s, computing migrated from desktop workstations to battery-powered handheld and mobile devices. Hardware miniaturization progressed from bulky cellular phones to integrated smartphones, personal digital assistants (PDAs), and wearable nodes. Operating systems in this generation (e.g., Android, iOS) are engineered around aggressive energy management, dynamic wireless and cellular network connectivity, touchscreen sensor input, and hardware-enforced application sandboxing.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Evolutionary path of operating system paradigms across hardware generations"
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    G1["1st Gen: Vacuum Tubes<br/>Direct plugboard wiring, no OS"]
+    G2["2nd Gen: Transistors<br/>Automated batch tape monitors"]
+    G3A["3rd Gen Part 1: SSI/MSI ICs<br/>Multiprogramming & time-sharing"]
+    G3B["3rd Gen Part 2: LSI/VLSI<br/>Microprocessors & RAID storage"]
+    G4["4th Gen: Desktop LSI<br/>Personal computing: CP/M & DOS"]
+    G5["5th Gen: Mobile SoCs<br/>Pervasive, battery-aware OS"]
+
+    G1 --> G2
+    G2 --> G3A
+    G3A --> G3B
+    G3B --> G4
+    G4 --> G5
+```
+
+##### **1.4 Processor Architecture, Instruction Execution, and Pipelines**
+
+At the hardware foundation of every operating system is the **Central Processing Unit (CPU)**, the computational engine responsible for fetching, interpreting, and executing machine instructions. To interact with bare metal, allocate runtime state, and enforce protection boundaries, the operating system relies directly on the CPU's internal machine cycle, internal register sets, and pipeline microarchitecture.
+
+###### **1.4.1 The Six-Step Instruction Cycle**
+
+The basic machine execution cycle defines the deterministic sequence of operations the processor carries out for each instruction:
+
+1. **Fetch Instruction:** The processor reads the next scheduled machine instruction from memory into an internal instruction buffer.
+2. **Decode Instruction:** The control unit analyzes the instruction bit pattern to determine the operational code (**opcode**) and the operand specifiers.
+3. **Calculate Operands:** The CPU computes the effective memory addresses for any source operands requiring memory reference (resolving base, index, or offset values).
+4. **Fetch Operands:** The processor retrieves source operands from memory; operands already residing in internal processor registers require no external memory access.
+5. **Execute Instruction:** The Arithmetic Logic Unit (ALU) or execution unit carries out the operation dictated by the opcode (such as integer addition, bitwise manipulation, or arithmetic comparison) and captures the operational result.
+6. **Write Operand:** The CPU commits the final output operand by storing it to the designated destination memory location or internal register.
+
+###### **1.4.2 Internal CPU Registers**
+
+Processor registers represent the fastest, smallest storage cells in the computer's memory hierarchy, operating directly within CPU clock cycles. Registers fall into two architectural classes:
+
+* **General-purpose registers:** Internal high-speed storage locations utilized by user programs and compiler code generators to store active variables, intermediate mathematical values, and computational results without incurring bus latency.
+* **Specialized control registers:** Hardware registers dedicated to orchestrating machine sequencing and enforcing system safety:
+  * **Program Counter (PC):** A dedicated pointer register containing the absolute memory address of the next machine instruction scheduled to be fetched into the pipeline.
+  * **Stack Pointer (SP):** A hardware register that points to the top of the current procedure call and activation frame stack in memory, enabling nested function linkage, return address tracking, and local variable allocation.
+  * **Program Status Word (PSW):** A privileged status register containing key hardware state indicators, including arithmetic condition flags (recording zero, negative, carry, or overflow outcomes from comparisons), current CPU interrupt priority levels, and the active hardware execution mode (**kernel mode** versus **user mode**). The operating system reads and restores the PSW during hardware traps and thread context switches.
+
+###### **1.4.3 Pipelining and Superscalar Architectures**
+
+Sequential CPUs without overlap take multiple full clock cycles per instruction, leaving hardware components idle during non-active stages. Modern CPUs optimize instruction throughput by introducing concurrent microarchitectures:
+
+In a **three-stage instruction pipeline**, execution splits into discrete, isolated functional stages: the **Fetch Unit**, the **Decode Unit**, and the **Execute Unit**. Instead of waiting for instruction $k$ to finish execution and commit results, the Fetch Unit retrieves instruction $k+1$ while the Decode Unit decodes instruction $k$, and the Execute Unit finishes instruction $k-1$. Under steady-state operation, the pipeline retires one instruction per clock cycle.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Comparison of a basic three-stage pipeline and a dual-issue superscalar CPU microarchitecture."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    subscript1["Three-Stage Linear Pipeline"]
+    F1["Fetch Unit"] --> D1["Decode Unit"] --> E1["Execute Unit"]
+
+    subscript2["Superscalar Dual-Pipeline Architecture"]
+    F2A["Fetch Unit 1"] --> D2A["Decode Unit 1"] --> HB(("Holding<br/>Buffer"))
+    F2B["Fetch Unit 2"] --> D2B["Decode Unit 2"] --> HB
+    HB --> E2A["Execute Unit 1"]
+    HB --> E2B["Execute Unit 2"]
+```
+
+A **superscalar CPU** expands on pipelining by instantiating duplicated, parallel hardware execution units. In this design, multiple instruction fetch and decode units feed decoded operations simultaneously into a centralized internal **holding buffer**. The execution units pull independent operations directly from this holding buffer in parallel. Consequently, a superscalar processor issues and retires more than one instruction per clock cycle ($IPC > 1$), maximizing ALU utilization while preserving architectural program order.
+
+##### **1.5 Processor Concurrency: Multithreading, Hyper-Threading, and Multicore**
+
+Modern processors employ hardware-level concurrency to bridge the growing speed divergence between execution pipelines and main memory. The operating system abstracts these hardware facilities to schedule threads across available compute units, distinguishing between concurrent multiplexing and true parallel execution.
+
+**Hardware multithreading** (termed **Hyper-Threading** by Intel) allows a single physical processor core to hold the architectural state of two or more independent threads simultaneously. By duplicating the register set—including the Program Counter (PC), the Stack Pointer (SP), general-purpose registers, and the Program Status Word (PSW)—the physical core exposes multiple **logical processors** to the operating system. When an active thread experiences a long-latency memory fetch (such as a cache miss requiring a trip to RAM), the CPU switches execution to the alternate thread in nanoseconds rather than leaving the pipeline idle. 
+
+Hyper-threading provides hardware concurrency rather than **true parallelism**: both logical processors share a single underlying set of execution units (ALUs, FPUs, pipelines) and cache hierarchies. If two threads running on the same physical core simultaneously issue execution-bound arithmetic instructions, they must contend for the shared hardware pipelines.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Structural comparison of Hyper-Threading versus Multicore execution architectures."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    subgraph HT["Hyper-Threaded Core"]
+        LP0["Logical Processor 0<br/>Registers / PC / PSW"]
+        LP1["Logical Processor 1<br/>Registers / PC / PSW"]
+        EU0["Shared Execution Units<br/>Fetch / Decode / ALU"]
+        L1_0["Shared L1 Cache"]
+        LP0 --> EU0
+        LP1 --> EU0
+        EU0 --> L1_0
+    end
+
+    subgraph MC["Multicore Die"]
+        subgraph C1["Physical Core 1"]
+            EU1["Dedicated ALU & Pipeline"]
+            L1_1["Dedicated L1 Cache"]
+            EU1 --> L1_1
+        end
+        subgraph C2["Physical Core 2"]
+            EU2["Dedicated ALU & Pipeline"]
+            L1_2["Dedicated L1 Cache"]
+            EU2 --> L1_2
+        end
+        L2["Shared L2 Cache"]
+        L1_1 --> L2
+        L1_2 --> L2
+    end
+```
+
+A **multicore chip** integrates multiple distinct physical central processing units onto a single integrated circuit die. Each core possesses its own independent execution pipeline, instruction fetch and decode units, and arithmetic logic units. Because hardware resources are fully replicated, multicore processors deliver true parallelism: multiple instructions execute at the exact same physical clock cycle. Coordinating multiple physical cores requires a **multiprocessor operating system** that balances threads across cores, manages synchronization, and maintains memory consistency.
+
+Multicore architectures differ fundamentally in their internal cache hierarchies:
+
+* **Independent per-core caches**: Each physical core contains its own dedicated Level 1 (L1) data and instruction cache, typically accessed within 1 to 2 clock cycles.
+* **Shared versus split Level 2 (L2) caches**: Implementations either route each core's L1 cache to a single unified L2 cache shared across all cores on the die, or provide each individual core with a private, dedicated L2 cache before routing external traffic to main memory or a shared L3 cache.
+
+A specialized extension of multicore parallelism is the **Graphics Processing Unit (GPU)**. Unlike general-purpose CPUs optimized for complex, branching control flow and minimal latency on single threads, a GPU integrates thousands of small, specialized execution cores. These cores operate concurrently on uniform data streams, providing high throughput for massively parallel computational tasks such as rendering polygon meshes or executing uniform matrix operations.
+
+###### **1.5.1 Workload Scheduling Analysis on Hyper-Threaded Dual-Core Systems**
+
+When the OS schedules threads onto a system equipped with hyper-threading, overall completion time is governed by whether threads share a physical execution engine or occupy isolated physical cores.
+
+Consider a system comprising two physical CPUs, where each CPU implements 2-way hyper-threading, presenting four logical processors to the OS scheduler. Suppose three programs—$P_0$, $P_1$, and $P_2$—with nominal run times of $5\text{ ms}$, $10\text{ ms}$, and $20\text{ ms}$ respectively, are submitted simultaneously. Assume the workloads are 100% CPU-bound, do not block for I/O, and do not migrate across CPUs after assignment.
+
+The total wall-clock time required to complete all three tasks depends on the OS placement strategy across physical CPUs and logical processors:
+
+* **Scenario A: $P_0$ and $P_1$ co-located on CPU 0; $P_2$ isolated on CPU 1.**
+  * CPU 1 executes $P_2$ in $20\text{ ms}$.
+  * On CPU 0, if $P_0$ and $P_1$ run concurrently across the two logical processors, execution completes in $\max(5, 10) = 10\text{ ms}$ under ideal hardware interleaving, or $5 + 10 = 15\text{ ms}$ if executed sequentially on a single logical processor.
+  * System completion time: $\max(10\text{ to }15\text{ ms}, 20\text{ ms}) = 20\text{ ms}$.
+* **Scenario B: $P_0$ and $P_2$ co-located on CPU 0; $P_1$ isolated on CPU 1.**
+  * CPU 1 executes $P_1$ in $10\text{ ms}$.
+  * CPU 0 requires $\max(5, 20) = 20\text{ ms}$ concurrently across two logical processors, or $5 + 20 = 25\text{ ms}$ sequentially.
+  * System completion time: $\max(20\text{ to }25\text{ ms}, 10\text{ ms}) = 25\text{ ms}$ (under sequential assignment).
+* **Scenario C: $P_1$ and $P_2$ co-located on CPU 0; $P_0$ isolated on CPU 1.**
+  * CPU 1 executes $P_0$ in $5\text{ ms}$.
+  * CPU 0 requires $\max(10, 20) = 20\text{ ms}$ concurrently across two logical processors, or $10 + 20 = 30\text{ ms}$ sequentially.
+  * System completion time: $30\text{ ms}$ if $P_1$ and $P_2$ are executed sequentially on one logical processor.
+* **Scenario D: All three programs scheduled onto CPU 0 (CPU 1 left idle).**
+  * If two programs run sequentially on logical processor 0 while the third occupies logical processor 1, runtime equals the maximum of the two partitions:
+    * Partition $(P_0 + P_1)$ vs $P_2$: $\max(5 + 10, 20) = 20\text{ ms}$.
+    * Partition $(P_0 + P_2)$ vs $P_1$: $\max(5 + 20, 10) = 25\text{ ms}$.
+    * Partition $(P_1 + P_2)$ vs $P_0$: $\max(10 + 20, 5) = 30\text{ ms}$.
+  * If all three run sequentially on a single logical processor: $5 + 10 + 20 = 35\text{ ms}$.
+  * Maximum system completion time across configurations: $35\text{ ms}$.
+
+##### **1.6 The Memory Hierarchy and Caching Performance**
+
+The **memory hierarchy** is an architectural organization that reconciles the wide disparity between processor execution speeds and secondary storage retrieval times. Because storage technologies exhibit an inherent trade-off—faster memory requires complex physical circuitry, yields smaller capacity, and incurs a higher financial cost per bit—computer systems arrange storage media in a stratified pyramid.
+
+The four canonical tiers of this hierarchy encompass:
+
+* **Registers**: Situated directly inside the CPU core, offering capacities under $1\text{ KB}$ with typical access latencies of approximately $1\text{ ns}$ (a single clock cycle).
+* **Cache**: High-speed static memory integrated into or placed adjacent to the processor die, with typical capacities of roughly $4\text{ MB}$ and latencies around $2\text{ ns}$ (often organized across two or three progressively larger, slower levels such as L1, L2, and L3).
+* **Main Memory (RAM)**: Volatile dynamic random-access memory servicing CPU requests that bypass the cache, providing typical capacities of $1\text{--}8\text{ GB}$ with access latencies near $10\text{ ns}$.
+* **Magnetic Disk**: Non-volatile secondary storage providing mass persistent capacity of $1\text{--}4\text{ TB}$, but operating at mechanical access latencies around $10\text{ ms}$ ($10{,}000{,}000\text{ ns}$).
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Memory access path across hierarchical storage tiers."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    Req["CPU memory request<br/>for target word"] --> Chk{"Word present<br/>in cache?"}
+    Chk -->|"Yes (Cache Hit)"| Fast["Return word to CPU<br/>in ~2 clock cycles"]
+    Chk -->|"No (Cache Miss)"| BusReq["Issue read request over bus<br/>to main memory"]
+    BusReq --> RamChk{"Word present<br/>in RAM?"}
+    RamChk -->|"Yes (RAM Hit)"| LoadC["Fetch line into cache<br/>access latency ~10 ns"]
+    RamChk -->|"No (Page Fault)"| DiskAcc["Transfer block from disk<br/>access latency ~10 ms"]
+```
+
+###### **1.6.1 Cache Organization and Management Policies**
+
+Data transfers between main memory and cache hardware do not occur as isolated individual bytes or words. Instead, main memory is subdivided into uniform blocks termed **cache lines**, typically fixed at $64\text{ bytes}$. When a running program requires a memory word, internal cache hardware inspects its directory:
+
+* A **cache hit** occurs when the requested line resides in cache. The word is served directly to CPU execution units without issuing transactions over the system bus, completing in approximately 2 clock cycles.
+* A **cache miss** forces a memory controller transaction across the system bus to retrieve the corresponding 64-byte line from RAM, stalling execution until arrival.
+
+Constructing an effective caching subsystem requires four fundamental policy decisions:
+
+1. **Fetch Policy**: Determining the exact trigger point for loading an item into the cache (for example, on-demand upon a miss versus prefetching anticipated memory lines).
+2. **Placement Policy**: Governing the specific cache line or set where an incoming memory block may be mapped.
+3. **Replacement Policy**: Selecting which existing cache line to evict when all eligible slots are occupied and a new line must be loaded.
+4. **Write and Eviction Destination**: Resolving where and when an evicted line must be synchronized back to the larger memory tier (such as updating main memory immediately upon every CPU store, or buffering updates and writing back only dirty, modified lines upon eviction).
+
+###### **1.6.2 Average Memory Access Time (AMAT)**
+
+The quantitative efficiency of a tiered memory subsystem is expressed via **Average Memory Access Time (AMAT)**. For a three-level system consisting of cache ($c$), main memory ($m$), and magnetic disk ($d$), let $h_c$ denote the cache hit rate, $t_c$ the cache access latency, $h_m$ the conditional hit rate in main memory following a cache miss, $t_m$ the main memory latency, and $t_d$ the magnetic disk access latency. The system-wide access time expands as:
+
+$$
+\text{AMAT} = h_c \cdot t_c + (1 - h_c) \cdot h_m \cdot t_m + (1 - h_c)(1 - h_m) \cdot t_d \tag{1}
+$$
+
+Consider a concrete architecture where $t_c = 1\text{ ns}$, $t_m = 10\text{ ns}$, and $t_d = 10\text{ ms} = 10{,}000{,}000\text{ ns}$. If the system achieves a cache hit rate of $h_c = 0.95$ (miss rate $1 - h_c = 0.05$) and a post-miss main memory hit rate of $h_m = 0.99$ (virtual memory page fault rate $1 - h_m = 0.01$), substituting these parameters into Equation (1) yields:
+
+$$
+\text{AMAT} = 0.95 \cdot 1\text{ ns} + 0.05 \cdot 0.99 \cdot 10\text{ ns} + 0.05 \cdot 0.01 \cdot 10{,}000{,}000\text{ ns}
+$$
+
+Evaluating the individual terms:
+
+$$
+\text{AMAT} = 0.95\text{ ns} + 0.495\text{ ns} + 5{,}000\text{ ns} = 5{,}001.445\text{ ns} \approx 5.001445\ \mu\text{s}
+$$
+
+Even though disk access occurs on only $0.05\% \times 1\% = 0.0005$ of all operations, its seven-order-of-magnitude latency penalty accounts for over $99.97\%$ of the resulting average access delay.
+
+##### **1.7 Storage Media, Disk Geometry, and Hardware Sizing**
+
+Computer systems depend on a continuum of secondary storage and non-volatile memory technologies to bridge the speed, cost, and persistence gap between volatile main memory and long-term storage.
+
+###### **1.7.1 Memory and Non-Volatile Storage Technologies**
+
+Primary memory systems combine several distinct solid-state storage technologies:
+
+* **Random-Access Memory (RAM)**: High-speed, byte-addressable, and volatile storage (typical access time around $10\text{ ns}$) that loses all state upon power loss. It serves processor read and write requests that cannot be resolved directly by on-chip cache levels.
+* **Read-Only Memory (ROM)**: Non-volatile storage programmed during manufacturing at the factory level. Its contents cannot be altered electrically thereafter. Systems employ ROM to store immutable, low-level firmware such as the initial bootstrap loader.
+* **Electrically Erasable Programmable ROM (EEPROM)**: Non-volatile memory that permits in-place electrical erasure and byte-level reprogramming without requiring physical chip replacement.
+* **Flash Memory**: A high-density, block-erasable variant of EEPROM. Its access performance is intermediate between RAM and magnetic disk storage. Flash memory cells endure a finite number of program-erase cycles before wearing out, requiring wear-leveling management to prevent premature cell failure.
+* **Complementary Metal-Oxide-Semiconductor (CMOS) Memory**: Low-power, volatile static RAM backed by a dedicated on-board battery. It preserves volatile real-time clock data, current date tracking, and hardware boot parameters (such as device boot priority order) across main system power cycles.
+
+###### **1.7.2 Magnetic Disk Geometry**
+
+A mechanical **Hard Disk Drive (HDD)** stores data magnetically across one or more rigid, rapidly spinning disks termed **platters**.
+
+The mechanical assembly comprises:
+
+* **Platters**: Flat circular substrates coated on both sides with magnetic material, rotating together on a central spindle at a constant angular velocity.
+* **Read/Write Heads**: Electromagnetic sensors that fly microscopically close to each recording surface.
+* **Actuator Arm**: A rigid mechanical arm that pivots to move all attached read/write heads radially across the platter surfaces in unison.
+* **Tracks**: Concentric circular recording rings established on the surface of each platter.
+* **Sectors**: Fixed-capacity angular sub-divisions of a track, representing the smallest directly addressable physical storage block.
+* **Segments**: Arcs along an individual track consisting of one or more adjacent sectors.
+
+###### **1.7.3 Disk I/O Access Latency**
+
+Reading or writing a block on a magnetic disk requires mechanical positioning before physical data serialization can occur. The total access time $T_{\text{access}}$ is governed by three sequential components:
+
+$$T_{\text{access}} = T_{\text{seek}} + T_{\text{rotation}} + T_{\text{transfer}} \tag{2}$$
+
+* **Seek Time ($T_{\text{seek}}$)**: The mechanical duration needed to accelerate, displace, and stabilize the actuator arm so that the read/write head aligns over the target concentric track.
+* **Rotational Latency ($T_{\text{rotation}}$)**: The delay while the target sector spins underneath the stationary head. On average, this equals the time needed for half a platter revolution:
+  $$T_{\text{rotation, avg}} = \frac{1}{2 \cdot \text{RPM}} \times 60\text{ seconds}$$
+* **Transfer Time ($T_{\text{transfer}}$)**: The duration required to transfer the serialized data bits as the sector sweeps under the head, determined by:
+  $$T_{\text{transfer}} = \frac{\text{Bytes to Transfer}}{\text{Track Capacity}} \times T_{\text{revolution}} = \frac{\text{Bytes}}{\text{Internal Data Transfer Rate}}$$
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Sequential components of magnetic hard disk read/write access time"
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Disk I/O Request Issued<br/>Address translation by controller"]
+    B["Seek Operation<br/>Actuator arm repositions to target track"]
+    C["Rotational Delay<br/>Platter spins sector under head"]
+    D["Data Transfer<br/>Bits read or written over the track"]
+    E["I/O Complete<br/>Data transferred to host memory"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+```
+
+Because seek time and rotational latency require physical mechanical movement (measured on the order of milliseconds, e.g., $10\text{ ms}$), disk operations are six orders of magnitude slower than solid-state main memory access (measured in nanoseconds).
+
+###### **1.7.4 Video Display Memory Calculations**
+
+Display adapters allocate dedicated memory (video RAM or shared system RAM) to maintain the screen representation. The memory footprint directly dictated the economic adoption of graphical user interfaces (GUIs).
+
+In a legacy character-cell monochrome terminal, each display coordinate maps to an ASCII character code:
+
+$$\text{Memory}_{\text{text}} = \text{Rows} \times \text{Columns} \times \text{Bytes per Character}$$
+
+For an 80-column by 25-line text display requiring 1 byte per character:
+
+$$\text{Memory}_{\text{text}} = 25 \times 80 \times 1\text{ byte} = 2{,}000\text{ bytes}$$
+
+In contrast, a graphical bitmapped display maps every individual pixel to one or more color channels in a frame buffer. For a display of width $W$, height $H$, and color depth $D$ bits per pixel:
+
+$$\text{Memory}_{\text{bitmap}} = \frac{W \times H \times D}{8}\text{ bytes}$$
+
+For a high-resolution display running at $1200 \times 900$ pixels with 24-bit TrueColor (8 bits each for red, green, and blue components, yielding 3 bytes per pixel):
+
+$$\text{Memory}_{\text{bitmap}} = 1200 \times 900 \times \frac{24}{8}\text{ bytes} = 1200 \times 900 \times 3 = 3{,}240{,}000\text{ bytes}$$
+
+At early personal computing hardware costs (such as 1980 memory priced at $\$5\text{ per KiB}$), the text buffer required $\frac{2000}{1024} \times 5 \approx \$9.77$ (roughly $\$10$), whereas the uncompressed graphical framebuffer represented:
+
+$$\text{Cost} = \frac{3{,}240{,}000\text{ bytes}}{1{,}024\text{ bytes/KiB}} \times \$5 \approx \$15{,}820$$
+
+This substantial memory overhead made early graphical operating systems economically prohibitive until solid-state memory costs decreased by orders of magnitude.
+
+##### **1.8 I/O Architecture, Device Drivers, and Data Transfer Mechanisms**
+
+Every input/output operation involves coordinating system software with peripheral hardware. An **I/O unit** physically partitions into two distinct entities:
+
+1. The **physical device**, which provides the mechanical or electromechanical transducer (such as the platters, read/write heads, and spindle of a magnetic disk). It exposes a minimal, hardware-standard interface.
+2. The **device controller** (adapter), an electronic chip or circuit board that acts as an intermediary. The controller accepts high-level commands from the operating system, converts serial bitstreams from the physical drive into structured byte blocks, checks for transmission errors, and exposes a collection of internal registers to the CPU.
+
+Controller registers generally divide into control registers (writable command flags), status registers (readable state and error flags), and data buffers (input/output byte pipelines). The operating system executes a specialized software module called a **device driver** to manage each controller. Because driver routines manipulate low-level registers and handle hardware signaling directly, device drivers run in **kernel mode** inside the operating system space. The driver translates abstract OS requests—such as reading a disk block—into the device-specific sequences of register writes required by that controller model.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Hardware and software control paths across I/O transfer architectures"
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    subgraph Host["Host Processing Subsystem"]
+        CPU["CPU Core<br/>(Kernel Device Driver)"]
+        RAM["Main Memory<br/>(System RAM)"]
+        IVT["Interrupt Vector<br/>Table"]
+    end
+    subgraph Control["Interconnect and Control"]
+        DMAC["DMA Controller"]
+        INTC["Interrupt Controller"]
+    end
+    subgraph Peripheral["Device Subsystem"]
+        DC["Device Controller<br/>(Registers and Buffers)"]
+        DEV["Physical Peripheral<br/>(e.g., Disk Media)"]
+    end
+
+    CPU -->|"1. Program transfer parameters"| DMAC
+    CPU -->|"Configure commands"| DC
+    DMAC -->|"2. Direct block data transfer"| RAM
+    DC <-->|"Bit serial transfer"| DEV
+    DC -->|"Fill / drain buffer"| DMAC
+    DMAC -->|"3. Signal completion"| INTC
+    DC -.->|"Direct interrupt line"| INTC
+    INTC -->|"4. Assert interrupt"| CPU
+    CPU -->|"5. Dispatch ISR via vector"| IVT
+```
+
+###### **1.8.1 Register Addressing: Port-Mapped vs. Memory-Mapped I/O**
+
+Architectures employ two primary paradigms to assign addresses to device controller registers:
+
+* **Port-Mapped I/O (Isolated I/O):** The hardware assigns controller registers to an isolated address space distinct from physical RAM, known as the **I/O port space**. Each controller register has a unique numerical port address (e.g., port `0x3F8`). Because standard memory instructions cannot address this space, the CPU architecture provides dedicated privileged assembly instructions, such as `IN register, port` and `OUT port, register`.
+* **Memory-Mapped I/O:** The memory controller maps device registers directly into the physical memory address space of the central processor. A range of physical addresses is reserved for hardware devices rather than main memory chips. Drivers read and write controller registers using standard assembly load and store operations (e.g., `MOV`), eliminating the need for specialized assembly instructions.
+
+###### **1.8.2 Data Transfer Mechanisms**
+
+Operating systems transfer blocks of data between peripheral controllers and system memory using one of three structural methods.
+
+1. **Programmed I/O (Busy Waiting / Polling):** The device driver writes the operation command into the controller's registers and enters a continuous loop that repeatedly reads the status register to detect when the device completes the request. Because the CPU performs no other work while waiting for mechanical motion or data line assertions, polling wastes CPU cycles entirely on I/O-bound tasks.
+2. **Interrupt-Driven I/O:** The driver programs the controller and issues the command, instructing the controller to emit a hardware signal upon completion. The operating system places the calling process into a blocked wait state and switches the CPU to execute another runnable process. When the device finishes, the controller raises an interrupt request line connected to the system **interrupt controller**. The interrupt controller asserts the CPU interrupt pin, providing the device index number. The CPU suspends the active instruction stream, saves state, and uses the device number as an index into the **interrupt vector**—a fixed hardware lookup table in lower memory containing pointers to driver **Interrupt Service Routines (ISRs)**. The dispatcher invokes the corresponding ISR, which transfers the received data, resets the device status, and unblocks the waiting process.
+3. **Direct Memory Access (DMA):** In high-throughput devices such as disks or network interfaces, transferring data byte-by-byte through the CPU creates a severe processing bottleneck. A **DMA controller** is an auxiliary hardware processor that drives the system bus independently. To initiate an I/O transfer, the CPU writes three primary values to the DMA controller registers:
+   * The source or destination memory starting address.
+   * The byte or word count $N$ to be transferred.
+   * The transfer control flags (read/write direction and transfer unit size).
+
+The CPU then commands the device controller to begin reading or writing. The DMA controller transfers the entire block of $N$ bytes directly across the system bus between the device controller internal buffer and main RAM without traversing the CPU execution registers. The CPU continues executing independent user processes concurrently. Once all $N$ bytes have transferred, the DMA controller asserts an interrupt line to notify the CPU that the entire operation has completed.
+
+##### **1.9 System Interconnects, Bus Topologies, and Plug-and-Play**
+
+A **bus** is a shared physical subsystem of electrical conductors and communication protocols that transfers data, memory addresses, and control signals between computer components. The operating system must detect and manage these interconnects to configure hardware abstractions and route I/O operations.
+
+In a **shared bus architecture**, multiple peripheral controllers and processors attach to a common set of physical wires. Because only one transaction may traverse the transmission lines at any instant, hardware access requires a dedicated **bus arbiter**. The arbiter evaluates competing transfer requests using priority protocols to resolve bus contention and grant access to a single device at a time.
+
+Physical bus transmission mechanisms follow two contrasting topologies:
+
+*   **Parallel bus architecture**: Transmits an entire data word simultaneously across multiple parallel physical wires. In a standard 32-bit PCI bus, $32$ distinct data lines transmit $32$ bits of data in parallel during a single clock cycle. As clock frequencies increase, physical timing skew across parallel lines limits maximum throughput.
+*   **Serial bus architecture**: Transmits sequential bitstreams packet by packet across a point-to-point communication channel called a **lane**. High throughput is achieved by operating lanes at gigahertz signaling rates and aggregating multiple lanes in parallel (such as $1$, $4$, $8$, or $16$ independent lanes in PCIe) to transmit multiple serialized data packets concurrently without inter-line skew constraints.
+
+A modern computing platform structures these interconnects into a functional bus hierarchy according to speed, latency, and device role:
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Modern system interconnect hierarchy and bus distribution"
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    CPU["CPU Core Complex"]
+    RAM["Main Memory (RAM)"]
+    GPU["High-Speed Graphics / Peripherals"]
+    SB["I/O Hub (Southbridge)"]
+    DISK["Storage Devices"]
+    PERIPH["External USB Devices"]
+
+    CPU <-->|"DDR3 / DDR4 Memory Bus"| RAM
+    CPU <-->|"PCIe Lanes"| GPU
+    CPU <-->|"DMI Point-to-Point Link"| SB
+    SB <-->|"SATA / SCSI"| DISK
+    SB <-->|"Host-Polled USB Bus"| PERIPH
+
+    classDef default fill:#e8f4f8,stroke:#355c7d,stroke-width:1px;
+    classDef hub fill:#fff3cd,stroke:#355c7d,stroke-width:1px;
+    class SB hub;
+```
+
+*   **DDR3 / DDR4 Bus**: High-bandwidth, low-latency memory bus dedicated exclusively to transferring instructions and cache lines between the CPU memory controller and physical RAM modules.
+*   **PCIe (Peripheral Component Interconnect Express)**: High-speed point-to-point serial interconnect linking the CPU root complex directly to graphics processing units and high-throughput expansion cards.
+*   **DMI (Direct Media Interface)**: Point-to-point chip-to-chip link connecting the CPU or memory controller hub (northbridge) to the platform I/O controller hub (southbridge).
+*   **SATA / SCSI**: Serial point-to-point storage interconnects optimized for transferring block-level data between storage host controllers and hard disk drives or solid-state disks.
+*   **USB (Universal Serial Bus)**: Centralized serial peripheral bus governed by a host controller that cyclically polls attached slave peripherals to verify whether devices have pending I/O packets.
+
+###### **1.9.1 Plug-and-Play Dynamic Allocation**
+
+Prior to dynamic bus configuration, expansion cards required manual configuration via physical hardware jumpers to select a fixed **Interrupt Request (IRQ)** line and a static range of **I/O port addresses**. If two expansion cards were set to the same IRQ or overlapping port ranges, hardware collisions crashed the system.
+
+The **Plug-and-Play (PnP)** architecture eliminates manual configuration through automated, centralized resource arbitration during the system boot sequence:
+
+1.  **Device Discovery**: The firmware (BIOS/UEFI) or the operating system scans all system buses (enumerating PCIe bridges, USB root hubs, and SATA controllers) to identify attached devices via vendor and device IDs.
+2.  **Resource Requirement Query**: The operating system reads the configuration header of each detected card to determine its required quantity of memory-mapped I/O addresses, port space, and interrupt lines.
+3.  **Conflict-Free Allocation**: The system calculates a globally unique, non-overlapping base address register (BAR) window and assigns an available IRQ level to each controller.
+4.  **Hardware Programming**: The OS writes the assigned address ranges and interrupt routing entries directly into each peripheral card's configuration registers and loads the corresponding device driver into kernel space.
+
+##### **1.10 The Computer Bootstrapping Sequence**
+
+**Bootstrapping** (or **booting**) is the deterministic, multi-stage hardware and software initialization sequence that transitions an unpowered computer into an operational state executing user programs. Because dynamic random-access memory (**RAM**) is volatile and initially devoid of instructions, the central processing unit cannot load an operating system directly upon receiving electrical power. Instead, control delegates through chained execution stages of increasing software abstraction.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Deterministic execution flow of the computer bootstrapping sequence."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TD
+    A["Firmware Execution & POST<br/>Motherboard check and RAM sizing"] --> B["Bus Scan & Device Selection<br/>Query buses and CMOS priority list"]
+    B --> C["Read Boot Sector (MBR)<br/>Locate active partition in table"]
+    C --> D["Execute Secondary Loader<br/>Transfer OS kernel into RAM"]
+    D --> E["Kernel Hardware Inventory<br/>Query BIOS and insert drivers"]
+    E --> F["Table & Daemon Initialization<br/>Create kernel tables and daemons"]
+    F --> G["Interactive System State<br/>Start login shell or graphical UI"]
+```
+
+###### **1.10.1 Firmware Execution and POST**
+
+At power-on, the processor initializes its registers and executes low-level firmware situated in non-volatile read-only memory (**ROM**) or flash memory located directly on the motherboard. This software layer is known as the **Basic Input Output System (BIOS)**.
+
+The BIOS immediately executes the **Power-On Self-Test (POST)**. The POST routine performs diagnostic checks on essential hardware components:
+
+* Validates the electrical integrity and signaling of the motherboard and processor.
+* Scans, sizes, and verifies the installed system **RAM**.
+* Checks core low-level peripherals (such as the system timer, keyboard controller, and baseline display interfaces) to confirm responsiveness.
+
+###### **1.10.2 Bus Enumeration and Device Selection**
+
+Following the POST, the BIOS surveys the system interconnects. It scans internal and external buses to register all attached physical controllers and devices.
+
+To determine which device to initiate execution from, the BIOS reads configuration variables stored in **CMOS memory** (Complementary Metal-Oxide-Semiconductor memory). The CMOS chip maintains low-power persistent state—including the real-time clock, date, and user-configured boot device priority list—using a dedicated battery. The BIOS sequentially polls the devices in this priority list (such as solid-state drives, magnetic hard disks, optical media, or peripheral buses) until it identifies a functioning, bootable medium.
+
+###### **1.10.3 The Boot Sector and Master Boot Record**
+
+Once a valid boot medium is selected, the BIOS retrieves its very first physical sector, known as the **boot sector**, and places it at a standardized physical memory address before transferring CPU execution control to it. On partitioned storage disks, this initial 512-byte sector constitutes the **Master Boot Record (MBR)**.
+
+The code within the MBR inspects the **partition table** located at the end of the sector. The partition table defines the layout of storage volumes on the medium. The MBR code parses these entries to find the designated **active partition** (the primary bootable partition containing operating system files).
+
+###### **1.10.4 The Secondary Boot Loader**
+
+Because a single 512-byte sector cannot accommodate complex file system drivers or large execution logic, the MBR reads a larger, intermediate program from the active partition: the **secondary boot loader**. 
+
+The secondary boot loader possesses sufficient logic to navigate the target file system. It locates the compiled operating system kernel binary on disk, copies the kernel code and initial data structures into main memory, and jumps the CPU instruction pointer to the operating system entry point.
+
+###### **1.10.5 Operating System and Kernel Initialization**
+
+The kernel assumes control of the CPU in privileged **kernel mode** and completes initialization across four continuous phases:
+
+1. **Hardware Configuration Query:** The operating system queries the BIOS tables to extract low-level hardware configuration data and bus mapping topologies generated during firmware execution.
+2. **Device Driver Loading:** For each enumerated physical device, the operating system verifies availability of a corresponding **device driver** and loads those modules into kernel space to govern peripheral controllers.
+3. **Core Table Initialization:** The kernel establishes internal control structures, including virtual memory mapping tables, interrupt handler tables, and process management tables.
+4. **Daemon Spawning and User Interface:** The kernel constructs the initial user space, spawns required background service processes (**daemons**), and launches the primary user interface—either a command-line login shell or a **graphical user interface (GUI)**—to begin accepting interactive commands.
+
+##### **1.11 The Operating System Zoo: Specialized OS Classes**
+
+An operating system is tailored to the scale, physical constraints, and execution requirements of the underlying hardware platform. Operating systems are classified across an architectural spectrum spanning room-sized data center installations down to credit-card microchips.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Taxonomy of specialized operating system classes across computing scales"
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Operating System Zoo"] --> B["Enterprise Scale<br/>Mainframes and Servers"]
+    A --> C["Interactive Platforms<br/>Multiprocessors, PCs, Mobile"]
+    A --> D["Constrained and Real-Time<br/>Embedded, Sensors, RTOS, Smart Cards"]
+
+    B --> B1["Mainframe OS: OS/390<br/>High-volume I/O, Batch, TPS"]
+    B --> B2["Server OS: Linux, Solaris<br/>Network multi-user resource sharing"]
+
+    C --> C1["PC and Multiprocessor OS<br/>SMP scheduling and interactive GUIs"]
+    C --> C2["Mobile OS: Android, iOS<br/>Touch input and energy preservation"]
+
+    D --> D1["Embedded and Sensors<br/>VxWorks, TinyOS, Fixed tasks"]
+    D --> D2["RTOS and Smart Cards<br/>QNX deadlines, Java Card JVM"]
+```
+
+###### **1.11.1 Mainframe and Server Operating Systems**
+
+A **mainframe operating system** manages room-sized computational clusters in enterprise data centers. Its primary architectural objective is maximizing concurrent Input/Output (I/O) throughput rather than raw single-threaded CPU speed. Mainframes such as the IBM System/360, System/370, and modern descendants running **OS/390** provide three distinct modes of service:
+
+* **Batch processing**: processes automated, non-interactive computational workloads without an operator present.
+* **Transaction-processing systems (TPS)**: orchestrate high volumes of concurrent, small-scale operational requests, such as bank account updates or airline reservations.
+* **Timesharing systems**: permit hundreds or thousands of remote enterprise users to execute queries simultaneously against a centralized database.
+
+A **server operating system** operates on workstations, high-end personal computers, or clustered server blades connected over a network. Designed for multi-tenant environments, it allows multiple remote users to access shared hardware and software services simultaneously. Typical workloads include hosting network files, web servers, domain name resolvers, and relational databases. Representative server operating systems include **Linux**, **FreeBSD**, **Solaris**, and **Windows Server**.
+
+###### **1.11.2 Multiprocessor, Personal Computer, and Mobile Operating Systems**
+
+A **multiprocessor operating system** coordinates computer systems comprising two or more distinct processing cores or physical CPUs sharing a coherent memory architecture. These systems govern parallel computers, multicomputers, and multi-core processors, executing scheduling algorithms that balance CPU-bound threads across symmetric physical execution cores. Modern desktop and notebook platforms—including standard distributions of Linux and Windows—incorporate multiprocessor kernels by default.
+
+A **personal computer operating system** is engineered to deliver a responsive, single-user interactive environment dominated by graphical user interfaces (GUIs). Resource management prioritizes low latency for foreground user tasks (such as word processors, web browsers, and media playback) over raw aggregate batch throughput. Canonical implementations include **Windows** (e.g., Windows 98, Windows XP, and later iterations), **Mac OS X**, **Linux**, and **FreeBSD**.
+
+A **handheld computer operating system** (or mobile OS) manages battery-powered personal communication devices, evolving from early Personal Digital Assistants (PDAs) into modern smartphones and tablets. These kernels integrate low-power CPU sleep states, dynamic frequency scaling, cellular and wireless transceivers, and direct capacitive touch input pipelines. The mobile computing domain is dominated by Google's **Android** and Apple's **iOS**.
+
+###### **1.11.3 Embedded and Sensor-Node Operating Systems**
+
+An **embedded operating system** controls physical appliances and machinery not conventionally classified as general-purpose computers. These environments operate on dedicated microcontrollers with fixed hardware components and execute locked, vendor-supplied software images that do not permit end-user software installation. Deployed environments include microwave ovens, digital television receivers, automotive engine control units (ECUs), and avionics. Prominent systems include **Embedded Linux**, **VxWorks**, and **QNX**.
+
+A **sensor-node operating system** governs miniature, autonomous computing motes deployed in physical environments to capture acoustic, thermal, or vibrational signals. Each sensor node contains an ultra-low-power CPU, minimal operational memory (a few kilobytes of RAM and ROM), an environmental sensor package, and an integrated radio transceiver. These nodes execute an event-driven kernel architecture that cooperatively routes telemetry across peer nodes to a central base station over mesh wireless topologies. The canonical implementation in this category is **TinyOS**.
+
+###### **1.11.4 Real-Time and Smart Card Operating Systems**
+
+A **real-time operating system (RTOS)** makes the temporal correctness of an operation as critical as its logical correctness: the system must deterministically execute tasks within rigid time bounds. Real-time operating systems fall into two distinct operational classes:
+
+* **Hard real-time system**: must provide an absolute mathematical guarantee that an action or response occurs before an explicit, deterministic deadline. Missing a single deadline represents a total system failure and can result in physical destruction or loss of life (e.g., industrial robotics, automotive anti-lock braking, avionics flight control).
+* **Soft real-time system**: enforces priority scheduling to meet targets, but an occasional deadline miss does not cause catastrophic system failure; instead, it causes degraded operational quality (e.g., audio dropouts in multimedia streaming or missed video frames).
+
+Microkernel architectures such as **QNX** are standard real-time implementations, isolating peripheral drivers into user space while maintaining predictable interrupt latency inside the scheduling core.
+
+A **smart card operating system** represents the most constrained class of operating software, executing directly on a secure microchip embedded within a plastic credit card or subscriber identity module (SIM). The physical device possesses severe memory restrictions (typically several kilobytes of RAM and small non-volatile flash or ROM storage) powered externally through card-reader contact pads or near-field induction loops. A common implementation strategy utilizes a **Java Card**, wherein the embedded ROM contains a compact bytecode interpreter for the **Java Virtual Machine (JVM)**. Host systems securely flash compiled Java applets onto the chip, where the resident interpreter executes cryptographic validation and financial transactions in a sandboxed, tamper-resistant environment.
+
+##### **1.12 UNIX System Architecture, Standard Streams, and Shell Process Control**
+
+The **UNIX system architecture** is organized as a hierarchy of concentric functional rings separating privileged system management from interactive computing:
+
+*   **Hardware:** The innermost physical core comprising the processor, primary memory, and peripheral controllers.
+*   **Kernel:** The privileged core software executing in supervisor mode with full access to bare hardware, managing physical memory, device communication, and low-level scheduling.
+*   **Shell:** A **text user interface (TUI)** command interpreter that mediates between human operators and the operating system by translating user command strings into low-level operating system instructions and system calls. Prominent implementations include the Bourne shell (`sh`), Bourne-Again shell (`bash`), KornShell (`ksh`), and C shell (`csh`).
+*   **User Programs:** The outermost ring encompassing non-privileged utilities, editors, compilers, and application software.
+
+###### **1.12.1 Command Structure Parsing**
+
+When receiving an input line, the shell tokenizes and evaluates the string into three distinct structural components:
+
+1.  **Command:** The target executable binary or built-in routine (for example, `sort`).
+2.  **Options (flags):** Modifiers prefixed with single hyphens (short options, e.g., `-n`, `-r`, `-h`) or double hyphens (long options, e.g., `--help`) that alter runtime behavioral parameters.
+3.  **Arguments:** Data targets, file path strings, or positional parameters passed to the invoked program.
+
+In the command invocation:
+```bash
+sort -n -r namelist > namelist.sorted
+```
+the shell parses `sort` as the command, `-n` and `-r` as options requesting numerical and reversed evaluation, `namelist` as the target file argument, and `> namelist.sorted` as an instruction routing output.
+
+###### **1.12.2 Standard Communication Streams and Redirection**
+
+Every UNIX process initializes with three preconnected communication channels known as **standard streams**:
+
+*   **Standard Input (`stdin`, file descriptor $0$):** The primary stream from which the program consumes input, bound by default to the keyboard.
+*   **Standard Output (`stdout`, file descriptor $1$):** The primary stream to which the program writes execution results, bound by default to the display terminal.
+*   **Standard Error (`stderr`, file descriptor $2$):** An unbuffered secondary output stream designated exclusively for error reporting and diagnostic logging, isolated from standard calculation output.
+
+The shell modifies stream endpoints via redirection operators:
+
+*   **Input Redirection (`<`):** Supplies stream content directly from a storage file into `stdin` (`head -n 3 < file.txt`).
+*   **Output Redirection (`>`):** Truncates or creates the designated target file, routing `stdout` content directly into storage (`ls > list.txt`).
+*   **Pipelines (`|`):** Directly chains the `stdout` channel of an upstream program to the `stdin` channel of a downstream program, enabling sequential stream filtering without creating intermediate disk files (`ls | sort -r | tail -n 3`).
+
+###### **1.12.3 Process Execution States and Job Control**
+
+Operating environments differentiate process execution into foreground and background contexts:
+
+*   **Foreground Process:** A task running synchronously with the terminal shell. It claims terminal input control and blocks the shell prompt until execution terminates or the process is explicitly suspended.
+*   **Background Process:** An asynchronous task initiated by appending an ampersand (`&`) to the command line (e.g., `gedit &`). It leaves the terminal shell non-blocking and free to parse subsequent input immediately.
+
+Terminal job control coordinates execution states across active tasks. Suspended and background processes are assigned numerical job IDs tracked via the `jobs` command. A job is referenced by `%job_number` (with `%+` identifying the current job and `%-` identifying the previous job).
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "UNIX process lifecycle and job control state transitions"
+%%| fig-width: 7
+flowchart TB
+    FG["Foreground<br/>(blocks terminal)"]
+    BG["Background<br/>(non-blocking)"]
+    ST["Stopped<br/>(execution suspended)"]
+    KL["Killed<br/>(terminated)"]
+
+    CMD1["$ cmd"] --> FG
+    CMD2["$ cmd &"] --> BG
+
+    FG -->|"Ctrl+Z"| ST
+    FG -->|"Ctrl+C"| KL
+
+    ST -->|"bg"| BG
+    ST -->|"fg"| FG
+
+    BG -->|"stop job#"| ST
+    BG -->|"fg"| FG
+    BG -->|"kill job#"| KL
+```
+
+State transitions occur deterministically:
+
+1.  Pressing `Ctrl+Z` delivers a suspend signal to the running foreground process, shifting it to the **Stopped** state and restoring shell control.
+2.  Executing `bg %n` resumes stopped job $n$ to run concurrently in the **Background**.
+3.  Executing `fg %n` pulls background or stopped job $n$ into the **Foreground**, re-blocking the shell.
+4.  Issuing `Ctrl+C` sends an interrupt signal to terminate an active foreground process into the **Killed** state, while `kill %n` terminates a background job.
 
 ***
 
