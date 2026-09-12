@@ -101,6 +101,15 @@ N - 3/4
 Для Test - римская I/II
 Для Midterm Final разрешён год 2025 например
 Другие названия source запрещены
+<X> обязан указывать на реально существующий файл транскрипта недели:
+`(Lecture 1, …)` требует `Lecture*.md`, `(Tutorial 1, …)` — `Tutorial*.md`,
+`(Lab 1, …)` — `Lab.md`, `(Chapter 1, …)` — `Chapter.md` и т.д.
+(детерминированный гейт `validate_practice_sources.py`: однозначные
+перепутанные виды чинятся сами, неоднозначные уводят статью в карантин).
+Если в исходниках недели такого вида файла нет — такой source запрещён,
+выдумывать номера задач/примеров под несуществующий источник нельзя.
+Для Chapter-источников без нумерованных задач номера Task — сквозные
+внутри статьи (self-checks), это нормально
 
 ### 404.qmd - игнорируем
 ### index.qmd - игнорируем
@@ -129,6 +138,8 @@ N - 3/4
   Redraw as mermaid/tikz per exemplars.
 - Equation tags must be unique (any style): duplicates are renumbered
   deterministically and stale (N) references remapped before validation.
+- Textual cross-references (`equation (N)`, `Eq. (N)`, ranges) must point at
+  an existing `\tag{N}` in the same file — dangling refs are gate violations.
 - Lists are always tight: no blank lines between items of one list; item
   math (`$$` lines, even labeled/multiline), continuation paragraphs and
   nested sublists attach directly (indented, no blank line). Blank lines

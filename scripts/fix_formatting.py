@@ -508,6 +508,98 @@ def detect_pitfalls(lines):
     return issues
 
 
+def validate_equation_xrefs(lines):
+    """Textual equation references must point at an existing \\tag{N} in the same file.
+
+    Catches stale cross-references left by regen renumbering (e.g. DE/1
+    'satisfies equation (17)' pointing at a tag that no longer exists):
+    renumber_equation_tags only rewrites refs when duplicate tags exist, so
+    dangling refs otherwise survive silently. This gate only flags.
+    """
+    BS = chr(92)
+    tag_re = re.compile(BS + BS + 'tag{(' + BS + 'd+(?:' + BS + '.' + BS + 'd+)*)}')
+    tags = set()
+    fence = False
+    for line in lines:
+        st = line.strip()
+        if st.startswith('```'):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        for m in tag_re.finditer(line):
+            tags.add(m.group(1))
+    if not tags:
+        return []
+    range_re = re.compile(
+        r'\b[Ee]quations?\s*\(\s*(\d+(?:\.\d+)*)\s*\)\s*[\-\u2013\u2014]\s*\(\s*(\d+(?:\.\d+)*)\s*\)')
+    ref_re = re.compile(
+        r'\b[Ee]quations?\s*\(\s*(\d+(?:\.\d+)*)\s*\)|\bEqs?\.?\s*\(\s*(\d+(?:\.\d+)*)\s*\)')
+    issues = []
+    fence = False
+    for idx, line in enumerate(lines, start=1):
+        st = line.strip()
+        if st.startswith('```'):
+            fence = not fence
+            continue
+        if fence or not st or st.startswith('#'):
+            continue
+        probe = re.sub(r'`[^`]*`', '', line)
+        consumed = []
+        for m in range_re.finditer(probe):
+            for g in (m.group(1), m.group(2)):
+                if g not in tags:
+                    issues.append(
+                        'Line ' + str(idx) + ': equation range references (' + g
+                        + ') with no matching ' + BS + 'tag{' + g + '} in this file.')
+            consumed.append((m.start(), m.end()))
+        for m in ref_re.finditer(probe):
+            if any(a <= m.start() < b for a, b in consumed):
+                continue
+            g = m.group(1) or m.group(2)
+            if g not in tags:
+                issues.append(
+                    'Line ' + str(idx) + ': references equation (' + g
+                    + ') with no matching ' + BS + 'tag{' + g + '} in this file.')
+    return issues
+
+
+def detect_doubled_words(lines):
+    """Catch duplicated adjacent words ('physical physical', 'continuous continuous').
+
+    Prose-only (fences, headings, tables and math spans are exempt); flags, does
+    not rewrite. Audit Sept 2026: two such typos shipped in regen'd theories.
+    Function words are exempt: stripping $...$ spans can glue them together
+    ('such that $x$ that' / 'AND and OR gates' are legitimate prose).
+    """
+    STOP = frozenset((
+        'and', 'or', 'nor', 'yet', 'so', 'but', 'for', 'the', 'a', 'an', 'to',
+        'of', 'in', 'on', 'at', 'by', 'from', 'into', 'over', 'through', 'per',
+        'via', 'with', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'has', 'have', 'had', 'do', 'does', 'did', 'can', 'will', 'would',
+        'should', 'could', 'may', 'might', 'must', 'shall', 'not', 'if',
+        'then', 'than', 'when', 'while', 'where', 'which', 'who', 'that',
+        'this', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'we',
+        'you', 'he', 'she', 'both', 'either', 'neither', 'between', 'vs',
+    ))
+    issues = []
+    fence = False
+    for idx, line in enumerate(lines, start=1):
+        st = line.strip()
+        if st.startswith('```'):
+            fence = not fence
+            continue
+        if fence or not st or st.startswith(('#', '|', '$')):
+            continue
+        probe = re.sub(r'\$[^$]*\$', ' ', line)
+        probe = re.sub(r'`[^`]*`', ' ', probe)
+        for m in re.finditer(r'\b([A-Za-z]{3,})\s+\1\b', probe, flags=re.IGNORECASE):
+            if m.group(1).lower() in STOP:
+                continue
+            issues.append('Line ' + str(idx) + ": duplicated word '" + m.group(1) + "'.")
+    return issues
+
+
 def validate_format_rules(filepath, lines):
     if should_skip_file(filepath):
         return []
@@ -518,6 +610,7 @@ def validate_format_rules(filepath, lines):
     issues.extend(validate_theory_headings(lines))
     issues.extend(validate_practice_headings(lines, filepath))
     issues.extend(validate_dividers(filepath, lines))
+    issues.extend(validate_equation_xrefs(lines))
     return issues
 
 
@@ -1171,10 +1264,11 @@ def process_file(filepath):
         with open(filepath, 'w', encoding="utf-8") as f:
             f.write(new_content)
 
-    return removed, added + separators_added, ai_found, changed, format_issues
+    style_notes = detect_doubled_words(lines)
+    return removed, added + separators_added, ai_found, changed, format_issues, style_notes
 
 
-def build_report(stats, artifacts_by_file, format_issues_by_file):
+def build_report(stats, artifacts_by_file, format_issues_by_file, style_notes_by_file=None):
     """Build the Markdown report."""
     lines = [
         "# Formatting Report",
@@ -1218,6 +1312,23 @@ def build_report(stats, artifacts_by_file, format_issues_by_file):
         lines.append("")
 
     lines.extend([
+        "## Style Notes (advisory, non-blocking)",
+        "",
+    ])
+    if style_notes_by_file:
+        for file_path in sorted(style_notes_by_file):
+            lines.append(f"### {file_path}")
+            lines.append("")
+            for note in style_notes_by_file[file_path]:
+                # NOTE: `*` bullets on purpose — fix_loop only consumes `- ` bullets,
+                # so advisories never become LLM fix tasks.
+                lines.append(f"* {note}")
+            lines.append("")
+    else:
+        lines.append("No style notes.")
+        lines.append("")
+
+    lines.extend([
         "## Formatting Changes",
         "",
         f"- Files processed: {stats['files_processed']}",
@@ -1245,9 +1356,10 @@ total_ai_detected = 0
 files_changed = 0
 all_artifacts = {}  # file -> list of artifacts
 format_issues = {}  # file -> list of format issues
+style_notes = {}  # file -> advisory style notes (non-blocking)
 
 for fp in qmd_files:
-    removed, added, ai, changed, file_format_issues = process_file(fp)
+    removed, added, ai, changed, file_format_issues, file_style_notes = process_file(fp)
     total_removed += removed
     total_added += added
     total_ai_detected += len(ai)
@@ -1260,6 +1372,9 @@ for fp in qmd_files:
     if file_format_issues:
         format_issues[fp] = file_format_issues
 
+    if file_style_notes:
+        style_notes[fp] = file_style_notes
+
 stats = {
     'files_processed': len(qmd_files),
     'files_changed': files_changed,
@@ -1269,7 +1384,7 @@ stats = {
 }
 
 Path(REPORT_FILE).write_text(
-    build_report(stats, all_artifacts, format_issues),
+    build_report(stats, all_artifacts, format_issues, style_notes),
     encoding='utf-8',
 )
 

@@ -25,7 +25,7 @@ from pathlib import Path
 
 
 from llm import complete as llm_complete
-from fix_loop import fix_article
+from fix_loop import fix_article, quarantine
 
 ROOT = Path(__file__).resolve().parents[2]
 INNO_NOTES = ROOT
@@ -1259,6 +1259,13 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
     tmp.write_text(article, encoding="utf-8")
     tmp.replace(qmd)
 
+    # Deterministic source-label gate (audit Sept 2026: DE/1 shipped invented
+    # `(Lecture 1, Task N)` labels with no Lecture transcript). Unambiguous
+    # kind swaps are fixed without LLM; leftovers quarantine below.
+    res = run([sys.executable, "scripts/agent/validate_practice_sources.py",
+               "--inno-files", str(inno_files), "--fix", str(qmd)])
+    print("  practice-sources autofix: " + (res.stdout.strip().splitlines() or [''])[-1][:200])
+
     # One article at a time here: fix/report/render share state.
     with _VALIDATE_LOCK:
         # Deterministic pre-pass: formatting autofix + renumber
@@ -1271,6 +1278,15 @@ def process_week(qmd: Path, mds: list[Path], inno_files: Path, api_key: str, dry
         # Block-level fix loop (up to 3 rounds), then quarantine (never delete).
         status = fix_article(qmd, rounds=3)
         if status == "ok":
+            res = run([sys.executable, "scripts/agent/validate_practice_sources.py",
+                       "--inno-files", str(inno_files), str(qmd)])
+            if res.returncode != 0:
+                tail = (res.stdout or "")[-2000:]
+                print(f"  practice-sources gate FAILED, quarantining {qmd}")
+                quarantine(qmd, ["practice-sources gate: invented source attribution needs human judgment"],
+                           tail, "")
+                print(f"  KEPT AS QUARANTINE {qmd} (pushed with .log, hidden from prod)")
+                return True
             print(f"  OK {qmd} (fix-loop clean + quarto render ok)")
             stale_log = qmd.with_suffix(".log")
             if stale_log.exists():
