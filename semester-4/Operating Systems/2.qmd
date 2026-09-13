@@ -1,0 +1,1516 @@
+---
+title: "W2. Linux Command Line Basics"
+author: "Giancarlo Succi"
+date: "September 13, 2026"
+format: html
+engine: knitr
+---
+
+#### **1. Theory**
+
+##### **1.1 Linux CLI Execution and Stream Redirection**
+
+The **command-line interface (CLI)** is a text-based environment through which users instruct the operating system kernel to manipulate filesystem structures, manage process execution lifecycles, and direct input/output data streams.
+
+A filesystem hierarchy organizes data into directories and files. The creation of a new directory node is performed using the `mkdir` utility:
+
+```bash
+mkdir folder_name
+```
+
+The argument `folder_name` denotes the name or path of the target directory to be instantiated within the current working context.
+
+By default, an operating system shell executes a program in the foreground: the shell process blocks and yields the terminal interface until the spawned child process completes execution. An **asynchronous background process** executes concurrently with the shell, immediately releasing terminal control back to the user prompt. A background process is initiated by appending a trailing ampersand (`&`) to the command:
+
+```bash
+command_line &
+```
+
+When this syntax is executed, the shell creates the process, assigns an operating system execution context, and immediately displays a new prompt without waiting for `command_line` to finish.
+
+Programs communicate runtime results through default data channels known as streams. The standard output stream (`stdout`) defaults to terminal display. The shell provides **stream redirection** operators to intercept and route this data stream into persistent files:
+
+*   **Overwriting redirection (`>`)**: Directs the output stream to a target file. If the file already exists, its contents are truncated and replaced entirely; if the file does not exist, it is created.
+    ```bash
+    command_line > file_name
+    ```
+*   **Appending redirection (`>>`)**: Directs the output stream to the end of a target file. If the file exists, the new stream data is appended to the existing contents without truncating prior records; if the file does not exist, it is created.
+    ```bash
+    command_line >> file_name
+    ```
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "CLI command execution models and standard output stream routing."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Command Invocation"] --> B["Execution Mode"]
+    A --> C["Stream Routing"]
+    B --> D["Foreground Execution<br/>(blocks active terminal)"]
+    B --> E["Background '&'<br/>(non-blocking asynchronous job)"]
+    C --> F["Truncate and Overwrite '>'<br/>(creates or replaces file)"]
+    C --> G["Sequential Append '>>'<br/>(preserves existing contents)"]
+```
+
+Translating high-level source text into machine instructions requires invoking a compiler toolchain via the CLI. The GNU Compiler Collection (`gcc`) serves as the standard compiler driver for C programs. The fundamental syntax for compiling a C source file into a named executable binary utilizes the output flag `-o`:
+
+```bash
+gcc ex.c -o ex
+```
+
+In this invocation, `gcc` consumes the source file `ex.c` and emits the compiled, assembled, and linked executable directly into the binary file named `ex`. Omission of the `-o` parameter causes the compiler to fall back to the default output binary name `a.out`.
+
+##### **1.2 Structural Architecture of a C Source Program**
+
+The structural architecture of a C source translation unit is organized into six formal, sequential divisions: the **documentation section**, the **link section**, the **definition section**, the **global declaration section**, the **`main()` function section**, and the **subprogram section**.
+
+*   **Documentation section**: Contains high-level commentary, such as the program description, author identity, and copyright notices.
+*   **Link section**: Supplies preprocessor directives (such as `#include <stdio.h>`) directing the compiler to link required library declarations and external interface headers.
+*   **Definition section**: Declares symbolic constants and functional macros using preprocessor directives such as `#define PI 3.1415926`.
+*   **Global declaration section**: Houses global variable definitions and function prototypes that remain visible and accessible across multiple functions.
+*   **`main()` function section**: Defines the mandated primary execution entry point called when the program launches. It contains two internal components:
+    *   **Declaration part**: Specifies all local variables, allocate-on-stack identifiers, and types utilized by the function.
+    *   **Executable part**: Contains runtime statements, computation instructions, input/output calls, and return operations.
+*   **Subprogram section**: Contains the operational definitions for all user-defined functions invoked across the translation unit.
+
+Every valid C executable program strictly requires exactly one **`main()` function section**. All remaining five sections are entirely optional according to the language specification; a minimal legal program consists solely of an empty or returning `main()` definition.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Structural architecture and section dependencies of a standard C source translation unit."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    subgraph OptionalSections["Optional Pre-Execution Context"]
+        A["Documentation Section<br/>(Program notes, author)"]
+        B["Link Section<br/>(#include directives)"]
+        C["Definition Section<br/>(#define macros, constants)"]
+        D["Global Declaration Section<br/>(Global variables, prototypes)"]
+    end
+    subgraph MandatorySection["Mandatory Entry Point"]
+        E["main() Function Section"]
+        E1["Declaration Part<br/>(Local variable declarations)"]
+        E2["Executable Part<br/>(Computations, returns)"]
+        E --> E1
+        E --> E2
+    end
+    subgraph AuxiliarySection["Auxiliary Code"]
+        F["Subprogram Section<br/>(User-defined functions)"]
+    end
+    A --> B --> C --> D --> E --> F
+```
+
+The concrete arrangement of these six structural divisions within a single source file appears as follows:
+
+```c
+// Documentation section
+// Author: Operating Systems Sample
+
+#include <stdio.h>         // Link section
+
+#define PI 3.1415926       // Definition section
+
+int global_var;            // Global declaration section
+void compute(void);        // Global declaration section (prototype)
+
+int main(void)             // main() function section
+{
+    int local_var;         // Declaration part
+    local_var = 10;        // Executable part
+    compute();             // Executable part
+    return 0;              // Executable part
+}
+
+void compute(void)         // Subprogram section
+{
+    global_var = 1;
+}
+```
+
+##### **1.3 Variable Model, Identifiers, and Scope Classifications**
+
+A program **variable** is an abstraction over a physical memory cell or a contiguous sequence of cells. Rather than referencing raw numerical addresses directly during algorithmic design, a program accesses hardware storage through symbolic variable bindings. Every variable in the C language model is governed by six fundamental attributes:
+
+*   **Name**: A symbolic **identifier** used in source code to reference the underlying memory binding.
+*   **Type**: The data specification establishing the memory footprint, representation format, and mathematical domain of valid values that can be stored.
+*   **Address**: The physical or virtual memory location identifying the byte offset where the variable's value is stored in memory.
+*   **Value**: The concrete bit pattern stored at the variable's address, interpreted through the lens of its associated type at an execution step.
+*   **Lifetime**: The temporal duration spanning the allocation, validity, and deallocation of the underlying memory storage during process execution.
+*   **Scope**: The spatial region of program source text across which a variable's identifier is bound, visible, and accessible.
+
+```c
+#include <stdio.h>
+
+void f(int n) {
+    float result = n * n;
+    printf("Parameter address: %p\n", (void *)&n);
+    printf("Local result address: %p\n", (void *)&result);
+    printf("Value received: %d\n", n);
+}
+
+int main(void) {
+    int myNumber = 10;
+    printf("Local myNumber address: %p\n", (void *)&myNumber);
+    f(myNumber);
+    return 0;
+}
+```
+
+In the execution of this program, the identifier `myNumber` possesses the type `int`, holding value $10$ at a distinct stack memory address (for example, `0x7ffe5a8bbedc`). When calling `f(myNumber)`, the formal parameter `n` is allocated its own stack address (`0x7ffe5a8bbeac`), holding an independent copy of value $10$. Its lifetime and scope remain restricted exclusively to the activation of function `f`.
+
+###### **1.3.1 Identifier Lexical Grammar**
+
+The lexical analyzer enforces rigorous grammatical constraints on the construction of variable names. An **identifier** must begin with an alphabetic character (either uppercase $A\text{--}Z$ or lowercase $a\text{--}z$) or an underscore (`_`). Numerical digits ($0\text{--}9$) cannot occupy the first character position.
+
+Typographical symbols such as `#`, `*`, `-`, or `@` are illegal within an identifier token; an expression like `#nm*rt` triggers a lexical rejection because `#` and `*` are not valid identifier characters. Furthermore, language keywords (including primitive type specifiers such as `int` and `float`) represent reserved syntax and cannot be appropriated as variable names.
+
+###### **1.3.2 Scope Tiers and Lifetime Constraints**
+
+The spatial visibility of an identifier and its associated memory lifetime are organized into three architectural scope tiers:
+
+*   **Global variables**: Variables declared outside of all executable function blocks. A global variable is visible to all subprograms defined beneath its declaration within the translation unit. Its lifetime spans the entire execution duration of the program, residing in statically allocated program memory initialized prior to `main()` execution.
+*   **Local variables**: Variables declared inside an executable block or compound statement. The scope of a local variable is restricted strictly to the enclosing function body or block delimited by braces. Its lifetime begins when control transfers into the declaring block and terminates when execution exits, with storage allocated dynamically on the thread's call stack.
+*   **Formal parameters**: Variables defined inside the signature parameter list of a function (such as `argc` and `argv` in `int main(int argc, char *argv[])`). Formal parameters are scoped exclusively within the body of the invoked function. Like local variables, their lifetime is bound to the function invocation frame allocated on the call stack, receiving their initial values from the arguments supplied by the caller.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Variable scope classifications and memory lifetime mappings."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Variable Declaration<br/>Location"] --> B["External: Outside Functions<br/>(Global Variables)"]
+    A --> C["Internal: Block Body<br/>(Local Variables)"]
+    A --> D["Signature: Parameter List<br/>(Formal Parameters)"]
+    B --> E["Scope: Entire File<br/>Lifetime: Program Runtime"]
+    C --> F["Scope: Enclosing Block<br/>Lifetime: Stack Frame"]
+    D --> G["Scope: Function Body<br/>Lifetime: Activation Instance"]
+```
+
+Because local variables and formal parameters inhabit the activation record of their parent function, external subprograms cannot read or modify them directly. When an external routine attempts to alter a variable residing in another function's stack frame without an explicit addressing handle, the compiler rejects the expression as an undeclared identifier outside of its permissible scope. Conversely, global variables remain accessible across separate functions, enabling persistent state updates across function invocations.
+
+##### **1.4 C Type System, Memory Footprints, and Numeral Bases**
+
+The C type system defines the interpretation, valid range, and physical memory footprint allocated to variables. A **data type** determines the binary encoding scheme used to represent a value inside a memory cell and defines the allowable operations on that cell. Data types are categorized into **primitive types** and **derived types**.
+
+A **primitive data type** is fundamentally supported by compiler code generation and directly mirrors processor registers or arithmetic logic unit operations:
+
+*   **Integer types**: represent discrete whole numbers with optional signs. The standard types include signed and unsigned variants of `char`, `short int` (or `short`), `int`, `long int` (or `long`), and `long long int` (or `long long`). Unsigned specifiers restrict values to non-negative domains, whereas signed specifiers utilize two's-complement notation.
+*   **Floating-point types**: represent real numbers via fractional encoding. Standard types include single-precision `float`, double-precision `double`, and extended-precision `long double`.
+*   **Void type**: denoted by `void`, represents the absence of a value or an untyped memory reference.
+
+A **derived data type** (or composite type) is constructed by aggregating or referencing primitive types:
+
+*   **Arrays**: contiguous allocations of homogeneous elements accessed via numerical index offsets. A **string** is a derived one-dimensional character array terminated by a null byte literal (`'\0'`).
+*   **Structures (`struct`)**: heterogeneous data records packaging multiple variables of varying types into a contiguous memory block.
+*   **Unions (`union`)**: memory overlays wherein multiple member definitions share the exact same physical byte space.
+*   **Pointers**: variables that hold the hardware memory address of another variable or data structure.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Taxonomy of primitive and derived data types in the C language."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    Root["C Data Types"] --> Prim["Primitive Types"]
+    Root --> Deriv["Derived Types"]
+    Prim --> Ints["Integral Types<br/>(char, short, int, long)"]
+    Prim --> Floats["Floating-Point Types<br/>(float, double)"]
+    Prim --> VType["Empty Type<br/>(void)"]
+    Deriv --> Arr["Arrays & Strings<br/>(Homogeneous, '\0' terminated)"]
+    Deriv --> StructUnion["Structures & Unions<br/>(Heterogeneous records)"]
+    Deriv --> Ptr["Pointers<br/>(Memory addresses)"]
+```
+
+The compile-time unary operator **`sizeof`** evaluates the physical memory footprint of an expression or parenthesized type specifier, returning its capacity as an unsigned integer representing bytes:
+
+$$\text{Memory Allocated} = \text{sizeof}(\text{type}) \quad \text{or} \quad \text{sizeof}(\text{variable})$$
+
+On typical 32-bit and 64-bit systems, primitive types occupy fixed byte boundaries:
+
+```c
+int a;
+float b;
+double c;
+printf("%lu, %lu, %lu\n", sizeof(a), sizeof(b), sizeof(c));
+```
+
+This inspection yields standard footprint measurements: `int` consumes $4\text{ bytes}$ ($32\text{ bits}$), `float` consumes $4\text{ bytes}$ ($32\text{ bits}$), and `double` consumes $8\text{ bytes}$ ($64\text{ bits}$). Type names themselves (`int`, `float`) are reserved keywords and cannot serve as variable identifiers.
+
+Memory representation differs fundamentally between integral and floating-point types. An integer stores a direct binary bit pattern bounded by architectural limits such as $\text{INT\_MAX} = 2^{31}-1$ for a signed 32-bit word. A floating-point number partitions its allocated bits into a sign bit $s$, an exponent $E$, and a significand (mantissa) $M$:
+
+$$V = (-1)^s \times M \times 2^E$$
+
+Because exponents scale the dynamic position of the binary radix point, a $4\text{-byte}$ `float` spans an absolute numerical range far exceeding the capacity of a $4\text{-byte}$ `int`. When converting a floating-point value to an integer variable via type casting (`(int)val`), the fractional part is truncated toward zero. If the magnitude of the floating-point value exceeds the fixed capacity of the destination integer, arithmetic overflow occurs, writing truncated or out-of-range bit patterns into the target variable.
+
+Underlying all memory cells is physical storage in binary form ($0\text{s}$ and $1\text{s}$). Because raw binary streams are difficult for human analysis, system software employs positional numeral systems with varying radix bases $b$:
+
+$$N_b = \sum_{k=0}^{n-1} d_k \cdot b^k \quad \text{where } d_k \in \{0, 1, \dots, b-1\}$$
+
+*   **Binary (base-2)**: utilizes digits $\{0, 1\}$; directly reflects hardware logic states.
+*   **Octal (base-8)**: utilizes digits $\{0, 1, 2, 3, 4, 5, 6, 7\}$; packs groups of 3 binary digits into a single numeral.
+*   **Decimal (base-10)**: utilizes digits $\{0, 1, 2, 3, 4, 5, 6, 7, 8, 9\}$; standard human arithmetic notation.
+*   **Hexadecimal (base-16)**: utilizes digits $\{0, 1, \dots, 9, \text{A}, \text{B}, \text{C}, \text{D}, \text{E}, \text{F}\}$; packs groups of 4 binary digits (nibbles) into a single numeral, standard for hardware addresses.
+
+Converting between radix representations follows polynomial expansion. Evaluating the octal number $1234_8$ to decimal produces:
+
+$$1234_8 = (1 \times 8^3) + (2 \times 8^2) + (3 \times 8^1) + (4 \times 8^0) = 512 + 128 + 24 + 4 = 668_{10}$$
+
+Mapping each octal digit to its corresponding 3-bit binary triplet yields the exact binary representation: $1_8 \to 001_2$, $2_8 \to 010_2$, $3_8 \to 011_2$, and $4_8 \to 100_2$, assembling into $1010011100_2$.
+
+##### **1.5 Standard Streams, I/O Mechanics, and Buffer Safety**
+
+Standard input and output in C operate over sequential byte streams managed through pointers to the `FILE` abstraction defined in `<stdio.h>`. Programs interface with three predefined runtime channels: standard input (`stdin`), standard output (`stdout`), and standard error (`stderr`).
+
+Standard stream facilities divide into unformatted character-oriented routines and formatted translation engines:
+
+*   **Character and String Stream Operations**: Low-level stream access transfers raw character units or string sequences without type parsing. Single-character output is performed via `putchar(int c)` on `stdout` or `fputc(int c, FILE *stream)` on an arbitrary stream; corresponding character ingestion uses `getchar(void)` or `fgetc(FILE *stream)`. String-level operations transfer contiguous character arrays: `puts(const char *s)` appends a trailing newline to `stdout`, whereas `fputs(const char *s, FILE *stream)` writes the exact contents of the null-terminated string to the specified stream.
+*   **Formatted Stream Conversions**: High-level conversions interpret stream bytes according to format specifier strings. Output engines `printf(const char *format, ...)` and `fprintf(FILE *stream, const char *format, ...)` translate internal representations of primitive types (such as `%d` for integers, `%f` for floating-point numbers, and `%s` for strings) into readable ASCII character streams. Conversely, `scanf(const char *format, ...)` and `fscanf(FILE *stream, const char *format, ...)` parse incoming character sequences into memory destinations supplied as pointer addresses (`&a`).
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Taxonomy of standard stream I/O facilities and safety characteristics."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Standard I/O Operations<br/>stdio.h Interface"] --> B["Character & Line I/O"]
+    A --> C["Formatted Conversion I/O"]
+    B --> D["Unbounded Ingestion<br/>gets - Deprecated"]
+    B --> E["Bounded Stream Ingestion<br/>fgets, fputs, getchar"]
+    C --> F["Stream Parsing<br/>scanf, printf, fprintf"]
+    C --> G["In-Memory Formatting<br/>sscanf, sprintf"]
+```
+
+###### **1.5.1 Buffer Overflow Vulnerabilities and Bounded Stream Ingestion**
+
+A **buffer overflow** occurs when an input operation writes data beyond the boundary of an allocated destination buffer, corrupting adjacent stack frames or data structures. The standard C function `gets(char *str)` reads standard input until encountering a newline or end-of-file condition without accepting a buffer length limit; if the input size exceeds the destination capacity, memory past the array boundary is overwritten. An unqualified string extraction specifier `%s` in `scanf("%s", buffer)` displays identical vulnerability because it processes non-whitespace character tokens indefinitely until whitespace occurs.
+
+Secure stream ingestion requires bounded operations that enforce maximum copy thresholds:
+
+*   **Bounded Reads via `fgets`**: The standard function `fgets(char *str, int num, FILE *stream)` limits ingestion by specifying the maximum byte capacity `num`. It reads up to `num - 1` characters, preserves the terminating newline character `\n` if encountered within the limit, and automatically appends a null byte `\0`. Ingesting from standard input uses the idiom:
+
+```c
+char name[10];
+fgets(name, sizeof(name), stdin);
+```
+
+*   **Portability Constraints of `getline`**: POSIX platforms provide `getline(char **lineptr, size_t *n, FILE *stream)`, which dynamically allocates or resizes the destination heap buffer to accommodate inputs of arbitrary length. However, `getline` is restricted to POSIX runtime specifications and is absent from standard Microsoft C library implementations, compromising cross-platform portability.
+
+###### **1.5.2 Formatted In-Memory Conversions**
+
+The functions `sscanf()` and `sprintf()` execute formatted conversions directly over contiguous memory buffers rather than external file streams:
+
+*   **String-to-Numeric Parsing via `sscanf`**: `sscanf(const char *s, const char *format, ...)` extracts data from a null-terminated string according to specified type directives. For example, converting the ASCII string representation `"2022"` into a primitive integer variable `val` proceeds as:
+
+```c
+int val;
+sscanf("2022", "%d", &val);
+```
+
+*   **Numeric-to-String Formatting via `sprintf`**: `sprintf(char *str, const char *format, ...)` transforms primitive data types into formatted ASCII sequences written directly into a destination character array, appending a null terminator:
+
+```c
+char out_str[16];
+int val = 2022;
+sprintf(out_str, "%d", val);
+```
+
+###### **1.5.3 Command-Line Argument Passing Semantics**
+
+When a compiled binary is invoked from the command-line shell, the operating system kernel and runtime startup code initialize parameters passed directly to the program entry point:
+
+```c
+int main(int argc, char *argv[])
+```
+
+The integer parameter `argc` (**argument count**) contains the total number of command-line tokens provided, including the program name. The parameter `argv` (**argument vector**) is an array of pointers to null-terminated character strings (`char *`). The first element, `argv[0]`, stores the invoked command string or path itself. Subsequent entries `argv[1]` through `argv[argc - 1]` hold the distinct positional argument strings separated by shell whitespace delimiters. For an execution invocation:
+
+```bash
+./a.out 42 13 12
+```
+
+The runtime establishes `argc = 4`. The pointer array resolves to:
+
+$$\begin{aligned}
+\text{argv}[0] &\to \text{"./a.out"} \\
+\text{argv}[1] &\to \text{"42"} \\
+\text{argv}[2] &\to \text{"13"} \\
+\text{argv}[3] &\to \text{"12"}
+\end{aligned}$$
+
+Because each token in `argv` arrives typed as a character string, numeric inputs must be converted into arithmetic types within the program body using memory conversion functions prior to evaluation. Detailed behavioral manuals for all standard I/O functions are documented within section 3 of the system reference manual, accessible via `man 3 <function_name>`.
+
+##### **1.6 Pointers, Memory Addressing, and Low-Level System Control**
+
+A **pointer** is a typed variable whose value is the memory address of another variable or composite data structure. Pointers provide explicit, unabstracted access to the physical or virtual address space of a process.
+
+Operating on pointer types relies on two fundamental unary operators:
+
+*   The **address-of operator** (`&`): returns the physical or virtual memory address where its operand variable is stored.
+*   The **dereference operator** (`*`): accesses or modifies the value stored at the memory address currently held by the pointer operand.
+
+Consider the sequential execution of pointer operations on the program stack:
+
+```c
+char c1, c2, *p;
+c1 = 'c';
+p = &c1;
+c2 = *p;
+```
+
+Stack allocation assigns distinct contiguous addresses to these variables. In a representative 32-bit stack frame spanning upward from address `0x29ff10` to `0x29ff38`, variable `c1` resides at address `0x29ff2a`, `c2` resides at `0x29ff2b`, and the pointer `p` resides at `0x29ff2c`. Execution proceeds across four distinct memory states:
+
+1.  **Declaration (`char c1, c2, *p;`)**: The compiler allocates memory cells on the stack frame. Prior to initialization, their contents contain residual stack data (e.g., `c1` contains raw byte `-3`, `c2` contains `127`, and `p` contains an arbitrary residual address `0x400080`).
+2.  **Direct assignment (`c1 = 'c';`)**: The ASCII code for `'c'` (integer value `99`) is written directly into stack address `0x29ff2a`.
+3.  **Address assignment (`p = &c1;`)**: The address-of operator evaluates the address of `c1` (`0x29ff2a`) and stores this numerical address into the pointer variable `p` at `0x29ff2c`. The pointer `p` now points directly to `c1`.
+4.  **Indirect assignment through dereferencing (`c2 = *p;`)**: The dereference operator reads the address held in `p` (`0x29ff2a`), retrieves the byte stored at that location (`99`), and copies that value into the storage cell of `c2` at `0x29ff2b`.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Stack memory layout and pointer dereferencing relationship."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    subgraph StackFrame["Stack Memory Space"]
+        direction TB
+        P["Pointer variable: p<br/>Address: 0x29ff2c<br/>Stored Value: 0x29ff2a"]
+        C1["Character variable: c1<br/>Address: 0x29ff2a<br/>Stored Value: 99 ('c')"]
+        C2["Character variable: c2<br/>Address: 0x29ff2b<br/>Stored Value: 99 ('c')"]
+    end
+    P -->|"Points to (holds address of)"| C1
+    C1 -->|"Value loaded via *p into"| C2
+```
+
+The C programming language is designed without runtime overhead and purposefully omits features common in high-level managed languages:
+
+*   Classes and objects
+*   Packages and modular namespaces
+*   Built-in language-level threads
+*   Strict runtime type safety
+*   Automatic garbage collection
+
+Memory in C follows an explicit lifecycle: storage is either static (fixed at compile time) or manually allocated and released on the heap via standard runtime functions (`malloc()` to allocate a specified byte count, and `free()` to release it back to the allocator). This deterministic memory model gives developers absolute control over hardware structures. In operating system kernels, where execution must satisfy strict timing constraints and direct hardware interfacing, the non-deterministic latency introduced by an automatic garbage collector executing at arbitrary intervals is intolerable.
+
+##### **1.7 Parameter Passing Semantics: By-Value versus By-Reference**
+
+In the C runtime model, parameter passing defines how arguments are transferred across function call boundaries on the execution stack. When a function executes, the runtime allocates a dedicated activation record (**stack frame**) containing the callee's local variables and formal parameters.
+
+*   **Pass-by-value**: The callee's formal parameter receives an isolated bitwise copy of the evaluated argument value. Any modification made to the formal parameter inside the callee's scope alters only that local stack frame entry, leaving the caller's variable in the preceding stack frame untouched.
+*   **Pass-by-reference**: In C, pass-by-reference is implemented structurally through pointers. Rather than receiving a duplicate of the underlying data value, the formal parameter receives the memory address of the caller's variable (passed via the address-of operator `&`). Through **dereferencing** (using the indirection operator `*`), the callee reads and modifies the memory residing in the caller's stack frame.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Stack frame memory interactions for pass-by-value and pointer-based pass-by-reference."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    subgraph ValueModel["Pass-by-Value: increment(arg)"]
+        direction TB
+        V1["Caller Frame:<br/>arg = 0 at 0x7ffd00"]
+        V2["Callee Frame:<br/>num = 0 at 0x7ffcf0"]
+        V3["Mutation:<br/>num = num + 1 = 1"]
+        V4["Return:<br/>arg remains 0"]
+        V1 -->|Value copied| V2
+        V2 --> V3
+        V3 --> V4
+    end
+
+    subgraph RefModel["Pass-by-Reference: increment(&arg)"]
+        direction TB
+        R1["Caller Frame:<br/>arg = 0 at 0x7ffd00"]
+        R2["Callee Frame:<br/>num = 0x7ffd00 at 0x7ffcf0"]
+        R3["Dereference Mutation:<br/>*num = *num + 1"]
+        R4["Return:<br/>arg updated to 1"]
+        R1 -->|Address passed| R2
+        R2 -->|Targeted write| R3
+        R3 --> R4
+    end
+```
+
+Consider the concrete behavioral difference between both evaluation models:
+
+```c
+// Pass-by-value implementation
+void increment_val(int num) {
+    num = num + 1;
+}
+
+// Pass-by-reference implementation using a pointer
+void increment_ref(int *num) {
+    *num = *num + 1;
+}
+
+int main(void) {
+    int arg = 0;
+
+    increment_val(arg);
+    // arg remains 0: num held an independent copy in increment_val's frame
+
+    increment_ref(&arg);
+    // arg is now 1: *num accessed and mutated 0x... address directly
+    return 0;
+}
+```
+
+In `increment_val(arg)`, the integer value `0` is copied into the memory slot reserved for parameter `num` inside `increment_val`'s frame. The operation `num = num + 1` changes `num` to `1`. When `increment_val` terminates, its frame is popped from the stack; `arg` inside `main` retains its initial value `0`.
+
+In `increment_ref(&arg)`, the expression `&arg` passes the virtual memory address of `arg` to the callee. The pointer parameter `num` is allocated inside `increment_ref`'s frame and populated with that address. The expression `*num = *num + 1` performs a memory dereference: the CPU resolves the target address stored in `num`, reads the 4-byte integer from `main`'s stack frame, computes $0 + 1$, and writes the resulting integer directly back into `main`'s variable slot.
+
+From an interface design perspective, pointer-based pass-by-reference provides two critical system capabilities:
+1.  **Direct side-effect control**: It enables functions to return multiple computed values or modify external state across caller scopes without relying on global variables.
+2.  **Memory efficiency**: It avoids copying large data payloads (such as multi-kilobyte structures or character buffers) onto the call stack, replacing the overhead of bulk data duplication with the transfer of a fixed-size memory address (4 bytes on 32-bit architectures, 8 bytes on 64-bit architectures).
+
+##### **1.8 The C Preprocessor and Modular Header Design**
+
+The **C preprocessor** is an initial text-processing phase of the translation system that executes prior to syntactic analysis and machine compilation. Rather than parsing semantic C statements, the preprocessor evaluates specialized control lines designated as **preprocessor directives**. 
+
+Preprocessor directives follow three structural syntax conventions:
+
+*   **Prefix syntax**: Every directive must initiate with a hash symbol (`#`) as the first non-whitespace character on the line.
+*   **Delimiter omission**: Directives are terminating-character agnostic; unlike standard C statements, they do not end with a semicolon (`;`).
+*   **Line continuation**: Directives are line-oriented by default. When a directive spans across multiple lines, a trailing backslash (`\`) placed at the immediate end of the line escapes the newline character, instructing the preprocessor to concatenate the subsequent line into a single logical directive.
+
+```c
+#define MAXIMUM_BUFFER_CAPACITY \
+    4096
+```
+
+The preprocessor performs lexical manipulation across source files through file inclusion and token substitution before generating intermediate extended source code.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "File inclusion lookup strategies and textual substitution flow in the C preprocessor."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Source File (.c)<br/>Contains Directives"] --> B{"Directive Type"}
+    B -->|#include &lt;header.h&gt;| C["System Search Path<br/>Standard Header Directories"]
+    B -->|#include &quot;header.h&quot;| D["Local Directory First<br/>User Search Paths"]
+    B -->|#define NAME TOKEN| E["Symbolic Substitution<br/>Token String Replacement"]
+    C --> F["Textual Insertion<br/>Copies Header Content"]
+    D --> F
+    E --> G["Extended Translation Unit<br/>Passed to Compiler"]
+    F --> G
+```
+
+###### **1.8.1 Header File Inclusion and Path Resolution**
+
+The `#include` directive instructs the preprocessor to locate a designated file, suspend scanning of the current file, and copy the full textual content of the target file directly into the translation unit at the directive's location. C standardizes two syntactical variants that dictate directory search hierarchies:
+
+*   **System path inclusion (`#include <file.h>`)**: Enclosing the target filename within angle brackets directs the preprocessor to traverse central **system include paths** configured within the compiler environment (such as directories housing the standard library header `<stdio.h>`).
+*   **User-defined path inclusion (`#include "file.h"`)**: Enclosing the target filename within double quotation marks commands the preprocessor to search the current working directory containing the active source file first. If the file is not discovered locally, the preprocessor falls back to search user-specified include directories and subsequently the standard system include paths.
+
+Header files conventionally carry the `.h` extension and contain shared type definitions, function prototypes, and symbolic macros.
+
+###### **1.8.2 Modular Decomposition and Header Contracts**
+
+In operating systems and large-scale software systems, header files structure code into independent architectural units using a **divide and conquer** paradigm. Modular decomposition via header files yields specific engineering properties:
+
+*   **Interface isolation**: A header file exposes an explicit functional contract between modules while concealing implementation internals contained in corresponding `.c` translation units.
+*   **Independent verification**: Software components defined across discrete files can be compiled, verified, and unit-tested in isolation rather than as an inseparable monolithic codebase.
+*   **Compilation contracts**: Function declarations inside `.h` files furnish the compiler with call signatures, return types, and argument configurations. This structural contract enables source files referencing external functions to pass compilation before the linker binds the resulting object modules together.
+
+###### **1.8.3 Symbolic Constants via `#define`**
+
+The `#define` directive establishes a **symbolic constant** through macro text substitution using the standard syntax:
+
+```c
+#define IDENTIFIER TOKEN_STRING
+```
+
+Upon encountering `#define`, the preprocessor registers `IDENTIFIER` within its symbol table. During the remaining scanning of the translation unit, every isolated instance of `IDENTIFIER` outside of string literals is substituted verbatim with `TOKEN_STRING`. 
+
+Using symbolic constants provides measurable advantages over literal values and mutable public variables:
+
+*   **Elimination of raw literals**: Assigning descriptive identifiers to literal values (e.g., `#define BUFFER_SIZE 4096`) clarifies developer intent and centralizes modifications, preventing manual multi-site editing discrepancies.
+*   **Immutability enforcement**: Global or public mutable variables can be modified during program execution, creating side effects; symbolic constants are fixed prior to code generation.
+*   **Machine code optimization**: Because symbolic constants undergo textual substitution before the compilation pass, the compiler evaluates constant expressions directly and embeds immediate operands straight into machine instructions, eliminating the memory read overhead and storage allocation required for global variables.
+
+##### **1.9 Macro Substitution Mechanics and Operator Precedence Hazards**
+
+A **function-like macro** is an identifier defined with a parameter list using the preprocessor directive `#define macro_name(param1, param2, ...) token_string`. When encountered in source text, the preprocessor replaces the macro invocation and its arguments directly with the substitution text, eliminating runtime function call overhead such as stack frame allocation and register manipulation while operating completely independent of the C type system.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Textual macro expansion versus semantic function invocation stages."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Macro Invocation<br/>double(b++)"] --> B["C Preprocessor<br/>Pure Token Substitution"]
+    B --> C["Expanded Code<br/>((b++) + (b++))"]
+    C --> D["Compiler Parser<br/>Operator Precedence Tree"]
+    D --> E["Side-Effect Duplication<br/>b evaluated twice"]
+```
+
+###### **1.9.1 Textual Substitution versus Semantic Compilation**
+
+Macro replacement operates strictly by **textual substitution** without syntax tree validation or semantic evaluation. The preprocessor matches parameter tokens by name and places the caller's raw text tokens directly into the expansion pattern. Because the preprocessor does not parse expressions or inspect types, any syntax alterations—including substituting language keywords such as `#define BEGIN {` and `#define END }`—are propagated directly into the source stream prior to compilation.
+
+###### **1.9.2 Operator Precedence and Parenthesization Rules**
+
+Because raw text expands directly into enclosing code, macro tokens interleave with surrounding C operators according to default operator precedence:
+
+*   **Enclosing expression precedence**: In an unparenthesized addition macro `#define plus(x, y) x + y`, the invocation `plus(a, b) * 2` expands to:
+    $$a + b \times 2$$
+    Multiplication binds more tightly than addition, computing $a + (b \times 2)$ instead of the intended $(a + b) \times 2$.
+*   **Argument expression precedence**: In an internally unparenthesized product macro `#define times(x, y) (x * y)`, passing compound expressions such as `times(a + 5, b - 2)` expands to:
+    $$(a + 5 \times b - 2)$$
+    The multiplication operator binds only to the adjacent terms $5$ and $b$, producing $a + (5 \times b) - 2$ instead of $(a + 5) \times (b - 2)$.
+
+Correct macro construction requires complete **defensive parenthesization**, enclosing each parameter reference individually and wrapping the entire replacement body:
+
+```c
+#define plus(x, y)  ((x) + (y))
+#define times(x, y) ((x) * (y))
+```
+
+###### **1.9.3 Multi-Evaluation and Side-Effect Duplication**
+
+When a macro references a parameter multiple times in its substitution string, any argument expression passed to that parameter executes repeatedly. For example, consider the doubling macro:
+
+```c
+#define double(x) ((x) + (x))
+```
+
+Invoking `double(b++)` where the initial value of $b$ is $2$ expands to:
+
+```c
+((b++) + (b++))
+```
+
+The post-increment operator evaluates twice in sequence:
+
+1.  The first operand `(b++)` evaluates to the current value $2$, and $b$ is incremented to $3$.
+2.  The second operand `(b++)` evaluates to the updated value $3$, and $b$ is incremented to $4$.
+3.  The addition computes $2 + 3 = 5$, while $b$ finishes with the final value of $4$.
+
+Instead of doubling the value $2$ to produce $4$ and incrementing $b$ once to $3$, the expansion produces an arithmetic result of $5$ and executes two distinct increments on $b$.
+
+##### **1.10 Conditional Compilation and Architectural Portability**
+
+**Conditional compilation** is a source-level preprocessing mechanism that includes or excludes designated blocks of source code from the final translation unit prior to the compilation phase, based on the evaluation of compile-time conditions and macro flags. In the C compilation model, the C preprocessor inspects conditional directives before emitting the extended source file (the `.i` intermediate representation). Inactive branches are entirely stripped from the text stream passed to the C compiler, ensuring that unsupported syntax or platform-incompatible instructions never reach the machine-code generation stage.
+
+The primary preprocessor directives controlling conditional compilation include:
+
+*   `#ifdef MACRO`: Evaluates to true if `MACRO` is currently defined, regardless of its assigned value.
+*   `#ifndef MACRO`: Evaluates to true if `MACRO` has not been defined.
+*   `#if condition`: Evaluates an integer constant expression; includes the enclosed block if the expression evaluates to non-zero.
+*   `#else`: Designates an alternate block of source code to include if the preceding `#if`, `#ifdef`, or `#ifndef` condition evaluates to false.
+*   `#endif`: Terminates a conditional preprocessor block.
+
+Operating system codebases must execute across heterogeneous CPU architectures (such as x86 and SPARC) while interfacing directly with physical hardware controllers. Because low-level control operations, interrupt protocols, and register interfaces differ fundamentally across processors, operating systems isolate architecture-dependent hardware interactions using conditional directives. 
+
+For example, an operating system driver acknowledging an interrupt on an Intel microprocessor requires hardware routines specific to that architecture. The preprocessor isolates this call using conditional gating:
+
+```c
+#ifdef X86
+intel_int_ack();
+#else
+sparc_int_ack();
+#endif
+```
+
+During preprocessing, if the build environment defines the macro `X86`, the preprocessor emits `intel_int_ack();` into the `.i` file and discards the `#else` branch. Conversely, if compiling for a SPARC system, the `X86` symbol remains undefined, causing the preprocessor to excise `intel_int_ack();` and retain only `sparc_int_ack();`. 
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Conditional compilation workflow isolating architecture-specific routines during preprocessing."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Source File (.c / .h)<br/>with #ifdef Directives"] --> B{"Macro X86<br/>Defined?"}
+    B -->|Yes| C["Emit intel_int_ack&#40;&#41;<br/>strip inactive branch"]
+    B -->|No| D["Emit sparc_int_ack&#40;&#41;<br/>strip inactive branch"]
+    C --> E["Preprocessed Output (.i)<br/>Target-specific source"]
+    D --> E
+    E --> F["C Compiler Pass<br/>Generates target assembly"]
+```
+
+This gating mechanism is fundamental to **cross-architectural compilation**, where an operating system is compiled on a host machine to produce target binary executables for a different hardware architecture. By defining architecture flags at invocation time, build systems selectively configure device drivers, memory layouts, and machine-level routines across heterogeneous targets without modifying the shared core source tree.
+
+##### **1.11 The Multi-Stage C Compilation Pipeline**
+
+The **compilation pipeline** is the sequential software toolchain process that transforms human-readable C source text into an executable machine code binary that the central processing unit executes directly. Unlike interpreted or virtual machine environments that rely on managed runtimes or bytecode, standard C programs undergo physical translation into architecture-specific machine instructions. This pipeline comprises four deterministic phases: preprocessing, compilation, assembly, and linking, followed by execution managed by the operating system loader.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "The multi-stage C compilation toolchain from source code to loaded process."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Source and Headers<br/>main.c, defs.h"] --> B["C Preprocessor"]
+    B --> C["Extended Source<br/>main.i"]
+    C --> D["C Compiler / LLVM"]
+    D --> E["Assembly Code<br/>main.s / main.asm"]
+    E --> F["Assembler"]
+    F --> G["Object Code<br/>main.o / main.obj"]
+    H["Standard Library<br/>libc.a"] --> I["Linker"]
+    G --> I
+    I --> J["Executable Binary<br/>a.out / main.out"]
+    J --> K["OS Loader"]
+    K --> L["Active Process<br/>in Main Memory"]
+```
+
+The toolchain processes translation units through five discrete mechanisms:
+
+1.  **Preprocessing Stage**: The **C preprocessor** accepts source units (`.c`) and header definitions (`.h`). It strips comments, expands symbolic macros defined by `#define`, evaluates conditional compilation blocks (`#ifdef`, `#endif`), and replaces `#include` statements directly with the verbatim contents of the specified interface headers. The resulting output is pure, un-tokenized extended source code saved with the `.i` file extension.
+2.  **Compilation Stage**: The **C compiler** translates the extended high-level source text (`.i`) into target-specific symbolic assembly instructions, outputting an assembly file (`.s` or `.asm`). While traditional C toolchains emit assembly directly for the host instruction set architecture, modern compiler systems utilize the **LLVM** (Low Level Virtual Machine) infrastructure. LLVM compilers map C language source code into a universal, low-level **intermediate representation (IR)** before translating and optimizing the IR into target-specific assembly, enabling multi-target code generation across diverse hardware processors.
+3.  **Assembly Stage**: The **assembler** translates symbolic assembly mnemonics into machine code instructions encoded in raw binary. The resulting artifact is a relocatable **object file** (`.o` on UNIX-like platforms or `.obj` on Windows). Because an object file is an incomplete binary segment, it contains unresolved memory locations for external symbols and cannot be executed directly by the CPU.
+4.  **Linking Stage**: The **linker** combines one or more independent object files (`.o`) with compiled binary archive files, such as static standard libraries (`libc.a`). The linker performs three core operations: it incorporates required standard runtime library functions, resolves inter-function references across disparate translation units, and relocates placeholder symbolic addresses to final target offsets. The final output is an integrated executable program, traditionally named `a.out` (or a specified binary name such as `main.out` or `main.exe`).
+5.  **Operating System Loader**: To run the executable, the operating system invokes the **loader**. The loader reads the binary file from persistent disk storage, allocates its initial execution boundaries in main memory (RAM), transfers the binary image into the allocated space, and initiates CPU instruction execution, instantiating an active runtime **process**.
+
+Consider a source file `main.c` requiring the standard library function `printf()`. Preprocessing expands `<stdio.h>` into `main.i`. The compilation stage lowers `main.i` to target assembly in `main.asm` (or `main.s`). The assembler translates these instructions into binary format within `main.obj` (or `main.o`). Finally, the linker binds `main.o` with the pre-compiled binary implementation of `printf` located inside `libc.a`, resolving the target address call and producing the executable binary `main.out`.
+
+##### **1.12 Build Automation, Dependency Tracking, and Makefiles**
+
+**Build automation** is the process of scripting and managing the translation of source code files into executable machine binaries. In large-scale system software projects consisting of hundreds or thousands of separate translation units, performing a complete recompilation upon every minor source alteration incurs severe computational and time overhead. To resolve this, **incremental compilation** selectively recompiles only the files directly altered or transitively affected by an alteration, leaving untouched binary artifacts intact.
+
+The canonical build automation utility on UNIX systems is **`make`**, which orchestrates compilation pipelines by reading a declarative configuration file known as a **`Makefile`**. A `Makefile` models project dependencies as a directed acyclic graph (DAG) composed of concrete build rules:
+
+$$\text{Target} : \text{Prerequisites} \\
+\quad \text{Recipe}$$
+
+*   **Target**: A file generated by the build process, such as an object file (`.o`), a shared library (`.so`), or an executable binary (such as `a.out`), or an abstract action label.
+*   **Prerequisites** (or **dependencies**): A collection of source files (`.c`), header files (`.h`), or other prerequisite targets required to produce the given target.
+*   **Recipe**: The shell commands executed to generate the target from its prerequisites, typically invoking the compiler or linker.
+
+The execution logic of `make` is governed by **timestamp-based change detection**. For every target $T$ associated with prerequisites $P_1, P_2, \dots, P_k$, the utility queries the filesystem for the last modified timestamp $t(F)$ of each file $F$. Recompilation of $T$ is triggered if and only if:
+
+$$\exists \, P_i \quad \text{such that} \quad t(P_i) > t(T)$$
+
+or if target file $T$ does not yet exist in the filesystem. When this condition holds, the recipe for $T$ executes, creating an updated target whose modification timestamp is strictly newer than its prerequisites. If $t(T) \ge t(P_i)$ for all $i \in \{1, \dots, k\}$, target $T$ is up to date, and its recipe is skipped.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Dependency evaluation and selective recompilation flow in make."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    A["Source and Header Files<br/>(main.c, other.c, defs.h)"] --> B["Dependency Graph Engine<br/>(make reads Makefile)"]
+    B --> C{"Compare Timestamps:<br/>t(Prereq) > t(Target)?"}
+    C -->|Yes: Modified| D["Targeted Recompilation<br/>(gcc -c modified.c)"]
+    C -->|No: Unchanged| E["Bypass Compilation<br/>(Preserve existing .o)"]
+    D --> F["Linker Phase<br/>(Combine .o to a.out)"]
+    E --> F
+```
+
+This dependency topology dictates the scope of rebuilds across different file types:
+
+*   **Isolated source modification**: Modifying an implementation file `other.c` changes only $t(\text{other.c})$. The dependency rule triggers the recompilation of `other.c` into `other.o`. The target `main.o` remains unmodified since $t(\text{main.o}) \ge t(\text{main.c})$. The final executable is updated by relinking the existing `main.o` with the newly recompiled `other.o`.
+*   **Shared header modification**: Modifying a fundamental header file `defs.h` updates $t(\text{defs.h})$. Because `defs.h` is declared as a prerequisite for every translation unit that includes it (`main.o : main.c defs.h` and `other.o : other.c defs.h`), the condition $t(\text{defs.h}) > t(\text{target})$ forces recompilation across all dependent compilation units, followed by a relink stage.
+
+As project architectures grow to thousands of interdependent files, maintaining low-level `Makefile` syntax manually becomes difficult and prone to missing prerequisite declarations. Software systems utilize **automated build system generators**, most prominently **`cmake`**. Functioning as a higher-level abstraction layer targeting C and C++ programs, `cmake` scans source trees, analyzes `#include` hierarchies automatically, detects system compilers and libraries, and generates native, syntax-error-free `Makefile` configurations tailored to the host environment. Once generated, standard build execution is offloaded directly to `make`.
+
+##### **1.13 Process Runtime Memory Layout and OS Execution Models**
+
+The **runtime memory layout** of an operating system or process defines the structural organization of its virtual address space during execution. When an operating system kernel or compiled binary is loaded into main memory, its address space is partitioned into specialized operational regions called **memory segments**, each assigned distinct access permissions, mutability rules, and directional growth vectors.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Structural organization and segment growth vectors of runtime memory."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    subgraph HighMem ["High Virtual Memory Addresses"]
+        direction TB
+        Stack["Stack Segment<br/>Local state and activation frames"]
+        GrowthDown["&#x25BC; Dynamic growth downward"]
+    end
+    subgraph Gap ["Unallocated Virtual Address Range"]
+        direction TB
+        FreeSpace["Free memory boundary gap"]
+    end
+    subgraph LowMem ["Low Virtual Memory Addresses"]
+        direction TB
+        GrowthUp["&#x25B2; Dynamic growth upward"]
+        Data["Data Segment<br/>Initialized and static variables"]
+        Text["Text (Code) Segment<br/>Read-only machine instructions"]
+    end
+    HighMem --> Gap
+    Gap --> LowMem
+```
+
+An executing process or kernel binary comprises three primary functional segments:
+
+*   **Text segment**: The region positioned near the bottom of virtual memory (at low virtual addresses) that contains raw machine instructions generated during compilation and linking. The text segment is **immutable**, remaining strictly read-only throughout program execution to preserve executable code integrity.
+*   **Data segment**: The memory region located immediately above the text segment. It is initialized at launch with specific values and static program state. Unlike the text segment, the data segment is mutable and possesses upward growth capability to accommodate expanding global storage allocations during program lifecycle demands.
+*   **Stack segment**: The transient memory region allocated at high virtual memory addresses. The stack is initially empty and dynamically expands downward toward lower addresses as function calls execute and activation frames are pushed. As functions complete execution and return control, activation frames are popped, causing the stack segment to shrink upward.
+
+Following the initial link stage and subsequent boot sequence, the operating system does not require all system capabilities to reside within the primary static binary. Through **dynamic kernel loading**, modular extensions that were omitted from static linking—such as peripheral device drivers and file system implementations—are loaded directly into active kernel memory on demand during runtime.
+
+In the execution model of operating systems, all kernel instructions rely on **direct hardware execution**. Unlike interpreted runtimes or execution environments that depend on Just-In-Time (JIT) compilation engines (such as standard Java virtual machines), compiled operating system binaries consist of native target machine code executed directly by bare central processing unit hardware.
+
+##### **1.14 System Metric Scaling and Prefix Standards**
+
+Operating systems interact directly with low-level hardware structures whose performance characteristics span wide dynamic ranges. Hardware timing intervals, CPU clock periods, memory capacities, bus frequencies, and device throughputs are quantified using standard **decimal metric prefixes** based on integer powers of ten ($10^{\pm 3k}$ for $k \in \{1, \dots, 8\}$).
+
+The **sub-unit system prefixes** quantify execution latency, clock durations, and physical switching times through negative powers of ten:
+
+*   **milli** ($10^{-3}$, $0.001$): Used for mechanical and operating system scheduling latencies, such as hard disk seek times and timer interrupt intervals.
+*   **micro** ($10^{-6}$, $0.000001$): Used for low-latency operating system operations, context switch durations, and solid-state device read/write latencies.
+*   **nano** ($10^{-9}$, $0.000000001$): Used for modern central processing unit (CPU) instruction cycle times and dynamic random-access memory (DRAM) access latencies.
+*   **pico** ($10^{-12}$, $0.000000000001$): Used for internal transistor switching speeds and high-speed CPU clock periods.
+*   **femto** ($10^{-15}$, $0.000000000000001$): Sub-picosecond scale characterizing laser pulses and optical interconnects.
+*   **atto** ($10^{-18}$, $0.000000000000000001$): Atomic-scale timing parameters.
+*   **zepto** ($10^{-21}$, $0.000000000000000000001$): Sub-atomic measurement scale.
+*   **yocto** ($10^{-24}$, $0.000000000000000000000001$): Minimal standardized sub-unit scale.
+
+The **super-unit system prefixes** scale positive throughput metrics, network bandwidths, clock frequencies, and mass storage volumes through positive powers of ten:
+
+*   **kilo** ($10^{3}$, $1{,}000$): Base scale for transmission speeds (e.g., kilobits per second) and kilohertz frequency signals.
+*   **mega** ($10^{6}$, $1{,}000{,}000$): Used for legacy bus frequencies and memory bandwidth measurements (megahertz, $\text{MHz}$).
+*   **giga** ($10^{9}$, $1{,}000{,}000{,}000$): Used for current microprocessor clock rates (gigahertz, $\text{GHz}$) and storage capacities (gigabytes, $\text{GB}$).
+*   **tera** ($10^{12}$, $1{,}000{,}000{,}000{,}000$): Used for modern secondary and persistent storage capacities (terabytes, $\text{TB}$).
+*   **peta** ($10^{15}$, $1{,}000{,}000{,}000{,}000{,}000$): Enterprise datacenter file system capacities (petabytes, $\text{PB}$).
+*   **exa** ($10^{18}$, $1{,}000{,}000{,}000{,}000{,}000{,}000$): High-performance computing cluster throughput and aggregate memory spaces.
+*   **zetta** ($10^{21}$, $1{,}000{,}000{,}000{,}000{,}000{,}000{,}000$): Global internet traffic and enterprise cloud volume metrics.
+*   **yotta** ($10^{24}$, $1{,}000{,}000{,}000{,}000{,}000{,}000{,}000{,}000$): Maximal standardized super-unit decimal scale.
+
+| Exponent | Explicit Value | Prefix | Exponent | Explicit Value | Prefix |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| $10^{-3}$ | $0.001$ | milli | $10^{3}$ | $1{,}000$ | Kilo |
+| $10^{-6}$ | $0.000001$ | micro | $10^{6}$ | $1{,}000{,}000$ | Mega |
+| $10^{-9}$ | $0.000000001$ | nano | $10^{9}$ | $1{,}000{,}000{,}000$ | Giga |
+| $10^{-12}$ | $0.000000000001$ | pico | $10^{12}$ | $1{,}000{,}000{,}000{,}000$ | Tera |
+| $10^{-15}$ | $0.000000000000001$ | femto | $10^{15}$ | $1{,}000{,}000{,}000{,}000{,}000$ | Peta |
+| $10^{-18}$ | $0.000000000000000001$ | atto | $10^{18}$ | $1{,}000{,}000{,}000{,}000{,}000{,}000$ | Exa |
+| $10^{-21}$ | $0.000000000000000000001$ | zepto | $10^{21}$ | $1{,}000{,}000{,}000{,}000{,}000{,}000{,}000$ | Zetta |
+| $10^{-24}$ | $0.000000000000000000000001$ | yocto | $10^{24}$ | $1{,}000{,}000{,}000{,}000{,}000{,}000{,}000{,}000$ | Yotta |
+
+The relationship between clock frequency $f$ and the corresponding cycle duration $T$ follows the reciprocal law:
+$$T = \frac{1}{f}$$
+
+For example, a microprocessor operating at a clock frequency of $2.5\text{ GHz}$ ($2.5 \times 10^9\text{ s}^{-1}$) exhibits a single clock period of:
+$$T = \frac{1}{2.5 \times 10^9\text{ s}^{-1}} = 0.4 \times 10^{-9}\text{ s} = 400\text{ ps}$$
+demonstrating the direct mapping between positive gigahertz frequencies and negative picosecond time domains in computer hardware characterization.
+
+```{mermaid}
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'Helvetica', 'primaryColor': '#e8f4f8', 'primaryTextColor': '#1f2d3d', 'primaryBorderColor': '#355c7d', 'lineColor': '#355c7d', 'secondaryColor': '#d6eef5', 'tertiaryColor': '#fff3cd', 'background': '#ffffff', 'mainBkg': '#e8f4f8', 'secondBkg': '#d6eef5', 'tertiaryBkg': '#fff3cd', 'clusterBkg': '#f9fbfd', 'clusterBorder': '#355c7d', 'edgeLabelBackground': '#ffffff' }}}%%
+%%| fig-cap: "Hierarchy of standard metric prefixes used in computing systems across temporal and volumetric scales."
+%%| fig-width: 7
+%%| fig-height: 4
+flowchart TB
+    Root["System Metric Units<br/>Powers of 10 Scale"] --> Sub["Sub-Units: Time and Latency<br/>Negative Exponents (10⁻³ to 10⁻²⁴)"]
+    Root --> Super["Super-Units: Scale and Throughput<br/>Positive Exponents (10³ to 10²⁴)"]
+    Sub --> T1["milli (10⁻³) • micro (10⁻⁶)<br/>nano (10⁻⁹) • pico (10⁻¹²)"]
+    Sub --> T2["femto (10⁻¹⁵) • atto (10⁻¹⁸)<br/>zepto (10⁻²¹) • yocto (10⁻²⁴)"]
+    Super --> S1["Kilo (10³) • Mega (10⁶)<br/>Giga (10⁹) • Tera (10¹²)"]
+    Super --> S2["Peta (10¹⁵) • Exa (10¹⁸)<br/>Zetta (10²¹) • Yotta (10²⁴)"]
+```
+
+***
+
+#### **2. Definitions**
+
+*   **Preprocessor**: A build system tool that evaluates directives such as `#include` and `#define` before compilation, performing textual substitution, header inclusion, and conditional code omission.
+*   **Compiler**: A translation program that converts preprocessed high-level C source code into architecture-specific assembly language instructions.
+*   **Assembler**: A system utility that translates human-readable assembly instructions into machine-executable binary object files.
+*   **Linker**: A system program that combines multiple object files and library archives into a single executable binary by resolving external symbolic references and relocating addresses.
+*   **Loader**: An operating system component that reads an executable program from secondary storage, maps its segments into main memory, and initiates CPU execution.
+*   **Pointer**: A variable that holds the physical or virtual memory address of another variable or data structure rather than storing a direct data value.
+*   **Text Segment**: An immutable, read-only region of process memory that contains the compiled machine instructions executed directly by the processor.
+*   **Data Segment**: A region of process memory allocated for global and static variables that can dynamically expand during execution and persists for the program's entire runtime.
+*   **Stack Segment**: A dynamically resizing region of process memory that grows and shrinks as function call frames, local variables, and return addresses are allocated and deallocated at runtime.
+*   **Preprocessor Macro**: A symbolic identifier or parameterized pattern defined by the `#define` directive that the preprocessor substitutes textually throughout source code prior to compilation.
+*   **Header File**: A source file with a `.h` extension containing type definitions, macro definitions, and function prototypes that specify modular interfaces across multiple implementation files.
+*   **Conditional Compilation**: A preprocessor mechanism using directives like `#ifdef` and `#endif` that selectively compiles specific code blocks based on defined architecture or configuration flags.
+*   **Makefile**: A configuration text file containing dependency relationships and build rules interpreted by the `make` utility to selectively recompile only modified source components.
+*   **Variable Scope**: The syntactic region within a computer program where an identifier is legally accessible and can be referenced.
+*   **Variable Lifetime**: The time span during program execution throughout which a variable remains allocated at a designated memory address.
+*   **Global Variable**: A variable declared outside of all functions that possesses program-wide scope and static storage duration lasting the entire runtime.
+*   **Local Variable**: A variable declared inside a function or compound block that is accessible only within that block and whose memory is automatically allocated on the call stack.
+*   **Formal Parameter**: A variable defined in a function signature that receives an argument's value or address when the function is invoked.
+*   **Pass by Value**: A parameter-passing convention where a function receives an independent copy of an argument's value, preventing the function from altering the caller's original variable.
+*   **Pass by Reference**: A parameter-passing technique in C achieved by passing a variable's memory address to a pointer parameter, allowing the function to directly access and modify the caller's original data.
+*   **Buffer Overflow**: A critical memory safety anomaly that occurs when an unconstrained input function writes more data than an allocated memory buffer can hold, overwriting adjacent memory.
+*   **Standard Streams**: Pre-established input and output channels in UNIX environments—specifically standard input (`stdin`), standard output (`stdout`), and standard error (`stderr`)—that connect a running process to terminal devices or redirected files.
+
+***
+
+#### **3. Practice**
+
+##### **3.1. Standard Input and Output Operations** (Lab 1, Example 1)
+
+Read a user name using `gets` and evaluate its safety compared to safer alternatives for reading from standard input. Declare strings as literals and character arrays, read and write floats and hexadecimal numbers, use formatted input, and convert between strings and integers.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Unbounded input functions like `gets()` cause memory corruption vulnerabilities, necessitating bounded stream operations like `fgets()`, while standard formatting specifiers enable robust conversions between textual and binary representations.
+
+1.  **Evaluate the safety of `gets()` versus `fgets()`.**
+    *   The function `char *gets(char *s)` reads a line from standard input into the buffer pointed to by `s` until a terminating newline or `EOF` is reached. It performs no bounds checking on the destination buffer. If the user provides input exceeding the buffer's allocated length, subsequent memory addresses on the call stack or heap are overwritten, leading to buffer overflow vulnerabilities and potential arbitrary code execution.
+    *   The function `char *fgets(char *s, int size, FILE *stream)` prevents overflow by accepting a maximum character count `size`. It reads at most `size - 1` characters and appends a terminating null byte (`'\0'`).
+    *   **Answer: `gets()` is unsafe because it lacks buffer size limits; `fgets()` should be used instead.**
+2.  **Declare strings using string literals and character arrays.**
+    *   Declaration as a string literal:
+        ```c
+        char str1[] = "OpSys";
+        ```
+    *   Declaration as an explicit character array:
+        ```c
+        char str2[] = {'O', 'p', 'S', 'y', 's', '\0'};
+        ```
+    *   Both allocate an array of 6 bytes in memory, containing the ASCII values for `'O'`, `'p'`, `'S'`, `'y'`, `'s'`, and the null terminator `'\0'`.
+    *   **Answer: Strings can be initialized with double-quoted literals or as an explicit null-terminated array of characters.**
+3.  **Read and write floating-point and hexadecimal numbers.**
+    *   Floating-point I/O utilizes the `%f` specifier:
+        ```c
+        float f;
+        scanf("%f", &f);
+        printf("Float value: %f\n", f);
+        ```
+    *   Hexadecimal I/O utilizes the `%x` (lowercase) or `%X` (uppercase) specifier:
+        ```c
+        unsigned int hex_val;
+        scanf("%x", &hex_val);
+        printf("Hexadecimal: 0x%X (Decimal: %u)\n", hex_val, hex_val);
+        ```
+    *   **Answer: `%f` handles floating-point numbers and `%x` or `%X` handles hexadecimal representations.**
+4.  **Use formatted input for reading strings and convert between integers and strings.**
+    *   Formatted string input can be read using `scanf("%s", buffer)`, but specifying field width prevents buffer overruns: `scanf("%255s", buffer)`.
+    *   To convert string `"2022"` to an integer, use `sscanf` or `atoi`:
+        ```c
+        char str_num[] = "2022";
+        int val;
+        sscanf(str_num, "%d", &val); // val is now 2022
+        ```
+    *   To convert integer `2022` to a string, use `sprintf`:
+        ```c
+        char out_str[10];
+        int num = 2022;
+        sprintf(out_str, "%d", num); // out_str contains "2022\0"
+        ```
+    *   **Answer: `sscanf()` parses values from strings into primitive variables, and `sprintf()` formats primitive values into string buffers.**
+
+**Answer:** `fgets()` guarantees bounded memory access, string literals implicitly include null terminators, `%f` and `%x` format floats and hexadecimals, and `sscanf()` / `sprintf()` provide two-way string-integer conversions.
+</details>
+
+##### **3.2. Variable Declarations and Value Limits** (Lab 1, Task 2)
+
+Create a program named `ex1.c` that declares integer, unsigned short integer, signed long int, float, and double variables. Assign maximum possible values to each variable, print their sizes and values, and write a script `ex1.sh` to run the program.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Standard C library headers `<limits.h>` and `<float.h>` define architecture-independent preprocessor macros for fundamental data type limits.
+
+1.  **Identify standard constant macros for maximum values.**
+    *   `int`: `INT_MAX` from `<limits.h>`
+    *   `unsigned short int`: `USHRT_MAX` from `<limits.h>`
+    *   `signed long int`: `LONG_MAX` from `<limits.h>`
+    *   `float`: `FLT_MAX` from `<float.h>`
+    *   `double`: `DBL_MAX` from `<float.h>`
+    *   **Answer: Standard limits macros specify the architectural upper bounds for each respective primitive type.**
+2.  **Implement the C source file `ex1.c`.**
+    *   Construct the program to print `sizeof` (in bytes) alongside the assigned values:
+        ```c
+        #include <stdio.h>
+        #include <limits.h>
+        #include <float.h>
+
+        int main(void) {
+            int var_int = INT_MAX;
+            unsigned short int var_ushort = USHRT_MAX;
+            signed long int var_long = LONG_MAX;
+            float var_float = FLT_MAX;
+            double var_double = DBL_MAX;
+
+            printf("int: size = %zu bytes, max value = %d\n", sizeof(var_int), var_int);
+            printf("unsigned short int: size = %zu bytes, max value = %u\n", sizeof(var_ushort), var_ushort);
+            printf("signed long int: size = %zu bytes, max value = %ld\n", sizeof(var_long), var_long);
+            printf("float: size = %zu bytes, max value = %e\n", sizeof(var_float), var_float);
+            printf("double: size = %zu bytes, max value = %e\n", sizeof(var_double), var_double);
+
+            return 0;
+        }
+        ```
+    *   **Answer: `ex1.c` maps each variable to its maximum limit macro and reports byte dimensions using `%zu`.**
+3.  **Construct the shell execution script `ex1.sh`.**
+    *   Write a bash script that compiles the program with `gcc` and executes the generated binary:
+        ```bash
+        #!/bin/bash
+        gcc -Wall -Wextra ex1.c -o ex1
+        if [ $? -eq 0 ]; then
+            ./ex1
+        fi
+        ```
+    *   Make the script executable with `chmod +x ex1.sh`.
+    *   **Answer: `ex1.sh` compiles `ex1.c` to binary `ex1` and executes it upon successful compilation.**
+
+**Answer:** Variables are declared with maximum limits from `<limits.h>` and `<float.h>`, sizes printed via `sizeof`, and execution orchestrated through `ex1.sh`.
+</details>
+
+##### **3.3. Character by Character String Reversal** (Lab 1, Task 3)
+
+Write a program named `ex2.c` that asks the user to type a string character-by-character until a dot or Enter key is entered, supporting up to 256 characters. Print the reversed string enclosed in double quotation marks, and write a script `ex2.sh` to run the program.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Reading characters sequentially into a fixed-size character buffer allows indexing boundaries to be tracked directly, enabling index-decremented traversal for reversed output.
+
+1.  **Construct the character reading loop.**
+    *   Initialize an array `char buffer[257]` to reserve space for 256 input characters plus the terminating null byte.
+    *   Use `getchar()` iteratively. Stop when character matches `.` or `\n` or `EOF`, or when buffer length reaches 256.
+    *   **Answer: Input loop terminates on `'.' || c == '\n' || c == EOF` or reaching index 256.**
+2.  **Implement `ex2.c`.**
+    *   Source implementation:
+        ```c
+        #include <stdio.h>
+
+        int main(void) {
+            char str[257];
+            int c;
+            int length = 0;
+
+            while (length < 256) {
+                c = getchar();
+                if (c == EOF || c == '.' || c == '\n') {
+                    break;
+                }
+                str[length++] = (char)c;
+            }
+            str[length] = '\0';
+
+            putchar('"');
+            for (int i = length - 1; i >= 0; i--) {
+                putchar(str[i]);
+            }
+            putchar('"');
+            putchar('\n');
+
+            return 0;
+        }
+        ```
+    *   **Answer: `ex2.c` reverses the collected characters and outputs them wrapped in quotation marks.**
+3.  **Create the script `ex2.sh`.**
+    *   Shell script content:
+        ```bash
+        #!/bin/bash
+        gcc -Wall -Wextra ex2.c -o ex2
+        if [ $? -eq 0 ]; then
+            ./ex2
+        fi
+        ```
+    *   **Answer: `ex2.sh` automates compilation and execution.**
+
+**Answer:** `ex2.c` ingests up to 256 characters until `.` or `\n`, reverses them into double quotes via reverse index iteration, and is executed via `ex2.sh`.
+</details>
+
+##### **3.4. Numeral System Base Conversion** (Lab 1, Task 4)
+
+Implement a function `convert` that converts a given non-negative number from a source numeral system to a target system, where both base specifiers are in the range 2 to 10. Write a program `ex3.c` that reads the input values and prints the converted number or an error message without using arrays, structures, or pointers, accompanied by a runner script `ex3.sh`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Numerical base conversion between arbitrary bases $s, t \in [2, 10]$ without heap or array data structures proceeds by accumulating an intermediate base-10 integer via arithmetic modulo operations, followed by repeated division to emit the target base digits.
+
+1.  **Formulate validation and base conversion arithmetic.**
+    *   Check that $2 \le s \le 10$ and $2 \le t \le 10$. If not, output `"cannot convert!"`.
+    *   Let the input number be $x \ge 0$. To convert $x$ from base $s$ to decimal:
+        Extract digits from right to left using `digit = temp % 10`, ensuring `digit < s`. If `digit >= s`, input is invalid.
+        Accumulate decimal value: $\text{dec} = \sum_{k=0}^{m} d_k \cdot s^k$.
+    *   To convert decimal value $\text{dec}$ to base $t$:
+        Repeatedly compute `remainder = dec % t` and `dec = dec / t`. Because arrays are restricted, accumulate the target representation arithmetically:
+        $\text{result} = \text{result} + \text{remainder} \times \text{multiplier}$, where $\text{multiplier}$ increments by a factor of 10 at each step.
+    *   **Answer: Modular arithmetic converts from base $s$ to base 10, then to base $t$ without requiring data arrays.**
+2.  **Implement `ex3.c`.**
+    *   Source code:
+        ```c
+        #include <stdio.h>
+
+        void convert(long long x, int s, int t) {
+            if (s < 2 || s > 10 || t < 2 || t > 10 || x < 0) {
+                printf("cannot convert!\n");
+                return;
+            }
+
+            long long dec = 0;
+            long long base_power = 1;
+            long long temp = x;
+
+            if (temp == 0) {
+                printf("0\n");
+                return;
+            }
+
+            while (temp > 0) {
+                int digit = temp % 10;
+                if (digit >= s) {
+                    printf("cannot convert!\n");
+                    return;
+                }
+                dec += digit * base_power;
+                base_power *= s;
+                temp /= 10;
+            }
+
+            long long result = 0;
+            long long multiplier = 1;
+
+            if (dec == 0) {
+                printf("0\n");
+                return;
+            }
+
+            while (dec > 0) {
+                int rem = dec % t;
+                result += rem * multiplier;
+                multiplier *= 10;
+                dec /= t;
+            }
+
+            printf("%lld\n", result);
+        }
+
+        int main(void) {
+            long long x;
+            int s, t;
+
+            if (scanf("%lld %d %d", &x, &s, &t) != 3) {
+                printf("cannot convert!\n");
+                return 0;
+            }
+
+            convert(x, s, t);
+            return 0;
+        }
+        ```
+    *   **Answer: `convert` parses digits, validates bounds against base $s$, and synthesizes base $t$ using pure scalars.**
+3.  **Construct runner script `ex3.sh`.**
+    *   Bash script:
+        ```bash
+        #!/bin/bash
+        gcc -Wall -Wextra ex3.c -o ex3
+        if [ $? -eq 0 ]; then
+            ./ex3
+        fi
+        ```
+    *   **Answer: `ex3.sh` compiles and launches `ex3.c`.**
+
+**Answer:** Base conversion is executed arithmetically via an intermediate base-10 value using modular arithmetic and base-power scaling, printing `"cannot convert!"` on invalid inputs.
+</details>
+
+##### **3.5. Character Frequency Counting** (Lab 1, Task 5)
+
+Write a function `count` that returns the occurrences of a character in a string, and a function `countAll` that prints occurrences of each character in a case-insensitive manner. Implement a program `ex4.c` that accepts a command-line string without using arrays, structures, or pointers, and provide an accompanying runner script `ex4.sh`.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Character comparison case-insensitivity is achieved by normalizing characters to lowercase using standard integer ASCII transformations (`c >= 'A' && c <= 'Z' ? c + 32 : c`) across the character array.
+
+1.  **Define case-normalization and the `count` function.**
+    *   Convert a character $c$ to lowercase: if $c \in ['A', 'Z']$, $c_{\text{lower}} = c + ('a' - 'A')$.
+    *   Loop through the character array until the null terminator `'\0'`. Compare each character to the target character in lowercase form.
+    *   **Answer: `count` iterates through string elements and returns the matching case-insensitive frequency tally.**
+2.  **Implement `countAll` and command-line parsing in `ex4.c`.**
+    *   The lab instructions permit string representations (`char str[]`) while barring general arrays, structures, or pointer-based arithmetic.
+    *   `countAll` iterates through the string character-by-character and calls `count`, printing comma-separated `char:count` pairs:
+        ```c
+        #include <stdio.h>
+
+        char to_lower_char(char c) {
+            if (c >= 'A' && c <= 'Z') {
+                return c + ('a' - 'A');
+            }
+            return c;
+        }
+
+        int count(char c, char str[]) {
+            int occurrences = 0;
+            char target = to_lower_char(c);
+            int i = 0;
+            while (str[i] != '\0') {
+                if (to_lower_char(str[i]) == target) {
+                    occurrences++;
+                }
+                i++;
+            }
+            return occurrences;
+        }
+
+        void countAll(char str[]) {
+            int i = 0;
+            while (str[i] != '\0') {
+                char current = to_lower_char(str[i]);
+                int cnt = count(current, str);
+                if (i > 0) {
+                    printf(", ");
+                }
+                printf("%c:%d", current, cnt);
+                i++;
+            }
+            printf("\n");
+        }
+
+        int main(int argc, char *argv[]) {
+            if (argc < 2) {
+                return 1;
+            }
+            countAll(argv[1]);
+            return 0;
+        }
+        ```
+    *   **Answer: `ex4.c` maps `argv[1]` to `countAll`, outputting each character's total occurrence tally.**
+3.  **Construct runner script `ex4.sh`.**
+    *   Bash script:
+        ```bash
+        #!/bin/bash
+        gcc -Wall -Wextra ex4.c -o ex4
+        if [ $? -eq 0 ]; then
+            ./ex4 "Innopolis"
+        fi
+        ```
+    *   **Answer: `ex4.sh` compiles and executes `ex4` with a sample command-line argument.**
+
+**Answer:** `count` and `countAll` inspect character strings case-insensitively using normalized ASCII comparisons, printing sequential character frequency mappings.
+</details>
+
+##### **3.6. Iterative Tribonacci Sequence Calculation** (Lab 1, Task 6)
+
+Write a function `tribonacci` that calculates the n-th value of the Tribonacci sequence for n between 0 and 37 without using arrays or recursion. Write a program `ex5.c` that calls this function with arguments 4 and 36, prints the results to standard output, and submit an `ex5.sh` script to compile and run it.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** State shifting over three scalar registers computes linear recurrence sequences in $O(n)$ time and $O(1)$ memory without recursive call-stack expansion or buffer storage.
+
+1.  **Formulate recurrence equations and base states.**
+    *   The sequence is defined as:
+        $$T_0 = 0,\quad T_1 = 1,\quad T_2 = 1$$
+        $$T_n = T_{n-1} + T_{n-2} + T_{n-3} \quad \text{for } n \ge 3$$
+    *   To compute $T_n$ without arrays or recursion, allocate three scalar tracking variables:
+        $$a = 0,\quad b = 1,\quad c = 1$$
+    *   For each step from $i = 3$ to $n$:
+        $$\text{next} = a + b + c$$
+        $$a \leftarrow b,\quad b \leftarrow c,\quad c \leftarrow \text{next}$$
+    *   **Answer: A rolling three-variable state update calculates $T_n$ using constant memory.**
+2.  **Implement `ex5.c`.**
+    *   Source implementation:
+        ```c
+        #include <stdio.h>
+
+        long long tribonacci(int n) {
+            if (n <= 0) return 0;
+            if (n == 1 || n == 2) return 1;
+
+            long long a = 0;
+            long long b = 1;
+            long long c = 1;
+            long long next = 0;
+
+            for (int i = 3; i <= n; i++) {
+                next = a + b + c;
+                a = b;
+                b = c;
+                c = next;
+            }
+            return c;
+        }
+
+        int main(void) {
+            printf("T(4) = %lld\n", tribonacci(4));
+            printf("T(36) = %lld\n", tribonacci(36));
+            return 0;
+        }
+        ```
+    *   Verifying $T(4)$:
+        $T_0=0, T_1=1, T_2=1, T_3 = 0+1+1 = 2, T_4 = 1+1+2 = 4$.
+    *   **Answer: `tribonacci(4)` returns 4; `tribonacci(36)` calculates iteratively without stack overflow.**
+3.  **Construct runner script `ex5.sh`.**
+    *   Shell script:
+        ```bash
+        #!/bin/bash
+        gcc -Wall -Wextra ex5.c -o ex5
+        if [ $? -eq 0 ]; then
+            ./ex5
+        fi
+        ```
+    *   **Answer: `ex5.sh` compiles `ex5.c` and runs the resulting executable.**
+
+**Answer:** `tribonacci(n)` iteratively accumulates the three preceding scalar values, yielding $T(4) = 4$ and $T(36) = 615693474$.
+</details>
+
+##### **3.7. Asterisk Geometric Pattern Printing** (Lab 1, Task 7)
+
+Write a program that prints specified geometric patterns of asterisks to the console, including increasing triangles, decreasing triangles, and rectangular blocks.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Nested iteration loops control spatial character generation, where the outer loop advances lines (rows) and the inner loops generate row-specific character counts (columns).
+
+1.  **Analyze loop bounds for the target patterns.**
+    *   Pattern A (Increasing triangle, height 7): For row $i \in [1, 7]$, output $i$ asterisks.
+    *   Pattern B (Increasing/decreasing triangle, height 7): Rows $1$ through $4$ increase from $1$ to $4$ asterisks; rows $5$ through $7$ decrease ($3, 2, 1$ asterisks). Column count can be represented as $c(i) = 4 - |4 - i|$ for $i \in [1, 7]$.
+    *   Pattern C (Rectangular block of dimension $7 \times 7$): For each row $i \in [1, 7]$, output 7 asterisks.
+    *   **Answer: Row and column indices govern asterisks emitted per line.**
+2.  **Implement the pattern generator program in C.**
+    *   Source code printing all three shapes side-by-side or sequentially:
+        ```c
+        #include <stdio.h>
+
+        int main(void) {
+            int n = 7;
+
+            printf("Pattern 1:\n");
+            for (int i = 1; i <= n; i++) {
+                for (int j = 1; j <= i; j++) {
+                    putchar('*');
+                }
+                putchar('\n');
+            }
+
+            printf("\nPattern 2:\n");
+            for (int i = 1; i <= n; i++) {
+                int stars = (i <= 4) ? i : (8 - i);
+                for (int j = 1; j <= stars; j++) {
+                    putchar('*');
+                }
+                putchar('\n');
+            }
+
+            printf("\nPattern 3:\n");
+            for (int i = 1; i <= n; i++) {
+                for (int j = 1; j <= n; j++) {
+                    putchar('*');
+                }
+                putchar('\n');
+            }
+
+            return 0;
+        }
+        ```
+    *   **Answer: Nested loops print each geometric pattern sequentially using conditional asterisk counts.**
+
+**Answer:** Nested loops evaluate row indices to emit exact column counts, producing increasing triangles, peaked diamonds/triangles, and solid rectangular blocks.
+</details>
+
+##### **3.8. Variable Naming Rules and Identifiers** (Tutorial 1, Task 8)
+
+Determine whether a variable name can start with a number or typographical symbols such as hash, asterisk, or underscore. Provide an example of an invalid variable name in C and explain why it is rejected by the compiler.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** In C grammar, an identifier must begin with an alphabetic character or an underscore (`_`), prohibiting numeric digits and operator symbols in leading positions.
+
+1.  **Evaluate leading character rules.**
+    *   *Can an identifier begin with a digit?* No. If identifiers could start with a digit, the lexical analyzer (lexer) would not be able to distinguish between numeric constants (such as `123` or `0x1F`) and variable names without backtracking.
+    *   *Can an identifier begin with typographical symbols like `#`, `*`, or `_`?*
+        - Underscore (`_`): Yes. It is classified syntactically as a non-digit letter.
+        - Hash (`#`): No. The `#` character is reserved for preprocessor directives (e.g., `#include`, `#define`).
+        - Asterisk (`*`): No. The `*` character is the dereference and multiplication operator.
+    *   **Answer: Only letters and underscores may begin an identifier; numbers and symbols like `#` and `*` are disallowed.**
+2.  **Analyze an invalid identifier example.**
+    *   Example: `#nm*rt`
+    *   Reason for rejection: The compiler's lexical phase treats `#` as an invalid character outside of preprocessor directive lines, and `*` is parsed as a binary or unary operator rather than part of an identifier token. This violates the lexical grammar for C identifiers:
+        $$\text{identifier} \to (\text{letter} \mid \text{'_'}) (\text{letter} \mid \text{digit} \mid \text{'_'})^*$$
+    *   **Answer: `#nm*rt` fails lexical tokenization because `#` and `*` are not valid identifier characters.**
+
+**Answer:** Identifiers cannot begin with numbers or symbols other than underscores; an example like `#nm*rt` is rejected due to lexical collisions with operators and preprocessor syntax.
+</details>
+
+##### **3.9. Data Type Memory Sizes and Conversions** (Tutorial 1, Task 9)
+
+List at least three primitive data types in C and determine how much memory each requires. Discuss the limitations, truncation risks, and casting requirements when substituting one data type for another, and determine whether type names can serve as variable identifiers.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Memory allocation sizes dictate the range and precision of primitive types, where assigning floating-point representations to integer containers truncates fractional components and risks overflow.
+
+1.  **List three primitive types and standard memory allocations.**
+    *   `int`: typically 4 bytes (32 bits), range $[-2^{31}, 2^{31}-1]$.
+    *   `float`: 4 bytes (32 bits, IEEE 754 single precision), $\approx 7$ decimal digits of precision.
+    *   `double`: 8 bytes (64 bits, IEEE 754 double precision), $\approx 15\text{--}17$ decimal digits of precision.
+    *   Memory footprint can be queried using `sizeof(int)`, `sizeof(float)`, and `sizeof(double)`.
+    *   **Answer: Standard 64-bit systems allocate 4 bytes to `int`, 4 bytes to `float`, and 8 bytes to `double`.**
+2.  **Analyze substitution, type casting, and truncation limits.**
+    *   Substituting an integer for a float/double is generally lossless within the mantissa range, but large 32-bit integers ($> 2^{24}$) lose precision when stored in a 32-bit `float`.
+    *   Substituting a `float` or `double` into an `int` variable discards the fractional part (truncation toward zero). An explicit cast `(int)my_float` should be applied.
+    *   If the floating-point magnitude exceeds `INT_MAX` ($\approx 2.14 \times 10^9$) or is less than `INT_MIN`, casting to `int` results in undefined behavior (storing garbled or saturated values).
+    *   **Answer: Floating-to-integer conversion truncates fractions and induces undefined behavior if range limits are exceeded.**
+3.  **Evaluate whether type names can be used as identifiers.**
+    *   Type names such as `int`, `float`, `double`, `char`, and `void` are reserved language keywords.
+    *   The C language grammar strictly forbids using reserved keywords as identifier names (`int int = 5;` triggers a syntax error).
+    *   **Answer: Reserved type keywords cannot serve as variable names.**
+
+**Answer:** `int` (4B), `float` (4B), and `double` (8B) differ in representation; downcasting floating types to integers causes fractional truncation, and keyword names cannot be reused as identifiers.
+</details>
+
+##### **3.10. Standard Program Structural Sections** (Tutorial 1, Task 10)
+
+Describe the structure of a standard C program across documentation, link, definition, global declaration, main function, and subprogram sections. Identify which sections are strictly mandatory and which are optional.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** A standard C source unit is structured into distinct functional sections organized by lifecycle phase (preprocessing, declarations, runtime entry, and subprograms).
+
+1.  **Enumerate and describe each structural section.**
+    *   **Documentation Section:** Contains comments, program intent, author information, and licensing (`//` or `/* ... */`).
+    *   **Link Section:** Contains `#include` preprocessor directives instructing the compiler to paste header files with standard and library function declarations (e.g., `#include <stdio.h>`).
+    *   **Definition Section:** Houses symbolic constants and preprocessor macro declarations (`#define PI 3.14159`).
+    *   **Global Declaration Section:** Houses global variable instantiations and forward function declarations (function prototypes).
+    *   **`main()` Function Section:** The mandatory runtime execution entry point. Divided into the **declaration part** (defining local variables) and the **executable part** (statements, logic, expressions).
+    *   **Subprogram Section:** Contains user-defined function definitions that implement modular tasks called by `main()` or other functions.
+    *   **Answer: A standard C program is partitioned across documentation, link, definition, global declaration, `main()`, and subprogram blocks.**
+2.  **Identify mandatory versus optional sections.**
+    *   The **`main()` function section is strictly mandatory**. Every valid, executable C program must possess exactly one `main()` function to serve as the entry point for the operating system loader.
+    *   All other sections (Documentation, Link, Definition, Global Declaration, Subprograms) are **optional**. A minimal C program can consist solely of `int main(void) { return 0; }`.
+    *   **Answer: Only the `main()` function section is strictly required; all remaining sections are optional.**
+
+**Answer:** A C program is organized into documentation, link, definition, global declaration, `main()`, and subprogram sections, of which only `main()` is mandatory.
+</details>
+
+##### **3.11. Variable Scope and Parameter Types** (Tutorial 1, Task 11)
+
+Define program scope and distinguish between global variables, local variables, and formal parameters. Explain their declaration locations and demonstrate accessibility rules using an illustrative multi-function code example.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Scope defines the lexical region of source code over which an identifier binding remains visible and accessible in memory.
+
+1.  **Classify scope categories and declaration locations.**
+    *   **Scope:** The spatial region within source code where a named identifier is recognized by the compiler and can be accessed.
+    *   **Global Variables:** Declared outside of all function blocks. Possess file scope (or program-wide scope if declared `extern`); allocated in the data/BSS segment; lifetime matches the program run duration.
+    *   **Local Variables:** Declared inside an enclosed block or function body. Possess block scope; allocated on the call stack; exist only while execution remains within that block.
+    *   **Formal Parameters:** Declared in the parameter signature of a function definition. Possess block scope identical to local variables within the function body, initialized with caller arguments upon entry.
+    *   **Answer: Globals reside outside all functions; locals reside inside function blocks; formal parameters reside in function headers.**
+2.  **Demonstrate accessibility via code analysis.**
+    *   Consider the following multi-function snippet:
+        ```c
+        #include <stdio.h>
+
+        int g_var; // Global variable: visible to main() and func()
+
+        void func(void) {
+            g_var = g_var + 1; // Legal: g_var is globally accessible
+            // l_var = 1;      // Compilation error: l_var is local to main()
+            // argc = 0;       // Compilation error: argc is a formal parameter of main()
+        }
+
+        int main(int argc, char *argv[]) { // argc, argv: formal parameters
+            int l_var = 0;                 // Local variable: accessible only in main()
+            g_var = 0;
+            func();
+            printf("g_var = %d\n", g_var); // Prints 1
+            return 0;
+        }
+        ```
+    *   `func()` can manipulate `g_var` because global identifiers are in scope across the file.
+    *   `func()` cannot access `l_var` or `argc` because their scopes are restricted strictly to `main()`.
+    *   **Answer: Local variables and formal parameters are confined to their defining function, whereas globals can be accessed and mutated across functions.**
+
+**Answer:** Scope governs variable visibility: global variables are accessible across the entire compilation unit, whereas local variables and formal parameters are confined to their specific function execution context.
+</details>
+
+##### **3.12. Standard Input Methods and Buffer Safety** (Tutorial 1, Task 12)
+
+Explain the various methods available to supply input to a C program, including command-line arguments, `gets`, `scanf`, `getline`, and `fgets`. Compare their relative safety regarding buffer overflow vulnerabilities and cross-platform portability.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Buffer overflow vulnerabilities occur when input routines lack destination bounds constraints, making functions with explicit length parameters essential for safe input handling.
+
+1.  **Analyze input mechanisms.**
+    *   **Command-line arguments (`argc`, `argv`):** Passed at process initiation. Safe from stdin buffer overruns, but strings must be validated before parsing.
+    *   **`gets()`:** Reads stdin into a pointer until newline. Inherently dangerous and deprecated/removed from modern C standards (C11) because it cannot receive buffer size limits, resulting in unchecked memory writes.
+    *   **`scanf()`:** Formatted input scanner. Unsafe when using `%s` without field width (e.g., `scanf("%s", buf)`), as it will overflow arbitrary length strings. Safe only when field width is specified explicitly (e.g., `scanf("%9s", buf)`).
+    *   **`getline()`:** Dynamically allocates/resizes memory to fit input. Safe from overflows, but defined in POSIX.1-2008 and not natively available in standard MSVC environments without custom implementations, limiting portability.
+    *   **`fgets()`:** Reads up to $N-1$ characters from stream and appends `'\0'`. Fully standardized in ANSI C and portable across Windows, Linux, and macOS.
+    *   **Answer: Five primary methods provide input: CLI args, `gets`, `scanf`, `getline`, and `fgets`.**
+2.  **Compare vulnerability and portability.**
+    *   *Safety hierarchy:* `fgets()` and bounded `scanf("%Ns")` are safe; `getline()` is safe with dynamic allocation; unbound `scanf("%s")` and `gets()` are critically vulnerable to buffer overflows.
+    *   *Portability:* `fgets()` and `scanf()` are universally portable ANSI C; `getline()` is POSIX-only.
+    *   **Answer: `fgets()` is the optimal standard choice for combining strict buffer overflow safety with universal cross-platform portability.**
+
+**Answer:** `gets()` and unbounded `scanf()` expose software to buffer overflow exploits; `getline()` is safe but POSIX-bound, making `fgets()` the most secure and portable input function in standard C.
+</details>
+
+##### **3.13. Standard Output Functions and Formatting** (Tutorial 1, Task 13)
+
+Explain how to produce screen output in a C program using `puts`, `fputs`, and the `printf` family of functions. Describe the syntactic differences and formatting capabilities provided by each approach.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** Output routines vary in stream targeting, newline handling, and whether they parse format strings into dynamic variable substitution pipelines.
+
+1.  **Differentiate `puts` and `fputs`.**
+    *   `int puts(const char *s)`:
+        - Writes null-terminated string `s` to `stdout`.
+        - Automatically appends a trailing newline character (`'\n'`).
+        - Does not support variable interpolation or format specifiers.
+    *   `int fputs(const char *s, FILE *stream)`:
+        - Writes string `s` to any specified stream (e.g., `stdout`, `stderr`, or file descriptor).
+        - Does **not** append a trailing newline; output matches the exact contents of the string buffer.
+    *   **Answer: `puts` automatically writes a trailing newline to `stdout`, whereas `fputs` writes directly to a chosen stream without automatic newlines.**
+2.  **Describe the `printf` family capabilities.**
+    *   The `printf` family (`printf`, `fprintf`, `sprintf`, `snprintf`) performs formatted output conversion.
+    *   Syntax: `printf(const char *format, ...)` parses conversion specifiers beginning with `%` to format variable arguments:
+        - `%d` / `%i`: signed decimal integer
+        - `%u`: unsigned decimal integer
+        - `%f`: floating point number
+        - `%s`: string
+        - `%x` / `%X`: hexadecimal format
+        - `%p`: pointer memory address
+    *   Provides precision control and column alignment (e.g., `%10.2f`).
+    *   **Answer: `printf` provides format-specifier conversions, field width limits, and numerical formatting unavailable in `puts` or `fputs`.**
+
+**Answer:** `puts()` writes a string to `stdout` with an automatic newline, `fputs()` directs text to arbitrary streams without modification, and `printf()` supplies flexible data type formatting and output alignment.
+</details>
+
+##### **3.14. Call by Value Versus Call by Reference** (Tutorial 1, Task 14)
+
+Contrast passing function arguments by value with passing them by reference. Explain how memory addresses and values are handled in each case, providing code examples to demonstrate whether caller arguments are modified.
+
+<details>
+<summary>Click to see the solution</summary>
+
+**Key Concept:** C functions evaluate arguments strictly by value; pass-by-reference is simulated by passing memory addresses as values, permitting indirect memory mutation via pointer dereferencing.
+
+1.  **Analyze call by value.**
+    *   The runtime creates a copy of the actual argument's value on the function's stack frame in the formal parameter.
+    *   Any mutations applied to the formal parameter inside the function body alter only the local stack copy; the caller variable in the invoking frame remains unchanged.
+    *   Code illustration:
+        ```c
+        void increment_by_value(int num) {
+            num = num + 1; // Modifies local stack copy only
+        }
+
+        int main(void) {
+            int arg = 0;
+            increment_by_value(arg);
+            // arg remains 0
+            return 0;
+        }
+        ```
+    *   **Answer: Call by value copies data, ensuring caller variables are protected against modification.**
+2.  **Analyze simulated call by reference.**
+    *   The caller passes the memory address of the variable using the address-of operator `&arg`.
+    *   The formal parameter is declared as a pointer (`int *num`), which stores this memory address.
+    *   Inside the function, the pointer is dereferenced using `*num`. Writing to `*num` modifies the value directly at the caller's memory address.
+    *   Code illustration:
+        ```c
+        void increment_by_reference(int *num) {
+            *num = *num + 1; // Dereferences address to modify caller's variable
+        }
+
+        int main(void) {
+            int arg = 0;
+            increment_by_reference(&arg);
+            // arg is now 1
+            return 0;
+        }
+        ```
+    *   **Answer: Passing pointers transmits addresses, enabling functions to mutate the caller's original variables.**
+
+**Answer:** Pass-by-value copies variable values, preventing external side-effects, while pass-by-reference passes memory addresses via pointers, enabling direct mutation of caller memory cells.
+</details>
