@@ -138,7 +138,8 @@ def should_skip_file(filepath):
     # Skip them from lecture formatting rules; they are intentional collections.
     # questions.qmd are exam banks with their own structure (chapters + quiz),
     # not lecture articles — exempt like cheatsheets (render still applies).
-    return (name in ('404.qmd', 'index.qmd', '0.qmd')
+    # feedback.qmd is a standalone voting page, also exempt.
+    return (name in ('404.qmd', 'index.qmd', '0.qmd', 'feedback.qmd')
             or name.endswith('.ru.qmd') or name.endswith('questions.qmd'))
 
 
