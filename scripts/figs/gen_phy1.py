@@ -91,9 +91,11 @@ ax.text(-0.12, B[1], '$B(0, Y_B)$', color='#b91c1c', ha='right', va='center')
 ax.annotate('', xy=(A[0] + 0.9, 0), xytext=tuple(A),
             arrowprops=dict(arrowstyle='-|>', color='#b91c1c', lw=2, shrinkA=3, shrinkB=0))
 ax.text(A[0] + 0.45, 0.15, '$v$', color='#b91c1c', ha='center', va='bottom')
-ax.annotate('', xy=(0.18, 1.15), xytext=(0.18, 1.95),
+vB_tail = (B[0], B[1] - 0.28)          # just below dot B, on the wall line x=0
+vB_len = B[1] / 4                        # proportional to current rod height
+ax.annotate('', xy=(vB_tail[0], vB_tail[1] - vB_len), xytext=vB_tail,
             arrowprops=dict(arrowstyle='-|>', color='#b91c1c', lw=2, shrinkA=0, shrinkB=0))
-ax.text(0.3, 1.55, '$v_B$', color='#b91c1c', ha='left', va='center')
+ax.text(vB_tail[0] + 0.14, vB_tail[1] - vB_len/2, '$v_B$', color='#b91c1c', ha='left', va='center')
 ax.set_xlim(-0.6, 4.8); ax.set_ylim(-0.7, 4.2); ax.set_aspect('equal'); ax.axis('off')
 fig.tight_layout(); fig.savefig(f'{OUT}/rod_mpl.png', dpi=150); plt.close(fig)
 

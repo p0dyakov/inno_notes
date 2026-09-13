@@ -629,6 +629,40 @@ def validate_fence_balance(lines):
     return []
 
 
+def validate_fig_anchors(filepath):
+    """Every generated PNG referenced by the file must be reproducible from
+    scripts/figs/ (no hand-drawn / hand-placed assets).
+
+    Checks: for each fig-mpl/*.png reference there is a gen_*.py script that
+    mentions the PNG stem. Flag-only; the fix is adding the figure to the
+    generator (computed geometry, anchored vectors) and rerunning it.
+    """
+    import os as _os
+    issues = []
+    try:
+        text = open(filepath, encoding='utf-8').read()
+    except OSError:
+        return issues
+    figs_dir = _os.path.join(_os.path.dirname(__file__), 'figs')
+    gens = []
+    if _os.path.isdir(figs_dir):
+        for fn in sorted(_os.listdir(figs_dir)):
+            if fn.startswith('gen_') and fn.endswith('.py'):
+                try:
+                    gens.append((fn, open(_os.path.join(figs_dir, fn),
+                                         encoding='utf-8').read()))
+                except OSError:
+                    pass
+    for m in re.finditer(r'fig-mpl/([A-Za-z0-9_]+)\.png', text):
+        stem = m.group(1)
+        if not any(stem in src for _, src in gens):
+            issues.append(
+                'Figure fig-mpl/' + stem + '.png is not produced by any '
+                'scripts/figs/gen_*.py — regenerate it from computed '
+                'geometry instead of committing a hand-made asset.')
+    return issues
+
+
 def validate_no_tikz(lines):
     """TikZ figures are banned: every figure must be a committed matplotlib
     PNG in the article folder's `fig-mpl/` directory (migration Sept 2026:
@@ -657,6 +691,7 @@ def validate_format_rules(filepath, lines):
     issues.extend(validate_dividers(filepath, lines))
     issues.extend(validate_equation_xrefs(lines))
     issues.extend(validate_no_tikz(lines))
+    issues.extend(validate_fig_anchors(filepath))
     issues.extend(validate_fence_balance(lines))
     return issues
 
