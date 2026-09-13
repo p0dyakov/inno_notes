@@ -9,6 +9,7 @@ Also writes scurve_mpl (solved S-curve tangency) and triangle_mpl
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.patches import Arc as MArc
 import numpy as np
 import os
 
@@ -58,10 +59,10 @@ ax.text(t1 - 0.12, x1 - 0.12, '$(t_1, x_1)$', ha='right', va='top',
         bbox=dict(fc='white', ec='none', pad=1))
 ax.text(t2 + 0.08, x2 + 0.05, '$(t_2, x_2)$', ha='left', va='bottom',
         bbox=dict(fc='white', ec='none', pad=1))
-ax.plot([t1, t2], [x1 - 0.45, x1 - 0.45], ls='--', color=GRAY, lw=1)
-ax.plot([t1, t1], [x1, x1 - 0.45], ls='--', color=GRAY, lw=1)
-ax.plot([t2, t2], [x1, x2], ls='--', color=GRAY, lw=1)
-ax.plot([t2, t2 + 0.001], [x1, x1], ls='--', color=GRAY, lw=1)
+y0 = x1 - 0.45
+ax.plot([t1, t2], [y0, y0], ls='--', color=GRAY, lw=1)
+ax.plot([t1, t1], [x1, y0], ls='--', color=GRAY, lw=1)
+ax.plot([t2, t2], [y0, x2], ls='--', color=GRAY, lw=1)
 ax.text((t1+t2)/2, x1 - 0.6, r'$\Delta t$', ha='center', va='top', color=GRAY)
 ax.text(t2 + 0.15, (x1+x2)/2, r'$\Delta x$', ha='left', va='center', color=GRAY,
         bbox=dict(fc='white', ec='none', pad=1))
@@ -90,17 +91,22 @@ ax.text(-0.12, B[1], '$B(0, Y_B)$', color='#b91c1c', ha='right', va='center')
 ax.annotate('', xy=(A[0] + 0.9, 0), xytext=tuple(A),
             arrowprops=dict(arrowstyle='-|>', color='#b91c1c', lw=2, shrinkA=3, shrinkB=0))
 ax.text(A[0] + 0.45, 0.15, '$v$', color='#b91c1c', ha='center', va='bottom')
-ax.annotate('', xy=(0.3, 1.95), xytext=(0.3, 2.55),
+ax.annotate('', xy=(0.18, 1.15), xytext=(0.18, 1.95),
             arrowprops=dict(arrowstyle='-|>', color='#b91c1c', lw=2, shrinkA=0, shrinkB=0))
-ax.text(0.42, 2.25, '$v_B$', color='#b91c1c', ha='left', va='center')
+ax.text(0.3, 1.55, '$v_B$', color='#b91c1c', ha='left', va='center')
 ax.set_xlim(-0.6, 4.8); ax.set_ylim(-0.7, 4.2); ax.set_aspect('equal'); ax.axis('off')
 fig.tight_layout(); fig.savefig(f'{OUT}/rod_mpl.png', dpi=150); plt.close(fig)
 
-# ---- 4. Mach cone (H=3, O=(1,0), B=(1,3), C=(5.5,3), A=(2.8,3)) ----
-# exact tangent from A to cone line CO: touch T=(3.63,1.75), r=|AT|=1.498
-fig, ax = plt.subplots(figsize=(7.0, 4.4))
+# ---- 4. Mach cone: right triangle OBC (OB=H vertical, BC=ut horizontal),
+# cone generator CO, exact tangent circle from A to CO ----
+fig, ax = plt.subplots(figsize=(7.0, 4.6))
 O = np.array([1.0, 0.0]); Bpt = np.array([1.0, 3.0]); C = np.array([5.5, 3.0]); A = np.array([2.8, 3.0])
-T = np.array([3.63, 1.75])
+d = O - C
+d = d / np.linalg.norm(d)            # unit vector along cone generator CO
+n = np.array([-d[1], d[0]])          # unit normal to CO
+r = abs(float((A - C) @ n))          # distance from A to line CO
+foot = A - float((A - C) @ n) * n    # projection of A onto line CO
+T = foot                             # exact tangency point, T=(3.631,1.754)
 ax.plot([-0.5, 6.5], [0, 0], color='k', lw=1.6)
 ax.text(6.6, 0.02, 'Ground', va='center')
 ax.plot([-0.5, 6.5], [3, 3], ls='--', color=GRAY, lw=1)
@@ -113,22 +119,21 @@ ax.annotate('', xy=(5.5, 3.5), xytext=(1.15, 3.5),
 ax.text(3.3, 3.62, '$ut$', ha='center', va='bottom', bbox=dict(fc='white', ec='none', pad=1))
 ax.plot([C[0], O[0]], [C[1], O[1]], color=RED, lw=2)
 th = np.linspace(0, 2*np.pi, 300)
-ax.plot(A[0] + 1.498*np.cos(th), A[1] + 1.498*np.sin(th), ls='--', color=BLUE, lw=1.2)
+ax.plot(A[0] + r*np.cos(th), A[1] + r*np.sin(th), ls='--', color=BLUE, lw=1.2)
 ax.annotate('', xy=tuple(T), xytext=tuple(A),
             arrowprops=dict(arrowstyle='->', color=BLUE, lw=1.4, shrinkA=0, shrinkB=1))
-ax.text((A[0]+T[0])/2 - 0.1, (A[1]+T[1])/2 + 0.15, "$ct'$", color=BLUE, ha='right', va='bottom',
+ax.text((A[0]+T[0])/2 - 0.15, (A[1]+T[1])/2 + 0.12, "$ct'$", color=BLUE, ha='right', va='bottom',
         bbox=dict(fc='white', ec='none', pad=1))
 ax.plot(*T, 'ko', ms=5)
-from matplotlib.patches import Arc as MArc
 ax.add_patch(MArc(tuple(C), 1.1, 1.1, angle=0, theta1=180, theta2=214, color='k', lw=1))
-ax.text(4.75, 2.55, r'$\alpha$', ha='center', va='center', bbox=dict(fc='white', ec='none', pad=1))
+ax.text(4.72, 2.52, r'$\alpha$', ha='center', va='center', bbox=dict(fc='white', ec='none', pad=1))
 ax.text(1.0, 3.95, '$B$ ($t=0$)', ha='center', va='bottom', bbox=dict(fc='white', ec='none', pad=1))
 ax.text(5.5, 3.95, '$C$ ($t$)', ha='center', va='bottom', bbox=dict(fc='white', ec='none', pad=1))
 ax.text(O[0], -0.25, '$O$ (Observer)', ha='center', va='top')
 ax.text(A[0] + 0.12, A[1] + 0.12, '$A$', ha='left', va='bottom', bbox=dict(fc='white', ec='none', pad=1))
 ax.set_xlim(-0.6, 7.3); ax.set_ylim(-0.6, 4.3); ax.set_aspect('equal'); ax.axis('off')
 fig.tight_layout(); fig.savefig(f'{OUT}/mach_mpl.png', dpi=150); plt.close(fig)
-
+print(f'mach: foot={foot.round(3)} r={r:.3f}')
 # ---- 5. osculating circle: compact arc 52..128 deg, r=2, C=(2,-0.2), A=(2,1.8) ----
 fig, ax = plt.subplots(figsize=(6.2, 4.0))
 Cc = np.array([2.0, -0.2]); Ap = np.array([2.0, 1.8])
