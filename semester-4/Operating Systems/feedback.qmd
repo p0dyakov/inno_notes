@@ -1,0 +1,201 @@
+---
+title: "Будет ли продолжение?"
+format: html
+engine: knitr
+---
+
+<style>
+.inn-feedback-wrap {
+  max-width: 640px;
+  margin: 48px auto 64px auto;
+  padding: 32px 28px;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 12px;
+}
+.inn-feedback-wrap h1 {
+  font-size: 1.6rem;
+  margin-bottom: 16px;
+}
+.inn-feedback-wrap p {
+  line-height: 1.65;
+}
+.inn-feedback-field {
+  margin-top: 20px;
+}
+.inn-feedback-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.inn-feedback-field input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid var(--bs-border-color, #ced4da);
+  border-radius: 8px;
+  background: var(--bs-body-bg, #fff);
+  color: var(--bs-body-color, #212529);
+  box-sizing: border-box;
+}
+.inn-feedback-btn {
+  margin-top: 20px;
+  padding: 12px 28px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #0d6efd;
+  color: #fff;
+}
+.inn-feedback-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.inn-feedback-note {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+.inn-feedback-field input.inn-invalid {
+  border-color: #dc3545;
+}
+.inn-feedback-err {
+  display: none;
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: #dc3545;
+}
+.inn-feedback-done {
+  display: none;
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(25, 135, 84, 0.12);
+  border: 1px solid rgba(25, 135, 84, 0.4);
+}
+</style>
+
+<div class="inn-feedback-wrap">
+
+# Продолжать ли InnoNotes?
+
+Привет! Меня зовут Захар, и я веду этот сайт с конспектами один.
+
+Скажу честно: я задумался о паузе. Каждая статья — это много часов работы: разобрать материалы лекций, изложить всё понятным языком, проверить формулы и перерисовать схемы. А сколько людей этим реально пользуется — я не знаю.
+
+Поэтому решаю так: если наберётся много желающих — я допишу все статьи четвёртого семестра и продолжу вести проект. Если нет — сайт останется как есть, а новые конспекты выходить не будут. Ваш голос ниже напрямую влияет на это решение.
+
+<div id="inn-feedback-form">
+<div class="inn-feedback-field">
+<label for="inn-tg-username">Ваш username в Telegram</label>
+<input id="inn-tg-username" type="text" placeholder="@username" autocomplete="off" maxlength="64" />
+<div class="inn-feedback-err" id="inn-tg-err" role="alert"></div>
+</div>
+<button class="inn-feedback-btn" id="inn-feedback-submit" type="button">Хочу, чтобы проект жил</button>
+<div class="inn-feedback-note">Нужно только для того, чтобы посчитать реальных людей, а не клики. Ничего писать вам не буду.</div>
+</div>
+
+<div class="inn-feedback-done" id="inn-feedback-done">
+Спасибо! Ваш голос учтён. Если нас будет много — статьи обязательно появятся.
+</div>
+
+</div>
+
+<script>
+(function () {
+  var KEY = 'inn_feedback_voted_v1';
+  var form = document.getElementById('inn-feedback-form');
+  var done = document.getElementById('inn-feedback-done');
+  var input = document.getElementById('inn-tg-username');
+  var btn = document.getElementById('inn-feedback-submit');
+
+  function showDone() {
+    if (form) form.style.display = 'none';
+    if (done) done.style.display = 'block';
+  }
+
+  function sendVote(username) {
+    // Delivery without any server secrets (page is static):
+    // 1) gtag event with beacon transport (survives page unload),
+    // 2) a second identical gtag call after 800ms in case the first
+    //    raced the gtag.js load,
+    // 3) localStorage flag is set ONLY after we attempted both sends,
+    //    plus any unsent vote is retried on the next visit.
+    // GA4 itself dedupes nothing — every attempt is a real event, so no
+    // vote is silently lost; duplicates are filtered at analysis time by
+    // tg_username.
+    var sent = 0;
+    function fire() {
+      try {
+        if (typeof gtag === 'function') {
+          gtag('event', 'inno_vote', {
+            event_category: 'feedback',
+            event_label: 'semester4_continue',
+            tg_username: username,
+            transport_type: 'beacon'
+          });
+          sent += 1;
+        }
+      } catch (e) {}
+    }
+    fire();
+    setTimeout(fire, 800);
+    setTimeout(function () {
+      if (sent > 0) {
+        try { localStorage.setItem(KEY, JSON.stringify({u: username, t: Date.now()})); } catch (e) {}
+        showDone();
+      } else {
+        // gtag missing (adblock?): keep vote locally, retry next visit.
+        try { localStorage.setItem(KEY + '_pending', JSON.stringify({u: username, t: Date.now()})); } catch (e) {}
+        showDone();
+      }
+    }, 1600);
+  }
+
+  function retryPending() {
+    var raw = null;
+    try { raw = localStorage.getItem(KEY + '_pending'); } catch (e) {}
+    if (!raw) return;
+    try {
+      var p = JSON.parse(raw);
+      if (p && p.u) sendVote(p.u);
+      localStorage.removeItem(KEY + '_pending');
+    } catch (e) {}
+  }
+
+  try {
+    if (localStorage.getItem(KEY)) { showDone(); return; }
+  } catch (e) {}
+  retryPending();
+
+  input.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); btn.click(); }
+  });
+  function setErr(msg) {
+    var err = document.getElementById('inn-tg-err');
+    if (msg) {
+      input.classList.add('inn-invalid');
+      if (err) { err.textContent = msg; err.style.display = 'block'; }
+      try { input.setAttribute('aria-invalid', 'true'); } catch (e) {}
+    } else {
+      input.classList.remove('inn-invalid');
+      if (err) { err.textContent = ''; err.style.display = 'none'; }
+      try { input.removeAttribute('aria-invalid'); } catch (e) {}
+    }
+  }
+  input.addEventListener('input', function () { setErr(''); });
+  btn.addEventListener('click', function () {
+    var v = (input.value || '').trim().replace(/^@+/, '');
+    if (!/^[A-Za-z0-9_]{5,32}$/.test(v)) {
+      setErr('Похоже, в username опечатка: только латиница, цифры и подчёркивание, 5–32 символа.');
+      input.focus();
+      return;
+    }
+    setErr('');
+    btn.disabled = true;
+    btn.textContent = 'Отправляем…';
+    sendVote('@' + v);
+  });
+})();
+</script>

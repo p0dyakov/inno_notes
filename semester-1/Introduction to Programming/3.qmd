@@ -52,15 +52,6 @@ Dynamic memory is allocated on the **heap** using functions from the `<stdlib.h>
 
 <!-- DIAGRAM HERE -->
 
-##### **1.5 Common Pointer Pitfalls**
-
-Pointers are powerful but introduce risks if not managed carefully. Scott Meyer identified several common categories of pointer problems:
-
-*   **Ownership and Destruction**: A pointer itself doesn't carry information about who is responsible for freeing the memory it points to. This can lead to **memory leaks** (if no one frees the memory) or **double frees** (if multiple parts of the code try to free it), which can corrupt the heap.
-*   **Dangling Pointers**: A **dangling pointer** is a pointer that refers to a memory location that has already been deallocated with `free`. Using (dereferencing) a dangling pointer results in *undefined behavior*, as that memory may now contain garbage or be in use by another part of the program.
-*   **Pointer vs. Array Ambiguity**: A pointer of type `T*` can point either to a single object or to the first element of an array of objects. The language itself provides no way to know which it is, or the size of the array, from the pointer alone.
-*   **Uninitialized Pointers**: A pointer that has been declared but not assigned a valid address contains a garbage value. Dereferencing it will access a random memory location, almost always leading to a crash.
-
 ##### **1.6 C Declarations**
 
 A **declaration** introduces an identifier (like a variable or function name) and specifies its properties. A declaration can contain up to four parts: a **storage class** (`static`), a **type specifier** (`int`), an **entity name** (`a`), and an **initializer** (`= 1`).
@@ -337,7 +328,8 @@ int main() {
 
     printf("Password not found (it might be longer than 3 characters or use other characters).\n");
     return 0;
-}```
+}
+```
 </details>
 
 ##### **3.4. Pointer Output Analysis** (Lab 3, Task 4)
@@ -357,7 +349,8 @@ int main() {
     printf("%d %d\n", a, b);
     return 0;
 }
-``````c
+```
+```c
 // Case B
 #include <stdio.h>
 void swap(int *ap, int *bp) {
@@ -372,7 +365,7 @@ int main() {
     printf("%d %d\n", a, b);
     return 0;
 }
-``````c
+```
 // Case C
 #include <stdio.h>
 int main() {
@@ -456,33 +449,27 @@ pointer also holds the address 1000.
 1. `printf("%d\n", *pointer);`
    - Dereferences `pointer`, gets the value at address 1000.
    - Output: 10
-
 2. `printf("%p\n", pointer);`
    - Prints the memory address stored in `pointer`.
    - Output: The address of the start of the array (e.g., 0x...1000)
-
 3. `printf("%d\n", *array);`
    - The array name `array` decays to a pointer to its first element.
    - Dereferencing it gives the value of the first element.
    - Output: 10
-
 4. `printf("%p\n", array);`
    - Prints the starting address of the array.
    - Output: The same address as line 2.
-
 5. `printf("%d\n", ++*pointer);`
    - `*pointer` is evaluated first (value is 10).
    - `++` (prefix increment) increments this value to 11.
    - The value at `array[0]` is now 11.
    - The result of the expression (11) is printed.
    - Output: 11
-
 6. `printf("%d\n", *++pointer);`
    - `++pointer` is evaluated first. The pointer `pointer` is incremented to point to the next integer in memory (address 1004).
    - `*` then dereferences this new address, getting the value of `array[1]`, which is 20.
    - The value 20 is printed.
    - Output: 20
-
 7. `printf("%d\n", *pointer1++ + ++*++pointer2);`
    - This line has multiple side effects. Evaluation order of operands to `+` is unspecified, but for most compilers it's right-to-left.
    - Sub-expression 1: `++*++pointer2`
@@ -528,19 +515,23 @@ Initial state after the code runs:
 Let's analyze the options:
 
 A) `k = 75`;
+
    - This statement changes the value of the variable 'k' to 75.
    - It has no effect on the variable 'i'. 'i' will remain 42.
 
 B) `*k = 75`;
+
    - This is a compile-time error. The variable 'k' is an integer, not a pointer.
    - The dereference operator '*' cannot be applied to an integer.
 
 C) `p = 75`;
+
    - This statement tries to change the memory address stored in the pointer 'p'.
    - It attempts to make 'p' point to memory address 75, which is almost certainly invalid and dangerous.
    - It does not change the value stored inside the variable 'i'.
 
 D) `*p = 75`;
+
    - 'p' holds the address of 'i'.
    - The dereference operator '*' means "the value at the address that p points to".
    - So, `*p = 75` means "set the value at the address of i to 75".
@@ -578,39 +569,31 @@ A string in C is terminated by a null character `\0`.
 1. Initial state:
     - `buf1`: `H e l l o \0`
     - `buf2`: `W o r l d \0`
-
 2. `char *ptr1 = buf1 + 2;`
    - `ptr1` now points to the 3rd character of `buf1` (the first 'l').
    - `buf1`: H e [l] l o \0  ( [ ] indicates where ptr1 points )
-
 3. `char *ptr2 = buf2 + 3;`
    - `ptr2` now points to the 4th character of `buf2` (the 'l').
    - `buf2`: W o r [l] d \0
-
 4. `strcpy(ptr1, buf2);`
    - This copies the entire string from `buf2` ("World") to the memory location where `ptr1` points.
    - The original contents of `buf1` from that point onwards are overwritten.
    - `buf1` becomes: H e W o r l d \0
    - `ptr1` still points to the 'W'.
-
 5. `strcpy(ptr2, buf1);`
    - This copies the current string from `buf1` ("HeWorld") to the memory location where `ptr2` points.
    - The original contents of `buf2` from that point onwards are overwritten.
    - `buf2` becomes: W o r H e W o r l d \0
    - `ptr2` still points to the 'H'.
-
 6. `printf("%s\n", buf1);`
    - Prints the entire string in `buf1`.
    - Output: HeWorld
-
 7. `printf("%s\n", ptr1);`
    - Prints the string starting from where `ptr1` points inside `buf1`.
    - Output: World
-
 8. `printf("%s\n", buf2);`
    - Prints the entire string in `buf2`.
    - Output: WorHeWorld
-
 9. `printf("%s\n", ptr2);`
    - Prints the string starting from where `ptr2` points inside `buf2`.
    - Output: HeWorld

@@ -630,7 +630,6 @@ digraph dpda_ab2n {
     | $q_1 \to q_2$ | $b,\, A / \varepsilon$ | First $b$: pop one $A$ |
     | $q_2 \circlearrowleft$ | $b,\, A / \varepsilon$ | Each subsequent $b$: pop one $A$ |
     | $q_2 \to q_3$ | $\varepsilon,\, Z_0 / Z_0$ | All $A$'s consumed; accept |
-
     *Note on the push step:* When reading $a$ with $A$ on top, we replace $A$ with $AAA$ — effectively, we keep the existing $A$ and add two more on top, so the stack grows by two per $a$. Equivalently, since each $a$ should add two symbols: we replace $A \to AAA$ (adding two) which matches the $2:1$ ratio.
 3.  **Trace for input $"abb"$** ($n=1$, $2n=2$):
     *   $q_0 \xrightarrow{a,\,Z_0/AAZ_0} q_1$: stack = $A, A, Z_0$
@@ -644,9 +643,7 @@ digraph dpda_ab2n {
     *   $q_2 \xrightarrow{b,\,A/\varepsilon} q_2$: stack = $A,Z_0$
     *   $q_2 \xrightarrow{b,\,A/\varepsilon} q_2$: stack = $Z_0$
     *   $q_2 \xrightarrow{b,\,A/\varepsilon} q_2$: stack = — (ERROR: stack underflow — wrong, recheck)
-
     *Correction:* Let's recount. For $n=2$: push 2 for first $a$ (stack = $AA Z_0$), then replace top $A$ with $AAA$ for second $a$: stack = $A,A,A,Z_0$ (4 $A$'s? No — $AA Z_0$ with top $A$ replaced by $AAA$ gives $A,A,A,Z_0$ — that's 3 $A$'s + $Z_0$). We need $2 \cdot 2 = 4$ symbols for $n=2$.
-
     *Revised approach:* A cleaner strategy: for each $a$, push **two** $A$'s unconditionally. Use a separate state to push the second $A$.
 
     | Transition | Notation | Meaning |
@@ -655,7 +652,6 @@ digraph dpda_ab2n {
     | $q_1 \to q_2$ | $\varepsilon,\, A / AA$ | Spontaneous: push second $A$ |
     | $q_2 \to q_2$ | $a,\, A / AA$ | Subsequent $a$ (first push) |
     | ... | ... | ... |
-
     *Simplest correct approach:* For each $a$, push two $A$'s by using a helper state:
 
     *   States: $q_0$ (start), $q_1$ (just read $a$, need to push second $A$), $q_2$ (ready to read $a$ or $b$), $q_3$ (reading $b$'s), $q_4$ (accepting)
@@ -934,7 +930,6 @@ digraph dpda_nested_counts {
     | $q_3 \circlearrowleft$ | $b,\, A / \varepsilon$ | More outer $b$'s: pop $A$ |
     | $q_3 \to q_4$ | $\varepsilon,\, Z_0 / Z_0$ | All matched: accept |
 3.  **Trace for input $"abba"$ is too short (minimum: $a^1b^1a^1b^1 = "abab"$):**
-
     Trace for $"abab"$ ($n=m=1$):
 
     *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$
@@ -1036,7 +1031,6 @@ digraph dpda_tut_abn {
     | 4 | $p_2$ | $\mathbf{b}$ | $A, Z_0$ | $b,\,A/\varepsilon$: pop $A$ |
     | 5 | $p_2$ | $\varepsilon$ | $Z_0$ | $\varepsilon,\,Z_0/Z_0$: accept |
     | 6 | $p_3$ | $\varepsilon$ | $Z_0$ | **ACCEPT** $\checkmark$ |
-
     Full configuration sequence:
     $$(p_0, aabb, Z_0) \vdash (p_1, abb, AZ_0) \vdash (p_1, bb, AAZ_0) \vdash (p_2, b, AZ_0) \vdash (p_2, \varepsilon, Z_0) \vdash (p_3, \varepsilon, Z_0)$$
 
@@ -1097,7 +1091,6 @@ Construct a DPDA that recognizes $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$, where $
     *   States: $q_0$ (push phase), $q_1$ (pop phase), $q_2$ (accepting)
     *   Stack alphabet: $\Gamma = \{Z_0, A, B\}$ where $A$ represents $a$ and $B$ represents $b$
 2.  **Transitions:**
-
     *Push phase* ($q_0$, self-loops — push symbols of $v$):
 
     | Notation | Meaning |
@@ -1108,7 +1101,6 @@ Construct a DPDA that recognizes $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$, where $
     | $a,\, B / AB$ | Subsequent $a$ with $B$ on top: push $A$ |
     | $b,\, A / BA$ | Subsequent $b$ with $A$ on top: push $B$ |
     | $b,\, B / BB$ | Subsequent $b$ with $B$ on top: push $B$ |
-
     *Pivot* (on reading $c$, move $q_0 \to q_1$, keep stack unchanged):
 
     | Notation | Meaning |
@@ -1116,14 +1108,12 @@ Construct a DPDA that recognizes $L_3 = \{vcv^R \mid v \in \{a,b\}^*\}$, where $
     | $c,\, Z_0 / Z_0$ | $v$ was empty: switch to pop mode |
     | $c,\, A / A$ | $c$ seen with $A$ on top: switch to pop mode |
     | $c,\, B / B$ | $c$ seen with $B$ on top: switch to pop mode |
-
     *Pop phase* ($q_1$, self-loops — match $v^R$):
 
     | Notation | Meaning |
     |:---------|:--------|
     | $a,\, A / \varepsilon$ | Read $a$, top is $A$: match, pop $A$ |
     | $b,\, B / \varepsilon$ | Read $b$, top is $B$: match, pop $B$ |
-
     *Accept*: $q_1 \to q_2$: $\varepsilon,\, Z_0 / Z_0$ — all matched, accept.
 3.  **Trace for input $"abcba"$** (so $v = "ab"$, $v^R = "ba"$):
     *   $q_0 \xrightarrow{a,\,Z_0/AZ_0} q_0$: stack = $A, Z_0$

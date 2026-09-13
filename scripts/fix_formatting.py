@@ -87,6 +87,19 @@ ANY_HEADING_RE = re.compile(r'^(#{1,6})\s+(.+?)\s*$')
 THEORY_LEVEL5_RE = re.compile(r'^#####\s+\*\*1\.\d+\s+.+?\*\*\s*$')
 THEORY_LEVEL6_RE = re.compile(r'^######\s+\*\*1\.\d+(?:\.\d+)+\s+.+?\*\*\s*$')
 PRACTICE_HEADING_RE = re.compile(r'^#####\s+\*\*(\d+)\.(\d+)\.\s+(.+?)(?:\*\*\s+\((.+)\))?\s*$')
+# Only two practice item kinds exist: Example (teacher demonstrates) and Task
+# (student assignment). Anything else (Problem, Practice Task(s), Exercise...)
+# breaks Solved-pills and the Practice taxonomy.
+ITEM_KIND_WORD_RE = re.compile(r'(?i)\b(tasks?|examples?|problems?|exercises?|practice)\b')
+# ATX headings must start their own line preceded by a blank line: without it
+# pandoc parses `##### ...` as lazy paragraph/list continuation and renders
+# the hashes literally. Mid-line glued headings (`...text ##### 1.6 ...`)
+# are split the same way (conservative: 4-6 hashes + numbered title only).
+ATX_HEADING_RE = re.compile(r'^(#{1,6})(?!#)[ \t]')
+GLUED_HEADING_RE = re.compile(r'^(.*?\S.*?)\s+(#{4,6})(?!#)[ \t]+(\*{0,2}\d.*)$')
+INLINE_CODE_RE = re.compile(r'`[^`]*`')
+def _count_dd(line):
+    return INLINE_CODE_RE.sub('', line).count('$$')
 # Allow dotted/suffixed task numbers (6.1, 3a, 17-18, 1 & 2), collection sources
 # (Practice Sheet, Additional Problems, Exercises, Preparing for Final, Mock Midterm,
 # Assignment, Problem Set), and topic-style sources (Chapter 1, Substitution).
@@ -125,7 +138,8 @@ def should_skip_file(filepath):
     # Skip them from lecture formatting rules; they are intentional collections.
     # questions.qmd are exam banks with their own structure (chapters + quiz),
     # not lecture articles — exempt like cheatsheets (render still applies).
-    return (name in ('404.qmd', 'index.qmd', '0.qmd')
+    # feedback.qmd is a standalone voting page, also exempt.
+    return (name in ('404.qmd', 'index.qmd', '0.qmd', 'feedback.qmd')
             or name.endswith('.ru.qmd') or name.endswith('questions.qmd'))
 
 
@@ -374,6 +388,14 @@ def validate_practice_headings(lines, filepath=""):
         if source_error:
             issues.append(f"Line {line_num}: {source_error} Found `({source_label})`.")
 
+        if source_label is not None:
+            last_part = source_label.rsplit(',', 1)[-1]
+            kind_match = ITEM_KIND_WORD_RE.search(last_part)
+            if kind_match and kind_match.group(0) not in ('Task', 'Example'):
+                issues.append(
+                    f"Line {line_num}: practice item kind must be `Example` or `Task`, "
+                    f"found `{kind_match.group(0)}`. Found `({source_label})`.")
+
     return issues
 
 
@@ -462,6 +484,202 @@ def validate_dividers(filepath, lines):
     return issues
 
 
+def detect_pitfalls(lines):
+    """Pitfalls blocks are banned (owner decision): headings with Pitfall(s)
+    and top-level bullets starting with **Key/Common Pitfall(s):**. The fixer
+    deletes the whole block (see prompts/rules.md); this gate only flags."""
+    issues = []
+    in_fence = False
+    for idx, line in enumerate(lines, start=1):
+        s = line.strip()
+        if s.startswith('```'):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        m = re.match(r'^(#{5,6})\s.*[Pp]itfall', s)
+        if m:
+            issues.append('Line ' + str(idx) + ': Pitfalls sections are banned; delete the entire block (heading + body up to the next heading).')
+            continue
+        if re.match(r'^[*-] \*\*(Key |Common )?Pitfalls?:\*\*', line):
+            issues.append('Line ' + str(idx) + ': Pitfall bullets are banned; delete the bullet and its nested list.')
+            continue
+        if re.match(r'^\*\*[^*]*[Pp]itfalls?[^*]*\*\*:?\s*$', s):
+            issues.append('Line ' + str(idx) + ': Standalone Pitfalls lead-ins are banned; delete the line and its bullet list.')
+    return issues
+
+
+def validate_equation_xrefs(lines):
+    """Textual equation references must point at an existing \\tag{N} in the same file.
+
+    Catches stale cross-references left by regen renumbering (e.g. DE/1
+    'satisfies equation (17)' pointing at a tag that no longer exists):
+    renumber_equation_tags only rewrites refs when duplicate tags exist, so
+    dangling refs otherwise survive silently. This gate only flags.
+    """
+    BS = chr(92)
+    tag_re = re.compile(BS + BS + 'tag{(' + BS + 'd+(?:' + BS + '.' + BS + 'd+)*)}')
+    tags = set()
+    fence = False
+    for line in lines:
+        st = line.strip()
+        if st.startswith('```'):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        for m in tag_re.finditer(line):
+            tags.add(m.group(1))
+    if not tags:
+        return []
+    range_re = re.compile(
+        r'\b[Ee]quations?\s*\(\s*(\d+(?:\.\d+)*)\s*\)\s*[\-\u2013\u2014]\s*\(\s*(\d+(?:\.\d+)*)\s*\)')
+    ref_re = re.compile(
+        r'\b[Ee]quations?\s*\(\s*(\d+(?:\.\d+)*)\s*\)|\bEqs?\.?\s*\(\s*(\d+(?:\.\d+)*)\s*\)')
+    issues = []
+    fence = False
+    for idx, line in enumerate(lines, start=1):
+        st = line.strip()
+        if st.startswith('```'):
+            fence = not fence
+            continue
+        if fence or not st or st.startswith('#'):
+            continue
+        probe = re.sub(r'`[^`]*`', '', line)
+        consumed = []
+        for m in range_re.finditer(probe):
+            for g in (m.group(1), m.group(2)):
+                if g not in tags:
+                    issues.append(
+                        'Line ' + str(idx) + ': equation range references (' + g
+                        + ') with no matching ' + BS + 'tag{' + g + '} in this file.')
+            consumed.append((m.start(), m.end()))
+        for m in ref_re.finditer(probe):
+            if any(a <= m.start() < b for a, b in consumed):
+                continue
+            g = m.group(1) or m.group(2)
+            if g not in tags:
+                issues.append(
+                    'Line ' + str(idx) + ': references equation (' + g
+                    + ') with no matching ' + BS + 'tag{' + g + '} in this file.')
+    return issues
+
+
+def detect_doubled_words(lines):
+    """Catch duplicated adjacent words ('physical physical', 'continuous continuous').
+
+    Prose-only (fences, headings, tables and math spans are exempt); flags, does
+    not rewrite. Audit Sept 2026: two such typos shipped in regen'd theories.
+    Function words are exempt: stripping $...$ spans can glue them together
+    ('such that $x$ that' / 'AND and OR gates' are legitimate prose).
+    """
+    STOP = frozenset((
+        'and', 'or', 'nor', 'yet', 'so', 'but', 'for', 'the', 'a', 'an', 'to',
+        'of', 'in', 'on', 'at', 'by', 'from', 'into', 'over', 'through', 'per',
+        'via', 'with', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'has', 'have', 'had', 'do', 'does', 'did', 'can', 'will', 'would',
+        'should', 'could', 'may', 'might', 'must', 'shall', 'not', 'if',
+        'then', 'than', 'when', 'while', 'where', 'which', 'who', 'that',
+        'this', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'we',
+        'you', 'he', 'she', 'both', 'either', 'neither', 'between', 'vs',
+    ))
+    issues = []
+    fence = False
+    for idx, line in enumerate(lines, start=1):
+        st = line.strip()
+        if st.startswith('```'):
+            fence = not fence
+            continue
+        if fence or not st or st.startswith(('#', '|', '$')):
+            continue
+        probe = re.sub(r'\$[^$]*\$', ' ', line)
+        probe = re.sub(r'`[^`]*`', ' ', probe)
+        for m in re.finditer(r'\b([A-Za-z]{3,})\s+\1\b', probe, flags=re.IGNORECASE):
+            if m.group(1).lower() in STOP:
+                continue
+            issues.append('Line ' + str(idx) + ": duplicated word '" + m.group(1) + "'.")
+    return issues
+
+
+def validate_fence_balance(lines):
+    """Every opening ``` fence must have its closing ```.
+
+    A dropped closing fence silently merges code blocks and eats prose on the
+    next render (caught by hand, Sept 2026 — never again). Flag-only.
+    """
+    # Strict pandoc/CommonMark pairing (verified against quarto pandoc):
+    # only a BARE fence (backticks + optional spaces) closes a block;
+    # a fence carrying an info string while a block is open is literal
+    # content (e.g. ```c shown inside ``````c demo blocks).
+    stack = []
+    for idx, line in enumerate(lines, start=1):
+        m = re.match(r'^(```+)\s*(\S.*)?$', line.strip())
+        if not m:
+            continue
+        length, info = len(m.group(1)), m.group(2)
+        if info is None:
+            if stack and length >= stack[-1][0]:
+                stack.pop()
+            elif not stack:
+                stack.append((length, idx))
+            # else: shorter bare run inside a longer block is content
+        elif not stack:
+            stack.append((length, idx))
+    if stack:
+        return ['Unbalanced ``` fences: a block was opened but never closed.']
+    return []
+
+
+def validate_fig_anchors(filepath):
+    """Every generated PNG referenced by the file must be reproducible from
+    scripts/figs/ (no hand-drawn / hand-placed assets).
+
+    Checks: for each fig-mpl/*.png reference there is a gen_*.py script that
+    mentions the PNG stem. Flag-only; the fix is adding the figure to the
+    generator (computed geometry, anchored vectors) and rerunning it.
+    """
+    import os as _os
+    issues = []
+    try:
+        text = open(filepath, encoding='utf-8').read()
+    except OSError:
+        return issues
+    figs_dir = _os.path.join(_os.path.dirname(__file__), 'figs')
+    gens = []
+    if _os.path.isdir(figs_dir):
+        for fn in sorted(_os.listdir(figs_dir)):
+            if fn.startswith('gen_') and fn.endswith('.py'):
+                try:
+                    gens.append((fn, open(_os.path.join(figs_dir, fn),
+                                         encoding='utf-8').read()))
+                except OSError:
+                    pass
+    for m in re.finditer(r'fig-mpl/([A-Za-z0-9_]+)\.png', text):
+        stem = m.group(1)
+        if not any(stem in src for _, src in gens):
+            issues.append(
+                'Figure fig-mpl/' + stem + '.png is not produced by any '
+                'scripts/figs/gen_*.py — regenerate it from computed '
+                'geometry instead of committing a hand-made asset.')
+    return issues
+
+
+def validate_no_tikz(lines):
+    """TikZ figures are banned: every figure must be a committed matplotlib
+    PNG in the article folder's `fig-mpl/` directory (migration Sept 2026:
+    LLM-written tikz coordinates eyeball intersections/tangencies and stack
+    labels; matplotlib computes geometry). Flag-only; the fix is regenerating
+    the figure via `scripts/figs/` and referencing the PNG.
+    """
+    issues = []
+    for idx, line in enumerate(lines, start=1):
+        if line.strip().startswith('```{tikz'):
+            issues.append(
+                'Line ' + str(idx) + ': ```{tikz} is banned; replace with a '
+                'matplotlib PNG in fig-mpl/ (see scripts/figs/README.md).')
+    return issues
+
+
 def validate_format_rules(filepath, lines):
     if should_skip_file(filepath):
         return []
@@ -472,6 +690,10 @@ def validate_format_rules(filepath, lines):
     issues.extend(validate_theory_headings(lines))
     issues.extend(validate_practice_headings(lines, filepath))
     issues.extend(validate_dividers(filepath, lines))
+    issues.extend(validate_equation_xrefs(lines))
+    issues.extend(validate_no_tikz(lines))
+    issues.extend(validate_fig_anchors(filepath))
+    issues.extend(validate_fence_balance(lines))
     return issues
 
 
@@ -479,6 +701,19 @@ def validate_format_rules(filepath, lines):
 def is_list_item(line):
     """Line starts with a list marker like '1. ', '- ', or '* '."""
     return bool(re.match(r'^\s*(\d+\.\s|[-*+] )', line))
+
+
+def is_block_boundary(line):
+    """Lines that already terminate a paragraph block: headers, fences,
+    tables, rules, math display, HTML tags, blockquotes."""
+    t = line.strip()
+    if not t:
+        return True
+    if t.startswith(('#', '```', '|', '>', '<', '$$')):
+        return True
+    if re.match(r'^(---+|\*\*\*+|___+)\s*$', t):
+        return True
+    return False
 
 
 def ends_with_colon(line):
@@ -568,6 +803,225 @@ def number_theory_subsections(lines):
     return out, changed
 
 
+def renumber_equation_tags(lines):
+    BS = chr(92)
+    tag_re = re.compile(BS + BS + 'tag{(' + BS + 'd+(?:' + BS + '.' + BS + 'd+)*)}')
+    ref_re = re.compile('(?<!' + BS + 'w)' + BS + '((' + BS + 'd{1,3}(?:' + BS + '.' + BS + 'd+)*)' + BS + ')(?!' + BS + 'w)')
+    out = list(lines)
+    fence = False
+    occ = []
+    for idx, line in enumerate(out):
+        s = line.strip()
+        if s.startswith('```'):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        for m in tag_re.finditer(line):
+            occ.append([idx, m.start(), m.end(), m.group(1)])
+    if not occ:
+        return out, False
+    ordered = [o[3] for o in occ]
+    seen = []
+    for v in ordered:
+        if v not in seen:
+            seen.append(v)
+    if len(ordered) == len(seen):
+        return out, False  # unique tags in any style: author's convention stands
+    first_num = {}
+    for pos, o in enumerate(occ, start=1):
+        if o[3] not in first_num:
+            first_num[o[3]] = str(pos)
+    by_line = {}
+    for pos, o in enumerate(occ, start=1):
+        by_line.setdefault(o[0], []).append((o[1], o[2], str(pos)))
+    changed = False
+    for idx, items in by_line.items():
+        line = out[idx]
+        for a, b, num in sorted(items, reverse=True):
+            line = line[:a] + BS + 'tag{' + num + '}' + line[b:]
+        if line != out[idx]:
+            out[idx] = line
+            changed = True
+    def _sub(m):
+        old = m.group(1)
+        if old in first_num:
+            return '(' + first_num[old] + ')'
+        return m.group(0)
+    TOK = BS + 'd+(?:[.]' + BS + 'd+)*'
+    TOK_RE = re.compile(TOK)
+    DASH = '-\u2013\u2014'
+    range_re = re.compile('(?<!' + BS + 'w)' + BS + '(' + '(' + TOK + ')' + BS + 's*[' + DASH + ']' + BS + 's*(' + TOK + ')' + BS + ')')
+    def _sub_range(m):
+        a = m.group(1)
+        b = m.group(2)
+        na = first_num.get(a, a)
+        nb = first_num.get(b, b)
+        if na == a and nb == b:
+            return m.group(0)
+        s0 = m.group(0)
+        o = m.start(0)
+        return s0[:m.start(1) - o] + na + s0[m.end(1) - o:m.start(2) - o] + nb + s0[m.end(2) - o:]
+    fence = False
+    for idx, line in enumerate(out):
+        s = line.strip()
+        if s.startswith('```'):
+            fence = not fence
+            continue
+        if fence or s.startswith('#'):
+            continue
+        new_line = range_re.sub(_sub_range, line)
+        new_line = ref_re.sub(_sub, new_line)
+        if new_line != line:
+            out[idx] = new_line
+            changed = True
+    return out, changed
+
+
+def _ascii_art_ratio(nonempty):
+    BOX = '─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬►◄▲▼◆●○■□→←↑↓'
+    SYMS = '|+<>^vVxXoO#*=~_./' + chr(92)
+    art = 0
+    n = 0
+    for s in nonempty:
+        if not s:
+            continue
+        n += 1
+        if s.startswith('|'):
+            continue
+        hit = False
+        for c in s:
+            if c in BOX:
+                hit = True
+                break
+        if hit:
+            art += 1
+            continue
+        letters = 0
+        syms = 0
+        for c in s:
+            if c.isalpha():
+                letters += 1
+            elif c in SYMS:
+                syms += 1
+        if len(s) >= 4 and syms >= 3 and letters * 5 <= len(s) * 2:
+            art += 1
+    return art / n if n else 0.0
+
+
+def _unfenced_art_line(s):
+    BOX = '─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬►◄▲▼◆●○■□→←↑↓'
+    if not s or len(s) > 200:
+        return False
+    if s.startswith(('|', '#', '<', '>', '-', '*', '$')):
+        return False
+    if s[0].isdigit() and ('.' in s[:5] or ')' in s[:5] or ':' in s[:5]):
+        return False
+    for c in s:
+        if c in BOX:
+            return True
+    if s.startswith('+') and len(s) >= 3:
+        return True
+    return False
+
+
+def detect_ascii_diagrams(lines):
+    issues = []
+    ART_INFO = ('', 'text', 'txt', 'plain', 'ascii', 'art', 'diagram')
+    fence = False
+    info = ''
+    start = 0
+    buf = []
+    n = len(lines)
+    run_start = None
+    run_end = None
+    def flush_fence(end_idx):
+        nonempty = [x.strip() for x in buf if x.strip()]
+        if len(nonempty) >= 3 and _ascii_art_ratio(nonempty) >= 0.6:
+            issues.append('Line ' + str(start) + ': ASCII-art diagram (lines ' + str(start) + '-' + str(end_idx) + '); redraw as mermaid/tikz per exemplars.')
+    def flush_run():
+        if run_start is not None and run_end is not None and run_end - run_start + 1 >= 4:
+            issues.append('Line ' + str(run_start) + ': ASCII-art diagram (lines ' + str(run_start) + '-' + str(run_end) + '); redraw as mermaid/tikz per exemplars.')
+    for idx, line in enumerate(lines, start=1):
+        s = line.strip()
+        if s.startswith('```'):
+            if fence:
+                if info in ART_INFO:
+                    flush_fence(idx - 1)
+                fence = False
+                buf = []
+            else:
+                fence = True
+                rest = s[3:].strip()
+                info = rest.split()[0] if rest else ''
+                if info.startswith('{') and info.endswith('}') and len(info) > 2:
+                    info = info[1:-1]
+                start = idx + 1
+                buf = []
+            flush_run()
+            run_start = None
+            run_end = None
+            continue
+        if fence:
+            buf.append(line)
+            continue
+        if _unfenced_art_line(s):
+            if run_start is None:
+                run_start = idx
+            run_end = idx
+        elif s:
+            flush_run()
+            run_start = None
+            run_end = None
+    if fence and info in ART_INFO:
+        flush_fence(n)
+    flush_run()
+    return issues
+
+
+def detect_tikz_rotate(lines):
+    """Flag rotated text in tikz blocks (unreadable labels)."""
+    issues = []
+    in_tikz = False
+    for i, line in enumerate(lines, start=1):
+        s = line.strip()
+        if s.startswith('```'):
+            if in_tikz:
+                in_tikz = False
+            elif 'tikz' in s:
+                in_tikz = True
+            continue
+        if in_tikz and re.search(r'(?<!shape border )rotate\s*=\s*(?!0\b)', line):
+            issues.append(
+                f"Line {i}: `rotate=` text rotation in tikz breaks "
+                f"readability (use horizontal labels).")
+    return issues
+
+
+def _is_joinable_continuation(line):
+    """Indented plain/math line that may merge into a list item's paragraph.
+
+    Used only to collapse blank lines strictly inside a list (tight lists
+    render without <p> gaps). Anything structural returns False, so the
+    blank line - and the loose list - stays untouched.
+    """
+    if not line or line[0] not in (' ', chr(9)):
+        return False
+    if is_list_item(line):
+        return False
+    stripped = line.strip()
+    if not stripped:
+        return False
+    indent = len(line) - len(line.lstrip(' '))
+    if indent < 1 or indent > 5:
+        return False
+    if stripped.startswith(('```', '|', '<', '#', '>', ':')):
+        return False
+    if len(stripped) >= 3 and set(stripped) <= set('-*_'):
+        return False
+    return True
+
+
 def process_file(filepath):
     with open(filepath, encoding="utf-8") as f:
         content = f.read()
@@ -576,8 +1030,16 @@ def process_file(filepath):
     # Auto-fix: sequential #### numbers + practice ##### prefixes before validating
     lines, _ = renumber_sections(lines, filepath)
     lines, _ = number_theory_subsections(lines)
+    if is_managed_file(filepath):
+        lines, _tags_fixed = renumber_equation_tags(lines)
+    else:
+        _tags_fixed = False
 
     format_issues = validate_format_rules(filepath, lines)
+    format_issues.extend(detect_pitfalls(lines))
+    format_issues.extend(detect_tikz_rotate(lines))
+    if is_managed_file(filepath):
+        format_issues.extend(detect_ascii_diagrams(lines))
 
     # === Detect AI artifacts (fenced code blocks are exempt: listings and
     # code comments legitimately contain flagged phrasing) ===
@@ -602,9 +1064,14 @@ def process_file(filepath):
                 break
 
     # === Pass 1: Remove blank lines within lists ===
+    # Goal: lists render TIGHT (no <p> wrappers = no gaps between items).
+    # Verified with quarto: item-attached $$ math (even labeled/multiline),
+    # continuation paragraphs and nested sublists all parse correctly without
+    # a preceding blank line and keep the list tight.
     result = []
     i = 0
     in_code = False
+    in_math = False
     removed = 0
 
     while i < len(lines):
@@ -627,13 +1094,23 @@ def process_file(filepath):
                 j += 1
 
             should_remove = False
-            if j < len(lines) and is_list_item(lines[j]) and prev_is_in_list(result):
-                prev = get_prev_nonblank(result)
-                # Exception: keep blank if prev ends with ':' and is NOT a list item
-                # (user wants blank line after colon before list)
-                if prev and ends_with_colon(prev) and not is_list_item(prev):
-                    should_remove = False
-                else:
+            if j < len(lines) and prev_is_in_list(result):
+                if is_list_item(lines[j]):
+                    prev = get_prev_nonblank(result)
+                    # Exception: keep blank if prev ends with ':' and is NOT a list item
+                    # (user wants blank line after colon before list).
+                    # Nested sublists need no blank either: pandoc nests them
+                    # correctly and the list stays tight.
+                    if prev and ends_with_colon(prev) and not is_list_item(prev):
+                        should_remove = False
+                    else:
+                        should_remove = True
+                elif not in_math and _is_joinable_continuation(lines[j]):
+                    # Item-attached math, continuation paragraph or wrapped text:
+                    # joining keeps the item a single block, so the whole list
+                    # renders tight. Structural lines (fences, tables, divs,
+                    # HTML, headings, quotes, rules, code-level indents) and
+                    # blanks inside $$ spans keep their blank line.
                     should_remove = True
 
             if should_remove:
@@ -644,6 +1121,8 @@ def process_file(filepath):
                 result.append(line)
                 i += 1
         else:
+            if '$$' in line and line.count('$$') % 2 == 1:
+                in_math = not in_math
             result.append(line)
             i += 1
 
@@ -678,6 +1157,158 @@ def process_file(filepath):
 
     lines = result
 
+    # === Pass 4: Ensure a blank line before every list start ===
+    # Without it pandoc parses `* ...` as emphasis and `1. ...` as paragraph
+    # continuation (the whole list renders as one run-on paragraph). Only the
+    # list START needs it: blanks inside a list are still removed by Pass 1.
+    # (implemented as explicit loop for lookahead-free prev-tracked logic)
+    yaml_open = bool(lines and lines[0].strip() == '---')
+    blanks_added = 0
+    result4 = []
+    in_code = False
+    in_math = False
+    yaml_done = not yaml_open
+    prev_nonblank = None  # last non-blank, non-skipped line
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('```'):
+            in_code = not in_code
+            result4.append(line)
+            if not in_code:
+                prev_nonblank = None  # fence resets paragraph context
+            continue
+        if in_code:
+            result4.append(line)
+            continue
+        if not yaml_done:
+            result4.append(line)
+            if i > 0 and stripped == '---':
+                yaml_done = True
+            prev_nonblank = None
+            continue
+        if stripped == '$$' or (stripped.startswith('$$') and stripped.endswith('$$') and len(stripped) > 2):
+            # single-line display math resets context like a boundary
+            result4.append(line)
+            prev_nonblank = None
+            continue
+        if stripped.startswith('$$'):
+            in_math = not in_math
+            result4.append(line)
+            if not in_math:
+                prev_nonblank = None
+            continue
+        if in_math:
+            result4.append(line)
+            continue
+        if stripped == '':
+            result4.append(line)
+            continue
+        if is_list_item(line) and prev_nonblank is not None and not is_block_boundary(prev_nonblank):
+            if result4 and result4[-1].strip() == '':
+                pass  # blank already present: idempotent no-op
+            elif is_list_item(prev_nonblank):
+                pass  # same list (nested or same level): keep tight, no blank
+            elif not prev_is_in_list(result4):
+                result4.append('')  # true list start after paragraph text
+                blanks_added += 1
+            # else: inside a list (e.g. sublist after item text): keep tight
+        result4.append(line)
+        prev_nonblank = line
+
+    lines = result4
+    added += blanks_added
+
+    # === Pass 5: ATX headings own their line + blank line before ===
+    # Without a preceding blank pandoc renders `##### ...` as literal text
+    # glued into the paragraph (observed on 1.5.x/1.6.x headings). Unclosed
+    # $$ spans and blank lines inside display math break the same way and
+    # cannot be fixed safely, so they are reported as violations (gate).
+    result5 = []
+    in_code5 = False
+    par_dd5 = 0
+    par_start5 = 0
+    yaml5 = bool(lines and lines[0].strip() == '---')
+    yaml_done5 = not yaml5
+    head_issues = []
+    head_added = 0
+    def _flush_par5(at_line):
+        if par_dd5 % 2 == 1:
+            head_issues.append(
+                f"Lines {par_start5}-{at_line}: unpaired `$$` display math "
+                f"breaks rendering (renders literally).")
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('```'):
+            in_code5 = not in_code5
+            _flush_par5(idx + 1)
+            par_dd5 = 0
+            par_start5 = 0
+            result5.append(line)
+            continue
+        if in_code5:
+            result5.append(line)
+            continue
+        if not yaml_done5:
+            result5.append(line)
+            if idx > 0 and stripped == '---':
+                yaml_done5 = True
+                par_dd5 = 0
+                par_start5 = 0
+            continue
+        # NOTE: table rows ('|...') are NOT a boundary here: a display-math
+        # line can start with '|' (|f|, norms). Balanced tables pass as one
+        # paragraph; an unbalanced row still flags at the table end.
+        if stripped == '' and par_start5 != 0 and par_dd5 % 2 == 1:
+            # Blank line strictly inside a display-math span can never
+            # render (pandoc splits the paragraph there): drop it so the
+            # span survives. Leftover odd parity still flags below.
+            removed += 1
+            continue
+        if stripped == '' or ATX_HEADING_RE.match(stripped) or stripped.startswith('<'):
+            _flush_par5(idx + 1)
+            par_dd5 = 0
+            par_start5 = 0
+        elif stripped.startswith('>'):
+            pass
+        else:
+            if par_start5 == 0:
+                par_start5 = idx + 1
+            par_dd5 += _count_dd(line)
+        if stripped == '':
+            result5.append(line)
+            continue
+        if stripped.startswith('|') or stripped.startswith('>') or stripped.startswith('<'):
+            result5.append(line)
+            continue
+        if not stripped.startswith('#'):
+            gm = GLUED_HEADING_RE.match(line)
+            if gm:
+                if par_start5 == 0:
+                    par_start5 = idx + 1
+                par_dd5 += _count_dd(gm.group(1))
+                _flush_par5(idx + 1)
+                par_dd5 = 0
+                par_start5 = 0
+                result5.append(gm.group(1))
+                result5.append('')
+                result5.append(gm.group(2) + ' ' + gm.group(3))
+                head_added += 1
+                continue
+        if ATX_HEADING_RE.match(stripped):
+            prev = get_prev_nonblank(result5)
+            if prev is not None and not ATX_HEADING_RE.match(prev.strip()):
+                if result5 and result5[-1].strip() != '':
+                    result5.append('')
+                    head_added += 1
+        result5.append(line)
+    if par_dd5 % 2 == 1:
+        head_issues.append(
+            f"Line {par_start5}: unpaired `$$` display math breaks "
+            f"rendering (renders literally).")
+    lines = result5
+    added += head_added
+    format_issues.extend(head_issues)
+
     # === Pass 3: Ensure '---' before top-level numbered section headers ===
     # Matches: #### **N. SectionName** (e.g. #### **2. Definitions**)
     SECTION_HEADER_RE = re.compile(r'^####\s+\*\*\d+\.')
@@ -711,15 +1342,16 @@ def process_file(filepath):
 
     # Write back
     new_content = '\n'.join(result)
-    changed = new_content != content
+    changed = (new_content != content) or _tags_fixed
     if changed:
         with open(filepath, 'w', encoding="utf-8") as f:
             f.write(new_content)
 
-    return removed, added + separators_added, ai_found, changed, format_issues
+    style_notes = detect_doubled_words(lines)
+    return removed, added + separators_added, ai_found, changed, format_issues, style_notes
 
 
-def build_report(stats, artifacts_by_file, format_issues_by_file):
+def build_report(stats, artifacts_by_file, format_issues_by_file, style_notes_by_file=None):
     """Build the Markdown report."""
     lines = [
         "# Formatting Report",
@@ -763,6 +1395,23 @@ def build_report(stats, artifacts_by_file, format_issues_by_file):
         lines.append("")
 
     lines.extend([
+        "## Style Notes (advisory, non-blocking)",
+        "",
+    ])
+    if style_notes_by_file:
+        for file_path in sorted(style_notes_by_file):
+            lines.append(f"### {file_path}")
+            lines.append("")
+            for note in style_notes_by_file[file_path]:
+                # NOTE: `*` bullets on purpose — fix_loop only consumes `- ` bullets,
+                # so advisories never become LLM fix tasks.
+                lines.append(f"* {note}")
+            lines.append("")
+    else:
+        lines.append("No style notes.")
+        lines.append("")
+
+    lines.extend([
         "## Formatting Changes",
         "",
         f"- Files processed: {stats['files_processed']}",
@@ -790,9 +1439,10 @@ total_ai_detected = 0
 files_changed = 0
 all_artifacts = {}  # file -> list of artifacts
 format_issues = {}  # file -> list of format issues
+style_notes = {}  # file -> advisory style notes (non-blocking)
 
 for fp in qmd_files:
-    removed, added, ai, changed, file_format_issues = process_file(fp)
+    removed, added, ai, changed, file_format_issues, file_style_notes = process_file(fp)
     total_removed += removed
     total_added += added
     total_ai_detected += len(ai)
@@ -805,6 +1455,9 @@ for fp in qmd_files:
     if file_format_issues:
         format_issues[fp] = file_format_issues
 
+    if file_style_notes:
+        style_notes[fp] = file_style_notes
+
 stats = {
     'files_processed': len(qmd_files),
     'files_changed': files_changed,
@@ -814,7 +1467,7 @@ stats = {
 }
 
 Path(REPORT_FILE).write_text(
-    build_report(stats, all_artifacts, format_issues),
+    build_report(stats, all_artifacts, format_issues, style_notes),
     encoding='utf-8',
 )
 
