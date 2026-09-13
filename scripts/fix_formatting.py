@@ -600,32 +600,48 @@ def detect_doubled_words(lines):
     return issues
 
 
-def validate_tikz_echo(lines):
-    """Every ```{tikz} figure must carry `#| echo: false` (or `%|` style).
+def validate_fence_balance(lines):
+    """Every opening ``` fence must have its closing ```.
 
-    Without it Quarto prints the tikz source as a code listing above the
-    rendered figure (seen in Physics/1, DE/1 — audit Sept 2026). Flag-only;
-    the fix is one inserted option line, handled by the fix loop / author.
+    A dropped closing fence silently merges code blocks and eats prose on the
+    next render (caught by hand, Sept 2026 — never again). Flag-only.
+    """
+    # Strict pandoc/CommonMark pairing (verified against quarto pandoc):
+    # only a BARE fence (backticks + optional spaces) closes a block;
+    # a fence carrying an info string while a block is open is literal
+    # content (e.g. ```c shown inside ``````c demo blocks).
+    stack = []
+    for idx, line in enumerate(lines, start=1):
+        m = re.match(r'^(```+)\s*(\S.*)?$', line.strip())
+        if not m:
+            continue
+        length, info = len(m.group(1)), m.group(2)
+        if info is None:
+            if stack and length >= stack[-1][0]:
+                stack.pop()
+            elif not stack:
+                stack.append((length, idx))
+            # else: shorter bare run inside a longer block is content
+        elif not stack:
+            stack.append((length, idx))
+    if stack:
+        return ['Unbalanced ``` fences: a block was opened but never closed.']
+    return []
+
+
+def validate_no_tikz(lines):
+    """TikZ figures are banned: every figure must be a committed matplotlib
+    PNG in the article folder's `fig-mpl/` directory (migration Sept 2026:
+    LLM-written tikz coordinates eyeball intersections/tangencies and stack
+    labels; matplotlib computes geometry). Flag-only; the fix is regenerating
+    the figure via `scripts/figs/` and referencing the PNG.
     """
     issues = []
-    i, n = 0, len(lines)
-    while i < n:
-        if lines[i].strip().startswith('```{tikz'):
-            start = i + 1
-            j = start
-            opts = []
-            while j < n and re.match(r'^(#|\%)\|', lines[j].strip()):
-                opts.append(lines[j].strip())
-                j += 1
-            if not any(re.match(r'(#|\%)\|\s*echo\s*:\s*false', o) for o in opts):
-                issues.append(
-                    'Line ' + str(start) + ': tikz figure without `echo: false` '
-                    'prints its source as a code listing; add `#| echo: false`.')
-            k = i + 1
-            while k < n and not lines[k].strip().startswith('```'):
-                k += 1
-            i = k
-        i += 1
+    for idx, line in enumerate(lines, start=1):
+        if line.strip().startswith('```{tikz'):
+            issues.append(
+                'Line ' + str(idx) + ': ```{tikz} is banned; replace with a '
+                'matplotlib PNG in fig-mpl/ (see scripts/figs/README.md).')
     return issues
 
 
@@ -640,7 +656,8 @@ def validate_format_rules(filepath, lines):
     issues.extend(validate_practice_headings(lines, filepath))
     issues.extend(validate_dividers(filepath, lines))
     issues.extend(validate_equation_xrefs(lines))
-    issues.extend(validate_tikz_echo(lines))
+    issues.extend(validate_no_tikz(lines))
+    issues.extend(validate_fence_balance(lines))
     return issues
 
 

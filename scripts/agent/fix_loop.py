@@ -134,7 +134,7 @@ def _fix_prompt(rules: str, violations: list[str], render_excerpt: str,
         parts.append("<<<BLOCK " + str(i) + " LINES " + str(a) + "-" + str(b) + ">>>")
         parts.append(_t)
         parts.append("<<<END>>>")
-    parts.append("Return ONLY the fixed blocks: repeat each header line exactly, then the FULL corrected lines (no LNNN: prefixes), then <<<END>>>. Fix every block separately. No explanations, no fences. Redraw any ASCII-art diagram violation as mermaid/tikz per exemplars (never re-emit ASCII).")
+    parts.append("Return ONLY the fixed blocks: repeat each header line exactly, then the FULL corrected lines (no LNNN: prefixes), then <<<END>>>. Fix every block separately. No explanations, no fences. Redraw any ASCII-art diagram violation as mermaid (flows) or a matplotlib PNG reference per exemplars (tikz is banned; never re-emit ASCII).")
     return chr(10).join(parts)
 
 

@@ -57,21 +57,13 @@ Rules: double-quoted labels; `<br/>` for line breaks (both lines always
 render); short labels (under ~6 words per line); palette fills #e8f4f8
 default, #d6eef5 secondary, #d7f0c2 success, #fff3cd active, #f9d9e2 danger.
 
-Tikz (function graphs, coordinate plots ONLY) — copy verbatim:
-```{tikz}
-#| label: fig-short-name
-#| fig-cap: "One-sentence caption"
-#| echo: false
-#| lang: tex
-#| fig-height: 4
-\begin{tikzpicture}[xscale=0.36, yscale=0.028]
-    \draw[->] (0,0) -- (27,0) node[right] {$t$};
-    \draw[->] (0,0) -- (0,215) node[above] {$N(t)$};
-    \draw[blue, thick] plot coordinates {(0,20) (5,50) (10,79) (15,93) (20,99)};
-\end{tikzpicture}
-```
-Rules: pure-tikz only (no pgfplots); short curve labels placed in EMPTY plot
-regions, never on curves/axes/gridlines; verify no two labels overlap.
+Matplotlib PNG (function graphs, coordinate plots ONLY) — TikZ is banned:
+`![One-sentence caption.](fig-mpl/short_name_mpl.png){#fig-short-name}`
+Rules: the PNG must be committed in the article folder's `fig-mpl/`
+directory, produced by a script under `scripts/figs/` with computed
+geometry (solve intersections/tangencies, never eyeball coordinates);
+short curve labels placed in EMPTY plot regions with white chips where
+crowded, never on curves/axes/gridlines; verify no two labels overlap.
 
 ## Equations and formatting
 
