@@ -121,187 +121,369 @@ gtag('js', new Date());
 gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 </script>
 <!-- Pre-paint font preload: the three faces above-the-fold text always needs
+
 (body 400, headings 700, nav/UI 600). Without this the browser discovers them
+
 only after CSS parse + first layout, so first paint uses the fallback and every
+
 cold open visibly "jumps" on swap. Hrefs are root-absolute so one include works
+
 at any page depth; they byte-match the URLs styles.css requests (no double fetch).
+
 Archivo mode intentionally not preloaded: default stack is SF, secondary stack
+
 keeps swap with metric-matched fallback (layout-stable). -->
-<link rel="preload" href="/styles/fonts/SF-Pro-Text-Regular.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/styles/fonts/SF-Pro-Text-Semibold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/styles/fonts/SF-Pro-Display-Bold.woff2" as="font" type="font/woff2" crossorigin>
+
+<link rel="preload" href="../../styles/fonts/SF-Pro-Text-Regular.woff2" as="font" type="font/woff2" crossorigin="">
+
+<link rel="preload" href="../../styles/fonts/SF-Pro-Text-Semibold.woff2" as="font" type="font/woff2" crossorigin="">
+
+<link rel="preload" href="../../styles/fonts/SF-Pro-Display-Bold.woff2" as="font" type="font/woff2" crossorigin="">
+
 <script>
+
 // Progressive-enhancement flag: custom nav replaces the server-rendered
+
 // quarto chrome (#quarto-sidebar/glass/header). Hiding it pre-paint avoids
+
 // a white flash in dark theme; without JS the flag is absent and the
+
 // quarto chrome stays visible. Removed again if custom UI fails to boot.
+
 document.documentElement.classList.add("js");
+
 </script>
+
 <script>
+
 (function () {
+
 	var KEY = "inn-color-mode";
+
 	function stored() {
+
 		try {
+
 			return localStorage.getItem(KEY);
+
 		} catch {
+
 			return null;
+
 		}
+
 	}
+
 	function computeDark() {
+
 		var s = stored();
+
 		if (s === "light") return false;
+
 		if (s === "dark") return true;
+
 		try {
+
 			return window.matchMedia("(prefers-color-scheme: dark)").matches;
+
 		} catch {
+
 			return false;
+
 		}
+
 	}
+
 	function apply() {
+
 		var dark = computeDark();
+
 		document.documentElement.classList.toggle("inn-dark", dark);
+
 		try {
+
 			document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+
 		} catch {
+
 			/* ignore */
+
 		}
+
 		try {
+
 			window.dispatchEvent(new CustomEvent("inn-color-mode-change"));
+
 		} catch {
+
 			/* ignore */
+
 		}
+
 	}
+
 	apply();
+
 	try {
+
 		window.__innColorMode = {
+
 			get: function () {
+
 				return stored() || "auto";
+
 			},
+
 			set: function (mode) {
+
 				if (mode === "auto") {
+
 					try {
+
 						localStorage.removeItem(KEY);
+
 					} catch {
+
 						/* ignore */
+
 					}
+
 				} else {
+
 					try {
+
 						localStorage.setItem(KEY, mode);
+
 					} catch {
+
 						/* ignore */
+
 					}
+
 				}
+
 				apply();
+
 			},
+
 			apply: apply,
+
 		};
+
 		window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+
 			if (!stored()) apply();
+
 		});
+
 	} catch {
+
 		/* ignore */
+
 	}
+
 	if (!document.documentElement.hasAttribute("data-inn-baked")) {
+
 		document.documentElement.classList.add("inn-ui-booting");
+
 	}
+
 })();
+
 </script>
+
 <script>
+
 // Sync pre-paint UI state: font stack + saved panel widths from localStorage.
+
 // Must run before first paint so the page never flashes default fonts/widths
+
 // and post-load JS only re-applies identical values (no visual change).
+
 (function () {
+
 	try {
+
 		var f = null;
+
 		try {
+
 			f = localStorage.getItem("inn-sans");
+
 		} catch (e) {}
+
 		// Deterministic default 'sf' (matches innResolveSansMode in index.html).
+
 		document.documentElement.classList.add(f === "archivo" ? "inn-sans-archivo" : "inn-sans-sf");
+
 	} catch (e) {}
+
 	function px(key, min, max, deflt) {
+
 		var v = deflt;
+
 		try {
+
 			var raw = parseInt(localStorage.getItem(key) || "", 10);
+
 			if (isFinite(raw)) v = Math.max(min, Math.min(max, raw));
+
 		} catch (e) {}
+
 		return v;
+
 	}
+
 	try {
+
 		document.documentElement.style.setProperty(
+
 			"--inn-nav-width",
+
 			px("inn_custom_nav_width", 272, 520, 344) + "px",
+
 		);
+
 		document.documentElement.style.setProperty(
+
 			"--inn-sidebar-width",
+
 			px("sidebar_width_px", 288, 608, 384) + "px",
+
 		);
+
 	} catch (e) {}
+
 })();
+
 </script>
+
+
+
 
 
 <style>
+
 	html {
+
 		--inn-loader-bg: #ffffff;
+
 		--inn-loader-spinner-track: rgba(23, 48, 66, 0.14);
+
 		--inn-loader-spinner-color: #173042;
+
 	}
+
+
 
 	html.inn-dark {
+
 		--inn-loader-bg: #000000;
+
 		--inn-loader-spinner-track: rgba(255, 255, 255, 0.22);
+
 		--inn-loader-spinner-color: #ffffff;
+
 	}
+
+
 
 	@keyframes inn-head-loader-spin {
+
 		to {
+
 			transform: rotate(360deg);
+
 		}
+
 	}
+
+
 
 	html.inn-ui-booting {
+
 		background: var(--inn-loader-bg);
+
 		overflow: hidden;
+
 	}
+
+
 
 	html.js body #quarto-sidebar,
+
 	html.js body #quarto-sidebar-glass,
+
 	html.js body #quarto-header,
+
 	html.js body #quarto-sidebar *,
+
 	html.js body #quarto-sidebar-glass *,
+
 	html.js body #quarto-header * {
+
 		visibility: hidden !important;
+
 	}
+
+
 
 	html.inn-ui-booting body {
+
 		opacity: 0;
+
 	}
+
+
 
 	html.inn-ui-booting::before {
+
 		content: "";
+
 		position: fixed;
+
 		inset: 0;
+
 		background: var(--inn-loader-bg);
+
 		z-index: 2147483646;
+
 		pointer-events: none;
+
 	}
 
+
+
 	html.inn-ui-booting::after {
+
 		content: "";
+
 		position: fixed;
+
 		top: 50%;
+
 		left: 50%;
+
 		width: 44px;
+
 		height: 44px;
+
 		margin: -22px 0 0 -22px;
+
 		border-radius: 50%;
+
 		border: 3px solid var(--inn-loader-spinner-track);
+
 		border-top-color: var(--inn-loader-spinner-color);
+
 		animation: inn-head-loader-spin 0.72s linear infinite;
+
 		z-index: 2147483647;
+
 		pointer-events: none;
+
 	}
+
 </style>
 
 <script type="text/javascript">
@@ -736,7 +918,6 @@ mjx-c.mjx-c32::before {
   content: "2";
 }
 </style>
-  <link rel="stylesheet" href="../../site_libs/quarto-diagram/mermaid.css">
   <link rel="preconnect" href="https://www.googletagmanager.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 </head>
@@ -1907,114 +2088,31 @@ mjx-c.mjx-c32::before {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="../../semester-4/Operating Systems/1.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">W1. System Modes and Memory</span></a>
+  <a href="../../semester-4/Operating Systems/feedback.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Будет ли продолжение?</span></a>
   </div>
 </li>
       </ul>
   </li>
           <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-17" role="navigation" aria-expanded="false">
- <span class="menu-text">Introduction to AI</span></a>
-          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-17" role="navigation" aria-expanded="false" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-17" class="collapse list-unstyled sidebar-section depth2 ">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../semester-4/Introduction to AI/1.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">W1. AI and Future of Work</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../semester-4/Introduction to AI/2.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">W2. Philosophy of AI</span></a>
-  </div>
-</li>
-      </ul>
+      <span class="sidebar-item-text sidebar-link text-start">
+ <span class="menu-text">Introduction to AI</span></span>
   </li>
           <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-18" role="navigation" aria-expanded="false">
- <span class="menu-text">Differential Equations</span></a>
-          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-18" role="navigation" aria-expanded="false" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-18" class="collapse list-unstyled sidebar-section depth2 ">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../semester-4/Differential Equations/1.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">W1. Direction Fields and Isoclines</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../semester-4/Differential Equations/2.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">W2. Separable Equations</span></a>
-  </div>
-</li>
-      </ul>
+      <span class="sidebar-item-text sidebar-link text-start">
+ <span class="menu-text">Differential Equations</span></span>
   </li>
           <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-19" role="navigation" aria-expanded="false">
- <span class="menu-text">Introduction to Optimization</span></a>
-          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-19" role="navigation" aria-expanded="false" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-19" class="collapse list-unstyled sidebar-section depth2 ">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../semester-4/Introduction to Optimization/1.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">W1. Linear Programming Basics</span></a>
-  </div>
-</li>
-      </ul>
+      <span class="sidebar-item-text sidebar-link text-start">
+ <span class="menu-text">Introduction to Optimization</span></span>
   </li>
           <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-20" role="navigation" aria-expanded="false">
- <span class="menu-text">Physics I</span></a>
-          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-20" role="navigation" aria-expanded="false" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-20" class="collapse list-unstyled sidebar-section depth2 ">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../semester-4/Physics I/1.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">W1. Kinematics</span></a>
-  </div>
-</li>
-      </ul>
+      <span class="sidebar-item-text sidebar-link text-start">
+ <span class="menu-text">Physics I</span></span>
   </li>
           <li class="sidebar-item sidebar-item-section">
-      <div class="sidebar-item-container"> 
-            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-21" role="navigation" aria-expanded="false">
- <span class="menu-text">Probability and Statistics</span></a>
-          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-21" role="navigation" aria-expanded="false" aria-label="Toggle section">
-            <i class="bi bi-chevron-right ms-2"></i>
-          </a> 
-      </div>
-      <ul id="quarto-sidebar-section-21" class="collapse list-unstyled sidebar-section depth2 ">  
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../semester-4/Probability and Statistics/1.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">W1. Foundations of Probability</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../../semester-4/Probability and Statistics/2.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">W2. Conditional Probability</span></a>
-  </div>
-</li>
-      </ul>
+      <span class="sidebar-item-text sidebar-link text-start">
+ <span class="menu-text">Probability and Statistics</span></span>
   </li>
       </ul>
   </li>
@@ -2374,7 +2472,11 @@ mjx-c.mjx-c32::before {
 <span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
 <span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    VeryHeavyObject<span class="op">*</span> object<span class="op">;</span></span>
 <span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="op">};</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Why this proxy is useful: 1. <strong>Deferred creation</strong>: The <code>VeryHeavyObject</code> is not allocated until the first time its members are accessed — even if many <code>ProxyForHeavy</code> variables exist. 2. <strong>Null-safety</strong>: The proxy guarantees that <code>object</code> is always initialized before any access, eliminating null-pointer dereference bugs.</p>
+<p>Why this proxy is useful:</p>
+<ol type="1">
+<li><strong>Deferred creation</strong>: The <code>VeryHeavyObject</code> is not allocated until the first time its members are accessed — even if many <code>ProxyForHeavy</code> variables exist.</li>
+<li><strong>Null-safety</strong>: The proxy guarantees that <code>object</code> is always initialized before any access, eliminating null-pointer dereference bugs.</li>
+</ol>
 <p>Key C++ rules for operator overloading: you can redefine <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>[]</code>, <code>()</code>, <code>new</code>, <code>delete</code>, <code>-&gt;</code>, and <code>*</code>. You cannot redefine <code>.</code> (dot access). You cannot invent new operators and cannot change an operator’s arity or precedence.</p>
 </section>
 <section id="how-to-apply-proxy" class="level6">
@@ -2651,7 +2753,15 @@ Click to see the solution
 <span id="cb11-75"><a href="#cb11-75" aria-hidden="true" tabindex="-1"></a>        <span class="bu">System</span><span class="op">.</span><span class="fu">out</span><span class="op">.</span><span class="fu">println</span><span class="op">(</span>styled<span class="op">.</span><span class="fu">write</span><span class="op">());</span></span>
 <span id="cb11-76"><a href="#cb11-76" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
 <span id="cb11-77"><a href="#cb11-77" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>How the stacking works:</strong> When <code>styled.write()</code> is called on the outermost <code>Bold</code> decorator: 1. <code>Bold.write()</code> calls <code>Italic.write()</code> (its wrappee). 2. <code>Italic.write()</code> calls <code>Underline.write()</code> (its wrappee). 3. <code>Underline.write()</code> calls <code>PlainText.write()</code>, which returns <code>"Hello, World!"</code>. 4. <code>Underline</code> wraps it: <code>"\033[4m" + "Hello, World!" + "\033[0m"</code>. 5. <code>Italic</code> wraps that: <code>"\033[3m" + underlined_text + "\033[0m"</code>. 6. <code>Bold</code> wraps that: <code>"\033[1m" + italic_underlined_text + "\033[0m"</code>.</p>
+<p><strong>How the stacking works:</strong> When <code>styled.write()</code> is called on the outermost <code>Bold</code> decorator:</p>
+<ol type="1">
+<li><code>Bold.write()</code> calls <code>Italic.write()</code> (its wrappee).</li>
+<li><code>Italic.write()</code> calls <code>Underline.write()</code> (its wrappee).</li>
+<li><code>Underline.write()</code> calls <code>PlainText.write()</code>, which returns <code>"Hello, World!"</code>.</li>
+<li><code>Underline</code> wraps it: <code>"\033[4m" + "Hello, World!" + "\033[0m"</code>.</li>
+<li><code>Italic</code> wraps that: <code>"\033[3m" + underlined_text + "\033[0m"</code>.</li>
+<li><code>Bold</code> wraps that: <code>"\033[1m" + italic_underlined_text + "\033[0m"</code>.</li>
+</ol>
 <p>The final string carries all three ANSI styling layers. On a terminal that supports ANSI codes, the text renders as bold, italic, and underlined simultaneously. The order of decoration controls which style wraps which.</p>
 </details>
 </section>
@@ -2793,7 +2903,14 @@ Click to see the solution
 <li>Own interface: <code>compile()</code>.</li>
 <li>Internally, <code>compile()</code> asks <code>parser.parseProgram()</code> to produce an AST and then <code>generator.visit(program)</code> to emit bytecode. The caller never touches any of these three components directly.</li>
 </ul>
-<p><strong>Trace of <code>compiler.compile()</code>:</strong> 1. Client constructs <code>Compiler(input, output)</code>. The compiler’s constructor initializes <code>lexer</code> (which internally creates <code>Reader</code> and <code>Scanner</code>), then <code>generator</code>, then <code>parser</code> (passing <code>lexer.scanner</code> to it). 2. Client calls <code>compiler.compile()</code>. 3. Inside <code>compile()</code>: <code>parser.parseProgram()</code> reads tokens from the scanner (via <code>lexer</code>) and builds an AST of type <code>Program*</code>. 4. <code>generator.visit(program)</code> traverses the AST and emits bytecode to the output stream. 5. The entire compiler subsystem (7+ classes) was used, but the client only saw one method call.</p>
+<p><strong>Trace of <code>compiler.compile()</code>:</strong></p>
+<ol type="1">
+<li>Client constructs <code>Compiler(input, output)</code>. The compiler’s constructor initializes <code>lexer</code> (which internally creates <code>Reader</code> and <code>Scanner</code>), then <code>generator</code>, then <code>parser</code> (passing <code>lexer.scanner</code> to it).</li>
+<li>Client calls <code>compiler.compile()</code>.</li>
+<li>Inside <code>compile()</code>: <code>parser.parseProgram()</code> reads tokens from the scanner (via <code>lexer</code>) and builds an AST of type <code>Program*</code>.</li>
+<li><code>generator.visit(program)</code> traverses the AST and emits bytecode to the output stream.</li>
+<li>The entire compiler subsystem (7+ classes) was used, but the client only saw one method call.</li>
+</ol>
 <p><strong>Answer:</strong> <code>LexicalAnalyzer</code> is a low-level Facade over <code>Reader</code> and <code>Scanner</code>. <code>Compiler</code> is a high-level Facade over the entire compilation pipeline. This two-level Facade structure is idiomatic for complex systems: each layer only talks to the layer immediately below it.</p>
 </details>
 </section>
@@ -2836,11 +2953,25 @@ Click to see the solution
 <p><strong>Key Concept:</strong> Because each decorator first calls <code>component.Draw()</code> (delegating inward) and then draws its own addition, the outermost decorator’s addition is rendered <em>last</em> (on top of everything else). The order of wrapping directly determines the visual layering.</p>
 <p><strong><code>wb1 = ScrollDecorator(BorderDecorator(TextView(), 2))</code></strong></p>
 <p>Structure (outermost first): <code>ScrollDecorator</code> → <code>BorderDecorator</code> → <code>TextView</code></p>
-<p>When <code>wb1.Draw()</code> is called: 1. <code>ScrollDecorator.Draw()</code> calls <code>component.Draw()</code> — which is <code>BorderDecorator.Draw()</code>. 2. <code>BorderDecorator.Draw()</code> calls <code>component.Draw()</code> — which is <code>TextView.Draw()</code>. 3. <code>TextView</code> draws its content (text). 4. <code>BorderDecorator</code> draws a border <em>around the text</em>. 5. <code>ScrollDecorator</code> draws a scroll bar <em>over the bordered text</em>.</p>
+<p>When <code>wb1.Draw()</code> is called:</p>
+<ol type="1">
+<li><code>ScrollDecorator.Draw()</code> calls <code>component.Draw()</code> — which is <code>BorderDecorator.Draw()</code>.</li>
+<li><code>BorderDecorator.Draw()</code> calls <code>component.Draw()</code> — which is <code>TextView.Draw()</code>.</li>
+<li><code>TextView</code> draws its content (text).</li>
+<li><code>BorderDecorator</code> draws a border <em>around the text</em>.</li>
+<li><code>ScrollDecorator</code> draws a scroll bar <em>over the bordered text</em>.</li>
+</ol>
 <p>Visual result: text → border → scroll bar on top.</p>
 <p><strong><code>wb2 = BorderDecorator(ScrollDecorator(TextView()), 2)</code></strong></p>
 <p>Structure (outermost first): <code>BorderDecorator</code> → <code>ScrollDecorator</code> → <code>TextView</code></p>
-<p>When <code>wb2.Draw()</code> is called: 1. <code>BorderDecorator.Draw()</code> calls <code>component.Draw()</code> — which is <code>ScrollDecorator.Draw()</code>. 2. <code>ScrollDecorator.Draw()</code> calls <code>component.Draw()</code> — which is <code>TextView.Draw()</code>. 3. <code>TextView</code> draws its content. 4. <code>ScrollDecorator</code> draws a scroll bar over the text. 5. <code>BorderDecorator</code> draws a border over <em>the scrolled text</em>, meaning the border encompasses the scroll bar area as well.</p>
+<p>When <code>wb2.Draw()</code> is called:</p>
+<ol type="1">
+<li><code>BorderDecorator.Draw()</code> calls <code>component.Draw()</code> — which is <code>ScrollDecorator.Draw()</code>.</li>
+<li><code>ScrollDecorator.Draw()</code> calls <code>component.Draw()</code> — which is <code>TextView.Draw()</code>.</li>
+<li><code>TextView</code> draws its content.</li>
+<li><code>ScrollDecorator</code> draws a scroll bar over the text.</li>
+<li><code>BorderDecorator</code> draws a border over <em>the scrolled text</em>, meaning the border encompasses the scroll bar area as well.</li>
+</ol>
 <p>Visual result: text → scroll bar → border on top. The border encloses the scroll bar, whereas in <code>wb1</code> the scroll bar was drawn on top of the border.</p>
 <p><strong>Dynamic decoration:</strong></p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>var w  <span class="op">=</span> <span class="kw">new</span> TextView<span class="op">();</span>           <span class="co">// A simple window exists</span></span>
@@ -2888,7 +3019,14 @@ Click to see the solution
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>p<span class="op">-&gt;</span>m <span class="op">=</span> <span class="dv">77</span><span class="op">;</span>     <span class="co">// LoadObject() is called automatically; no null-check needed</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The object is created on first access and reused on all subsequent accesses. The proxy also ensures that accessing <code>p-&gt;m</code> is always safe — there is no way to reach a null pointer through the proxy.</p>
 <p><strong>(b) How <code>p-&gt;m = 77</code> works:</strong></p>
-<p>C++ evaluates <code>p-&gt;m</code> as <code>(p.operator-&gt;()).m</code>. The call chain is: 1. <code>p.operator-&gt;()</code> is called. This is <code>ProxyForHeavy::operator-&gt;()</code>. 2. Inside, <code>LoadObject()</code> checks whether <code>object == nullptr</code>. If so, it allocates a new <code>VeryHeavyObject</code>. 3. <code>operator-&gt;()</code> returns the raw <code>VeryHeavyObject*</code> pointer. 4. The <code>.m</code> access is then applied to that raw pointer, giving <code>object-&gt;m</code>. 5. The assignment <code>= 77</code> stores 77 in <code>object-&gt;m</code>.</p>
+<p>C++ evaluates <code>p-&gt;m</code> as <code>(p.operator-&gt;()).m</code>. The call chain is:</p>
+<ol type="1">
+<li><code>p.operator-&gt;()</code> is called. This is <code>ProxyForHeavy::operator-&gt;()</code>.</li>
+<li>Inside, <code>LoadObject()</code> checks whether <code>object == nullptr</code>. If so, it allocates a new <code>VeryHeavyObject</code>.</li>
+<li><code>operator-&gt;()</code> returns the raw <code>VeryHeavyObject*</code> pointer.</li>
+<li>The <code>.m</code> access is then applied to that raw pointer, giving <code>object-&gt;m</code>.</li>
+<li>The assignment <code>= 77</code> stores 77 in <code>object-&gt;m</code>.</li>
+</ol>
 <p>So <code>p-&gt;m = 77</code> is exactly equivalent to: create the object if not yet created, then set its <code>m</code> field to 77.</p>
 <p><strong>(c) Without the proxy:</strong></p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode cpp code-with-copy"><code class="sourceCode cpp"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>VeryHeavyObject<span class="op">*</span> ptr <span class="op">=</span> <span class="kw">nullptr</span><span class="op">;</span></span>
@@ -3093,7 +3231,11 @@ Click to see the solution
 <li><strong>Audio finalization</strong>: <code>new AudioMixer().fix(intermediateResult)</code> processes and mixes the audio track, producing the final <code>java.io.File</code>.</li>
 </ol>
 <p><strong>(c) What the client needs to know:</strong></p>
-<p>The <code>Demo</code> client knows <em>only</em> two things: 1. The existence of <code>VideoConversionFacade</code> and its <code>convertVideo(String fileName, String format)</code> method signature. 2. That the method returns a <code>java.io.File</code> (standard library type).</p>
+<p>The <code>Demo</code> client knows <em>only</em> two things:</p>
+<ol type="1">
+<li>The existence of <code>VideoConversionFacade</code> and its <code>convertVideo(String fileName, String format)</code> method signature.</li>
+<li>That the method returns a <code>java.io.File</code> (standard library type).</li>
+</ol>
 <p>The client has zero knowledge of <code>VideoFile</code>, <code>CodecFactory</code>, <code>BitrateReader</code>, <code>AudioMixer</code>, or the codec classes. If the subsystem changes (e.g., a new codec is supported, or <code>BitrateReader</code> is replaced), <code>Demo</code> requires no modification.</p>
 <p><strong>Answer:</strong> This is a canonical Facade: one method call by the client triggers a multi-step, multi-object pipeline internally. The boundary between “what the client needs to know” and “what the subsystem does” is the Facade interface.</p>
 </details>
@@ -3174,7 +3316,13 @@ Click to see the solution
 <p><strong>Result of <code>getDescription()</code>:</strong> <code>"Ivan - naked human + boots + socks + pants + shirt"</code></p>
 <p><strong>Trace of <code>fullyDressed.dress()</code>:</strong></p>
 <p>The same propagation, but each decorator appends its clothing item:</p>
-<p>1–5. Propagates down to <code>SimpleHuman.dress()</code>, which returns <code>"Ivan gets dressed: "</code>. 6. <code>BootsDecorator</code> appends: <code>"Ivan gets dressed: boots, "</code> 7. <code>SocksDecorator</code> appends: <code>"Ivan gets dressed: boots, socks, "</code> 8. <code>PantsDecorator</code> appends: <code>"Ivan gets dressed: boots, socks, pants, "</code> 9. <code>ShirtDecorator</code> appends: <code>"Ivan gets dressed: boots, socks, pants, shirt, "</code></p>
+<p>1–5. Propagates down to <code>SimpleHuman.dress()</code>, which returns <code>"Ivan gets dressed: "</code>.</p>
+<ol start="6" type="1">
+<li><code>BootsDecorator</code> appends: <code>"Ivan gets dressed: boots, "</code></li>
+<li><code>SocksDecorator</code> appends: <code>"Ivan gets dressed: boots, socks, "</code></li>
+<li><code>PantsDecorator</code> appends: <code>"Ivan gets dressed: boots, socks, pants, "</code></li>
+<li><code>ShirtDecorator</code> appends: <code>"Ivan gets dressed: boots, socks, pants, shirt, "</code></li>
+</ol>
 <p><strong>Result of <code>dress()</code>:</strong> <code>"Ivan gets dressed: boots, socks, pants, shirt, "</code></p>
 <p><strong>Answer:</strong> The clothing appears in innermost-first order (boots → socks → pants → shirt) because the innermost decorator returns first. Changing the wrapping order in <code>new ShirtDecorator(new PantsDecorator(...))</code> directly changes the order items appear in the output string.</p>
 </details>
@@ -3310,7 +3458,12 @@ Image 'dog' successfully loaded.
 Displaying image: dog
 Displaying dog (second time):
 Displaying image: dog</code></pre>
-<p><strong>Key observations:</strong> 1. <code>ProxyImage</code> construction is instant — the 3-second delay appears only on the <em>first</em> <code>display()</code> call. 2. After the first call, the <code>RealImage</code> is cached in <code>realImage</code>; subsequent calls skip the <code>null</code> check and call <code>realImage.display()</code> directly. 3. Each <code>ProxyImage</code> instance manages its own <code>RealImage</code> independently.</p>
+<p><strong>Key observations:</strong></p>
+<ol type="1">
+<li><code>ProxyImage</code> construction is instant — the 3-second delay appears only on the <em>first</em> <code>display()</code> call.</li>
+<li>After the first call, the <code>RealImage</code> is cached in <code>realImage</code>; subsequent calls skip the <code>null</code> check and call <code>realImage.display()</code> directly.</li>
+<li>Each <code>ProxyImage</code> instance manages its own <code>RealImage</code> independently.</li>
+</ol>
 <p><strong>Answer:</strong> The proxy transparently delays the expensive object creation until it is actually needed, then caches it for reuse. From the client’s perspective, <code>image1.display()</code> always works identically — the difference (loading vs.&nbsp;cached) is an internal detail of the proxy.</p>
 </details>
 
