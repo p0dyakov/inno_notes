@@ -102,6 +102,15 @@ jobs:
           done
           echo "render base: $BASE"
           echo "base=$BASE" >> "$GITHUB_OUTPUT"
+      - name: Free Windows excluded TCP port ranges
+        run: |
+          # quarto binds a localhost port for headless Chrome (mermaid→svg).
+          # Windows runners randomly reserve wide excluded port ranges
+          # (Hyper-V/WinNAT), so Deno.listen can die with os error 10013.
+          # Restarting winnat releases those reservations.
+          net.exe stop winnat || true
+          net.exe start winnat || true
+          netsh.exe interface ipv4 show excludedportrange protocol=tcp || true
       - name: Incremental render (only changed files, parallel)
         run: python scripts/render_changed.py --base "${{ steps.renderbase.outputs.base }}" --jobs 4
       - name: Gate on formatting report

@@ -69,6 +69,22 @@ def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT), **kwargs)
 
 
+def full_render() -> int:
+    # A full render spawns headless Chrome for mermaid→svg; on the Windows
+    # runner the port bind can be denied (os error 10013 — excluded port
+    # ranges). Quarto picks a fresh port every run, so a retry usually
+    # passes, and _freeze makes the second attempt much cheaper.
+    res = subprocess.run(["quarto", "render"], cwd=str(ROOT))
+    for attempt in (2, 3):
+        if res.returncode == 0:
+            break
+        print(f"WARN: full quarto render failed (rc={res.returncode}), "
+              f"retry {attempt}/3")
+        time.sleep(5)
+        res = subprocess.run(["quarto", "render"], cwd=str(ROOT))
+    return res.returncode
+
+
 def base_valid(base: str) -> bool:
     return run(["git", "rev-parse", "--verify", "--quiet", base]).returncode == 0
 
@@ -372,20 +388,20 @@ def main() -> None:
           f"includes: {len(includes)}; assets: {len(assets)}; full: {full_needed}")
 
     if full_needed:
-        res = subprocess.run(["quarto", "render"], cwd=str(ROOT))
-        if res.returncode == 0:
+        rc = full_render()
+        if rc == 0:
             purge_draft_outputs(all_draft_qmds())
             slim_search_file()
-        sys.exit(res.returncode)
+        sys.exit(rc)
 
     snap = snapshot_search()
     if snap is None:
         print("WARN: _site/search.json missing, falling back to full render")
-        res = subprocess.run(["quarto", "render"], cwd=str(ROOT))
-        if res.returncode == 0:
+        rc = full_render()
+        if rc == 0:
             purge_draft_outputs(all_draft_qmds())
             slim_search_file()
-        sys.exit(res.returncode)
+        sys.exit(rc)
 
     # Suppress project pre/post-render during parallel renders: update scripts
     # already ran once above (serially, race-free); bake runs per file after.

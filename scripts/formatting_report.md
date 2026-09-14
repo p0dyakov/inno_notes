@@ -1,6 +1,6 @@
 # Formatting Report
 
-Generated: 2026-09-13 14:09:27
+Generated: 2026-09-14 00:30:08
 
 ## AI Artifacts
 
@@ -30,12 +30,12 @@ No format-rule violations detected.
 
 ### semester-4/Introduction to Optimization/1.qmd
 
-* Line 127: duplicated word 'one'.
+* Line 129: duplicated word 'one'.
 
 ## Formatting Changes
 
 - Files processed: 167
-- Files changed: 1
+- Files changed: 0
 - Blank lines removed between list items: 2
 - Blank lines/separators added: 2
 - Potential AI artifacts detected: 0
