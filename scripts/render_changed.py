@@ -331,6 +331,13 @@ def main() -> None:
     except Exception as e:  # noqa: BLE001
         print(f"WARN: update_sidebar skipped ({e})")
 
+    # update_sidebar() may have just rewritten _quarto.yml in the working
+    # tree: a dirty nav file means the sidebar changed even if the committed
+    # copy did not, so every page needs a fresh render to pick it up.
+    nav_dirty = bool(
+        run(["git", "status", "--porcelain", "--", "_quarto.yml"]).stdout.strip()
+    )
+
     if not base_valid(args.base):
         # Unknown base (e.g. manual dispatch with empty `before`): safest is
         # a full render rather than a silent no-op.
@@ -382,7 +389,7 @@ def main() -> None:
                       if re.search(r"\.(png|jpe?g|gif|svg|mp4|pdf|css|js)$", p, re.I)
                       and not p.startswith(("_site/", "node_modules/"))
                       and not (ROOT / p).exists()]
-    full_needed = args.full or "_quarto.yml" in changed
+    full_needed = args.full or nav_dirty or "_quarto.yml" in changed
 
     print(f"changed: {len(changed)} files; qmd to render: {len(qmds)}; "
           f"includes: {len(includes)}; assets: {len(assets)}; full: {full_needed}")

@@ -1616,10 +1616,21 @@ def update_sidebar(semesters: list[str] | None = None) -> None:
     qmds: list[Path] = []
     for sem in semesters:
         text = _ensure_semester_section(text, sem)
-        for entry in load_registry(sem).get("courses", {}).values():
-            text = _ensure_course_section_in(text, entry.get("name", ""), sem)
         # Find all qmds on disk for this semester
-        qmds.extend(sorted((ROOT / sem).rglob("*.qmd")))
+        sem_qmds = sorted((ROOT / sem).rglob("*.qmd"))
+        qmds.extend(sem_qmds)
+        # A course earns a sidebar section only when it owns unlisted,
+        # non-draft pages; otherwise paused semesters (all files hidden)
+        # would reappear as empty section headings in the nav.
+        unlisted = {
+            qmd.parent.name
+            for qmd in sem_qmds
+            if not _is_draft_qmd(qmd) and yml_rel(qmd) not in text
+        }
+        for entry in load_registry(sem).get("courses", {}).values():
+            name = entry.get("name", "")
+            if name in unlisted:
+                text = _ensure_course_section_in(text, name, sem)
     added = 0
     for qmd in qmds:
         if _is_draft_qmd(qmd):
