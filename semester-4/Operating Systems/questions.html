@@ -119,369 +119,187 @@ gtag('js', new Date());
 gtag('config', 'G-H1WYLNDN76', { 'anonymize_ip': true});
 </script>
 <!-- Pre-paint font preload: the three faces above-the-fold text always needs
-
 (body 400, headings 700, nav/UI 600). Without this the browser discovers them
-
 only after CSS parse + first layout, so first paint uses the fallback and every
-
 cold open visibly "jumps" on swap. Hrefs are root-absolute so one include works
-
 at any page depth; they byte-match the URLs styles.css requests (no double fetch).
-
 Archivo mode intentionally not preloaded: default stack is SF, secondary stack
-
 keeps swap with metric-matched fallback (layout-stable). -->
-
-<link rel="preload" href="../../styles/fonts/SF-Pro-Text-Regular.woff2" as="font" type="font/woff2" crossorigin="">
-
-<link rel="preload" href="../../styles/fonts/SF-Pro-Text-Semibold.woff2" as="font" type="font/woff2" crossorigin="">
-
-<link rel="preload" href="../../styles/fonts/SF-Pro-Display-Bold.woff2" as="font" type="font/woff2" crossorigin="">
-
+<link rel="preload" href="/styles/fonts/SF-Pro-Text-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/styles/fonts/SF-Pro-Text-Semibold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/styles/fonts/SF-Pro-Display-Bold.woff2" as="font" type="font/woff2" crossorigin>
 <script>
-
 // Progressive-enhancement flag: custom nav replaces the server-rendered
-
 // quarto chrome (#quarto-sidebar/glass/header). Hiding it pre-paint avoids
-
 // a white flash in dark theme; without JS the flag is absent and the
-
 // quarto chrome stays visible. Removed again if custom UI fails to boot.
-
 document.documentElement.classList.add("js");
-
 </script>
-
 <script>
-
 (function () {
-
 	var KEY = "inn-color-mode";
-
 	function stored() {
-
 		try {
-
 			return localStorage.getItem(KEY);
-
 		} catch {
-
 			return null;
-
 		}
-
 	}
-
 	function computeDark() {
-
 		var s = stored();
-
 		if (s === "light") return false;
-
 		if (s === "dark") return true;
-
 		try {
-
 			return window.matchMedia("(prefers-color-scheme: dark)").matches;
-
 		} catch {
-
 			return false;
-
 		}
-
 	}
-
 	function apply() {
-
 		var dark = computeDark();
-
 		document.documentElement.classList.toggle("inn-dark", dark);
-
 		try {
-
 			document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
-
 		} catch {
-
 			/* ignore */
-
 		}
-
 		try {
-
 			window.dispatchEvent(new CustomEvent("inn-color-mode-change"));
-
 		} catch {
-
 			/* ignore */
-
 		}
-
 	}
-
 	apply();
-
 	try {
-
 		window.__innColorMode = {
-
 			get: function () {
-
 				return stored() || "auto";
-
 			},
-
 			set: function (mode) {
-
 				if (mode === "auto") {
-
 					try {
-
 						localStorage.removeItem(KEY);
-
 					} catch {
-
 						/* ignore */
-
 					}
-
 				} else {
-
 					try {
-
 						localStorage.setItem(KEY, mode);
-
 					} catch {
-
 						/* ignore */
-
 					}
-
 				}
-
 				apply();
-
 			},
-
 			apply: apply,
-
 		};
-
 		window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
-
 			if (!stored()) apply();
-
 		});
-
 	} catch {
-
 		/* ignore */
-
 	}
-
 	if (!document.documentElement.hasAttribute("data-inn-baked")) {
-
 		document.documentElement.classList.add("inn-ui-booting");
-
 	}
-
 })();
-
 </script>
-
 <script>
-
 // Sync pre-paint UI state: font stack + saved panel widths from localStorage.
-
 // Must run before first paint so the page never flashes default fonts/widths
-
 // and post-load JS only re-applies identical values (no visual change).
-
 (function () {
-
 	try {
-
 		var f = null;
-
 		try {
-
 			f = localStorage.getItem("inn-sans");
-
 		} catch (e) {}
-
 		// Deterministic default 'sf' (matches innResolveSansMode in index.html).
-
 		document.documentElement.classList.add(f === "archivo" ? "inn-sans-archivo" : "inn-sans-sf");
-
 	} catch (e) {}
-
 	function px(key, min, max, deflt) {
-
 		var v = deflt;
-
 		try {
-
 			var raw = parseInt(localStorage.getItem(key) || "", 10);
-
 			if (isFinite(raw)) v = Math.max(min, Math.min(max, raw));
-
 		} catch (e) {}
-
 		return v;
-
 	}
-
 	try {
-
 		document.documentElement.style.setProperty(
-
 			"--inn-nav-width",
-
 			px("inn_custom_nav_width", 272, 520, 344) + "px",
-
 		);
-
 		document.documentElement.style.setProperty(
-
 			"--inn-sidebar-width",
-
 			px("sidebar_width_px", 288, 608, 384) + "px",
-
 		);
-
 	} catch (e) {}
-
 })();
-
 </script>
-
-
-
 
 
 <style>
-
 	html {
-
 		--inn-loader-bg: #ffffff;
-
 		--inn-loader-spinner-track: rgba(23, 48, 66, 0.14);
-
 		--inn-loader-spinner-color: #173042;
-
 	}
-
-
 
 	html.inn-dark {
-
 		--inn-loader-bg: #000000;
-
 		--inn-loader-spinner-track: rgba(255, 255, 255, 0.22);
-
 		--inn-loader-spinner-color: #ffffff;
-
 	}
-
-
 
 	@keyframes inn-head-loader-spin {
-
 		to {
-
 			transform: rotate(360deg);
-
 		}
-
 	}
-
-
 
 	html.inn-ui-booting {
-
 		background: var(--inn-loader-bg);
-
 		overflow: hidden;
-
 	}
-
-
 
 	html.js body #quarto-sidebar,
-
 	html.js body #quarto-sidebar-glass,
-
 	html.js body #quarto-header,
-
 	html.js body #quarto-sidebar *,
-
 	html.js body #quarto-sidebar-glass *,
-
 	html.js body #quarto-header * {
-
 		visibility: hidden !important;
-
 	}
-
-
 
 	html.inn-ui-booting body {
-
 		opacity: 0;
-
 	}
-
-
 
 	html.inn-ui-booting::before {
-
 		content: "";
-
 		position: fixed;
-
 		inset: 0;
-
 		background: var(--inn-loader-bg);
-
 		z-index: 2147483646;
-
 		pointer-events: none;
-
 	}
-
-
 
 	html.inn-ui-booting::after {
-
 		content: "";
-
 		position: fixed;
-
 		top: 50%;
-
 		left: 50%;
-
 		width: 44px;
-
 		height: 44px;
-
 		margin: -22px 0 0 -22px;
-
 		border-radius: 50%;
-
 		border: 3px solid var(--inn-loader-spinner-track);
-
 		border-top-color: var(--inn-loader-spinner-color);
-
 		animation: inn-head-loader-spin 0.72s linear infinite;
-
 		z-index: 2147483647;
-
 		pointer-events: none;
-
 	}
-
 </style>
 
 
@@ -1695,7 +1513,7 @@ main#quarto-document-content img {
 </style>
 <section id="contents" class="level1">
 <h1>Contents</h1>
-<p>Total — 428 questions</p>
+<p>Total — 430 questions</p>
 <ul>
 <li><a href="#chapter-1">Chapter 1 — 45 questions</a></li>
 <li><a href="#chapter-2">Chapter 2 — 74 questions</a></li>
@@ -1703,7 +1521,7 @@ main#quarto-document-content img {
 <li><a href="#chapter-4">Chapter 4 — 57 questions</a></li>
 <li><a href="#chapter-5">Chapter 5 — 66 questions</a></li>
 <li><a href="#chapter-6">Chapter 6 — 55 questions</a></li>
-<li><a href="#sudden-quiz">Sudden Quiz — 64 questions</a></li>
+<li><a href="#sudden-quiz">Sudden Quiz — 66 questions</a></li>
 </ul>
 </section>
 <section id="chapter-1" class="level1">
@@ -8541,6 +8359,27 @@ How do you read a float number “grade” from stdin?
 <summary>
 Solution
 </summary>
+<p>Safest way — read a whole line with <code>fgets</code>, then parse with <code>strtof</code> and validate: the buffer cannot overflow and malformed input is detected:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb63"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdlib.h&gt;</span></span>
+<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">char</span> buf<span class="op">[</span><span class="dv">64</span><span class="op">];</span></span>
+<span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-7"><a href="#cb63-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(!</span>fgets<span class="op">(</span>buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">),</span> stdin<span class="op">))</span></span>
+<span id="cb63-8"><a href="#cb63-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb63-9"><a href="#cb63-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-10"><a href="#cb63-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">char</span> <span class="op">*</span>end<span class="op">;</span></span>
+<span id="cb63-11"><a href="#cb63-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">float</span> grade <span class="op">=</span> strtof<span class="op">(</span>buf<span class="op">,</span> <span class="op">&amp;</span>end<span class="op">);</span></span>
+<span id="cb63-12"><a href="#cb63-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-13"><a href="#cb63-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>end <span class="op">==</span> buf <span class="op">||</span> <span class="op">*</span>end <span class="op">!=</span> <span class="ch">'</span><span class="sc">\n</span><span class="ch">'</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb63-14"><a href="#cb63-14" aria-hidden="true" tabindex="-1"></a>        fprintf<span class="op">(</span>stderr<span class="op">,</span> <span class="st">"Invalid input</span><span class="sc">\n</span><span class="st">"</span><span class="op">);</span></span>
+<span id="cb63-15"><a href="#cb63-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb63-16"><a href="#cb63-16" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb63-17"><a href="#cb63-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-18"><a href="#cb63-18" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Entered number: </span><span class="sc">%f\n</span><span class="st">"</span><span class="op">,</span> grade<span class="op">);</span></span>
+<span id="cb63-19"><a href="#cb63-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb63-20"><a href="#cb63-20" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>scanf ("%f", &amp;grade)</code> — always check the return value (number of items matched); on non-numeric input it returns 0 and leaves <code>grade</code> untouched.</p>
 <p><code>fscanf (stdin, "%f", &amp;grade)</code> — same, reading explicitly from <code>stdin</code>.</p>
 </details>
@@ -8552,7 +8391,7 @@ How do you get command line parameters in a C program?
 <summary>
 Solution
 </summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb63"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">(</span><span class="dt">int</span> argc<span class="op">,</span> <span class="dt">char</span> <span class="op">*</span>args<span class="op">[])</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb64"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">(</span><span class="dt">int</span> argc<span class="op">,</span> <span class="dt">char</span> <span class="op">*</span>args<span class="op">[])</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-7-3" class="level3">
@@ -8562,7 +8401,7 @@ How do you define a string “username” in C (50 characters)?
 <summary>
 Solution
 </summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb64"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="dt">char</span> username<span class="op">[</span><span class="dv">50</span><span class="op">];</span> <span class="co">// Plain char array: no pointers involved.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb65"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="dt">char</span> username<span class="op">[</span><span class="dv">50</span><span class="op">];</span> <span class="co">// Plain char array: no pointers involved.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-8-3" class="level3">
@@ -8702,7 +8541,7 @@ How do you declare a pointer to a constant integer in C?
 <summary>
 Solution
 </summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb65"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="dt">const</span> <span class="dt">int</span> <span class="op">*</span>ptr<span class="op">;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb66"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="dt">const</span> <span class="dt">int</span> <span class="op">*</span>ptr<span class="op">;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-20-3" class="level3">
@@ -8712,26 +8551,26 @@ How do you handle integer input via stdin as safely as possible?
 <summary>
 Solution
 </summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb66"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
-<span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdlib.h&gt;</span></span>
-<span id="cb66-3"><a href="#cb66-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb66-4"><a href="#cb66-4" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb66-5"><a href="#cb66-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">char</span> buf<span class="op">[</span><span class="dv">64</span><span class="op">];</span></span>
-<span id="cb66-6"><a href="#cb66-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb66-7"><a href="#cb66-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(!</span>fgets<span class="op">(</span>buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">),</span> stdin<span class="op">))</span></span>
-<span id="cb66-8"><a href="#cb66-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
-<span id="cb66-9"><a href="#cb66-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb66-10"><a href="#cb66-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">char</span> <span class="op">*</span>end<span class="op">;</span></span>
-<span id="cb66-11"><a href="#cb66-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">long</span> val <span class="op">=</span> strtol<span class="op">(</span>buf<span class="op">,</span> <span class="op">&amp;</span>end<span class="op">,</span> <span class="dv">10</span><span class="op">);</span></span>
-<span id="cb66-12"><a href="#cb66-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb66-13"><a href="#cb66-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>end <span class="op">==</span> buf <span class="op">||</span> <span class="op">*</span>end <span class="op">!=</span> <span class="ch">'</span><span class="sc">\n</span><span class="ch">'</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb66-14"><a href="#cb66-14" aria-hidden="true" tabindex="-1"></a>        fprintf<span class="op">(</span>stderr<span class="op">,</span> <span class="st">"Invalid input</span><span class="sc">\n</span><span class="st">"</span><span class="op">);</span></span>
-<span id="cb66-15"><a href="#cb66-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
-<span id="cb66-16"><a href="#cb66-16" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb66-17"><a href="#cb66-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb66-18"><a href="#cb66-18" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Entered number: </span><span class="sc">%ld\n</span><span class="st">"</span><span class="op">,</span> val<span class="op">);</span></span>
-<span id="cb66-19"><a href="#cb66-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb66-20"><a href="#cb66-20" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb67"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdlib.h&gt;</span></span>
+<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb67-5"><a href="#cb67-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">char</span> buf<span class="op">[</span><span class="dv">64</span><span class="op">];</span></span>
+<span id="cb67-6"><a href="#cb67-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-7"><a href="#cb67-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(!</span>fgets<span class="op">(</span>buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">),</span> stdin<span class="op">))</span></span>
+<span id="cb67-8"><a href="#cb67-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb67-9"><a href="#cb67-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-10"><a href="#cb67-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">char</span> <span class="op">*</span>end<span class="op">;</span></span>
+<span id="cb67-11"><a href="#cb67-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">long</span> val <span class="op">=</span> strtol<span class="op">(</span>buf<span class="op">,</span> <span class="op">&amp;</span>end<span class="op">,</span> <span class="dv">10</span><span class="op">);</span></span>
+<span id="cb67-12"><a href="#cb67-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-13"><a href="#cb67-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>end <span class="op">==</span> buf <span class="op">||</span> <span class="op">*</span>end <span class="op">!=</span> <span class="ch">'</span><span class="sc">\n</span><span class="ch">'</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb67-14"><a href="#cb67-14" aria-hidden="true" tabindex="-1"></a>        fprintf<span class="op">(</span>stderr<span class="op">,</span> <span class="st">"Invalid input</span><span class="sc">\n</span><span class="st">"</span><span class="op">);</span></span>
+<span id="cb67-15"><a href="#cb67-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb67-16"><a href="#cb67-16" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb67-17"><a href="#cb67-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-18"><a href="#cb67-18" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Entered number: </span><span class="sc">%ld\n</span><span class="st">"</span><span class="op">,</span> val<span class="op">);</span></span>
+<span id="cb67-19"><a href="#cb67-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb67-20"><a href="#cb67-20" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-21-4" class="level3">
@@ -8836,6 +8675,12 @@ Solution
 <li>Input: ex1.o + libraries</li>
 <li>Output: ex1.out (executable file)</li>
 <li>What happens: combining object files and libraries into the final executable.</li>
+</ul>
+<p>Loading (extra step after the 4 build stages, shown in the textbook diagram)</p>
+<ul>
+<li>Input: ex1.out (executable file)</li>
+<li>Output: a running process in memory</li>
+<li>What happens: the OS loader maps the executable into memory and jumps to its entry point.</li>
 </ul>
 </details>
 </section>
@@ -8971,28 +8816,28 @@ Solution
 <p>Sending a signal. Via the terminal:</p>
 <p><code>kill -SIGKILL &lt;pid&gt;</code> or <code>kill -9 &lt;pid&gt;</code> (the same thing)</p>
 <p>In C:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb67"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;signal.h&gt;</span></span>
-<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
-<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
-<span id="cb67-5"><a href="#cb67-5" aria-hidden="true" tabindex="-1"></a>    pid_t pid <span class="op">=</span> <span class="dv">1234</span><span class="op">;</span> <span class="co">// PID of the target process (hard-coded example).</span></span>
-<span id="cb67-6"><a href="#cb67-6" aria-hidden="true" tabindex="-1"></a>    kill<span class="op">(</span>pid<span class="op">,</span> SIGKILL<span class="op">);</span> <span class="co">// Send SIGKILL: the process is terminated at once.</span></span>
-<span id="cb67-7"><a href="#cb67-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb67-8"><a href="#cb67-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Handling signals in a process:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb68"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
-<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;signal.h&gt;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb68"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;signal.h&gt;</span></span>
+<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
 <span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb68-4"><a href="#cb68-4" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> handler<span class="op">(</span><span class="dt">int</span> sig<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb68-5"><a href="#cb68-5" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Caught signal </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> sig<span class="op">);</span></span>
-<span id="cb68-6"><a href="#cb68-6" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
-<span id="cb68-7"><a href="#cb68-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb68-8"><a href="#cb68-8" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
-<span id="cb68-9"><a href="#cb68-9" aria-hidden="true" tabindex="-1"></a>    signal<span class="op">(</span>SIGINT<span class="op">,</span> handler<span class="op">);</span> <span class="co">// Call handler() instead of dying when the user presses Ctrl+C.</span></span>
-<span id="cb68-10"><a href="#cb68-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb68-11"><a href="#cb68-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="op">(</span><span class="dv">1</span><span class="op">)</span> <span class="op">{}</span> <span class="co">// Spin forever so the process stays alive to catch the signal.</span></span>
-<span id="cb68-12"><a href="#cb68-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb68-13"><a href="#cb68-13" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb68-4"><a href="#cb68-4" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb68-5"><a href="#cb68-5" aria-hidden="true" tabindex="-1"></a>    pid_t pid <span class="op">=</span> <span class="dv">1234</span><span class="op">;</span> <span class="co">// PID of the target process (hard-coded example).</span></span>
+<span id="cb68-6"><a href="#cb68-6" aria-hidden="true" tabindex="-1"></a>    kill<span class="op">(</span>pid<span class="op">,</span> SIGKILL<span class="op">);</span> <span class="co">// Send SIGKILL: the process is terminated at once.</span></span>
+<span id="cb68-7"><a href="#cb68-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb68-8"><a href="#cb68-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Handling signals in a process:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb69"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;signal.h&gt;</span></span>
+<span id="cb69-3"><a href="#cb69-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb69-4"><a href="#cb69-4" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> handler<span class="op">(</span><span class="dt">int</span> sig<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb69-5"><a href="#cb69-5" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Caught signal </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> sig<span class="op">);</span></span>
+<span id="cb69-6"><a href="#cb69-6" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb69-7"><a href="#cb69-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb69-8"><a href="#cb69-8" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb69-9"><a href="#cb69-9" aria-hidden="true" tabindex="-1"></a>    signal<span class="op">(</span>SIGINT<span class="op">,</span> handler<span class="op">);</span> <span class="co">// Call handler() instead of dying when the user presses Ctrl+C.</span></span>
+<span id="cb69-10"><a href="#cb69-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb69-11"><a href="#cb69-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="op">(</span><span class="dv">1</span><span class="op">)</span> <span class="op">{}</span> <span class="co">// Spin forever so the process stays alive to catch the signal.</span></span>
+<span id="cb69-12"><a href="#cb69-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb69-13"><a href="#cb69-13" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Signals allow notifying, interrupting, or controlling processes asynchronously.</p>
 </details>
 </section>
@@ -9004,6 +8849,7 @@ How do you list files (including hidden ones) in bash?
 Solution
 </summary>
 <p><code>ls -al</code></p>
+<p>For a specific directory: <code>ls -al /path/to/dir</code></p>
 </details>
 </section>
 <section id="question-36-6" class="level3">
@@ -9013,27 +8859,27 @@ How do you create a process in C? Write the code.
 <summary>
 Solution
 </summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb69"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
-<span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
-<span id="cb69-3"><a href="#cb69-3" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;sys/types.h&gt;</span></span>
-<span id="cb69-4"><a href="#cb69-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb69-5"><a href="#cb69-5" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
-<span id="cb69-6"><a href="#cb69-6" aria-hidden="true" tabindex="-1"></a>    pid_t pid <span class="op">=</span> fork<span class="op">();</span> <span class="co">// Split into parent and child; fork() returns 0 to the child.</span></span>
-<span id="cb69-7"><a href="#cb69-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb69-8"><a href="#cb69-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>pid <span class="op">&lt;</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb69-9"><a href="#cb69-9" aria-hidden="true" tabindex="-1"></a>        <span class="co">// fork() failed (e.g. too many processes): report the error.</span></span>
-<span id="cb69-10"><a href="#cb69-10" aria-hidden="true" tabindex="-1"></a>        perror<span class="op">(</span><span class="st">"fork failed"</span><span class="op">);</span></span>
-<span id="cb69-11"><a href="#cb69-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
-<span id="cb69-12"><a href="#cb69-12" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>pid <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb69-13"><a href="#cb69-13" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Child branch: fork() returned 0 here.</span></span>
-<span id="cb69-14"><a href="#cb69-14" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Hello from child process! PID: </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> getpid<span class="op">());</span></span>
-<span id="cb69-15"><a href="#cb69-15" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
-<span id="cb69-16"><a href="#cb69-16" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Parent branch: pid holds the child's PID.</span></span>
-<span id="cb69-17"><a href="#cb69-17" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Hello from parent process! PID: </span><span class="sc">%d</span><span class="st">, child PID: </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> getpid<span class="op">(),</span> pid<span class="op">);</span></span>
-<span id="cb69-18"><a href="#cb69-18" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb69-19"><a href="#cb69-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb69-20"><a href="#cb69-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb69-21"><a href="#cb69-21" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb70"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
+<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;sys/types.h&gt;</span></span>
+<span id="cb70-4"><a href="#cb70-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb70-5"><a href="#cb70-5" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb70-6"><a href="#cb70-6" aria-hidden="true" tabindex="-1"></a>    pid_t pid <span class="op">=</span> fork<span class="op">();</span> <span class="co">// Split into parent and child; fork() returns 0 to the child.</span></span>
+<span id="cb70-7"><a href="#cb70-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb70-8"><a href="#cb70-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>pid <span class="op">&lt;</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb70-9"><a href="#cb70-9" aria-hidden="true" tabindex="-1"></a>        <span class="co">// fork() failed (e.g. too many processes): report the error.</span></span>
+<span id="cb70-10"><a href="#cb70-10" aria-hidden="true" tabindex="-1"></a>        perror<span class="op">(</span><span class="st">"fork failed"</span><span class="op">);</span></span>
+<span id="cb70-11"><a href="#cb70-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb70-12"><a href="#cb70-12" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>pid <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb70-13"><a href="#cb70-13" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Child branch: fork() returned 0 here.</span></span>
+<span id="cb70-14"><a href="#cb70-14" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Hello from child process! PID: </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> getpid<span class="op">());</span></span>
+<span id="cb70-15"><a href="#cb70-15" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb70-16"><a href="#cb70-16" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Parent branch: pid holds the child's PID.</span></span>
+<span id="cb70-17"><a href="#cb70-17" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Hello from parent process! PID: </span><span class="sc">%d</span><span class="st">, child PID: </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> getpid<span class="op">(),</span> pid<span class="op">);</span></span>
+<span id="cb70-18"><a href="#cb70-18" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb70-19"><a href="#cb70-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb70-20"><a href="#cb70-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb70-21"><a href="#cb70-21" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-37-2" class="level3">
@@ -9043,41 +8889,41 @@ How do you create a thread that updates a global variable? Write the program.
 <summary>
 Solution
 </summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb70"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
-<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;pthread.h&gt;</span></span>
-<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
-<span id="cb70-4"><a href="#cb70-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb70-5"><a href="#cb70-5" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> counter <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> <span class="co">// Shared counter: every thread updates it, so it needs the mutex.</span></span>
-<span id="cb70-6"><a href="#cb70-6" aria-hidden="true" tabindex="-1"></a>pthread_mutex_t lock<span class="op">;</span> <span class="co">// Guards shared data: only the lock holder may touch it.</span></span>
-<span id="cb70-7"><a href="#cb70-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb70-8"><a href="#cb70-8" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="op">*</span>update_counter<span class="op">(</span><span class="dt">void</span> <span class="op">*</span>arg<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb70-9"><a href="#cb70-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">5</span><span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
-<span id="cb70-10"><a href="#cb70-10" aria-hidden="true" tabindex="-1"></a>        pthread_mutex_lock<span class="op">(&amp;</span>lock<span class="op">);</span> <span class="co">// Enter the critical section (wait if another thread is inside).</span></span>
-<span id="cb70-11"><a href="#cb70-11" aria-hidden="true" tabindex="-1"></a>        counter<span class="op">++;</span></span>
-<span id="cb70-12"><a href="#cb70-12" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Thread: counter = </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> counter<span class="op">);</span></span>
-<span id="cb70-13"><a href="#cb70-13" aria-hidden="true" tabindex="-1"></a>        pthread_mutex_unlock<span class="op">(&amp;</span>lock<span class="op">);</span> <span class="co">// Leave the critical section, waking one waiter if any.</span></span>
-<span id="cb70-14"><a href="#cb70-14" aria-hidden="true" tabindex="-1"></a>        sleep<span class="op">(</span><span class="dv">1</span><span class="op">);</span></span>
-<span id="cb70-15"><a href="#cb70-15" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb70-16"><a href="#cb70-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb70-17"><a href="#cb70-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> NULL<span class="op">;</span></span>
-<span id="cb70-18"><a href="#cb70-18" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
-<span id="cb70-19"><a href="#cb70-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb70-20"><a href="#cb70-20" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
-<span id="cb70-21"><a href="#cb70-21" aria-hidden="true" tabindex="-1"></a>    pthread_t thread<span class="op">;</span></span>
-<span id="cb70-22"><a href="#cb70-22" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_init<span class="op">(&amp;</span>lock<span class="op">,</span> NULL<span class="op">);</span></span>
-<span id="cb70-23"><a href="#cb70-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb70-24"><a href="#cb70-24" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Start the worker thread.</span></span>
-<span id="cb70-25"><a href="#cb70-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>pthread_create<span class="op">(&amp;</span>thread<span class="op">,</span> NULL<span class="op">,</span> update_counter<span class="op">,</span> NULL<span class="op">)</span> <span class="op">!=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb70-26"><a href="#cb70-26" aria-hidden="true" tabindex="-1"></a>        perror<span class="op">(</span><span class="st">"pthread_create failed"</span><span class="op">);</span></span>
-<span id="cb70-27"><a href="#cb70-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
-<span id="cb70-28"><a href="#cb70-28" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb70-29"><a href="#cb70-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb70-30"><a href="#cb70-30" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Block until the worker thread exits.</span></span>
-<span id="cb70-31"><a href="#cb70-31" aria-hidden="true" tabindex="-1"></a>    pthread_join<span class="op">(</span>thread<span class="op">,</span> NULL<span class="op">);</span></span>
-<span id="cb70-32"><a href="#cb70-32" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_destroy<span class="op">(&amp;</span>lock<span class="op">);</span></span>
-<span id="cb70-33"><a href="#cb70-33" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Final counter value: </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> counter<span class="op">);</span></span>
-<span id="cb70-34"><a href="#cb70-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb70-35"><a href="#cb70-35" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb71"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;pthread.h&gt;</span></span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> counter <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> <span class="co">// Shared counter: every thread updates it, so it needs the mutex.</span></span>
+<span id="cb71-6"><a href="#cb71-6" aria-hidden="true" tabindex="-1"></a>pthread_mutex_t lock<span class="op">;</span> <span class="co">// Guards shared data: only the lock holder may touch it.</span></span>
+<span id="cb71-7"><a href="#cb71-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-8"><a href="#cb71-8" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="op">*</span>update_counter<span class="op">(</span><span class="dt">void</span> <span class="op">*</span>arg<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb71-9"><a href="#cb71-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">5</span><span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb71-10"><a href="#cb71-10" aria-hidden="true" tabindex="-1"></a>        pthread_mutex_lock<span class="op">(&amp;</span>lock<span class="op">);</span> <span class="co">// Enter the critical section (wait if another thread is inside).</span></span>
+<span id="cb71-11"><a href="#cb71-11" aria-hidden="true" tabindex="-1"></a>        counter<span class="op">++;</span></span>
+<span id="cb71-12"><a href="#cb71-12" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Thread: counter = </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> counter<span class="op">);</span></span>
+<span id="cb71-13"><a href="#cb71-13" aria-hidden="true" tabindex="-1"></a>        pthread_mutex_unlock<span class="op">(&amp;</span>lock<span class="op">);</span> <span class="co">// Leave the critical section, waking one waiter if any.</span></span>
+<span id="cb71-14"><a href="#cb71-14" aria-hidden="true" tabindex="-1"></a>        sleep<span class="op">(</span><span class="dv">1</span><span class="op">);</span></span>
+<span id="cb71-15"><a href="#cb71-15" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb71-16"><a href="#cb71-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-17"><a href="#cb71-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> NULL<span class="op">;</span></span>
+<span id="cb71-18"><a href="#cb71-18" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb71-19"><a href="#cb71-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-20"><a href="#cb71-20" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb71-21"><a href="#cb71-21" aria-hidden="true" tabindex="-1"></a>    pthread_t thread<span class="op">;</span></span>
+<span id="cb71-22"><a href="#cb71-22" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_init<span class="op">(&amp;</span>lock<span class="op">,</span> NULL<span class="op">);</span></span>
+<span id="cb71-23"><a href="#cb71-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-24"><a href="#cb71-24" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Start the worker thread.</span></span>
+<span id="cb71-25"><a href="#cb71-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>pthread_create<span class="op">(&amp;</span>thread<span class="op">,</span> NULL<span class="op">,</span> update_counter<span class="op">,</span> NULL<span class="op">)</span> <span class="op">!=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb71-26"><a href="#cb71-26" aria-hidden="true" tabindex="-1"></a>        perror<span class="op">(</span><span class="st">"pthread_create failed"</span><span class="op">);</span></span>
+<span id="cb71-27"><a href="#cb71-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb71-28"><a href="#cb71-28" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb71-29"><a href="#cb71-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-30"><a href="#cb71-30" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Block until the worker thread exits.</span></span>
+<span id="cb71-31"><a href="#cb71-31" aria-hidden="true" tabindex="-1"></a>    pthread_join<span class="op">(</span>thread<span class="op">,</span> NULL<span class="op">);</span></span>
+<span id="cb71-32"><a href="#cb71-32" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_destroy<span class="op">(&amp;</span>lock<span class="op">);</span></span>
+<span id="cb71-33"><a href="#cb71-33" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Final counter value: </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> counter<span class="op">);</span></span>
+<span id="cb71-34"><a href="#cb71-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb71-35"><a href="#cb71-35" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-38-3" class="level3">
@@ -9087,8 +8933,8 @@ How do you declare a const pointer to float in C?
 <summary>
 Solution
 </summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb71"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="dt">const</span> <span class="dt">float</span> <span class="op">*</span>ptr<span class="op">;</span>       <span class="co">/* Pointer to a constant float: *ptr cannot change, ptr can. */</span></span>
-<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a><span class="dt">float</span> <span class="op">*</span> <span class="dt">const</span> ptr <span class="op">=</span> <span class="op">&amp;</span>x<span class="op">;</span> <span class="co">/* Constant pointer to float: ptr cannot change, *ptr can. */</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb72"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="dt">const</span> <span class="dt">float</span> <span class="op">*</span>ptr<span class="op">;</span>       <span class="co">/* Pointer to a constant float: *ptr cannot change, ptr can. */</span></span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a><span class="dt">float</span> <span class="op">*</span> <span class="dt">const</span> ptr <span class="op">=</span> <span class="op">&amp;</span>x<span class="op">;</span> <span class="co">/* Constant pointer to float: ptr cannot change, *ptr can. */</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-39-4" class="level3">
@@ -9143,8 +8989,8 @@ Solution
 <li>Passing data to threads or callback functions where the data type is unknown in advance.</li>
 </ul>
 <p>Example:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb72"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> x <span class="op">=</span> <span class="dv">10</span><span class="op">;</span></span>
-<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="op">*</span>ptr <span class="op">=</span> <span class="op">&amp;</span>x<span class="op">;</span> <span class="co">// A void* can hold the address of any type.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb73"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> x <span class="op">=</span> <span class="dv">10</span><span class="op">;</span></span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="op">*</span>ptr <span class="op">=</span> <span class="op">&amp;</span>x<span class="op">;</span> <span class="co">// A void* can hold the address of any type.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-42-4" class="level3">
@@ -9155,6 +9001,9 @@ How do you open (view) a file via the command line? Give at least 4 ways.
 Solution
 </summary>
 <pre class="text"><code>cat filename.txt
+head filename.txt
+tail filename.txt
+grep '' filename.txt
 xdg-open filename.txt
 nano filename.txt
 vim filename.txt
@@ -9216,54 +9065,54 @@ How do you create 3 threads that store their PIDs in a global array? Write the p
 <summary>
 Solution
 </summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb74"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
-<span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;pthread.h&gt;</span></span>
-<span id="cb74-3"><a href="#cb74-3" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdint.h&gt;</span></span>
-<span id="cb74-4"><a href="#cb74-4" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;sys/types.h&gt;</span></span>
-<span id="cb74-5"><a href="#cb74-5" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
-<span id="cb74-6"><a href="#cb74-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-7"><a href="#cb74-7" aria-hidden="true" tabindex="-1"></a><span class="pp">#define NUM_THREADS </span><span class="dv">3</span></span>
-<span id="cb74-8"><a href="#cb74-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-9"><a href="#cb74-9" aria-hidden="true" tabindex="-1"></a>pid_t pid_array<span class="op">[</span>NUM_THREADS<span class="op">];</span> <span class="co">// Shared result array: slot i is filled in by thread i.</span></span>
-<span id="cb74-10"><a href="#cb74-10" aria-hidden="true" tabindex="-1"></a>pthread_mutex_t lock<span class="op">;</span> <span class="co">// Guards shared data: only the lock holder may touch it.</span></span>
-<span id="cb74-11"><a href="#cb74-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-12"><a href="#cb74-12" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="op">*</span>update_pid<span class="op">(</span><span class="dt">void</span> <span class="op">*</span>arg<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb74-13"><a href="#cb74-13" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> index <span class="op">=</span> <span class="op">(</span><span class="dt">int</span><span class="op">)(</span><span class="dt">intptr_t</span><span class="op">)</span>arg<span class="op">;</span></span>
-<span id="cb74-14"><a href="#cb74-14" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_lock<span class="op">(&amp;</span>lock<span class="op">);</span></span>
-<span id="cb74-15"><a href="#cb74-15" aria-hidden="true" tabindex="-1"></a>    pid_array<span class="op">[</span>index<span class="op">]</span> <span class="op">=</span> getpid<span class="op">();</span> <span class="co">// Save our PID into our own slot (all threads share one PID).</span></span>
-<span id="cb74-16"><a href="#cb74-16" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Thread </span><span class="sc">%d</span><span class="st">: PID = </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> index<span class="op">,</span> pid_array<span class="op">[</span>index<span class="op">]);</span></span>
-<span id="cb74-17"><a href="#cb74-17" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_unlock<span class="op">(&amp;</span>lock<span class="op">);</span></span>
-<span id="cb74-18"><a href="#cb74-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> NULL<span class="op">;</span></span>
-<span id="cb74-19"><a href="#cb74-19" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
-<span id="cb74-20"><a href="#cb74-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-21"><a href="#cb74-21" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
-<span id="cb74-22"><a href="#cb74-22" aria-hidden="true" tabindex="-1"></a>    pthread_t threads<span class="op">[</span>NUM_THREADS<span class="op">];</span></span>
-<span id="cb74-23"><a href="#cb74-23" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> indices<span class="op">[</span>NUM_THREADS<span class="op">];</span></span>
-<span id="cb74-24"><a href="#cb74-24" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_init<span class="op">(&amp;</span>lock<span class="op">,</span> NULL<span class="op">);</span></span>
-<span id="cb74-25"><a href="#cb74-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-26"><a href="#cb74-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> NUM_THREADS<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
-<span id="cb74-27"><a href="#cb74-27" aria-hidden="true" tabindex="-1"></a>        indices<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> i<span class="op">;</span></span>
-<span id="cb74-28"><a href="#cb74-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-29"><a href="#cb74-29" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="op">(</span>pthread_create<span class="op">(&amp;</span>threads<span class="op">[</span>i<span class="op">],</span> NULL<span class="op">,</span> update_pid<span class="op">,</span> <span class="op">&amp;</span>indices<span class="op">[</span>i<span class="op">])</span> <span class="op">!=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb74-30"><a href="#cb74-30" aria-hidden="true" tabindex="-1"></a>            perror<span class="op">(</span><span class="st">"pthread_create failed"</span><span class="op">);</span></span>
-<span id="cb74-31"><a href="#cb74-31" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
-<span id="cb74-32"><a href="#cb74-32" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
-<span id="cb74-33"><a href="#cb74-33" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb74-34"><a href="#cb74-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-35"><a href="#cb74-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> NUM_THREADS<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
-<span id="cb74-36"><a href="#cb74-36" aria-hidden="true" tabindex="-1"></a>        pthread_join<span class="op">(</span>threads<span class="op">[</span>i<span class="op">],</span> NULL<span class="op">);</span></span>
-<span id="cb74-37"><a href="#cb74-37" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb74-38"><a href="#cb74-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-39"><a href="#cb74-39" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_destroy<span class="op">(&amp;</span>lock<span class="op">);</span></span>
-<span id="cb74-40"><a href="#cb74-40" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Final PID array: "</span><span class="op">);</span></span>
-<span id="cb74-41"><a href="#cb74-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-42"><a href="#cb74-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> NUM_THREADS<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
-<span id="cb74-43"><a href="#cb74-43" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"</span><span class="sc">%d</span><span class="st"> "</span><span class="op">,</span> pid_array<span class="op">[</span>i<span class="op">]);</span></span>
-<span id="cb74-44"><a href="#cb74-44" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb74-45"><a href="#cb74-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-46"><a href="#cb74-46" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"</span><span class="sc">\n</span><span class="st">"</span><span class="op">);</span></span>
-<span id="cb74-47"><a href="#cb74-47" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb74-48"><a href="#cb74-48" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb75"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;pthread.h&gt;</span></span>
+<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdint.h&gt;</span></span>
+<span id="cb75-4"><a href="#cb75-4" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;sys/types.h&gt;</span></span>
+<span id="cb75-5"><a href="#cb75-5" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
+<span id="cb75-6"><a href="#cb75-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-7"><a href="#cb75-7" aria-hidden="true" tabindex="-1"></a><span class="pp">#define NUM_THREADS </span><span class="dv">3</span></span>
+<span id="cb75-8"><a href="#cb75-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-9"><a href="#cb75-9" aria-hidden="true" tabindex="-1"></a>pid_t pid_array<span class="op">[</span>NUM_THREADS<span class="op">];</span> <span class="co">// Shared result array: slot i is filled in by thread i.</span></span>
+<span id="cb75-10"><a href="#cb75-10" aria-hidden="true" tabindex="-1"></a>pthread_mutex_t lock<span class="op">;</span> <span class="co">// Guards shared data: only the lock holder may touch it.</span></span>
+<span id="cb75-11"><a href="#cb75-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-12"><a href="#cb75-12" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="op">*</span>update_pid<span class="op">(</span><span class="dt">void</span> <span class="op">*</span>arg<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb75-13"><a href="#cb75-13" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> index <span class="op">=</span> <span class="op">(</span><span class="dt">int</span><span class="op">)(</span><span class="dt">intptr_t</span><span class="op">)</span>arg<span class="op">;</span></span>
+<span id="cb75-14"><a href="#cb75-14" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_lock<span class="op">(&amp;</span>lock<span class="op">);</span></span>
+<span id="cb75-15"><a href="#cb75-15" aria-hidden="true" tabindex="-1"></a>    pid_array<span class="op">[</span>index<span class="op">]</span> <span class="op">=</span> getpid<span class="op">();</span> <span class="co">// Save our PID into our own slot (all threads share one PID).</span></span>
+<span id="cb75-16"><a href="#cb75-16" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Thread </span><span class="sc">%d</span><span class="st">: PID = </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> index<span class="op">,</span> pid_array<span class="op">[</span>index<span class="op">]);</span></span>
+<span id="cb75-17"><a href="#cb75-17" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_unlock<span class="op">(&amp;</span>lock<span class="op">);</span></span>
+<span id="cb75-18"><a href="#cb75-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> NULL<span class="op">;</span></span>
+<span id="cb75-19"><a href="#cb75-19" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb75-20"><a href="#cb75-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-21"><a href="#cb75-21" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb75-22"><a href="#cb75-22" aria-hidden="true" tabindex="-1"></a>    pthread_t threads<span class="op">[</span>NUM_THREADS<span class="op">];</span></span>
+<span id="cb75-23"><a href="#cb75-23" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> indices<span class="op">[</span>NUM_THREADS<span class="op">];</span></span>
+<span id="cb75-24"><a href="#cb75-24" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_init<span class="op">(&amp;</span>lock<span class="op">,</span> NULL<span class="op">);</span></span>
+<span id="cb75-25"><a href="#cb75-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-26"><a href="#cb75-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> NUM_THREADS<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb75-27"><a href="#cb75-27" aria-hidden="true" tabindex="-1"></a>        indices<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> i<span class="op">;</span></span>
+<span id="cb75-28"><a href="#cb75-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-29"><a href="#cb75-29" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="op">(</span>pthread_create<span class="op">(&amp;</span>threads<span class="op">[</span>i<span class="op">],</span> NULL<span class="op">,</span> update_pid<span class="op">,</span> <span class="op">&amp;</span>indices<span class="op">[</span>i<span class="op">])</span> <span class="op">!=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb75-30"><a href="#cb75-30" aria-hidden="true" tabindex="-1"></a>            perror<span class="op">(</span><span class="st">"pthread_create failed"</span><span class="op">);</span></span>
+<span id="cb75-31"><a href="#cb75-31" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb75-32"><a href="#cb75-32" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb75-33"><a href="#cb75-33" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb75-34"><a href="#cb75-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-35"><a href="#cb75-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> NUM_THREADS<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb75-36"><a href="#cb75-36" aria-hidden="true" tabindex="-1"></a>        pthread_join<span class="op">(</span>threads<span class="op">[</span>i<span class="op">],</span> NULL<span class="op">);</span></span>
+<span id="cb75-37"><a href="#cb75-37" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb75-38"><a href="#cb75-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-39"><a href="#cb75-39" aria-hidden="true" tabindex="-1"></a>    pthread_mutex_destroy<span class="op">(&amp;</span>lock<span class="op">);</span></span>
+<span id="cb75-40"><a href="#cb75-40" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Final PID array: "</span><span class="op">);</span></span>
+<span id="cb75-41"><a href="#cb75-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-42"><a href="#cb75-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> NUM_THREADS<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb75-43"><a href="#cb75-43" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"</span><span class="sc">%d</span><span class="st"> "</span><span class="op">,</span> pid_array<span class="op">[</span>i<span class="op">]);</span></span>
+<span id="cb75-44"><a href="#cb75-44" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb75-45"><a href="#cb75-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-46"><a href="#cb75-46" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"</span><span class="sc">\n</span><span class="st">"</span><span class="op">);</span></span>
+<span id="cb75-47"><a href="#cb75-47" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb75-48"><a href="#cb75-48" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-47-1" class="level3">
@@ -9298,9 +9147,9 @@ Solution
 <li>Violating the critical section can lead to unpredictable results and bugs.</li>
 </ul>
 <p>Example in C with a pthread mutex:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb75"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a>pthread_mutex_lock<span class="op">(&amp;</span>lock<span class="op">);</span> <span class="co">// Wait for the lock, then enter the critical section.</span></span>
-<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a><span class="co">// Only one thread at a time runs this code.</span></span>
-<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a>pthread_mutex_unlock<span class="op">(&amp;</span>lock<span class="op">);</span> <span class="co">// Leave the critical section so others may proceed.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb76"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a>pthread_mutex_lock<span class="op">(&amp;</span>lock<span class="op">);</span> <span class="co">// Wait for the lock, then enter the critical section.</span></span>
+<span id="cb76-2"><a href="#cb76-2" aria-hidden="true" tabindex="-1"></a><span class="co">// Only one thread at a time runs this code.</span></span>
+<span id="cb76-3"><a href="#cb76-3" aria-hidden="true" tabindex="-1"></a>pthread_mutex_unlock<span class="op">(&amp;</span>lock<span class="op">);</span> <span class="co">// Leave the critical section so others may proceed.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-49-2" class="level3">
@@ -9356,7 +9205,7 @@ What is a variadic function in C? How would you declare one?
 Solution
 </summary>
 <p>A variadic function in C is a function with no explicitly stated number of arguments. The functionality of variadic functions is provided by <code>&lt;stdarg.h&gt;</code> standard library. To declare such function, it is sufficient to add ellipsis in the function signature:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb76"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a>return_type function_name<span class="op">(</span>static_arg1<span class="op">,</span> static_arg2<span class="op">,</span> <span class="op">...);</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb77"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a>return_type function_name<span class="op">(</span>static_arg1<span class="op">,</span> static_arg2<span class="op">,</span> <span class="op">...);</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-53-2" class="level3">
@@ -9481,54 +9330,54 @@ Write a piece of C code that will recreate the following dialog between two proc
 Solution
 </summary>
 <p>Two unnamed pipes plus <code>fork()</code>: one pipe carries Process 1 → Process 2, the other Process 2 → Process 1. Blocking <code>read()</code> calls enforce the turn order, so no extra locks are needed for this strict alternation (locks such as a mutex or a semaphore would be needed for shared memory instead of pipes).</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb77"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
-<span id="cb77-2"><a href="#cb77-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;string.h&gt;</span></span>
-<span id="cb77-3"><a href="#cb77-3" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
-<span id="cb77-4"><a href="#cb77-4" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;sys/wait.h&gt;</span></span>
-<span id="cb77-5"><a href="#cb77-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-6"><a href="#cb77-6" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb77-7"><a href="#cb77-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> p1_to_p2<span class="op">[</span><span class="dv">2</span><span class="op">],</span> p2_to_p1<span class="op">[</span><span class="dv">2</span><span class="op">];</span>   <span class="co">/* Two one-way pipes: one for each direction. */</span></span>
-<span id="cb77-8"><a href="#cb77-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">char</span> buf<span class="op">[</span><span class="dv">128</span><span class="op">];</span></span>
-<span id="cb77-9"><a href="#cb77-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-10"><a href="#cb77-10" aria-hidden="true" tabindex="-1"></a>    pipe<span class="op">(</span>p1_to_p2<span class="op">);</span></span>
-<span id="cb77-11"><a href="#cb77-11" aria-hidden="true" tabindex="-1"></a>    pipe<span class="op">(</span>p2_to_p1<span class="op">);</span></span>
-<span id="cb77-12"><a href="#cb77-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-13"><a href="#cb77-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>fork<span class="op">()</span> <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span>              <span class="co">/* The child plays the role of Process 2. */</span></span>
-<span id="cb77-14"><a href="#cb77-14" aria-hidden="true" tabindex="-1"></a>        close<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
-<span id="cb77-15"><a href="#cb77-15" aria-hidden="true" tabindex="-1"></a>        close<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">0</span><span class="op">]);</span></span>
-<span id="cb77-16"><a href="#cb77-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-17"><a href="#cb77-17" aria-hidden="true" tabindex="-1"></a>        read<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">0</span><span class="op">],</span> buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">));</span>        <span class="co">/* "Is this a test?" */</span></span>
-<span id="cb77-18"><a href="#cb77-18" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Process 2 got: </span><span class="sc">%s\n</span><span class="st">"</span><span class="op">,</span> buf<span class="op">);</span></span>
-<span id="cb77-19"><a href="#cb77-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-20"><a href="#cb77-20" aria-hidden="true" tabindex="-1"></a>        <span class="dt">const</span> <span class="dt">char</span> <span class="op">*</span>answer <span class="op">=</span> <span class="st">"Yes, a test on process synchronization"</span><span class="op">;</span></span>
-<span id="cb77-21"><a href="#cb77-21" aria-hidden="true" tabindex="-1"></a>        write<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">1</span><span class="op">],</span> answer<span class="op">,</span> strlen<span class="op">(</span>answer<span class="op">)</span> <span class="op">+</span> <span class="dv">1</span><span class="op">);</span></span>
-<span id="cb77-22"><a href="#cb77-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-23"><a href="#cb77-23" aria-hidden="true" tabindex="-1"></a>        read<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">0</span><span class="op">],</span> buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">));</span>        <span class="co">/* "I wonder ..." */</span></span>
-<span id="cb77-24"><a href="#cb77-24" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Process 2 got: </span><span class="sc">%s\n</span><span class="st">"</span><span class="op">,</span> buf<span class="op">);</span></span>
-<span id="cb77-25"><a href="#cb77-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-26"><a href="#cb77-26" aria-hidden="true" tabindex="-1"></a>        close<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">0</span><span class="op">]);</span></span>
-<span id="cb77-27"><a href="#cb77-27" aria-hidden="true" tabindex="-1"></a>        close<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
-<span id="cb77-28"><a href="#cb77-28" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb77-29"><a href="#cb77-29" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb77-30"><a href="#cb77-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-31"><a href="#cb77-31" aria-hidden="true" tabindex="-1"></a>    <span class="co">/* The parent plays the role of Process 1. */</span></span>
-<span id="cb77-32"><a href="#cb77-32" aria-hidden="true" tabindex="-1"></a>    close<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">0</span><span class="op">]);</span></span>
-<span id="cb77-33"><a href="#cb77-33" aria-hidden="true" tabindex="-1"></a>    close<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
-<span id="cb77-34"><a href="#cb77-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-35"><a href="#cb77-35" aria-hidden="true" tabindex="-1"></a>    <span class="dt">const</span> <span class="dt">char</span> <span class="op">*</span>q1 <span class="op">=</span> <span class="st">"Is this a test?"</span><span class="op">;</span></span>
-<span id="cb77-36"><a href="#cb77-36" aria-hidden="true" tabindex="-1"></a>    write<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">1</span><span class="op">],</span> q1<span class="op">,</span> strlen<span class="op">(</span>q1<span class="op">)</span> <span class="op">+</span> <span class="dv">1</span><span class="op">);</span></span>
-<span id="cb77-37"><a href="#cb77-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-38"><a href="#cb77-38" aria-hidden="true" tabindex="-1"></a>    read<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">0</span><span class="op">],</span> buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">));</span>            <span class="co">/* Block until Process 2 answers. */</span></span>
-<span id="cb77-39"><a href="#cb77-39" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Process 1 got: </span><span class="sc">%s\n</span><span class="st">"</span><span class="op">,</span> buf<span class="op">);</span></span>
-<span id="cb77-40"><a href="#cb77-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-41"><a href="#cb77-41" aria-hidden="true" tabindex="-1"></a>    <span class="dt">const</span> <span class="dt">char</span> <span class="op">*</span>q2 <span class="op">=</span> <span class="st">"I wonder if any locks can help"</span><span class="op">;</span></span>
-<span id="cb77-42"><a href="#cb77-42" aria-hidden="true" tabindex="-1"></a>    write<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">1</span><span class="op">],</span> q2<span class="op">,</span> strlen<span class="op">(</span>q2<span class="op">)</span> <span class="op">+</span> <span class="dv">1</span><span class="op">);</span></span>
-<span id="cb77-43"><a href="#cb77-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-44"><a href="#cb77-44" aria-hidden="true" tabindex="-1"></a>    close<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
-<span id="cb77-45"><a href="#cb77-45" aria-hidden="true" tabindex="-1"></a>    close<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">0</span><span class="op">]);</span></span>
-<span id="cb77-46"><a href="#cb77-46" aria-hidden="true" tabindex="-1"></a>    wait<span class="op">(</span>NULL<span class="op">);</span></span>
-<span id="cb77-47"><a href="#cb77-47" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb77-48"><a href="#cb77-48" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb78"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb78-2"><a href="#cb78-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;string.h&gt;</span></span>
+<span id="cb78-3"><a href="#cb78-3" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
+<span id="cb78-4"><a href="#cb78-4" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;sys/wait.h&gt;</span></span>
+<span id="cb78-5"><a href="#cb78-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-6"><a href="#cb78-6" aria-hidden="true" tabindex="-1"></a><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb78-7"><a href="#cb78-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> p1_to_p2<span class="op">[</span><span class="dv">2</span><span class="op">],</span> p2_to_p1<span class="op">[</span><span class="dv">2</span><span class="op">];</span>   <span class="co">/* Two one-way pipes: one for each direction. */</span></span>
+<span id="cb78-8"><a href="#cb78-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">char</span> buf<span class="op">[</span><span class="dv">128</span><span class="op">];</span></span>
+<span id="cb78-9"><a href="#cb78-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-10"><a href="#cb78-10" aria-hidden="true" tabindex="-1"></a>    pipe<span class="op">(</span>p1_to_p2<span class="op">);</span></span>
+<span id="cb78-11"><a href="#cb78-11" aria-hidden="true" tabindex="-1"></a>    pipe<span class="op">(</span>p2_to_p1<span class="op">);</span></span>
+<span id="cb78-12"><a href="#cb78-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-13"><a href="#cb78-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>fork<span class="op">()</span> <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span>              <span class="co">/* The child plays the role of Process 2. */</span></span>
+<span id="cb78-14"><a href="#cb78-14" aria-hidden="true" tabindex="-1"></a>        close<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
+<span id="cb78-15"><a href="#cb78-15" aria-hidden="true" tabindex="-1"></a>        close<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">0</span><span class="op">]);</span></span>
+<span id="cb78-16"><a href="#cb78-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-17"><a href="#cb78-17" aria-hidden="true" tabindex="-1"></a>        read<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">0</span><span class="op">],</span> buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">));</span>        <span class="co">/* "Is this a test?" */</span></span>
+<span id="cb78-18"><a href="#cb78-18" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Process 2 got: </span><span class="sc">%s\n</span><span class="st">"</span><span class="op">,</span> buf<span class="op">);</span></span>
+<span id="cb78-19"><a href="#cb78-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-20"><a href="#cb78-20" aria-hidden="true" tabindex="-1"></a>        <span class="dt">const</span> <span class="dt">char</span> <span class="op">*</span>answer <span class="op">=</span> <span class="st">"Yes, a test on process synchronization"</span><span class="op">;</span></span>
+<span id="cb78-21"><a href="#cb78-21" aria-hidden="true" tabindex="-1"></a>        write<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">1</span><span class="op">],</span> answer<span class="op">,</span> strlen<span class="op">(</span>answer<span class="op">)</span> <span class="op">+</span> <span class="dv">1</span><span class="op">);</span></span>
+<span id="cb78-22"><a href="#cb78-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-23"><a href="#cb78-23" aria-hidden="true" tabindex="-1"></a>        read<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">0</span><span class="op">],</span> buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">));</span>        <span class="co">/* "I wonder ..." */</span></span>
+<span id="cb78-24"><a href="#cb78-24" aria-hidden="true" tabindex="-1"></a>        printf<span class="op">(</span><span class="st">"Process 2 got: </span><span class="sc">%s\n</span><span class="st">"</span><span class="op">,</span> buf<span class="op">);</span></span>
+<span id="cb78-25"><a href="#cb78-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-26"><a href="#cb78-26" aria-hidden="true" tabindex="-1"></a>        close<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">0</span><span class="op">]);</span></span>
+<span id="cb78-27"><a href="#cb78-27" aria-hidden="true" tabindex="-1"></a>        close<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
+<span id="cb78-28"><a href="#cb78-28" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb78-29"><a href="#cb78-29" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb78-30"><a href="#cb78-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-31"><a href="#cb78-31" aria-hidden="true" tabindex="-1"></a>    <span class="co">/* The parent plays the role of Process 1. */</span></span>
+<span id="cb78-32"><a href="#cb78-32" aria-hidden="true" tabindex="-1"></a>    close<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">0</span><span class="op">]);</span></span>
+<span id="cb78-33"><a href="#cb78-33" aria-hidden="true" tabindex="-1"></a>    close<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
+<span id="cb78-34"><a href="#cb78-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-35"><a href="#cb78-35" aria-hidden="true" tabindex="-1"></a>    <span class="dt">const</span> <span class="dt">char</span> <span class="op">*</span>q1 <span class="op">=</span> <span class="st">"Is this a test?"</span><span class="op">;</span></span>
+<span id="cb78-36"><a href="#cb78-36" aria-hidden="true" tabindex="-1"></a>    write<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">1</span><span class="op">],</span> q1<span class="op">,</span> strlen<span class="op">(</span>q1<span class="op">)</span> <span class="op">+</span> <span class="dv">1</span><span class="op">);</span></span>
+<span id="cb78-37"><a href="#cb78-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-38"><a href="#cb78-38" aria-hidden="true" tabindex="-1"></a>    read<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">0</span><span class="op">],</span> buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">));</span>            <span class="co">/* Block until Process 2 answers. */</span></span>
+<span id="cb78-39"><a href="#cb78-39" aria-hidden="true" tabindex="-1"></a>    printf<span class="op">(</span><span class="st">"Process 1 got: </span><span class="sc">%s\n</span><span class="st">"</span><span class="op">,</span> buf<span class="op">);</span></span>
+<span id="cb78-40"><a href="#cb78-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-41"><a href="#cb78-41" aria-hidden="true" tabindex="-1"></a>    <span class="dt">const</span> <span class="dt">char</span> <span class="op">*</span>q2 <span class="op">=</span> <span class="st">"I wonder if any locks can help"</span><span class="op">;</span></span>
+<span id="cb78-42"><a href="#cb78-42" aria-hidden="true" tabindex="-1"></a>    write<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">1</span><span class="op">],</span> q2<span class="op">,</span> strlen<span class="op">(</span>q2<span class="op">)</span> <span class="op">+</span> <span class="dv">1</span><span class="op">);</span></span>
+<span id="cb78-43"><a href="#cb78-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-44"><a href="#cb78-44" aria-hidden="true" tabindex="-1"></a>    close<span class="op">(</span>p1_to_p2<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
+<span id="cb78-45"><a href="#cb78-45" aria-hidden="true" tabindex="-1"></a>    close<span class="op">(</span>p2_to_p1<span class="op">[</span><span class="dv">0</span><span class="op">]);</span></span>
+<span id="cb78-46"><a href="#cb78-46" aria-hidden="true" tabindex="-1"></a>    wait<span class="op">(</span>NULL<span class="op">);</span></span>
+<span id="cb78-47"><a href="#cb78-47" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb78-48"><a href="#cb78-48" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </section>
 <section id="question-63-1" class="level3">
@@ -9548,16 +9397,16 @@ Solution
 <section id="question-64-1" class="level3">
 <h3 class="anchored" data-anchor-id="question-64-1">Question 64</h3>
 <p>Your game crashes after 30 minutes of gameplay with “OutOfMemoryError”. You read code and find:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb78"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> spawn_enemy<span class="op">()</span> <span class="op">{</span></span>
-<span id="cb78-2"><a href="#cb78-2" aria-hidden="true" tabindex="-1"></a>    Enemy <span class="op">*</span>enemy <span class="op">=</span> <span class="op">(</span>Enemy<span class="op">*)</span>malloc<span class="op">(</span><span class="kw">sizeof</span><span class="op">(</span>Enemy<span class="op">));</span></span>
-<span id="cb78-3"><a href="#cb78-3" aria-hidden="true" tabindex="-1"></a>    enemy<span class="op">-&gt;</span>health <span class="op">=</span> <span class="dv">100</span><span class="op">;</span></span>
-<span id="cb78-4"><a href="#cb78-4" aria-hidden="true" tabindex="-1"></a>    enemies<span class="op">[</span>enemy_count<span class="op">++]</span> <span class="op">=</span> enemy<span class="op">;</span></span>
-<span id="cb78-5"><a href="#cb78-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
-<span id="cb78-6"><a href="#cb78-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb78-7"><a href="#cb78-7" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> kill_enemy<span class="op">(</span><span class="dt">int</span> index<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb78-8"><a href="#cb78-8" aria-hidden="true" tabindex="-1"></a>    enemies<span class="op">[</span>index<span class="op">]</span> <span class="op">=</span> NULL<span class="op">;</span> <span class="co">// Drop it from the list (the memory itself is not freed here).</span></span>
-<span id="cb78-9"><a href="#cb78-9" aria-hidden="true" tabindex="-1"></a>    enemy_count<span class="op">--;</span></span>
-<span id="cb78-10"><a href="#cb78-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb79"><pre class="sourceCode c code-with-copy"><code class="sourceCode c"><span id="cb79-1"><a href="#cb79-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> spawn_enemy<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb79-2"><a href="#cb79-2" aria-hidden="true" tabindex="-1"></a>    Enemy <span class="op">*</span>enemy <span class="op">=</span> <span class="op">(</span>Enemy<span class="op">*)</span>malloc<span class="op">(</span><span class="kw">sizeof</span><span class="op">(</span>Enemy<span class="op">));</span></span>
+<span id="cb79-3"><a href="#cb79-3" aria-hidden="true" tabindex="-1"></a>    enemy<span class="op">-&gt;</span>health <span class="op">=</span> <span class="dv">100</span><span class="op">;</span></span>
+<span id="cb79-4"><a href="#cb79-4" aria-hidden="true" tabindex="-1"></a>    enemies<span class="op">[</span>enemy_count<span class="op">++]</span> <span class="op">=</span> enemy<span class="op">;</span></span>
+<span id="cb79-5"><a href="#cb79-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb79-6"><a href="#cb79-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb79-7"><a href="#cb79-7" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> kill_enemy<span class="op">(</span><span class="dt">int</span> index<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb79-8"><a href="#cb79-8" aria-hidden="true" tabindex="-1"></a>    enemies<span class="op">[</span>index<span class="op">]</span> <span class="op">=</span> NULL<span class="op">;</span> <span class="co">// Drop it from the list (the memory itself is not freed here).</span></span>
+<span id="cb79-9"><a href="#cb79-9" aria-hidden="true" tabindex="-1"></a>    enemy_count<span class="op">--;</span></span>
+<span id="cb79-10"><a href="#cb79-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 What’s the bug, and how do you fix it?
 <details>
 <summary>
@@ -9568,6 +9417,33 @@ Solution
 <li>Memory leak (the OOM cause): the slot is set to <code>NULL</code> but the heap block is never released — every kill leaks <code>sizeof(Enemy)</code> bytes until the process runs out of memory. Fix: <code>free(enemies[index]);</code> before clearing the slot.</li>
 <li>Broken bookkeeping: the slot is nulled but the array is never compacted while <code>enemy_count--</code> shrinks the active range — live enemies past the hole become unreachable/garbled. Fix: move the last live element into the freed slot (<code>enemies[index] = enemies[--enemy_count];</code>) instead.</li>
 </ol>
+</details>
+</section>
+<section id="question-65-1" class="level3">
+<h3 class="anchored" data-anchor-id="question-65-1">Question 65</h3>
+What is POSIX?
+<details>
+<summary>
+Solution
+</summary>
+<p>POSIX (Portable Operating System Interface) is a family of IEEE standards (IEEE 1003.x) that defines a common API between applications and Unix-like operating systems: system calls, the C library interface, shells and command-line utilities, signals, file-system semantics, and threads (pthreads). The goal is source portability — a program written against POSIX compiles and runs on any compliant system (Linux, macOS, BSD, etc.) without changes. POSIX threads (pthread) are just one part of it — the standard also covers processes, I/O and IPC.</p>
+</details>
+</section>
+<section id="question-66" class="level3">
+<h3 class="anchored" data-anchor-id="question-66">Question 66</h3>
+What is preemptive scheduling, and when might you need it?
+<details>
+<summary>
+Solution
+</summary>
+<p>Preemptive scheduling means the OS can forcibly take the CPU away from a running process — typically on a timer interrupt when its time quantum expires, or when a higher-priority process becomes ready — and hand it to another process.</p>
+<p>You need it whenever responsiveness, fairness, or deadlines matter:</p>
+<ul>
+<li>Interactive systems — a single CPU-hogging process must not freeze the UI or other users’ programs.</li>
+<li>Real-time systems — a high-priority task must start within a hard deadline, so it preempts whatever is running.</li>
+<li>Shared/multi-user systems — the CPU is shared fairly; nobody can hold it forever.</li>
+</ul>
+<p>Trade-off: extra context-switch overhead and more complexity — which is why batch/embedded setups sometimes prefer non-preemptive scheduling.</p>
 </details>
 
 
