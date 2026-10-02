@@ -18,7 +18,7 @@ main#quarto-document-content img {
 
 # Contents
 
-Total — 428 questions
+Total — 430 questions
 
 - [Chapter 1 — 45 questions](#chapter-1)
 - [Chapter 2 — 74 questions](#chapter-2)
@@ -26,7 +26,7 @@ Total — 428 questions
 - [Chapter 4 — 57 questions](#chapter-4)
 - [Chapter 5 — 66 questions](#chapter-5)
 - [Chapter 6 — 55 questions](#chapter-6)
-- [Sudden Quiz — 64 questions](#sudden-quiz)
+- [Sudden Quiz — 66 questions](#sudden-quiz)
 
 # Chapter 1
 
@@ -7504,6 +7504,31 @@ How do you read a float number "grade" from stdin?
 <details>
 <summary>Solution</summary>
 
+Safest way — read a whole line with `fgets`, then parse with `strtof` and validate: the buffer cannot overflow and malformed input is detected:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    char buf[64];
+
+    if (!fgets(buf, sizeof(buf), stdin))
+        return 1;
+
+    char *end;
+    float grade = strtof(buf, &end);
+
+    if (end == buf || *end != '\n') {
+        fprintf(stderr, "Invalid input\n");
+        return 1;
+    }
+
+    printf("Entered number: %f\n", grade);
+    return 0;
+}
+```
+
 `scanf ("%f", &grade)` — always check the return value (number of items matched); on non-numeric input it returns 0 and leaves `grade` untouched.
 
 `fscanf (stdin, "%f", &grade)` — same, reading explicitly from `stdin`.
@@ -7785,6 +7810,12 @@ Linking
 - Output: ex1.out (executable file)
 - What happens: combining object files and libraries into the final executable.
 
+Loading (extra step after the 4 build stages, shown in the textbook diagram)
+
+- Input: ex1.out (executable file)
+- Output: a running process in memory
+- What happens: the OS loader maps the executable into memory and jumps to its entry point.
+
 </details>
 
 ### Question 27
@@ -7946,6 +7977,8 @@ How do you list files (including hidden ones) in bash?
 
 `ls -al`
 
+For a specific directory: `ls -al /path/to/dir`
+
 </details>
 
 ### Question 36
@@ -8095,6 +8128,9 @@ How do you open (view) a file via the command line? Give at least 4 ways.
 
 ```text
 cat filename.txt
+head filename.txt
+tail filename.txt
+grep '' filename.txt
 xdg-open filename.txt
 nano filename.txt
 vim filename.txt
@@ -8489,5 +8525,31 @@ Two bugs, both in `kill_enemy()`:
 
 1. Memory leak (the OOM cause): the slot is set to `NULL` but the heap block is never released — every kill leaks `sizeof(Enemy)` bytes until the process runs out of memory. Fix: `free(enemies[index]);` before clearing the slot.
 2. Broken bookkeeping: the slot is nulled but the array is never compacted while `enemy_count--` shrinks the active range — live enemies past the hole become unreachable/garbled. Fix: move the last live element into the freed slot (`enemies[index] = enemies[--enemy_count];`) instead.
+
+</details>
+
+### Question 65
+What is POSIX?
+<details>
+<summary>Solution</summary>
+
+POSIX (Portable Operating System Interface) is a family of IEEE standards (IEEE 1003.x) that defines a common API between applications and Unix-like operating systems: system calls, the C library interface, shells and command-line utilities, signals, file-system semantics, and threads (pthreads). The goal is source portability — a program written against POSIX compiles and runs on any compliant system (Linux, macOS, BSD, etc.) without changes. POSIX threads (pthread) are just one part of it — the standard also covers processes, I/O and IPC.
+
+</details>
+
+### Question 66
+What is preemptive scheduling, and when might you need it?
+<details>
+<summary>Solution</summary>
+
+Preemptive scheduling means the OS can forcibly take the CPU away from a running process — typically on a timer interrupt when its time quantum expires, or when a higher-priority process becomes ready — and hand it to another process.
+
+You need it whenever responsiveness, fairness, or deadlines matter:
+
+- Interactive systems — a single CPU-hogging process must not freeze the UI or other users' programs.
+- Real-time systems — a high-priority task must start within a hard deadline, so it preempts whatever is running.
+- Shared/multi-user systems — the CPU is shared fairly; nobody can hold it forever.
+
+Trade-off: extra context-switch overhead and more complexity — which is why batch/embedded setups sometimes prefer non-preemptive scheduling.
 
 </details>
